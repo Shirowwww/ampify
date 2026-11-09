@@ -7,6 +7,7 @@
 #include <iterator>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <thread>
 
 #include "../core/apple_music.hpp"
@@ -343,6 +344,73 @@ bool ReadyToInstall(Context& ctx) {
     return true;
 }
 
+// cache\update-offer.txt, with kit_update = ask: the release last offered, when ("at=", seconds since 1970), and
+// whether the person clicked its notification ("accepted=1").
+struct Offer {
+    std::string version;
+    std::int64_t at = -1;
+    bool accepted = false;
+};
+
+constexpr std::int64_t kOfferQuietSeconds = 7 * 24 * 60 * 60;  // a release left alone is offered again a week later
+constexpr unsigned long kOfferWaitMs = 2 * 60 * 1000;           // a click from the notification centre still counts
+
+Offer ReadOffer(const std::filesystem::path& file) {
+    Offer offer;
+    std::string text;
+    if (!ReadWholeFile(file, text)) return offer;
+    std::istringstream lines(text);
+    std::string line;
+    while (std::getline(lines, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.rfind("version=", 0) == 0) offer.version = line.substr(8);
+        if (line.rfind("accepted=", 0) == 0) offer.accepted = line.substr(9) == "1";
+        if (line.rfind("at=", 0) == 0) {
+            try {
+                offer.at = std::stoll(line.substr(3));
+            } catch (const std::logic_error&) {  // std::stoll: invalid_argument, out_of_range
+                offer.at = -1;
+            }
+        }
+    }
+    return offer;
+}
+
+// kit_update = ask. The release is offered in a notification, never in a window that waits for an answer: Ampify and
+// Apple Music stay usable, and a notification left alone comes back only a week later. True when it may be installed
+// now: the person clicked this notification, or an earlier one for the same release.
+bool OfferTaken(Context& ctx, const std::string& version) {
+    std::filesystem::path file = ctx.kit.Cache() / "update-offer.txt";
+    Offer offer = ReadOffer(file);
+    if (offer.version == version && offer.accepted) return true;
+    std::int64_t now = NowSeconds();
+    if (offer.version == version && offer.at >= 0 && now >= offer.at && now - offer.at < kOfferQuietSeconds) {
+        ctx.out << "Version " << version << " was offered less than a week ago and left alone: not offered again yet.\n";
+        return false;
+    }
+    std::optional<bool> answer = platform::OfferNotice(i18n::Text("update.askTitle", {{"version", version}}),
+                                                       i18n::Text("update.askText", {{"installed", kKitVersion}}),
+                                                       kOfferWaitMs);
+    if (!answer) {
+        ctx.out << "Version " << version << " could not be offered (no notification area yet): offered on the next run.\n";
+        return false;
+    }
+    bool clicked = *answer;
+    std::error_code ec;
+    std::filesystem::create_directories(ctx.kit.Cache(), ec);
+    std::string error;
+    if (!WriteTextFile(file, "version=" + version + "\nat=" + std::to_string(now) + "\naccepted=" + (clicked ? "1" : "0") + "\n",
+                       error) &&
+        !clicked) {
+        ctx.out << "Version " << version << " offered in a notification and left alone, but that could not be kept ("
+                << error << "): offered again on the next run.\n";
+        return false;
+    }
+    ctx.out << "Version " << version
+            << (clicked ? " taken from its notification.\n" : " offered in a notification and left alone: offered again in a week.\n");
+    return clicked;
+}
+
 }  // namespace
 
 int CmdAutoUpdate(Context& ctx) {
@@ -366,12 +434,7 @@ int CmdAutoUpdate(Context& ctx) {
     }
 
     UseUserLanguage(settings);
-    if (mode == uirender::KitUpdate::Ask &&
-        !platform::AskYesNo(i18n::Text("update.askTitle", {{"version", release->version}}),
-                            i18n::Text("update.askText", {{"installed", kKitVersion}}))) {
-        ctx.out << "Version " << release->version << " declined: asked again tomorrow.\n";
-        return 0;
-    }
+    if (mode == uirender::KitUpdate::Ask && !OfferTaken(ctx, release->version)) return 0;
     Options installing = ctx.options;
     installing.apply = true;
     Context install{installing, ctx.kit, ctx.in, ctx.out, ctx.err};

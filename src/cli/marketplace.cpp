@@ -15,11 +15,14 @@
 #include "../core/settings.hpp"
 #include "../core/settings_catalog.hpp"
 #include "../core/theme/files.hpp"
+#include "../core/theme/retired.hpp"
+#include "../core/theme/scheme_choice.hpp"
 #include "../core/theme/theme.hpp"
 #include "../core/ui_render/mods.hpp"
 #include "archive.hpp"
 #include "backup.hpp"
 #include "catalog.hpp"
+#include "console_style.hpp"
 #include "element.hpp"
 #include "internal.hpp"
 #include "kit.hpp"
@@ -38,10 +41,6 @@ constexpr std::string_view kRequiredKitFiles[] = {kCliFile, kLauncherFile, kKern
 constexpr std::uintmax_t kMaxReadmeBytes = 256 * 1024;
 constexpr int kReadmeSeconds = 15;
 
-bool StartsWith(std::string_view text, std::string_view prefix) {
-    return text.size() >= prefix.size() && text.substr(0, prefix.size()) == prefix;
-}
-
 // file:///C:/dev/x.zip becomes C:/dev/x.zip, and file:///home/me/x.zip becomes /home/me/x.zip.
 std::string LocalPathOf(std::string_view url) {
     std::string_view rest = url.substr(7);  // after "file://"
@@ -54,7 +53,7 @@ std::string LocalPathOf(std::string_view url) {
 }  // namespace
 
 bool FetchTo(const std::string& url, const std::filesystem::path& destination, std::string& error, int maxSeconds) {
-    if (StartsWith(url, "file://")) {
+    if (url.starts_with("file://")) {
         std::error_code ec;
         std::filesystem::copy_file(Utf8ToPath(LocalPathOf(url)), destination,
                                    std::filesystem::copy_options::overwrite_existing, ec);
@@ -85,7 +84,7 @@ bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
     std::string text;
     std::filesystem::path cached = ctx.kit.Cache() / "catalog.json";
 
-    if (StartsWith(source, "https://")) {
+    if (source.starts_with("https://")) {
         local = false;
         std::filesystem::path part = ctx.kit.Downloads() / "catalog.json.part";
         std::error_code ec;
@@ -107,7 +106,7 @@ bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
         }
     } else {
         local = true;
-        std::string path = StartsWith(source, "file://") ? LocalPathOf(source) : source;
+        std::string path = source.starts_with("file://") ? LocalPathOf(source) : source;
         if (!ReadWholeFile(Utf8ToPath(path), text)) {
             ctx.err << "ampify: catalog not found: " << path << "\n";
             return false;
@@ -121,6 +120,9 @@ bool LoadCatalog(Context& ctx, Catalog& catalog, bool& local) {
         return false;
     }
     catalog = std::move(*parsed);
+    // A catalog published before an element was retired still lists it: Ampify would remove it again at the next
+    // start (theme::RetiredFolders), so it is neither shown nor installed.
+    std::erase_if(catalog.entries, [](const CatalogEntry& entry) { return theme::IsRetired(entry.kind, entry.id); });
     if (!local) catalog.sourceUrl = source;
     return true;
 }
@@ -291,7 +293,7 @@ std::string DefaultReleaseUrl(std::string_view version) {
 }
 
 std::optional<ReleaseInfo> FetchRelease(Context& ctx, const std::string& source, std::string& error, int maxSeconds) {
-    if (!StartsWith(source, "file://") && !StartsWith(source, "https://")) {
+    if (!source.starts_with("file://") && !source.starts_with("https://")) {
         error = "release address refused: " + source;
         return std::nullopt;
     }
@@ -332,11 +334,81 @@ std::filesystem::path OldFileName(const std::filesystem::path& file) {
 
 }  // namespace
 
+namespace {
+
+// Downloads the release's archive and checksums, checks the archive against them, and unpacks it in `staged`.
+// Returns the reason it stopped, or an empty text.
+std::string StageRelease(Context& ctx, const std::string& archiveUrl, const std::string& sumsUrl,
+                         const std::string& archiveName, const std::filesystem::path& staged) {
+    std::string error;
+    std::filesystem::path archive = ctx.kit.Updates() / archiveName;
+    std::filesystem::path sumsFile = ctx.kit.Updates() / std::string(kChecksumsFile);
+    if (!FetchTo(archiveUrl, archive, error) || !FetchTo(sumsUrl, sumsFile, error)) {
+        RemoveQuietly(archive);
+        return error;
+    }
+    std::string sumsText;
+    ReadWholeFile(sumsFile, sumsText);
+    std::map<std::string, std::string> sums = ParseChecksums(sumsText);
+    RemoveQuietly(sumsFile);
+    auto expected = sums.find(archiveName);
+    std::optional<std::string> digest = Sha256File(archive);
+    if (expected == sums.end() || !digest || *digest != expected->second) {
+        RemoveQuietly(archive);
+        return "wrong SHA-256 for the update archive: archive refused";
+    }
+    std::vector<std::string> entries;
+    if (!platform::ListZip(archive, entries, error) || !CheckArchiveListing(entries).empty()) {
+        RemoveQuietly(archive);
+        return error.empty() ? CheckArchiveListing(entries) : error;
+    }
+    RemoveQuietly(staged);
+    std::error_code ec;
+    std::filesystem::create_directories(staged, ec);
+    bool extracted = platform::ExtractZip(archive, staged, error);
+    RemoveQuietly(archive);
+    if (!extracted) {
+        RemoveQuietly(staged);
+        return error;
+    }
+    if (ContainsLink(staged)) {
+        RemoveQuietly(staged);
+        return "symbolic link not allowed in the update archive";
+    }
+    for (std::string_view required : kRequiredKitFiles) {
+        if (!std::filesystem::is_regular_file(staged / required, ec)) {
+            RemoveQuietly(staged);
+            return "incomplete archive, missing file: " + std::string(required);
+        }
+    }
+    return {};
+}
+
+// Copies the staged programs into the install folder. A running program can be renamed on Windows, not overwritten:
+// the old file is kept as *.old, or *.1.old and so on while an older *.old still runs (a launcher started before the
+// last update). Returns the reason it stopped, or an empty text.
+std::string ReplaceProgramFiles(const std::filesystem::path& staged, const std::filesystem::path& installDir) {
+    std::error_code ec;
+    for (const auto& file : std::filesystem::directory_iterator(staged, ec)) {
+        if (!file.is_regular_file(ec)) continue;
+        std::filesystem::path destination = installDir / file.path().filename();
+        if (std::filesystem::exists(destination, ec)) {
+            std::filesystem::rename(destination, OldFileName(destination), ec);
+            if (ec) return "cannot replace " + Utf8(destination);
+        }
+        std::filesystem::copy_file(file.path(), destination, std::filesystem::copy_options::overwrite_existing, ec);
+        if (ec) return "cannot copy to " + Utf8(destination);
+    }
+    return {};
+}
+
+}  // namespace
+
 int InstallKitRelease(Context& ctx, const std::string& source, const std::string& wanted) {
     std::string error;
     std::optional<ReleaseInfo> release = FetchRelease(ctx, source, error);
     if (!release) return Failure(ctx, error);
-    bool releaseLocal = StartsWith(source, "file://");
+    bool releaseLocal = source.starts_with("file://");
     std::error_code ec;
     std::filesystem::create_directories(ctx.kit.Updates(), ec);
     // The command to run once Apple Music is closed, to install what this run downloaded.
@@ -379,51 +451,18 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
         return Failure(ctx, "address refused in the release");
     }
 
-    std::filesystem::path archive = ctx.kit.Updates() / archiveName;
-    std::filesystem::path sumsFile = ctx.kit.Updates() / checksums;
-    ctx.out << "Downloading version " << release->version << "...\n" << std::flush;
-    if (!FetchTo(archiveAddress->second, archive, error) || !FetchTo(sumsAddress->second, sumsFile, error)) {
-        RemoveQuietly(archive);
-        return Failure(ctx, error);
-    }
-
-    std::string sumsText;
-    ReadWholeFile(sumsFile, sumsText);
-    std::map<std::string, std::string> sums = ParseChecksums(sumsText);
-    RemoveQuietly(sumsFile);
-    auto expected = sums.find(archiveName);
-    std::optional<std::string> digest = Sha256File(archive);
-    if (expected == sums.end() || !digest || *digest != expected->second) {
-        RemoveQuietly(archive);
-        return Failure(ctx, "wrong SHA-256 for the update archive: archive refused");
-    }
-
-    std::vector<std::string> entries;
-    if (!platform::ListZip(archive, entries, error) || !CheckArchiveListing(entries).empty()) {
-        RemoveQuietly(archive);
-        return Failure(ctx, error.empty() ? CheckArchiveListing(entries) : error);
-    }
-
+    Heading(ctx, wanted.empty() ? "update " + std::string(kKitVersion) + " to " + release->version
+                                : "version " + release->version);
+    Working download(ctx, "Downloading version " + release->version);
     std::filesystem::path staged = ctx.kit.Updates() / release->version;
-    RemoveQuietly(staged);
-    std::filesystem::create_directories(staged, ec);
-    if (!platform::ExtractZip(archive, staged, error)) {
-        RemoveQuietly(archive);
-        RemoveQuietly(staged);
-        return Failure(ctx, error);
-    }
-    RemoveQuietly(archive);
-    if (ContainsLink(staged)) {
-        RemoveQuietly(staged);
-        return Failure(ctx, "symbolic link not allowed in the update archive");
-    }
-    for (std::string_view required : kRequiredKitFiles) {
-        if (!std::filesystem::is_regular_file(staged / required, ec)) {
-            RemoveQuietly(staged);
-            return Failure(ctx, "incomplete archive, missing file: " + std::string(required));
-        }
-    }
+    error = StageRelease(ctx, archiveAddress->second, sumsAddress->second, archiveName, staged);
+    download.Finish(error.empty(), "Version " + release->version + " downloaded, SHA-256 checked");
+    if (!error.empty()) return Failure(ctx, error);
 
+    if (!ctx.options.apply && Styled(ctx)) {
+        Note(ctx, "Close Apple Music, then run ", applyCommand);
+        return 0;
+    }
     if (!ctx.options.apply) {
         ctx.out << "Version " << release->version << " downloaded and checked in " << Utf8(staged)
                 << ".\nClose Apple Music, then run: " << applyCommand << "\n";
@@ -436,19 +475,10 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     }
     std::filesystem::path installDir = ctx.options.installDir ? Utf8ToPath(*ctx.options.installDir)
                                                               : platform::ExecutableDirectory();
-    for (const auto& file : std::filesystem::directory_iterator(staged, ec)) {
-        if (!file.is_regular_file(ec)) continue;
-        std::filesystem::path destination = installDir / file.path().filename();
-        if (std::filesystem::exists(destination, ec)) {
-            // A running program can be renamed on Windows, not overwritten. Keep the old file as *.old, or *.1.old and
-            // so on while an older *.old still runs (a launcher started before the last update).
-            std::filesystem::path old = OldFileName(destination);
-            std::filesystem::rename(destination, old, ec);
-            if (ec) return Failure(ctx, "cannot replace " + Utf8(destination));
-        }
-        std::filesystem::copy_file(file.path(), destination, std::filesystem::copy_options::overwrite_existing, ec);
-        if (ec) return Failure(ctx, "cannot copy to " + Utf8(destination));
-    }
+    Working installing(ctx, "Installing version " + release->version, false);
+    error = ReplaceProgramFiles(staged, installDir);
+    installing.Finish(error.empty(), "Version " + release->version + " installed in " + Utf8(installDir));
+    if (!error.empty()) return Failure(ctx, error);
     // The Marketplace and Now Playing ship with the kit (src/core/kit_layout.hpp): an update replaces them too.
     for (const std::string& line : InstallBundledElements(staged, ctx.kit.Root())) {
         ctx.err << "ampify: not updated: " << line << "\n";
@@ -464,6 +494,10 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     }
     // Settings > Apps shows the version the installer wrote: it follows the update (only for the installed copy).
     if (platform::IsInstallDirectory(installDir)) platform::SetInstalledVersion(release->version);
+    if (Styled(ctx)) {
+        Note(ctx, "Open Apple Music again to use it.");
+        return 0;
+    }
     ctx.out << "ampify " << release->version << " installed in " << Utf8(installDir)
             << ". Open Apple Music again to use it.\n";
     return 0;
@@ -512,7 +546,8 @@ Json SettingsJson(const uirender::ModEntry& element) {
         Json setting = Json::Object{{"key", spec.key},
                                     {"label", spec.label},
                                     {"type", std::string(ToString(spec.type))},
-                                    {"value", element.values[index]}};
+                                    {"value", element.values[index]},
+                                    {"default", spec.defaultValue}};
         if (!spec.options.empty()) setting.Set("options", TextList(spec.options));
         if (spec.min) setting.Set("min", *spec.min);
         if (spec.max) setting.Set("max", *spec.max);
@@ -521,6 +556,20 @@ Json SettingsJson(const uirender::ModEntry& element) {
         list.push_back(std::move(setting));
     }
     return list;
+}
+
+// The scheme the kernel shows for the active theme, chosen as it chooses (theme.scheme, "auto", theme.schedule, the
+// theme's default), so the page's menu names what is on screen; LoadTheme's first scheme for a name colors.ini lacks.
+std::string SchemeInUse(Context& ctx, const Settings& settings) {
+    std::string active = ActiveThemeId(settings);
+    if (active.empty()) return {};
+    theme::FolderFiles files(ctx.kit.Root() / "themes" / active);
+    std::vector<std::string> schemes = theme::ReadSchemes(files);
+    theme::SchemeChoice choice =
+        theme::ChooseScheme(settings.GetString("theme.scheme", ""), settings.GetString("theme.schedule", ""), schemes,
+                            {platform::SystemUsesDarkMode(), platform::LocalMinute()}, theme::ReadDefaultScheme(files));
+    if (std::find(schemes.begin(), schemes.end(), choice.scheme) != schemes.end()) return choice.scheme;
+    return schemes.empty() ? std::string() : schemes.front();
 }
 
 // `ampify market --json`: what the Marketplace page shows. The catalogue (empty with catalogOk false when it cannot be
@@ -571,7 +620,8 @@ int PrintMarketJson(Context& ctx) {
                                {"catalog", std::move(entries)},
                                {"installed", std::move(installed)},
                                {"theme", ActiveThemeId(settings)},
-                               {"scheme", settings.GetString("theme.scheme", "")}};
+                               {"scheme", settings.GetString("theme.scheme", "")},
+                               {"schemeInUse", SchemeInUse(ctx, settings)}};
     ctx.out << result.Dump() << "\n";
     return 0;
 }

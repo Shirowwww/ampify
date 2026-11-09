@@ -252,7 +252,7 @@ int CmdPublish(Context& ctx) {
     if (validation.manifest) {
         for (std::string& left : StarterLeftovers(*validation.manifest)) validation.errors.push_back(std::move(left));
     }
-    if (!validation.ok() || !validation.errors.empty() || !validation.manifest) {
+    if (!validation.ok()) {
         ctx.err << Utf8(folder) << ": invalid, nothing was sent\n";
         for (const std::string& problem : validation.errors) ctx.err << "  - " << problem << "\n";
         ctx.err << "Fix the points above, then run ampify publish again.\n";

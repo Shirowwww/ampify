@@ -145,6 +145,17 @@ bool IsInstallDirectory(const std::filesystem::path&) {
     return false;
 }
 
+std::filesystem::path InstallDirectory() { return {}; }
+
+TerminalLook PrepareTerminal() {
+    const char* term = std::getenv("TERM");
+    if (!isatty(STDOUT_FILENO) || !term || std::string(term) == "dumb") return {};
+    const char* locale = std::getenv("LC_ALL");
+    if (!locale || !*locale) locale = std::getenv("LANG");
+    std::string name = locale ? locale : "";
+    return {true, name.find("UTF-8") != std::string::npos || name.find("utf8") != std::string::npos};
+}
+
 bool SetInstalledVersion(const std::string&) {
     return false;
 }
@@ -158,10 +169,12 @@ std::string UserLocale() {
     return lang && *lang ? lang : "en";
 }
 
-bool AskYesNo(const std::string&, const std::string&) {
-    return false;
-}
+bool SystemUsesDarkMode() { return false; }
+
+int LocalMinute() { return 0; }
 
 void ShowNotice(const std::string&, const std::string&) {}
+
+std::optional<bool> OfferNotice(const std::string&, const std::string&, unsigned long) { return std::nullopt; }
 
 }  // namespace ampify::platform

@@ -231,7 +231,7 @@ int CmdImport(Context& ctx) {
             if (name.empty() || name[0] == '.') continue;
 
             FolderValidation check = ValidateElementFolder(entry.path());
-            if (!check.ok() || !check.errors.empty() || !check.manifest) {
+            if (!check.ok()) {
                 for (const std::string& problem : check.errors) problems.push_back(name + " : " + problem);
                 continue;
             }
@@ -284,7 +284,7 @@ int CmdImport(Context& ctx) {
     for (const Planned& item : planned) {
         std::filesystem::remove_all(ctx.kit.Element(item.kind, item.id), ec);
         std::filesystem::create_directories(ctx.kit.Folder(item.kind), ec);
-        if (!CopyElementFolder(item.source, ctx.kit.Element(item.kind, item.id), error)) {
+        if (!CopyTree(item.source, ctx.kit.Element(item.kind, item.id), error)) {
             std::filesystem::remove_all(staging, ec);
             return Failure(ctx, error + " (previous state backed up: " + *snapshot + ")");
         }

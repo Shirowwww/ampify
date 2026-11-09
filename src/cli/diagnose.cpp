@@ -9,6 +9,7 @@
 
 #include "../core/reliability.hpp"
 #include "../core/safe_mode.hpp"
+#include "../core/settings_catalog.hpp"
 #include "../core/text_util.hpp"
 #include "../core/version_gate.hpp"
 #include "../core/version_list.hpp"
@@ -23,6 +24,7 @@ namespace ampify::cli {
 namespace {
 
 constexpr size_t kJournalTail = 3;
+constexpr size_t kFreezeTail = 8;  // the freeze log's last lines per log; `ampify report` keeps them all
 
 // The archive and download tools that `ampify install` and `ampify update` need.
 #ifdef _WIN32
@@ -57,6 +59,28 @@ std::vector<std::filesystem::path> Leftovers(const KitLayout& kit) {
         }
     }
     return found;
+}
+
+// The freeze log (apple.watchdog): whether it is on, then per log the stalls it found and its last lines.
+void ReportFreezes(Context& ctx, const Settings& settings, const std::vector<std::filesystem::path>& journals,
+                   const std::function<void(const std::string&)>& ok, const std::function<void(const std::string&)>& info) {
+    if (ChoiceOf(settings, kFreezeLogKey) != "on") {
+        info("freeze log: off (apple.watchdog = on writes Apple Music's freezes to its log)");
+        return;
+    }
+    ok("freeze log: on");
+    for (const std::filesystem::path& journal : journals) {
+        std::string text;
+        if (!ReadWholeFile(journal, text)) continue;
+        FreezeDigest digest = DigestFreezeLog(text);
+        if (digest.lines.empty()) continue;
+        ctx.out << "            " << Utf8(journal.filename()) << ": " << digest.stalls << " stall(s)"
+                << (digest.stalls > 0 ? ", the longest " + std::to_string(digest.worstStallMs) + " ms" : "") << "\n";
+        size_t begin = digest.lines.size() > kFreezeTail ? digest.lines.size() - kFreezeTail : 0;
+        for (size_t index = begin; index < digest.lines.size(); index++) {
+            ctx.out << "              " << digest.lines[index] << "\n";
+        }
+    }
 }
 
 constexpr int kCrashDays = 7;
@@ -146,7 +170,7 @@ int CmdDoctor(Context& ctx) {
         warn("leftover of an interrupted install or development: " + Utf8(leftover) + " (can be deleted)");
     }
 
-    // active.txt must describe the current settings, or the kernel loads what was there before the last change.
+    // active.txt records what the settings load: it is out of date until `ampify apply` runs again.
     ActiveReport report = ComputeActive(ctx.kit, settings);
     for (const std::string& problem : report.problems) warn("enabled but not loaded: " + problem);
     std::string written;
@@ -161,6 +185,8 @@ int CmdDoctor(Context& ctx) {
     ampify::SafeMode safeMode(ctx.kit.SafeModeState().string());
     if (safeMode.IsActive()) {
         warn("safe mode on: the kernel is turned off after two starts without an answer");
+    } else if (safeMode.ThisLaunchSafe()) {
+        warn("safe mode: Apple Music's current start runs without the kernel; the next start tries again");
     } else {
         ok("safe mode: off");
     }
@@ -175,6 +201,7 @@ int CmdDoctor(Context& ctx) {
             for (const std::string& line : LastLines(journal, kJournalTail)) ctx.out << "              " << line << "\n";
         }
     }
+    ReportFreezes(ctx, settings, journals, ok, info);
 
     std::vector<std::string> extra = LoadVersionList(ctx.kit.Root() / std::string(kVersionListFile));
     std::string versions;

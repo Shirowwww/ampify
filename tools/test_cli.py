@@ -474,12 +474,12 @@ class Marketplace(AmpifyTestCase):
         folder = self.write_element("glow", "theme")
         manifest_path = os.path.join(folder, "manifest.json")
         manifest = read_json(manifest_path)
-        manifest["translations"] = {"it": {"name": "Bagliore", "description": "Una prova."}}
+        manifest["translations"] = {"sv": {"name": "Glöd", "description": "Ett prov."}}
         with open(manifest_path, "w", encoding="utf-8") as handle:
             json.dump(manifest, handle)
         result = self.ampify("validate", folder)
         self.assertEqual(result.returncode, 1)
-        self.assertIn("translations.it", result.stderr + result.stdout)
+        self.assertIn("translations.sv", result.stderr + result.stdout)
 
     def test_market_json_keeps_a_catalog_preview_only_from_a_known_host(self):
         def listed(name, **changes):
@@ -802,6 +802,28 @@ class Activation(AmpifyTestCase):
         expected = "Would stop the background launcher" if os.name == "nt" else "nothing to turn off"
         self.assertIn(expected, result.stdout)
 
+    def test_uninstall_without_an_installed_copy_says_so(self):
+        result = self.ampify("uninstall", "--dry-run", "--install-dir", os.path.join(self.tmp, "nothing-here"))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("not installed", result.stderr)
+
+    def test_uninstall_dry_run_names_the_uninstaller_and_keeps_the_data_unless_asked(self):
+        folder = os.path.join(self.tmp, "install")
+        os.makedirs(folder)
+        open(os.path.join(folder, "ampify_setup.exe"), "wb").close()
+
+        window = self.ampify("uninstall", "--dry-run", "--install-dir", folder)
+        self.assertEqual(window.returncode, 0, window.stderr)
+        self.assertIn('ampify_setup.exe" /uninstall', window.stdout)
+        self.assertNotIn("/silent", window.stdout)
+        self.assertNotIn("/purgedata", window.stdout)
+
+        quiet = self.ampify("uninstall", "--dry-run", "--yes", "--install-dir", folder)
+        self.assertIn("/uninstall /silent /keepdata", quiet.stdout)
+        purge = self.ampify("uninstall", "--dry-run", "--yes", "--delete-data", "--install-dir", folder)
+        self.assertIn("/uninstall /silent /purgedata", purge.stdout)
+        self.assertTrue(os.path.exists(os.path.join(folder, "ampify_setup.exe")))
+
     def test_apply_from_a_build_folder_leaves_the_automatic_start_alone(self):
         result = self.ampify("apply")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -916,6 +938,36 @@ class KitUpdate(AmpifyTestCase):
         install_dir = os.path.join(self.tmp, "install")
         os.makedirs(install_dir)
         result = self.ampify("update", "--auto", "--release-url", file_url(release), "--install-dir", install_dir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        with open(os.path.join(install_dir, "ampify.exe"), encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "ampify.exe 9.9.9")
+
+    def write_offer(self, version, accepted):
+        os.makedirs(os.path.join(self.kit, "cache"), exist_ok=True)
+        with open(os.path.join(self.kit, "cache", "update-offer.txt"), "w", encoding="utf-8") as handle:
+            handle.write(f"version={version}\nat={int(time.time())}\naccepted={1 if accepted else 0}\n")
+
+    def test_ask_leaves_a_release_alone_for_a_week_once_its_notification_was_ignored(self):
+        release = self.make_release("9.9.9")
+        install_dir = os.path.join(self.tmp, "install")
+        os.makedirs(install_dir)
+        self.ampify("config", "kit_update", "ask")
+        self.write_offer("9.9.9", accepted=False)
+        result = self.ampify("update", "--auto", "--release-url", file_url(release), "--install-dir", install_dir,
+                             timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("not offered again yet", result.stdout)
+        self.assertFalse(os.path.exists(os.path.join(install_dir, "ampify.exe")))
+
+    @unittest.skipIf(apple_music_running(), "Apple Music runs here: the update would end its agent")
+    def test_ask_installs_a_release_whose_notification_was_clicked_earlier(self):
+        release = self.make_release("9.9.9")
+        install_dir = os.path.join(self.tmp, "install")
+        os.makedirs(install_dir)
+        self.ampify("config", "kit_update", "ask")
+        self.write_offer("9.9.9", accepted=True)  # clicked while Apple Music was open: the next run installs it
+        result = self.ampify("update", "--auto", "--release-url", file_url(release), "--install-dir", install_dir,
+                             timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr)
         with open(os.path.join(install_dir, "ampify.exe"), encoding="utf-8") as handle:
             self.assertEqual(handle.read(), "ampify.exe 9.9.9")
@@ -1165,6 +1217,7 @@ class Report(AmpifyTestCase):
                 '[08:00:01.000] Player: cover of "Secret Song Title": address '
                 '"amp-artwork-id://17820666364333712412.dbid/783EDFEC-D43D-47E2-B448-8ECCFFE09C81_1.1"\n'
                 '[08:00:02.000] Theme "glass": 750 value(s) applied\n'
+                "[08:00:03.000] UI thread stalled 640 ms, while: theme tick\n"
             )
         with open(os.path.join(self.kit, "settings.txt"), "w", encoding="utf-8") as handle:
             handle.write("theme.active = glass\nextensions.scrobbler.session_key = abc123secret\n")
@@ -1178,9 +1231,15 @@ class Report(AmpifyTestCase):
         with zipfile.ZipFile(out) as bundle:
             names = bundle.namelist()
             text = "\n".join(bundle.read(name).decode("utf-8", "replace") for name in names)
-        for expected in ("README.txt", "system.txt", "doctor.txt", "settings.txt", "logs/AppleMusic.log"):
+        for expected in ("README.txt", "system.txt", "doctor.txt", "settings.txt", "logs/AppleMusic.log", "freezes.txt"):
             self.assertIn(expected, names)
         self.assertIn('Theme "glass": 750 value(s) applied', text)
+        with zipfile.ZipFile(out) as bundle:
+            freezes = bundle.read("freezes.txt").decode("utf-8")
+            doctor = bundle.read("doctor.txt").decode("utf-8")
+        self.assertIn("AppleMusic.log: 1 stall(s), the longest 640 ms", freezes)
+        self.assertIn("UI thread stalled 640 ms, while: theme tick", freezes)
+        self.assertIn("freeze log: on", doctor)
         self.assertIn("theme.active = glass", text)
         self.assertIn("session_key = <hidden>", text)
         for secret in ("Secret Song", "abc123secret", "17820666364333712412", "783EDFEC"):

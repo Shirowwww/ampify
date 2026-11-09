@@ -59,6 +59,8 @@ Applying
   launch                       applies, then starts Apple Music with the kernel now (ampify_launcher.exe)
   restore                      Ampify no longer loads with Apple Music; nothing in the package is changed
   restore --backup <name>      puts back the settings of a backup
+  uninstall [--yes] [--delete-data]   removes Ampify and gives Apple Music back as it was; your themes,
+                               settings and extensions stay unless you choose to delete them
   backup                       backs up the settings and the elements
   backup list                  lists the backups
   watch [--interval ms]        applies at each change of a theme or an extension
@@ -88,9 +90,10 @@ Profiles and transfers
 Options
   --kit-dir <folder>           Ampify folder (%USERPROFILE%\Ampify by default)
   --catalog <source>           catalog: local file, file:// or https://
-  --dry-run                    shows what would happen and writes nothing (apply, launch, restore, import,
-                               publish, devtools, config --dir; other commands refuse it)
+  --dry-run                    shows what would happen and writes nothing (apply, launch, restore, uninstall,
+                               import, publish, devtools, config --dir; other commands refuse it)
   --yes, -y                    answers yes to every question
+  --delete-data                uninstall: deletes the Ampify folder (themes, settings, extensions) too
   --max-cycles <n>             stops watch, dev or logs --follow after n passes (useful for tests)
   --follow                     logs: keeps printing new lines
   --json                       market: prints the state as JSON (read by the Marketplace app)

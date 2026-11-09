@@ -98,7 +98,7 @@ int CmdBuild(Context& ctx) {
     if (validation.manifest) {
         for (std::string& left : StarterLeftovers(*validation.manifest)) validation.errors.push_back(std::move(left));
     }
-    if (!validation.ok() || !validation.errors.empty() || !validation.manifest) {
+    if (!validation.ok()) {
         PrintProblems(ctx, folder, validation, "nothing was written");
         return 1;
     }
@@ -154,7 +154,7 @@ int CmdInspect(Context& ctx) {
     }
 
     FolderValidation validation = ValidateElementFolder(folder);
-    if (!validation.ok() || !validation.errors.empty() || !validation.manifest) {
+    if (!validation.ok()) {
         PrintProblems(ctx, folder, validation, "");
         return 1;
     }

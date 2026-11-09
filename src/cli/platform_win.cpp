@@ -224,6 +224,20 @@ bool IsInstallDirectory(const std::filesystem::path& directory) {
     return std::filesystem::equivalent(directory, win::InstallDirectory(), ec);
 }
 
+std::filesystem::path InstallDirectory() { return win::InstallDirectory(); }
+
+TerminalLook PrepareTerminal() {
+    HANDLE out = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD mode = 0;
+    if (out == INVALID_HANDLE_VALUE || !GetConsoleMode(out, &mode)) return {};  // a pipe or a file
+    if (!(mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) && !SetConsoleMode(out, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING)) {
+        return {};  // a console from before Windows 10
+    }
+    // The classic console's font has no braille nor tick: the marks stay plain ASCII there.
+    bool unicode = _wgetenv(L"WT_SESSION") != nullptr || _wgetenv(L"TERM_PROGRAM") != nullptr;
+    return {true, unicode};
+}
+
 bool SetInstalledVersion(const std::string& version) {
     return win::SetDisplayVersion(FromUtf8(kUninstallKey), FromUtf8(version));
 }
@@ -243,15 +257,37 @@ std::string UserLocale() {
     return win::UserLocaleName();
 }
 
-bool AskYesNo(const std::string& title, const std::string& text) {
-    // Not forced to the front: it may come while a game runs, and then waits in the taskbar.
-    UINT style = MB_YESNO | MB_ICONQUESTION;
-    return MessageBoxW(nullptr, FromUtf8(text).c_str(), FromUtf8(title).c_str(), style) == IDYES;
+bool SystemUsesDarkMode() {
+    return win::SystemUsesDarkMode();
 }
 
-void ShowNotice(const std::string& title, const std::string& text) {
-    // Windows shows the balloon as a notification; the icon must stay a moment, or the notification goes with it.
-    constexpr DWORD kNoticeShownMs = 8000;
+int LocalMinute() {
+    return win::LocalMinute();
+}
+
+namespace {
+
+constexpr UINT kNoticeMessage = WM_APP + 1;  // what the shell sends about the notification (a click, its end)
+
+// Handles the shell's messages until `waitMs` has passed or the person clicks the notification.
+bool WaitForClick(DWORD waitMs) {
+    ULONGLONG deadline = GetTickCount64() + waitMs;
+    while (true) {
+        ULONGLONG now = GetTickCount64();
+        if (now >= deadline) return false;
+        MsgWaitForMultipleObjects(0, nullptr, FALSE, static_cast<DWORD>(deadline - now), QS_ALLINPUT);
+        MSG message;
+        while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+            if (message.message == kNoticeMessage && message.lParam == NIN_BALLOONUSERCLICK) return true;
+            DispatchMessageW(&message);
+        }
+    }
+}
+
+// Shows the balloon of a notification area icon that lives as long as this call: the notification goes with the icon,
+// so the icon stays for the whole of `waitMs`. Returns whether the person clicked the notification meanwhile, or nothing
+// when it could not be shown (the notification area is not ready yet, right after sign-in).
+std::optional<bool> Balloon(const std::string& title, const std::string& text, DWORD waitMs) {
     // Without an id of its own, a balloon from a console run is filed under the console's program (PowerShell), which
     // then shows Ampify's logo on its own notifications. Windows shows this id as the notification's header.
     SetCurrentProcessExplicitAppUserModelID(L"Ampify");
@@ -264,14 +300,16 @@ void ShowNotice(const std::string& title, const std::string& text) {
     RegisterClassExW(&windowClass);
     HWND window = CreateWindowExW(0, windowClass.lpszClassName, L"", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, instance,
                                   nullptr);
-    if (!window) return;
+    if (!window) return std::nullopt;
     NOTIFYICONDATAW icon{};
     icon.cbSize = sizeof icon;
     icon.hWnd = window;
     icon.uID = 1;
-    icon.uFlags = NIF_ICON | NIF_TIP;
+    icon.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
+    icon.uCallbackMessage = kNoticeMessage;
     icon.hIcon = win::AmpifyIcon(false);
     wcsncpy_s(icon.szTip, L"Ampify", _TRUNCATE);
+    std::optional<bool> clicked;
     if (Shell_NotifyIconW(NIM_ADD, &icon)) {
         // The balloon goes in a second call, on an icon the shell already shows.
         icon.uFlags = NIF_INFO;
@@ -280,10 +318,25 @@ void ShowNotice(const std::string& title, const std::string& text) {
         wcsncpy_s(icon.szInfoTitle, FromUtf8(title).c_str(), _TRUNCATE);
         wcsncpy_s(icon.szInfo, FromUtf8(text).c_str(), _TRUNCATE);
         Shell_NotifyIconW(NIM_MODIFY, &icon);
-        Sleep(kNoticeShownMs);
+        clicked = WaitForClick(waitMs);
         Shell_NotifyIconW(NIM_DELETE, &icon);
     }
     DestroyWindow(window);
+    return clicked;
+}
+
+}  // namespace
+
+void ShowNotice(const std::string& title, const std::string& text) {
+    // Windows shows the balloon as a notification; the icon must stay a moment, or the notification goes with it.
+    constexpr DWORD kNoticeShownMs = 8000;
+    Balloon(title, text, kNoticeShownMs);
+}
+
+std::optional<bool> OfferNotice(const std::string& title, const std::string& text, unsigned long waitMs) {
+    // The notification moves to the notification centre after a few seconds: the icon stays for the whole wait, so a
+    // click there still counts.
+    return Balloon(title, text, waitMs);
 }
 
 }  // namespace ampify::platform

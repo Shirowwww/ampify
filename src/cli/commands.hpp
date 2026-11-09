@@ -25,6 +25,7 @@ struct Options {
     int maxCycles = 0;                        // --max-cycles: stop `watch` after N passes, 0 for never
     bool dryRun = false;                      // --dry-run: print what would run, run nothing
     bool yes = false;                         // --yes: answer yes to every question
+    bool deleteData = false;                  // --delete-data: `uninstall` deletes the Ampify folder too
     bool check = false;                       // --check: `update` only looks
     bool apply = false;                       // --apply: `update` installs the files it downloaded
     bool autoUpdate = false;                  // --auto: `update` follows kit_update, as the background launcher runs it

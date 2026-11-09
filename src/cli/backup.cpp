@@ -16,9 +16,9 @@ bool IsSafeBackupName(std::string_view name) {
     return name.find_first_of("/\\:") == std::string_view::npos;
 }
 
-// Copies a file or a folder tree, one entry at a time. Symbolic links are skipped, so a link cannot pull
-// files in from elsewhere. (A whole-tree std::filesystem::copy onto an existing folder fails on some Windows
-// C++ runtimes, hence the explicit walk.)
+}  // namespace
+
+// A whole-tree std::filesystem::copy onto an existing folder fails on some Windows C++ runtimes, hence the walk.
 bool CopyTree(const std::filesystem::path& from, const std::filesystem::path& to, std::string& error) {
     std::error_code ec;
     std::filesystem::file_status status = std::filesystem::symlink_status(from, ec);
@@ -48,6 +48,8 @@ bool CopyTree(const std::filesystem::path& from, const std::filesystem::path& to
     return true;
 }
 
+namespace {
+
 // Empties the kit's configuration: settings.txt and the four element folders. Nothing else is touched.
 bool ClearConfiguration(const KitLayout& kit, std::string& error) {
     std::error_code ec;
@@ -63,10 +65,6 @@ bool ClearConfiguration(const KitLayout& kit, std::string& error) {
 }
 
 }  // namespace
-
-bool CopyElementFolder(const std::filesystem::path& from, const std::filesystem::path& to, std::string& error) {
-    return CopyTree(from, to, error);
-}
 
 std::optional<std::string> CreateBackup(const KitLayout& kit, std::string& error) {
     std::string name = cli::LocalTimeText("%Y%m%d-%H%M%S");

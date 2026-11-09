@@ -62,7 +62,94 @@ bool IsAllowedDownloadUrl(std::string_view url, bool localCatalog) {
     return localCatalog && IsFileUrl(url);
 }
 
-std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, std::vector<std::string>& errors) {
+namespace {
+
+// One version of an element, as the entry itself or an item of its `newer` list. Fields this version of Ampify does
+// not know are left aside, so a catalog that gains one keeps working here.
+CatalogEntry ReadCatalogEntry(const Json& item, const std::string& where, bool localCatalog,
+                              std::vector<std::string>& errors) {
+    CatalogEntry entry;
+    ReadElementInfo(item, where, ManifestMode::Author, kKitApiMajor, entry, errors);
+    RefuseFirstPartyPermissions(entry, where, errors);
+
+    const Json* url = item.Find("url");
+    if (url == nullptr) {
+        errors.push_back(where + ".url: required field missing");
+    } else if (!url->IsString() || !IsAllowedDownloadUrl(*url->AsString(), localCatalog)) {
+        errors.push_back(where + ".url: https:// address expected");
+    } else {
+        entry.url = *url->AsString();
+    }
+
+    if (const Json* preview = item.Find("preview")) {
+        if (!preview->IsString() || !IsPreviewUrl(*preview->AsString())) {
+            errors.push_back(where + ".preview: https:// address of a .png, .jpg or .jpeg image expected");
+        } else {
+            entry.preview = *preview->AsString();
+        }
+    }
+
+    const Json* sha = item.Find("sha256");
+    if (sha == nullptr) {
+        errors.push_back(where + ".sha256: required field missing");
+    } else if (!sha->IsString() || !IsSha256Hex(*sha->AsString())) {
+        errors.push_back(where + ".sha256: 64 lowercase hexadecimal characters expected");
+    } else {
+        entry.sha256 = *sha->AsString();
+    }
+
+    if (const Json* minimum = item.Find("minAmpify")) {
+        if (!minimum->IsString() || !IsReleaseVersion(*minimum->AsString())) {
+            errors.push_back(where + ".minAmpify: Ampify version expected (three numbers, like 1.3.0)");
+        } else {
+            entry.minAmpify = *minimum->AsString();
+        }
+    }
+    return entry;
+}
+
+// The entry followed by the versions of its `newer` list, which must be the same element by the same author.
+std::vector<CatalogEntry> ReadVersions(const Json& item, const std::string& where, bool localCatalog,
+                                       std::vector<std::string>& errors) {
+    std::vector<CatalogEntry> versions{ReadCatalogEntry(item, where, localCatalog, errors)};
+    const Json* newer = item.Find("newer");
+    if (newer == nullptr) return versions;
+    if (!newer->IsArray()) {
+        errors.push_back(where + ".newer: list expected");
+        return versions;
+    }
+    const CatalogEntry first = versions.front();  // a copy: push_back below moves the vector's items
+    for (size_t index = 0; index < newer->AsArray()->size(); index++) {
+        const Json& later = (*newer->AsArray())[index];
+        std::string at = where + ".newer[" + std::to_string(index) + "]";
+        if (!later.IsObject()) {
+            errors.push_back(at + ": object expected");
+            continue;
+        }
+        if (later.Find("newer") != nullptr) errors.push_back(at + ".newer: only the entry itself lists newer versions");
+        CatalogEntry version = ReadCatalogEntry(later, at, localCatalog, errors);
+        if (version.id != first.id) errors.push_back(at + ".id: must be the entry's id, " + first.id);
+        if (version.kind != first.kind) errors.push_back(at + ".kind: must be the entry's kind");
+        if (version.author != first.author) errors.push_back(at + ".author: must be the entry's author, " + first.author);
+        versions.push_back(std::move(version));
+    }
+    return versions;
+}
+
+// The newest version whose minAmpify `ampifyVersion` reaches, or null when this Ampify is too old for all of them.
+const CatalogEntry* NewestUsable(const std::vector<CatalogEntry>& versions, std::string_view ampifyVersion) {
+    const CatalogEntry* chosen = nullptr;
+    for (const CatalogEntry& version : versions) {
+        if (!version.minAmpify.empty() && CompareDottedVersions(ampifyVersion, version.minAmpify) < 0) continue;
+        if (chosen == nullptr || CompareDottedVersions(version.version, chosen->version) > 0) chosen = &version;
+    }
+    return chosen;
+}
+
+}  // namespace
+
+std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, std::vector<std::string>& errors,
+                                    std::string_view ampifyVersion) {
     std::string syntaxError;
     std::optional<Json> document = Json::Parse(text, &syntaxError, Json::DuplicateKeys::Refuse);
     if (!document) {
@@ -122,42 +209,14 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
                 continue;
             }
 
-            // Fields this version does not know are left aside, so a catalog that gains one keeps working here.
             size_t entryBefore = errors.size();
-            CatalogEntry entry;
-            ReadElementInfo(item, where, ManifestMode::Author, kKitApiMajor, entry, errors);
-            RefuseFirstPartyPermissions(entry, where, errors);
-
-            const Json* url = item.Find("url");
-            if (url == nullptr) {
-                errors.push_back(where + ".url: required field missing");
-            } else if (!url->IsString() || !IsAllowedDownloadUrl(*url->AsString(), localCatalog)) {
-                errors.push_back(where + ".url: https:// address expected");
-            } else {
-                entry.url = *url->AsString();
+            std::vector<CatalogEntry> versions = ReadVersions(item, where, localCatalog, errors);
+            const std::string& id = versions.front().id;
+            if (!id.empty() && !ids.insert(id).second) {
+                errors.push_back(where + ".id: id already in the catalog: " + id);
             }
-
-            if (const Json* preview = item.Find("preview")) {
-                if (!preview->IsString() || !IsPreviewUrl(*preview->AsString())) {
-                    errors.push_back(where + ".preview: https:// address of a .png, .jpg or .jpeg image expected");
-                } else {
-                    entry.preview = *preview->AsString();
-                }
-            }
-
-            const Json* sha = item.Find("sha256");
-            if (sha == nullptr) {
-                errors.push_back(where + ".sha256: required field missing");
-            } else if (!sha->IsString() || !IsSha256Hex(*sha->AsString())) {
-                errors.push_back(where + ".sha256: 64 lowercase hexadecimal characters expected");
-            } else {
-                entry.sha256 = *sha->AsString();
-            }
-
-            if (!entry.id.empty() && !ids.insert(entry.id).second) {
-                errors.push_back(where + ".id: id already in the catalog: " + entry.id);
-            }
-            if (errors.size() == entryBefore) catalog.entries.push_back(std::move(entry));
+            const CatalogEntry* usable = NewestUsable(versions, ampifyVersion);
+            if (errors.size() == entryBefore && usable != nullptr) catalog.entries.push_back(*usable);
         }
     }
 

@@ -251,9 +251,11 @@ std::vector<std::string> SetProblems(const ReplayRequest& request) {
             why = "the replayed theme is the first argument";
         } else if (key == kInspectKey || key == kLiveReloadKey) {
             why = "the bench sets it itself";
+        } else if (key == kPlaybarKey) {
+            if (!IsOfferedValue(key, value)) why = "\"" + value + "\" is not one of " + OfferedValues(key);
         } else if (!kThemeKeys.count(key)) {
             why = key.starts_with("theme.") ? "not a key of the theme service"
-                                            : "the bench reads theme.*, themes.<id>.* and snippets.<id>.* only";
+                                            : "the bench reads theme.*, apple.playbar, themes.<id>.* and snippets.<id>.* only";
         } else if (key == "theme.accent" && !value.empty() && !IsArtworkAccent(value) && !ParseAccent(value)) {
             why = "\"" + value + "\" is not RRGGBB, #RRGGBB or artwork";
         }

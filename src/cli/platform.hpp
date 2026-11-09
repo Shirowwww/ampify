@@ -87,16 +87,30 @@ bool DisableAutoStart(std::string& error);
 // Stops the background launcher and starts `launcher` in its place, the sign-in entry untouched (after an update).
 bool RestartAutoStart(const std::filesystem::path& launcher, std::string& error);
 
+// What the standard output can show: colours (a console that understands ANSI sequences, which Windows is asked to
+// turn on), and the marks of Ampify's steps (the font of Windows Terminal, or a UTF-8 terminal elsewhere).
+struct TerminalLook {
+    bool colour = false;
+    bool unicode = false;
+};
+TerminalLook PrepareTerminal();
+
 // The user's locale, such as "fr-FR" (Windows) or the LANG variable elsewhere; "en" when nothing says.
 std::string UserLocale();
 
-// A Yes / No question in a small window of its own, for `ampify update --auto` with kit_update = ask. True for Yes.
-// Systems without windows answer false.
-bool AskYesNo(const std::string& title, const std::string& text);
+// What the kernel reads to pick a scheme (theme.scheme = auto, theme.schedule): Windows apps in dark mode, and the local
+// time in minutes from midnight. Light and midnight where there is no such setting.
+bool SystemUsesDarkMode();
+int LocalMinute();
 
 // A notification of a few seconds near the clock (a balloon of a notification area icon that goes away after it).
 // Nothing on systems without one.
 void ShowNotice(const std::string& title, const std::string& text);
+
+// The same notification, which offers something: true when the person clicks it within `waitMs` (also from the
+// notification centre), false when it is left alone, nothing when it could not be shown (the notification area is not
+// ready yet, or the system has none). Nothing waits on the person: no window, no focus taken.
+std::optional<bool> OfferNotice(const std::string& title, const std::string& text, unsigned long waitMs);
 
 // The image names of the running processes (`ampify doctor`: programs known to crash Apple Music). Empty where they
 // cannot be listed, and always outside Windows.
@@ -111,5 +125,8 @@ std::optional<std::filesystem::path> CrashDumpsFolder();
 // True when `directory` is the folder the installer puts Ampify in. Only that copy turns the automatic start on, so
 // a build folder or an extracted zip never registers itself at sign-in.
 bool IsInstallDirectory(const std::filesystem::path& directory);
+
+// The folder the installer puts Ampify in (%LOCALAPPDATA%\Programs\Ampify). Empty where Ampify does not install.
+std::filesystem::path InstallDirectory();
 
 }  // namespace ampify::platform

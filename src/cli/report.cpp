@@ -3,6 +3,7 @@
 
 #include <system_error>
 
+#include "../core/reliability.hpp"
 #include "anonymize.hpp"
 #include "apple_facts.hpp"
 #include "internal.hpp"
@@ -30,6 +31,8 @@ constexpr std::string_view kReadme =
     "settings.txt     the settings, secret-looking values hidden\n"
     "active.txt       the elements the kernel loads\n"
     "logs/            the logs of the kernel, the launcher and the installer\n"
+    "freezes.txt      every line of the freeze log (Apple Music's stalls, slow network waits, memory), even\n"
+    "                 from a log cut to its end above\n"
     "crashes.txt      recent crashes of Apple Music or Ampify reported by Windows (last 14 days)\n"
     "inspector.txt    the last interface tree (only with --tree)\n";
 
@@ -109,6 +112,22 @@ std::string DoctorText(Context& ctx) {
     return out.str();
 }
 
+// The freeze log's lines of every log, under the name of their log, so a long session's stalls are all there.
+std::string FreezesText(const Context& ctx) {
+    std::string text;
+    for (const std::filesystem::path& log : JournalFiles(ctx.kit)) {
+        std::string whole;
+        if (!ReadWholeFile(log, whole)) continue;
+        FreezeDigest digest = DigestFreezeLog(whole);
+        if (digest.lines.empty()) continue;
+        text += "== " + Utf8(log.filename()) + ": " + std::to_string(digest.stalls) + " stall(s), the longest " +
+                std::to_string(digest.worstStallMs) + " ms\n";
+        for (const std::string& line : digest.lines) text += line + "\n";
+        text += "\n";
+    }
+    return text.empty() ? "The freeze log wrote nothing (apple.watchdog off, or no freeze yet).\n" : text;
+}
+
 std::filesystem::path DefaultArchive(const Context& ctx) {
     return ctx.kit.Root() / "reports" / ("ampify-report-" + LocalTimeText("%Y%m%d-%H%M%S") + ".zip");
 }
@@ -141,6 +160,7 @@ int CmdReport(Context& ctx) {
     addFile("state.txt", ctx.kit.SafeModeState(), true);
     addFile("versions.txt", ctx.kit.Root() / "versions.txt", false);
     for (const std::filesystem::path& log : JournalFiles(ctx.kit)) addFile("logs/" + Utf8(log.filename()), log, false);
+    add("freezes.txt", FreezesText(ctx));
 #ifdef _WIN32
     add("crashes.txt", PowerShell(kCrashes));
 #endif

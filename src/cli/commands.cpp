@@ -484,6 +484,8 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
             options.dryRun = true;
         } else if (arg == "--yes" || arg == "-y") {
             options.yes = true;
+        } else if (arg == "--delete-data") {
+            options.deleteData = true;
         } else if (arg == "--check") {
             options.check = true;
         } else if (arg == "--apply") {
@@ -840,14 +842,91 @@ int CmdNew(Context& ctx) {
 
 namespace {
 
-// Commands that honour --dry-run. Any other would run for real, so the option is refused there instead.
-constexpr std::string_view kDryRunCommands[] = {"apply", "launch", "auto", "restore", "import", "publish", "devtools", "notice"};
+// What a command honours besides running.
+enum Trait : unsigned {
+    kDryRun = 1,  // --dry-run: any other command would run for real, so the option is refused there
+    kChain = 2,   // takes no argument and can follow another on a line, as in Spicetify: `ampify backup apply launch`
+    kNotice = 4,  // the notice about a new kit release may follow; never a command whose output a script reads
+    kAlias = 8,   // another name of the row before it, left out of the lists the messages give
+};
+
+int CmdInspectAny(Context& ctx) {
+    return ctx.options.tree ? CmdInspectTree(ctx) : CmdInspect(ctx);
+}
+
+struct Command {
+    std::string_view name;
+    int (*run)(Context& ctx);
+    unsigned traits = 0;
+};
+
+// Every command, once. The order is the one the --dry-run message lists them in.
+constexpr Command kCommands[] = {
+    {"help", CmdHelp},
+    {"version", CmdVersion, kChain},
+    {"path", CmdPath},
+    {"config", CmdConfig},  // --dry-run with --dir only (SupportsDryRun)
+    {"list", CmdList, kNotice},
+    {"settings", CmdSettings},
+    {"theme", CmdTheme},
+    {"validate", CmdValidate},
+    {"new", CmdNew},
+    {"market", CmdMarket, kNotice},
+    {"catalog", CmdMarket, kNotice | kAlias},
+    {"install", CmdInstall},
+    {"remove", CmdRemove},
+    {"update", CmdUpdate},
+    {"apply", CmdApply, kDryRun | kChain | kNotice},
+    {"launch", CmdLaunch, kDryRun | kChain | kNotice},
+    {"auto", CmdLaunch, kDryRun | kChain | kNotice | kAlias},
+    {"restore", CmdRestore, kDryRun | kChain},
+    {"uninstall", CmdUninstall, kDryRun},
+    {"import", CmdImport, kDryRun},
+    {"backup", CmdBackup, kChain},
+    {"watch", CmdWatch},
+    {"build", CmdBuild},
+    {"publish", CmdPublish, kDryRun},
+    {"inspect", CmdInspectAny},
+    {"devtools", CmdDevtools, kDryRun | kChain},
+    {"versions", CmdVersions},
+    {"notice", CmdNotice, kDryRun},
+    {"install-kit", CmdInstallKit},
+    {"types", CmdTypes},
+    {"dev", CmdDev},
+    {"logs", CmdLogs},
+    {"doctor", CmdDoctor, kChain | kNotice},
+    {"report", CmdReport},
+    {"profile", CmdProfile},
+    {"export", CmdExport},
+    {"test", CmdTest},
+};
+
+const Command* FindCommand(std::string_view name) {
+    for (const Command& command : kCommands) {
+        if (command.name == name) return &command;
+    }
+    return nullptr;
+}
+
+bool Has(std::string_view name, Trait trait) {
+    const Command* command = FindCommand(name);
+    return command && (command->traits & trait) != 0;
+}
 
 bool SupportsDryRun(const Options& options) {
     const std::string& command = options.positional[0];
     if (command == "config") return options.dir;
-    return std::find(std::begin(kDryRunCommands), std::end(kDryRunCommands), std::string_view(command)) !=
-           std::end(kDryRunCommands);
+    return Has(command, kDryRun);
+}
+
+// "apply, launch, ..., notice and config --dir": the commands that take --dry-run, for its refusal.
+std::string DryRunCommandList() {
+    std::string list;
+    for (const Command& command : kCommands) {
+        if ((command.traits & kDryRun) && !(command.traits & kAlias)) list += std::string(command.name) + ", ";
+    }
+    list.resize(list.size() - 2);
+    return list + " and config --dir";
 }
 
 int Dispatch(Context& ctx) {
@@ -855,59 +934,13 @@ int Dispatch(Context& ctx) {
     if (options.positional.empty()) return CmdHelp(ctx);
     const std::string& command = options.positional[0];
     if (options.dryRun && command != "help" && !SupportsDryRun(options)) {
-        return Usage(ctx, "--dry-run is not available for " + command + ": run it without --dry-run (" +
-                              "it works with apply, launch, restore, import, publish, devtools, notice and config --dir)");
+        return Usage(ctx, "--dry-run is not available for " + command + ": run it without --dry-run (it works with " +
+                              DryRunCommandList() + ")");
     }
-
-    if (command == "help") return CmdHelp(ctx);
-    if (command == "version") return CmdVersion(ctx);
-    if (command == "path") return CmdPath(ctx);
-    if (command == "config") return CmdConfig(ctx);
-    if (command == "list") return CmdList(ctx);
-    if (command == "settings") return CmdSettings(ctx);
-    if (command == "theme") return CmdTheme(ctx);
-    if (command == "validate") return CmdValidate(ctx);
-    if (command == "new") return CmdNew(ctx);
-    if (command == "market" || command == "catalog") return CmdMarket(ctx);
-    if (command == "install") return CmdInstall(ctx);
-    if (command == "remove") return CmdRemove(ctx);
-    if (command == "update") return CmdUpdate(ctx);
-    if (command == "apply") return CmdApply(ctx);
-    if (command == "launch" || command == "auto") return CmdLaunch(ctx);
-    if (command == "restore") return CmdRestore(ctx);
-    if (command == "backup") return CmdBackup(ctx);
-    if (command == "watch") return CmdWatch(ctx);
-    if (command == "build") return CmdBuild(ctx);
-    if (command == "publish") return CmdPublish(ctx);
-    if (command == "inspect") return options.tree ? CmdInspectTree(ctx) : CmdInspect(ctx);
-    if (command == "devtools") return CmdDevtools(ctx);
-    if (command == "versions") return CmdVersions(ctx);
-    if (command == "notice") return CmdNotice(ctx);
-    if (command == "install-kit") return CmdInstallKit(ctx);
-    if (command == "types") return CmdTypes(ctx);
-    if (command == "dev") return CmdDev(ctx);
-    if (command == "logs") return CmdLogs(ctx);
-    if (command == "doctor") return CmdDoctor(ctx);
-    if (command == "report") return CmdReport(ctx);
-    if (command == "profile") return CmdProfile(ctx);
-    if (command == "export") return CmdExport(ctx);
-    if (command == "import") return CmdImport(ctx);
-    if (command == "test") return CmdTest(ctx);
+    if (const Command* known = FindCommand(command)) return known->run(ctx);
     // `ampify theme` was answered above: the other kinds share one set of verbs.
     if (std::optional<ElementKind> kind = KindNamed(command)) return CmdKind(ctx, ToString(*kind));
     return Usage(ctx, Tr("unknownCommand", {{"command", command}}));
-}
-
-// Verbs that take no argument and can follow one another on a line, as in Spicetify (`spicetify backup apply`):
-// `ampify backup apply launch`. A word that is not in this list (an id, `list`, `on`) makes the line one command.
-constexpr std::string_view kChainVerbs[] = {"backup", "apply", "launch", "auto", "restore", "devtools", "doctor", "version"};
-
-// Commands after which the notice about a new kit release may be printed. Never after a command whose output a script
-// reads (path, config), nor after update itself.
-constexpr std::string_view kNoticeCommands[] = {"launch", "auto", "apply", "list", "doctor", "market", "catalog"};
-
-bool Contains(std::span<const std::string_view> list, std::string_view word) {
-    return std::find(list.begin(), list.end(), word) != list.end();
 }
 
 }  // namespace
@@ -915,7 +948,7 @@ bool Contains(std::span<const std::string_view> list, std::string_view word) {
 bool IsChainLine(const std::vector<std::string>& positional) {
     if (positional.size() < 2) return false;
     for (const std::string& word : positional) {
-        if (!Contains(kChainVerbs, word)) return false;
+        if (!Has(word, kChain)) return false;
     }
     return true;
 }
@@ -935,7 +968,7 @@ int Execute(const Options& options, std::istream& in, std::ostream& out, std::os
         Options one = options;
         one.positional = commands[i];
         Context ctx{one, kit, in, out, err};
-        if (!one.positional.empty() && Contains(kNoticeCommands, one.positional[0])) notice = true;
+        if (!one.positional.empty() && Has(one.positional[0], kNotice)) notice = true;
         code = Dispatch(ctx);
         if (code != 0) {
             if (i + 1 < commands.size()) {

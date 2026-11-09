@@ -76,8 +76,6 @@ bool MentionsField(const std::vector<std::string>& errors, const std::string& fi
 
 }  // namespace
 
-// ---- SHA-256 -----------------------------------------------------------------------------------
-
 TEST_CASE(Sha256_KnownVectors) {
     CHECK(ampify::Sha256Hex("") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     CHECK(ampify::Sha256Hex("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
@@ -107,8 +105,6 @@ TEST_CASE(Sha256_HexFormatIsStrict) {
     CHECK(!ampify::IsSha256Hex(std::string(63, 'a')));
     CHECK(!ampify::IsSha256Hex(std::string(64, 'g')));
 }
-
-// ---- JSON --------------------------------------------------------------------------------------
 
 namespace {
 
@@ -181,8 +177,6 @@ TEST_CASE(Json_QuoteEscapesControlCharacters) {
     CHECK(ampify::Json::Quote("a\"b\\c\n") == "\"a\\\"b\\\\c\\n\"");
     CHECK(ampify::Json::Quote(std::string(1, '\x01')) == "\"\\u0001\"");
 }
-
-// ---- Manifests ---------------------------------------------------------------------------------
 
 TEST_CASE(Manifest_ValidExtensionParses) {
     std::vector<std::string> errors;
@@ -306,8 +300,6 @@ TEST_CASE(Folder_ThemeAndSnippetRules) {
     CHECK(!ampify::ParseManifest(text, "css-only", 1, empty).errors.empty());
 }
 
-// ---- Catalog -----------------------------------------------------------------------------------
-
 namespace {
 
 const char* const kCatalogEntry = R"({
@@ -394,6 +386,69 @@ TEST_CASE(Catalog_RejectsBadChecksumDuplicatesAndUnknownKeys) {
     CHECK(errors.empty());
 }
 
+namespace {
+
+// The demo entry at 1.2.3 for every Ampify, with later versions for newer Ampify releases in `newer`.
+std::string CatalogWithNewer(const std::string& newer) {
+    std::string entry = kCatalogEntry;
+    entry.insert(entry.size() - 1, R"(, "newer": [)" + newer + "]");
+    return CatalogWith(entry);
+}
+
+std::string NewerDemo(const std::string& version, const std::string& minAmpify) {
+    return R"({"id": "demo", "name": "Demo", "version": ")" + version + R"(", "kind": "extension",
+      "author": "Shirowwww", "description": "A test extension.", "kitApi": "1.0", "minAmpify": ")" + minAmpify +
+           R"(", "url": "https://example.com/demo-)" + version + R"(.zip",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111", "permissions": ["storage"]})";
+}
+
+}  // namespace
+
+// Ampify 1.2.1 and older read only the entry itself, so the catalog keeps their version there and lists later ones in
+// `newer`: each Ampify takes the newest version whose minAmpify it reaches.
+TEST_CASE(Catalog_TakesTheNewestVersionThisAmpifyReaches) {
+    std::string text = CatalogWithNewer(NewerDemo("1.4.0", "9.0.0") + "," + NewerDemo("1.3.0", "1.3.0"));
+    std::vector<std::string> errors;
+    std::optional<ampify::Catalog> current = ampify::ParseCatalog(text, false, errors, "1.3.0");
+    CHECK(errors.empty());
+    CHECK(current && current->entries.size() == 1);
+    CHECK(current && current->entries[0].version == "1.3.0");
+    CHECK(current && current->entries[0].url == "https://example.com/demo-1.3.0.zip");
+
+    std::optional<ampify::Catalog> older = ampify::ParseCatalog(text, false, errors, "1.2.9");
+    CHECK(older && older->entries[0].version == "1.2.3");
+    std::optional<ampify::Catalog> later = ampify::ParseCatalog(text, false, errors, "9.0.0");
+    CHECK(later && later->entries[0].version == "1.4.0");
+    CHECK(errors.empty());
+}
+
+TEST_CASE(Catalog_LeavesOutAnElementThisAmpifyIsTooOldFor) {
+    std::string entry = kCatalogEntry;
+    entry.insert(entry.size() - 1, R"(, "minAmpify": "9.0.0")");
+    std::vector<std::string> errors;
+    std::optional<ampify::Catalog> catalog = ampify::ParseCatalog(CatalogWith(entry), false, errors, "1.3.0");
+    CHECK(errors.empty());
+    CHECK(catalog && catalog->entries.empty());
+}
+
+TEST_CASE(Catalog_RefusesANewerVersionOfAnotherElement) {
+    std::vector<std::string> errors;
+    std::string other = NewerDemo("1.3.0", "1.3.0");
+    other.replace(other.find("\"demo\""), 6, "\"other\"");
+    CHECK(!ampify::ParseCatalog(CatalogWithNewer(other), false, errors, "1.3.0").has_value());
+    CHECK(MentionsField(errors, "extensions[0].newer[0].id"));
+
+    errors.clear();
+    CHECK(!ampify::ParseCatalog(CatalogWithNewer(NewerDemo("1.3.0", "1.3")), false, errors, "1.3.0").has_value());
+    CHECK(MentionsField(errors, "extensions[0].newer[0].minAmpify"));
+
+    errors.clear();
+    std::string nested = NewerDemo("1.3.0", "1.3.0");
+    nested.insert(nested.size() - 1, R"(, "newer": [])");
+    CHECK(!ampify::ParseCatalog(CatalogWithNewer(nested), false, errors, "1.3.0").has_value());
+    CHECK(MentionsField(errors, "extensions[0].newer[0].newer"));
+}
+
 TEST_CASE(Catalog_TagsAndPreviewAreChecked) {
     auto with = [](const std::string& fields) {
         std::string entry = kCatalogEntry;
@@ -461,8 +516,6 @@ TEST_CASE(Catalog_AnArchiveCannotHoldAMarketplacePermission) {
     CHECK(problem.find("kit.manage") != std::string::npos);
 }
 
-// ---- Archives ----------------------------------------------------------------------------------
-
 TEST_CASE(Archive_RefusesEscapingEntries) {
     std::string reason;
     CHECK(ampify::IsSafeArchiveEntry("manifest.json", reason));
@@ -493,8 +546,6 @@ TEST_CASE(Archive_DetectsLinksInExtractedTree) {
     std::filesystem::create_directory_symlink(root / "manifest.json", root / "link.json", ec);
     if (!ec) CHECK(ampify::ContainsLink(root));
 }
-
-// ---- Versions and release metadata ----------------------------------------------------------------
 
 TEST_CASE(Version_ComparesNumerically) {
     CHECK(ampify::CompareDottedVersions("0.10.0", "0.9.0") == 1);
@@ -531,8 +582,6 @@ TEST_CASE(Release_ChecksumsAcceptBothFormats) {
     CHECK(sums["other.zip"] == std::string(64, 'b'));
     CHECK(sums.count("upper.zip") == 0);
 }
-
-// ---- Kit layout, elements and activation -------------------------------------------------------------
 
 TEST_CASE(Kit_ListsValidElementsAndSkipsWorkInProgress) {
     ampify::test::ScratchDir root("kit-list");
@@ -641,8 +690,6 @@ TEST_CASE(WriteTextFile_CreatesFoldersAndReplacesAtomically) {
     CHECK(!std::filesystem::exists(file.string() + ".tmp"));
 }
 
-// ---- Backups -----------------------------------------------------------------------------------
-
 TEST_CASE(Backup_CreateListAndRestore) {
     ampify::test::ScratchDir root("backup-cycle");
     ampify::KitLayout kit(root);
@@ -694,8 +741,6 @@ TEST_CASE(Backup_WithoutSettingsStillCreatesTheSnapshot) {
     }
 }
 
-// ---- Change detection --------------------------------------------------------------------------------
-
 TEST_CASE(Fingerprint_ChangesOnlyWhenTheKitChanges) {
     ampify::test::ScratchDir root("fingerprint");
     ampify::KitLayout kit(root);
@@ -711,8 +756,6 @@ TEST_CASE(Fingerprint_ChangesOnlyWhenTheKitChanges) {
     CHECK(ampify::KitFingerprint(kit) != before);
     CHECK(ampify::KitFingerprint(kit).size() == 16);
 }
-
-// ---- Fixed-width output helpers used by the commands ----------------------------------------------
 
 TEST_CASE(Path_ElementIdsAreCheckedBeforeUse) {
     CHECK(ampify::IsElementId("atmos-leveler"));
@@ -814,8 +857,8 @@ TEST_CASE(Manifest_TranslationsKeepTheSameLengthRulesInEveryLanguage) {
     CHECK(translated && translated->translations.at("fr").name == "Démo");
     CHECK(translated && translated->translations.at("fr").description == "Un test.");
 
-    CHECK(!ParseAuthored(base + R"("translations": {"it": {"name": "a", "description": "b"}}})", errors).has_value());
-    CHECK(MentionsField(errors, "translations.it: unknown language"));
+    CHECK(!ParseAuthored(base + R"("translations": {"sv": {"name": "a", "description": "b"}}})", errors).has_value());
+    CHECK(MentionsField(errors, "translations.sv: unknown language"));
     errors.clear();
     CHECK(!ParseAuthored(base + R"("translations": {"fr": {"name": "Démo"}}})", errors).has_value());
     CHECK(MentionsField(errors, "translations.fr.description: required field missing"));
@@ -983,8 +1026,6 @@ TEST_CASE(Report_HidesSecretLookingSettings) {
     CHECK(Has(out, "extensions.keyboard-skip.enabled = 1"));
     CHECK(Has(out, "extensions.discord-presence.user = <hidden>"));
 }
-
-// ---- TypeScript and JSX sources ---------------------------------------------------------------------------------
 
 namespace {
 

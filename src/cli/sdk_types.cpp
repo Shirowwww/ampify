@@ -36,7 +36,7 @@ type BoxProps = {
 };
 type TextStyleProps = { size?: number; weight?: number; color?: UiColor; wrap?: boolean; maxLines?: number };
 type UiNode = TooltipProps & Omit<PlaceProps, "align"> & BoxProps & Omit<TextStyleProps, "size"> & {
-  type: "stack" | "row" | "list" | "layer" | "card" | "text" | "button" | "toggle" | "slider" | "textfield" | "image" | "icon" | "dropdown" | "option" | "lyrics" | "grid" | "tabs" | "tab" | "menu" | "item";
+  type: "stack" | "row" | "list" | "layer" | "card" | "text" | "button" | "toggle" | "slider" | "textfield" | "image" | "icon" | "dropdown" | "option" | "lyrics" | "grid" | "tabs" | "tab" | "menu" | "item" | "progress" | "checkbox" | "divider" | "spinner";
   columns?: number;                       // grid: 1 to 12
   selected?: boolean;                     // tab: the one that is on
   align?: "start" | "center" | "end" | "stretch" | "left" | "right";
@@ -45,7 +45,8 @@ type UiNode = TooltipProps & Omit<PlaceProps, "align"> & BoxProps & Omit<TextSty
   placeholder?: string;                   // lyrics: shown while the song has none
   children?: UiNode[];
   onClick?: number;   // callback number (button, card, image, icon)
-  onChange?: number;  // callback number (toggle, slider, textfield, dropdown)
+  max?: number;       // progress: the value of a full bar, 100 by default
+  onChange?: number;  // callback number (toggle, checkbox, slider, textfield, dropdown)
   [prop: string]: unknown;
 };
 // active: a top bar, play bar or sidebar entry that starts on, drawn in the accent colour (Ampify.ui.setActive changes it)
@@ -265,7 +266,9 @@ declare const Ampify: {
   // 5.5 Interface [preview]
   ui: {
     topbar: { addButton(button: UiButton): number; remove(id: number): boolean };  // the id setLabel and setActive take
-    playbar: { addButton(button: UiButton): number; remove(id: number): boolean };
+    // mark: a stretch of the progress line for a button it added, as parts of the song (0 to 1); no `to` marks the
+    // start alone, no `from` clears it
+    playbar: { addButton(button: UiButton): number; remove(id: number): boolean; mark(id: number, from?: number, to?: number): boolean };
     sidebar: { addItem(item: UiButton): number; remove(id: number): boolean };  // on while its own page is open, or after setActive
     menu: { addItem(where: "context" | "app", item: MenuItem): number; remove(id: number): boolean };
     // show: a named popup (lowercase letters, digits, dashes), changed in place when shown again; close closes it
@@ -385,7 +388,11 @@ declare const Ampify: {
     ButtonSecondary: AmpifyComponent<ButtonProps>;
     ButtonTertiary: AmpifyComponent<ButtonProps>;
     Toggle: AmpifyComponent<ToggleProps>;
+    Checkbox: AmpifyComponent<ToggleProps>;
     Slider: AmpifyComponent<SliderProps>;
+    ProgressBar: AmpifyComponent<TooltipProps & { value?: number; max?: number; label?: string }>;
+    Divider: AmpifyComponent;
+    Spinner: AmpifyComponent<TooltipProps & { size?: number; label?: string }>;
     TextField: AmpifyComponent<TextFieldProps>;
     Dropdown: AmpifyComponent<DropdownProps>;
     Grid: AmpifyComponent<GridProps>;

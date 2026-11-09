@@ -33,7 +33,7 @@ bool SyncElement(const KitLayout& kit, const std::filesystem::path& source, cons
     std::filesystem::path target = kit.Element(kind, id);
 
     std::filesystem::remove_all(staging, ec);
-    if (!CopyElementFolder(source, staging, error)) {
+    if (!CopyTree(source, staging, error)) {
         std::filesystem::remove_all(staging, ec);
         return false;
     }
@@ -50,7 +50,7 @@ bool SyncElement(const KitLayout& kit, const std::filesystem::path& source, cons
     return true;
 }
 
-// One reload: check the folder, copy it into the kit, then write active.txt so the kernel picks it up.
+// One reload: compile if needed, check the folder, copy it into the kit and ask the kernel to restart the element.
 // A broken edit is reported and the copy that was working stays in the kit.
 void ReloadOnce(Context& ctx, const std::filesystem::path& source, const std::string& kind, const std::string& id) {
     std::string stamp = "[" + ClockText() + "] ";
@@ -62,7 +62,7 @@ void ReloadOnce(Context& ctx, const std::filesystem::path& source, const std::st
     }
     if (compile == CompileOutcome::Compiled) ctx.out << stamp << compiled << "\n";
     FolderValidation check = ValidateElementFolder(source);
-    if (!check.ok() || !check.errors.empty() || !check.manifest) {
+    if (!check.ok()) {
         ctx.err << stamp << "invalid, Ampify keeps the previous version:\n";
         for (const std::string& problem : check.errors) ctx.err << "  - " << problem << "\n";
         return;
@@ -135,7 +135,7 @@ int CmdDev(Context& ctx) {
     if (compile == CompileOutcome::Failed) return Failure(ctx, compiled);
     if (compile == CompileOutcome::Compiled) ctx.out << compiled << "\n";
     FolderValidation first = ValidateElementFolder(source);
-    if (!first.ok() || !first.errors.empty() || !first.manifest) {
+    if (!first.ok()) {
         ctx.err << Utf8(source) << ": invalid, nothing was copied\n";
         for (const std::string& problem : first.errors) ctx.err << "  - " << problem << "\n";
         return 1;

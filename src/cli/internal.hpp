@@ -55,7 +55,6 @@ int Usage(Context& ctx, const std::string& message);
 bool LoadSettings(const Context& ctx, Settings& settings, std::string& error);
 bool SaveSettings(const Context& ctx, const Settings& settings, std::string& error);
 
-// The local time now, written with a strftime format.
 inline std::string LocalTimeText(const char* format) {
     std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     std::tm local{};
@@ -69,7 +68,6 @@ inline std::string LocalTimeText(const char* format) {
     return buffer;
 }
 
-// The time as HH:MM:SS, for the lines that `watch` and `dev` print.
 inline std::string ClockText() { return LocalTimeText("%H:%M:%S"); }
 
 // True for the answers that mean yes: y, yes (spaces and case are ignored).
@@ -136,6 +134,7 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
 int CmdApply(Context& ctx);
 int CmdLaunch(Context& ctx);
 int CmdRestore(Context& ctx);
+int CmdUninstall(Context& ctx);
 int CmdBackup(Context& ctx);
 int CmdWatch(Context& ctx);
 
@@ -181,8 +180,9 @@ int CmdConfigDir(Context& ctx);
 void NotifyKitUpdate(Context& ctx);
 
 // ampify update --auto, which the background launcher runs while Apple Music is closed. Follows kit_update: installs
-// a newer release on its own (auto), after a Yes (ask), or does nothing (off). At most one look a day
-// (cache\auto-update.txt); a failed look or install is tried again on the launcher's next run.
+// a newer release on its own (auto), once its notification is clicked (ask, cache\update-offer.txt), or does
+// nothing (off). At most one look a day (cache\auto-update.txt); a failed look or install is tried again on the
+// launcher's next run.
 int CmdAutoUpdate(Context& ctx);
 
 // Commands in diagnose.cpp.

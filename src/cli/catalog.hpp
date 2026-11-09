@@ -15,6 +15,7 @@ struct CatalogEntry : ElementInfo {
     std::string url;
     std::string sha256;
     std::optional<std::string> preview;  // https address of the card image
+    std::string minAmpify;               // oldest Ampify release this version needs; empty for any
 };
 
 struct Catalog {
@@ -44,8 +45,11 @@ bool IsAllowedDownloadUrl(std::string_view url, bool localCatalog);
 std::string UrlHost(std::string_view url);
 
 // Parses catalog.json (schemas/catalog.schema.json). `localCatalog` is true when the file was read from disk.
-// On failure returns nullopt and appends one message per problem to `errors`.
-std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, std::vector<std::string>& errors);
+// Each element comes out at the newest of its versions (the entry and its `newer` list) whose minAmpify
+// `ampifyVersion` reaches, and is left out when it has none. On failure returns nullopt and appends one message per
+// problem to `errors`.
+std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, std::vector<std::string>& errors,
+                                    std::string_view ampifyVersion = kKitVersion);
 
 const CatalogEntry* FindCatalogEntry(const Catalog& catalog, std::string_view id);
 

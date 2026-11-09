@@ -4,8 +4,11 @@
 #include <chrono>
 #include <thread>
 
+#include "../core/apple_music.hpp"
 #include "../core/launch_flags.hpp"
+#include "../core/safe_mode.hpp"
 #include "backup.hpp"
+#include "console_style.hpp"
 #include "internal.hpp"
 #include "kit.hpp"
 #include "platform.hpp"
@@ -111,7 +114,12 @@ int CmdLaunch(Context& ctx) {
         return Failure(ctx, std::string(kLauncherFile) + " not found next to ampify: " + Utf8(launcher));
     }
     if (!platform::StartDetached({Utf8(launcher)})) return Failure(ctx, "cannot start: " + Utf8(launcher));
-    ctx.out << "Apple Music is starting with the kernel.\n";
+    // The launcher decides: safe mode starts the app without the kernel, which it says in its own notice.
+    if (SafeMode(ctx.kit.SafeModeState().string()).IsActive()) {
+        ctx.out << "Apple Music is starting without the kernel (safe mode); the next start tries again.\n";
+    } else {
+        ctx.out << "Apple Music is starting with the kernel.\n";
+    }
     return 0;
 }
 
@@ -145,6 +153,51 @@ int CmdRestore(Context& ctx) {
     if (!platform::DisableAutoStart(error)) return Failure(ctx, error);
     ctx.out << "Ampify no longer loads with Apple Music. If Apple Music is open, close it to finish."
                "\nNothing in Apple Music's package was changed. Run ampify apply to turn Ampify back on.\n";
+    return 0;
+}
+
+// Hands over to the installed uninstaller (the file Settings > Apps runs), which removes this very program: it is
+// started and left to run, so nothing of Ampify stays in use. Its window asks about the data, No by default; with
+// --yes it runs without a window and keeps the data unless --delete-data is given.
+int CmdUninstall(Context& ctx) {
+    if (ctx.options.positional.size() > 1) return Usage(ctx, "uninstall takes --yes and --delete-data, not an argument");
+    std::filesystem::path folder =
+        ctx.options.installDir ? Utf8ToPath(*ctx.options.installDir) : platform::InstallDirectory();
+    if (folder.empty()) return Failure(ctx, "Ampify installs only on Windows: nothing to uninstall here");
+    std::filesystem::path setup = folder / kSetupFile;
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(setup, ec)) {
+        return Failure(ctx, "Ampify is not installed: " + Utf8(setup) +
+                                " not found. A build folder or an unzipped package is removed by deleting it.");
+    }
+    std::vector<std::string> command = {Utf8(setup), "/uninstall"};
+    if (ctx.options.yes) command.push_back("/silent");
+    if (ctx.options.yes || ctx.options.deleteData) command.push_back(ctx.options.deleteData ? "/purgedata" : "/keepdata");
+    if (ctx.options.dryRun) {
+        ctx.out << "Would start: \"" << command[0] << "\"";
+        for (size_t i = 1; i < command.size(); i++) ctx.out << " " << command[i];
+        ctx.out << "\n--dry-run: nothing was removed.\n";
+        return 0;
+    }
+    if (ctx.options.yes && (platform::IsProcessRunning(std::string(kAppleMusicImage)) ||
+                            platform::IsProcessRunning(std::string(kLibraryAgentImage)))) {
+        return Failure(ctx, "Apple Music is open: close it first, or run ampify uninstall without --yes");
+    }
+    Heading(ctx, "uninstall");
+    if (!platform::StartDetached(command)) return Failure(ctx, "cannot start the uninstaller: " + Utf8(setup));
+    if (Styled(ctx)) {
+        Done(ctx, ctx.options.yes ? "Uninstaller started" : "Uninstaller opened in its window");
+        Note(ctx, !ctx.options.yes          ? "It asks whether to delete your themes, settings and extensions too."
+                  : ctx.options.deleteData ? "Your themes, settings and extensions are deleted too."
+                                           : "Your themes, settings and extensions stay in " + Utf8(ctx.kit.Root()) + ".");
+        return 0;
+    }
+    if (ctx.options.yes) {
+        ctx.out << "Ampify is being removed. Your themes, settings and extensions are "
+                << (ctx.options.deleteData ? "deleted too.\n" : "kept in " + Utf8(ctx.kit.Root()) + ".\n");
+    } else {
+        ctx.out << "The uninstaller is open: it asks whether to delete your themes, settings and extensions too.\n";
+    }
     return 0;
 }
 
