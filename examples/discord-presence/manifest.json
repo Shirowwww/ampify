@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "discord-presence",
   "name": "Discord presence",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Your Discord status shows what you listen to: cover, artist, album, progress bar, links and buttons. Turn it on with Discord open. Covers and links come from Apple Music's catalog; a cover it lacks (your own files) goes to a free host that deletes it after a few months, which can be turned off.",
@@ -166,6 +166,52 @@
         "App name": "应用名称",
         "None": "无",
         "Other platforms": "其他平台 (song.link)"
+      }
+    },
+    "it": {
+      "name": "Presenza Discord",
+      "description": "Il tuo stato Discord mostra cosa ascolti: copertina, artista, album, barra di avanzamento, link e pulsanti. Attivala con Discord aperto. Copertine e link arrivano dal catalogo di Apple Music; quella dei tuoi file passa da un host gratuito che la elimina dopo qualche mese (disattivabile).",
+      "settings": {
+        "status-line": "Nome mostrato nell'elenco dei membri",
+        "show-cover": "Mostra la copertina del brano",
+        "animated-covers": "Copertine animate, per i pochi album che ne hanno una",
+        "share-covers": "Carica online le copertine dei tuoi file",
+        "show-album": "Mostra l'album al passaggio sulla copertina",
+        "show-progress": "Mostra il tempo trascorso",
+        "clickable-links": "Titolo, artista e copertina aprono Apple Music",
+        "show-paused": "Resta visibile in pausa",
+        "button-1": "Primo pulsante sotto lo stato",
+        "button-2": "Secondo pulsante sotto lo stato"
+      },
+      "options": {
+        "Artist": "L'artista",
+        "Title": "Il titolo",
+        "App name": "Il nome dell'app",
+        "None": "Nessuno",
+        "Other platforms": "Altre piattaforme (song.link)"
+      }
+    },
+    "ko": {
+      "name": "Discord 프레즌스",
+      "description": "Discord 상태에 지금 듣는 곡이 표시됩니다. 커버, 아티스트, 앨범, 진행 막대, 링크, 버튼이 나옵니다. Discord를 연 상태에서 켜세요. 커버와 링크는 Apple Music 카탈로그에서 가져오며, 없는 커버(내 파일)는 몇 달 뒤 삭제하는 무료 호스트를 거칩니다(끌 수 있습니다).",
+      "settings": {
+        "status-line": "멤버 목록에 표시되는 이름",
+        "show-cover": "곡 커버 표시",
+        "animated-covers": "움직이는 커버(몇몇 앨범에만 있음)",
+        "share-covers": "내 파일의 커버를 온라인에 올리기",
+        "show-album": "커버에 마우스를 올리면 앨범 표시",
+        "show-progress": "경과 시간 표시",
+        "clickable-links": "제목, 아티스트, 커버를 누르면 Apple Music 열기",
+        "show-paused": "일시정지 중에도 계속 표시",
+        "button-1": "상태 아래 첫 번째 버튼",
+        "button-2": "상태 아래 두 번째 버튼"
+      },
+      "options": {
+        "Artist": "아티스트",
+        "Title": "제목",
+        "App name": "앱 이름",
+        "None": "없음",
+        "Other platforms": "다른 플랫폼(song.link)"
       }
     }
   },

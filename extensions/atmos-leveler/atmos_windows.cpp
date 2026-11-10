@@ -137,8 +137,6 @@ bool ResolveApi() {
            Resolve(cf, "CFStringGetBytes", g_api.CFStringGetBytes);
 }
 
-// --- Levels kept across runs ---------------------------------------------------------------------
-
 std::filesystem::path LevelsFile() {
     return ampify::win::KitDirectory() / kLevelsFileName;
 }
@@ -196,8 +194,6 @@ void UseConfig(const LevelerConfig& config) {
     std::lock_guard<std::mutex> guard(g_levelerLock);
     g_config = config;
 }
-
-// --- Following the playing item ------------------------------------------------------------------
 
 // Describes one CoreFoundation object as text, such as "mediaType:'soun' mediaSubType:'qec3' ...".
 std::string Describe(const Api& api, const void* object) {

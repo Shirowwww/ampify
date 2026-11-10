@@ -17,6 +17,10 @@ Ampify.i18n.define({
         paused: "再生を一時停止しました。" },
   zh: { title: "睡眠定时器", armed: "音乐将在 {minutes} 分钟后暂停。可在“设置”的 Ampify 中修改时间。",
         paused: "播放已暂停。" },
+  it: { title: "Timer di spegnimento", armed: "La musica va in pausa tra {minutes} min. Cambia il ritardo nelle Impostazioni, sotto Ampify.",
+        paused: "La riproduzione è in pausa." },
+  ko: { title: "취침 타이머", armed: "{minutes}분 후에 음악이 일시정지됩니다. 시간은 설정의 Ampify에서 바꿀 수 있습니다.",
+        paused: "재생이 일시정지되었습니다." },
 });
 
 const minutes = Ampify.config.get("minutes", 30);

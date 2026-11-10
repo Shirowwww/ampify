@@ -9,6 +9,8 @@ Ampify.i18n.define({
   ru: { copy: "Копировать ссылку" },
   ja: { copy: "リンクをコピー" },
   zh: { copy: "复制链接" },
+  it: { copy: "Copia link" },
+  ko: { copy: "링크 복사" },
 });
 
 Ampify.ui.menu.addItem("context", {

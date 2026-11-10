@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "bookmarks",
   "name": "Bookmarks",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Save songs, albums, artists and playlists from the context menu, or the exact moment of the song playing from the playback bar, like Spicetify's bookmark.js. Come back to them from the main menu.",
@@ -34,6 +34,14 @@
     "zh": {
       "name": "书签",
       "description": "像 Spicetify 的 bookmark.js 一样，可从右键菜单收藏歌曲、专辑、艺术家和播放列表，也可从播放栏记下当前歌曲的确切时刻。之后在主菜单中回到它们。"
+    },
+    "it": {
+      "name": "Segnalibri",
+      "description": "Salva brani, album, artisti e playlist dal menu contestuale, o l'istante esatto del brano in riproduzione dalla barra di riproduzione, come bookmark.js di Spicetify. Ritrovali dal menu principale."
+    },
+    "ko": {
+      "name": "북마크",
+      "description": "Spicetify의 bookmark.js처럼 컨텍스트 메뉴에서 곡, 앨범, 아티스트, 플레이리스트를 저장하거나, 재생 바에서 재생 중인 곡의 정확한 시점을 저장합니다. 저장한 항목은 메인 메뉴에서 다시 열 수 있습니다."
     }
   },
   "tags": ["bookmark", "library"],

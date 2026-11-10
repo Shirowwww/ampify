@@ -45,6 +45,16 @@ Ampify.i18n.define({
     clicks: "点击次数：{count}", addOne: "加一", addOneHelp: "给计数器加一", timer: "定时器",
     turnOn: "开启", length: "时长（{unit}）",
   },
+  it: {
+    title: "Pannello React", view: "Visualizzazione", simple: "Semplice", full: "Completa", counter: "Contatore",
+    clicks: "Clic: {count}", addOne: "Aggiungi uno", addOneHelp: "Aggiunge uno al contatore", timer: "Timer",
+    turnOn: "Attiva", length: "Durata ({unit})",
+  },
+  ko: {
+    title: "React 패널", view: "보기", simple: "간단히", full: "전체", counter: "카운터",
+    clicks: "클릭 수: {count}", addOne: "1 더하기", addOneHelp: "카운터에 1을 더합니다", timer: "타이머",
+    turnOn: "켜기", length: "길이({unit})",
+  },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
 

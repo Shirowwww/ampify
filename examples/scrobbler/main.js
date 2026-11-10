@@ -89,6 +89,24 @@ Ampify.i18n.define({
     noKey: "Last.fm：此副本没有应用密钥。请设置一个：ampify config extensions.scrobbler.apiKey <密钥>",
     signedOut: "已退出 Last.fm。",
   },
+  it: {
+    allow: "Consenti Ampify nella pagina di Last.fm appena aperta.",
+    connected: "Connesso a Last.fm come {name}.",
+    late: "Last.fm non è stato consentito in tempo. Disattiva e riattiva «Usa il mio account Last.fm» per riprovare.",
+    blocked: "Non è stato possibile aprire la pagina di Last.fm. Disattiva e riattiva «Usa il mio account Last.fm» tra qualche secondo.",
+    waiting: "Last.fm non è ancora connesso. Disattiva e riattiva «Usa il mio account Last.fm» per riaprire la sua pagina.",
+    noKey: "Last.fm: questa copia non ha una chiave dell'applicazione. Impostane una: ampify config extensions.scrobbler.apiKey <chiave>",
+    signedOut: "Disconnesso da Last.fm.",
+  },
+  ko: {
+    allow: "방금 열린 Last.fm 페이지에서 Ampify를 허용하세요.",
+    connected: "{name} 계정으로 Last.fm에 연결되었습니다.",
+    late: "제때 Last.fm을 허용하지 않았습니다. \"내 Last.fm 계정 사용\"을 껐다가 다시 켜서 다시 시도하세요.",
+    blocked: "Last.fm 페이지를 열 수 없었습니다. 몇 초 후에 \"내 Last.fm 계정 사용\"을 껐다가 다시 켜세요.",
+    waiting: "아직 Last.fm에 연결되지 않았습니다. \"내 Last.fm 계정 사용\"을 껐다가 다시 켜면 해당 페이지가 다시 열립니다.",
+    noKey: "Last.fm: 이 사본에는 애플리케이션 키가 없습니다. 키를 설정하세요: ampify config extensions.scrobbler.apiKey <키>",
+    signedOut: "Last.fm에서 로그아웃되었습니다.",
+  },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
 
@@ -212,17 +230,24 @@ function flush() {
   const pending = Ampify.storage.get("pending", []);
   if (pending.length === 0) return;
   sending = true;
-  call("track.scrobble", pending[0]).then((answer) => {
-    sending = false;
-    if (answer.status !== 200) {
-      Ampify.log("Last.fm did not accept the play (code " + answer.status + "), trying again in 5 minutes");
-      return;
-    }
-    const rest = Ampify.storage.get("pending", []);
-    rest.shift();
-    Ampify.storage.set("pending", rest);
-    flush();
-  });
+  call("track.scrobble", pending[0]).then(
+    (answer) => {
+      sending = false;
+      if (answer.status !== 200) {
+        Ampify.log("Last.fm did not accept the play (code " + answer.status + "), trying again in 5 minutes");
+        return;
+      }
+      const rest = Ampify.storage.get("pending", []);
+      rest.shift();
+      Ampify.storage.set("pending", rest);
+      flush();
+    },
+    // A request Ampify refused (too many at once, a refused address) must not stop the later sends.
+    (error) => {
+      sending = false;
+      Ampify.log("the play was not sent (" + error.message + "), trying again in 5 minutes");
+    },
+  );
 }
 
 function onTrack(state) {

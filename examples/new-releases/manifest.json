@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "new-releases",
   "name": "New releases",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "app",
   "author": "Shirowwww",
   "description": "Recent albums, EPs and singles from the artists you listen to, like Spicetify's New Releases. Checked once a day in Apple's public catalog; click a release to open it in Apple Music.",
@@ -34,6 +34,14 @@
     "zh": {
       "name": "新发行",
       "description": "像 Spicetify 的 New Releases 一样，列出你常听艺术家最近的专辑、EP 和单曲。每天在 Apple 公开目录中检查一次，点击即可在 Apple Music 中打开。"
+    },
+    "it": {
+      "name": "Novità",
+      "description": "Album, EP e singoli recenti degli artisti che ascolti, come New Releases di Spicetify. Controllati una volta al giorno nel catalogo pubblico di Apple; un clic apre l'uscita in Apple Music."
+    },
+    "ko": {
+      "name": "신규 발매",
+      "description": "Spicetify의 New Releases처럼 내가 듣는 아티스트의 최신 앨범, EP, 싱글을 보여 줍니다. Apple의 공개 카탈로그에서 하루에 한 번 확인하며, 항목을 누르면 Apple Music에서 열립니다."
     }
   },
   "tags": ["releases", "discovery"],

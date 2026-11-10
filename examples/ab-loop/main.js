@@ -9,6 +9,8 @@ Ampify.i18n.define({
   ru: { start: "Повтор: отметить начало", end: "Повтор с {start}: отметить конец", clear: "Повтор {start}–{end}: остановить" },
   ja: { start: "ループ: 開始位置を設定", end: "{start} からループ: 終了位置を設定", clear: "{start}〜{end} をループ中: 停止" },
   zh: { start: "循环：标记起点", end: "从 {start} 循环：标记终点", clear: "正在循环 {start} 至 {end}：停止" },
+  it: { start: "Loop: segna l'inizio", end: "Loop da {start}: segna la fine", clear: "Loop da {start} a {end}: ferma" },
+  ko: { start: "반복: 시작 지점 표시", end: "{start}부터 반복: 끝 지점 표시", clear: "{start}부터 {end}까지 반복 중: 중지" },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
 
@@ -32,9 +34,19 @@ function labelOf() {
   return t("clear", { start: clock(loop.startMs), end: clock(loop.endMs) });
 }
 
+// A, B and the passage between them on the progress line, as parts of the song. Before Ampify 1.3 the line cannot be
+// marked: the button's tooltip still says where the loop runs.
+function markLine() {
+  if (typeof Ampify.ui.playbar.mark !== "function") return;
+  const durationMs = Ampify.player.state().durationMs || 0;
+  const part = (ms) => (ms >= 0 && durationMs > 0 ? ms / durationMs : undefined);
+  Ampify.ui.playbar.mark(button, part(loop.startMs), part(loop.endMs));
+}
+
 function show() {
   Ampify.ui.setLabel(button, labelOf());
   Ampify.ui.setActive(button, loop.startMs >= 0);
+  markLine();
 }
 
 function stopTimer() {

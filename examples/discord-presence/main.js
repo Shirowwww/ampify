@@ -61,15 +61,19 @@ const HOSTS = [
   },
 ];
 // Animated covers: the album's motion artwork, a video Discord cannot show, made a GIF by Ampify on this PC and put on
-// the same free hosts. 200 pixels, 10 frames a second: a 20 second loop is under a megabyte.
+// the same free hosts. 200 pixels, 15 frames a second (at 10 the motion stuttered): a 20 second loop is about 1.5 MB.
 const MOTION_HOST = "mvod.itunes.apple.com";
 // A busy video makes a heavy GIF, past what Ampify makes (3 MB, seen with Currents): lighter ones are tried in turn.
-const GIFS = [{ side: 200, fps: 10, seconds: 30 }, { side: 160, fps: 8, seconds: 20 }, { side: 120, fps: 6, seconds: 12 }];
+const GIFS = [
+  { side: 200, fps: 15, seconds: 20 }, { side: 200, fps: 10, seconds: 20 }, { side: 160, fps: 8, seconds: 20 },
+  { side: 120, fps: 6, seconds: 12 },
+];
 const MAX_ANIMATIONS = 100;  // albums whose GIF is kept in storage
 const SETTLE_MS = 2000;  // Windows takes a moment to show the new track's cover
+const COVER_WAIT_MS = 3000;  // how long a new track waits for its cover before it shows with the logo
 const MAX_REMEMBERED = 200;  // tracks whose lookup is kept in storage
 // The Apple store of each language (English: the US one); the links then open in it.
-const STOREFRONTS = { fr: "fr", de: "de", es: "es", pt: "br", ru: "ru", ja: "jp", zh: "cn" };
+const STOREFRONTS = { fr: "fr", de: "de", es: "es", pt: "br", ru: "ru", ja: "jp", zh: "cn", it: "it", ko: "kr" };
 
 Ampify.i18n.define({
   en: { paused: "Paused", unknown: "Unknown title", listen: "Listen on Apple Music", youtube: "Find on YouTube Music",
@@ -88,6 +92,10 @@ Ampify.i18n.define({
         youtube: "YouTube Music で探す", spotify: "Spotify で探す", platforms: "ほかのサービス" },
   zh: { paused: "已暂停", unknown: "未知标题", listen: "在 Apple Music 上收听",
         youtube: "在 YouTube Music 上查找", spotify: "在 Spotify 上查找", platforms: "其他平台" },
+  it: { paused: "In pausa", unknown: "Titolo sconosciuto", listen: "Ascolta su Apple Music",
+        youtube: "Trova su YouTube Music", spotify: "Trova su Spotify", platforms: "Altre piattaforme" },
+  ko: { paused: "일시정지됨", unknown: "알 수 없는 제목", listen: "Apple Music에서 듣기",
+        youtube: "YouTube Music에서 찾기", spotify: "Spotify에서 찾기", platforms: "다른 플랫폼" },
 });
 const t = (key) => Ampify.i18n.t(key);
 
@@ -116,13 +124,14 @@ Ampify.storage.remove("lookups");
 const lookups = new Map(Object.entries(Ampify.storage.get(LOOKUPS_KEY, {})));
 const asking = new Set();
 
-// Lower case, without accents or punctuation: "Beyoncé - Halo (Live)" ~ "beyonce halo live".
+// Lower case, without accents or punctuation, in any script: "Beyoncé - Halo (Live)" ~ "beyonce halo live",
+// and a Japanese or Cyrillic title keeps its letters.
 function plain(text) {
   return String(text || "")
     .normalize("NFD")
     .replace(/\p{M}/gu, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
@@ -533,16 +542,34 @@ function activityFor(state) {
   return activity;
 }
 
+// A track not looked up yet waits a moment for its cover before Discord is told. Sent with Ampify's logo first, the
+// cover that came a second later often did not show until the next song: Discord kept the first image.
+let waitingFor = null;  // { id, over }: the track whose cover is awaited, and whether the wait is over
+
+function waitsForCover(track) {
+  if (!options.showCover || known(track) !== undefined) return false;
+  if (!waitingFor || waitingFor.id !== track.id) {
+    const wait = { id: track.id, over: false };
+    waitingFor = wait;
+    setTimeout(() => {
+      wait.over = true;
+      if (waitingFor === wait) show(Ampify.player.state());
+    }, COVER_WAIT_MS);
+  }
+  return !waitingFor.over;
+}
+
 function show(state) {
   const track = state && state.track;
   if (!track || (!state.playing && !options.showPaused)) {
     Ampify.discord.clear();
     return;
   }
-  Ampify.discord.setActivity(activityFor(state));
   const found = known(track);
   if (found === undefined) lookUp(track);
-  else if (found && found.motion && options.animatedCovers && options.showCover && !animation(found)) {
+  if (waitsForCover(track)) return;
+  Ampify.discord.setActivity(activityFor(state));
+  if (found && found.motion && options.animatedCovers && options.showCover && !animation(found)) {
     animate(found.motion);
   }
 }

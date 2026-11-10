@@ -4,20 +4,22 @@
 const { h, useState, useEffect } = Ampify.React;
 const { Card, Button, ButtonPrimary, ButtonTertiary, Dropdown, Slider, Text, TextField, Toggle } = Ampify.components;
 
-// Texts in English, French, German, Spanish, Portuguese, Russian, Japanese and Chinese; Ampify.i18n picks the Windows
+// Texts in English, French, German, Spanish, Portuguese, Russian, Japanese, Chinese, Italian and Korean; Ampify.i18n picks the Windows
 // display language. Apple Music's own words where it has one (Activé, Désactivé, Retour, Einstellungen).
 Ampify.i18n.define({
   en: {
-    "tab.theme": "Themes", "tab.extension": "Extensions", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.installed": "Installed",
+    "tab.theme": "Themes", "tab.extension": "Extensions", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.developer": "Developers", "tab.installed": "Installed",
     "empty.theme": "No theme in the catalog yet.",
     "empty.extension": "No extension in the catalog yet.",
     "empty.app": "No app in the catalog yet.",
     "empty.snippet": "No snippet in the catalog yet.",
+    "empty.developer": "No example for developers in the catalog yet.",
     "empty.installed": "Nothing installed yet. Pick a theme or an extension in the other tabs.",
     "intro.theme": "A theme changes how Apple Music looks: colours, shapes and fonts. One is used at a time.",
     "intro.extension": "An extension adds a feature to Apple Music. It lists what it is allowed to do before you turn it on.",
     "intro.app": "An app is a page of its own inside Apple Music, with an entry in the sidebar.",
     "intro.snippet": "A snippet is a small tweak to the look: a few lines of style that you turn on besides a theme.",
+    "intro.developer": "Examples for people who make extensions: small pieces of code to read and start from. They add little or nothing to Apple Music.",
     "broken.title": "Why it cannot load",
     "broken.hint": "Uninstall it and install it again. If the problem comes back, tell its author.",
     "kind.theme": "Theme", "kind.palette": "Colours", "kind.extension": "Extension", "kind.app": "App", "kind.snippet": "Snippet",
@@ -34,7 +36,7 @@ Ampify.i18n.define({
     "scheme": "Scheme", "tags": "Tags: {tags}",
     "theme.none": "No theme: Apple Music's own look.", "theme.inUse": "Theme in use: {name}",
     "search.theme": "Search themes", "search.extension": "Search extensions", "search.app": "Search apps",
-    "search.snippet": "Search snippets", "search.installed": "Search what is installed",
+    "search.snippet": "Search snippets", "search.developer": "Search examples", "search.installed": "Search what is installed",
     "search.none": "Nothing matches \"{search}\"",
     "search.where": "Search looks in names, authors, descriptions and tags.",
     "catalog.unreadable": "The catalog cannot be read",
@@ -45,27 +47,27 @@ Ampify.i18n.define({
     "status.unreadable": "Cannot read the state of Ampify: {error}", "status.unreadableReply": "unreadable reply",
     "status.failed": "Failed: {error}", "status.failedCode": "Failed (code {code})",
     "done.installedInUse": "{name} installed and in use", "done.installedOn": "{name} installed and on",
-    "done.installedUse": "{name} installed. Read what it can do, then use it.",
-    "done.installedTurnOn": "{name} installed. Read what it can do, then turn it on.",
     "done.updated": "{name} updated to {version}", "done.inUse": "{name} in use",
     "done.inUseScheme": "{name} in use, {scheme} scheme", "done.appleLook": "Apple Music's own look is back",
     "done.on": "{name} turned on", "done.off": "{name} turned off", "done.removed": "{name} uninstalled",
     "preview": "Preview of {name}",
-    "detail.settings": "Settings", "detail.settingsNote": "Changes apply at once. You also find them in Apple Music's Settings, under Ampify.", "done.setting": "{name}: {setting} changed", "action.settingsOf": "Settings of {name}",
+    "detail.settings": "Settings", "detail.reset": "Reset", "detail.settingsNote": "Changes apply at once. You also find them in Apple Music's Settings, under Ampify.", "done.setting": "{name}: {setting} changed", "action.settingsOf": "Settings of {name}",
     "detail.readmeLoading": "Reading its description…",
     "action.settings": "Settings", "action.openSettings": "Open Ampify's settings", "detail.can": "What it can do", "detail.about": "About", "detail.kind": "Type", "detail.author": "Made by", "detail.version": "Version", "detail.tags": "Tags", "detail.gone": "This element is no longer in the catalog, nor installed.", "detail.noDescription": "No description yet.",
   },
   fr: {
-    "tab.theme": "Thèmes", "tab.extension": "Extensions", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.installed": "Installés",
+    "tab.theme": "Thèmes", "tab.extension": "Extensions", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.developer": "Développeurs", "tab.installed": "Installés",
     "empty.theme": "Aucun thème dans le catalogue pour l'instant.",
     "empty.extension": "Aucune extension dans le catalogue pour l'instant.",
     "empty.app": "Aucune app dans le catalogue pour l'instant.",
     "empty.snippet": "Aucun snippet dans le catalogue pour l'instant.",
+    "empty.developer": "Aucun exemple pour développeurs dans le catalogue pour l'instant.",
     "empty.installed": "Rien d'installé pour l'instant. Choisissez un thème ou une extension dans les autres onglets.",
     "intro.theme": "Un thème change l'apparence d'Apple Music : couleurs, formes et polices. On en utilise un à la fois.",
     "intro.extension": "Une extension ajoute une fonction à Apple Music. Elle liste ce qu'elle a le droit de faire avant que vous l'activiez.",
     "intro.app": "Une app est une page à part dans Apple Music, avec son entrée dans la barre latérale.",
     "intro.snippet": "Un snippet est un petit réglage d'apparence : quelques lignes de style à activer en plus d'un thème.",
+    "intro.developer": "Des exemples pour qui crée des extensions : de petits morceaux de code à lire pour démarrer. Ils n'ajoutent presque rien à Apple Music.",
     "broken.title": "Pourquoi il ne se charge pas",
     "broken.hint": "Désinstallez-le puis réinstallez-le. Si le problème revient, prévenez son auteur.",
     "kind.theme": "Thème", "kind.palette": "Couleurs", "kind.extension": "Extension", "kind.app": "App", "kind.snippet": "Snippet",
@@ -83,7 +85,7 @@ Ampify.i18n.define({
     "scheme": "Variante", "tags": "Mots-clés : {tags}",
     "theme.none": "Aucun thème : le look d'Apple Music.", "theme.inUse": "Thème utilisé : {name}",
     "search.theme": "Rechercher un thème", "search.extension": "Rechercher une extension", "search.app": "Rechercher une app",
-    "search.snippet": "Rechercher un snippet", "search.installed": "Rechercher dans ce qui est installé",
+    "search.snippet": "Rechercher un snippet", "search.developer": "Rechercher un exemple", "search.installed": "Rechercher dans ce qui est installé",
     "search.none": "Rien ne correspond à « {search} »",
     "search.where": "La recherche porte sur les noms, auteurs, descriptions et mots-clés.",
     "catalog.unreadable": "Le catalogue est illisible",
@@ -94,27 +96,27 @@ Ampify.i18n.define({
     "status.unreadable": "Impossible de lire l'état d'Ampify : {error}", "status.unreadableReply": "réponse illisible",
     "status.failed": "Échec : {error}", "status.failedCode": "Échec (code {code})",
     "done.installedInUse": "Installé et utilisé : {name}", "done.installedOn": "Installé et activé : {name}",
-    "done.installedUse": "Installé : {name}. Lisez ce que cet élément peut faire, puis utilisez-le.",
-    "done.installedTurnOn": "Installé : {name}. Lisez ce que cet élément peut faire, puis activez-le.",
     "done.updated": "Mis à jour en {version} : {name}", "done.inUse": "Utilisé : {name}",
     "done.inUseScheme": "Utilisé : {name}, variante {scheme}", "done.appleLook": "Le look d'Apple Music est revenu",
     "done.on": "Activé : {name}", "done.off": "Désactivé : {name}", "done.removed": "Désinstallé : {name}",
     "preview": "Aperçu de {name}",
-    "detail.settings": "Réglages", "detail.settingsNote": "Les changements s'appliquent tout de suite. Ils sont aussi dans les Réglages d'Apple Music, sous Ampify.", "done.setting": "{name} : réglage « {setting} » modifié", "action.settingsOf": "Réglages de {name}",
+    "detail.settings": "Réglages", "detail.reset": "Remettre", "detail.settingsNote": "Les changements s'appliquent tout de suite. Ils sont aussi dans les Réglages d'Apple Music, sous Ampify.", "done.setting": "{name} : réglage « {setting} » modifié", "action.settingsOf": "Réglages de {name}",
     "detail.readmeLoading": "Lecture de sa présentation…",
     "action.settings": "Réglages", "action.openSettings": "Ouvrir les réglages d'Ampify", "detail.can": "Ce qu'il peut faire", "detail.about": "À propos", "detail.kind": "Type", "detail.author": "Créé par", "detail.version": "Version", "detail.tags": "Mots-clés", "detail.gone": "Cet élément n'est plus dans le catalogue ni installé.", "detail.noDescription": "Pas encore de description.",
   },
   de: {
-    "tab.theme": "Designs", "tab.extension": "Erweiterungen", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.installed": "Installiert",
+    "tab.theme": "Designs", "tab.extension": "Erweiterungen", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.developer": "Entwickler", "tab.installed": "Installiert",
     "empty.theme": "Noch kein Design im Katalog.",
     "empty.extension": "Noch keine Erweiterung im Katalog.",
     "empty.app": "Noch keine App im Katalog.",
     "empty.snippet": "Noch kein Snippet im Katalog.",
+    "empty.developer": "Noch kein Beispiel für Entwickler im Katalog.",
     "empty.installed": "Noch nichts installiert. Wählen Sie in den anderen Tabs ein Design oder eine Erweiterung aus.",
     "intro.theme": "Ein Design ändert das Aussehen von Apple Music: Farben, Formen und Schriften. Es ist immer nur eines aktiv.",
     "intro.extension": "Eine Erweiterung fügt Apple Music eine Funktion hinzu. Sie listet auf, was sie darf, bevor Sie sie aktivieren.",
     "intro.app": "Eine App ist eine eigene Seite in Apple Music mit einem Eintrag in der Seitenleiste.",
     "intro.snippet": "Ein Snippet ist eine kleine Anpassung des Aussehens: ein paar Zeilen Stil, die Sie zusätzlich zu einem Design aktivieren.",
+    "intro.developer": "Beispiele für alle, die Erweiterungen entwickeln: kleine Codestücke zum Lesen und als Ausgangspunkt. Sie fügen Apple Music kaum etwas hinzu.",
     "broken.title": "Warum es sich nicht laden lässt",
     "broken.hint": "Deinstallieren Sie es und installieren Sie es erneut. Kehrt das Problem zurück, melden Sie es dem Autor.",
     "kind.theme": "Design", "kind.palette": "Farben", "kind.extension": "Erweiterung", "kind.app": "App", "kind.snippet": "Snippet",
@@ -132,7 +134,7 @@ Ampify.i18n.define({
     "scheme": "Variante", "tags": "Stichwörter: {tags}",
     "theme.none": "Kein Design: der eigene Look von Apple Music.", "theme.inUse": "Aktives Design: {name}",
     "search.theme": "Designs suchen", "search.extension": "Erweiterungen suchen", "search.app": "Apps suchen",
-    "search.snippet": "Snippets suchen", "search.installed": "In den installierten suchen",
+    "search.snippet": "Snippets suchen", "search.developer": "Beispiele suchen", "search.installed": "In den installierten suchen",
     "search.none": "Nichts passt zu „{search}“",
     "search.where": "Die Suche berücksichtigt Namen, Autoren, Beschreibungen und Stichwörter.",
     "catalog.unreadable": "Der Katalog kann nicht gelesen werden",
@@ -143,27 +145,27 @@ Ampify.i18n.define({
     "status.unreadable": "Der Zustand von Ampify kann nicht gelesen werden: {error}", "status.unreadableReply": "unlesbare Antwort",
     "status.failed": "Fehlgeschlagen: {error}", "status.failedCode": "Fehlgeschlagen (Code {code})",
     "done.installedInUse": "{name} installiert und in Benutzung", "done.installedOn": "{name} installiert und aktiviert",
-    "done.installedUse": "{name} installiert. Lesen Sie, was es kann, und verwenden Sie es dann.",
-    "done.installedTurnOn": "{name} installiert. Lesen Sie, was es kann, und aktivieren Sie es dann.",
     "done.updated": "{name} auf {version} aktualisiert", "done.inUse": "{name} in Benutzung",
     "done.inUseScheme": "{name} in Benutzung, Variante {scheme}", "done.appleLook": "Der eigene Look von Apple Music ist zurück",
     "done.on": "{name} aktiviert", "done.off": "{name} deaktiviert", "done.removed": "{name} deinstalliert",
     "preview": "Vorschau von {name}",
-    "detail.settings": "Einstellungen", "detail.settingsNote": "Änderungen gelten sofort. Sie finden sie auch in den Einstellungen von Apple Music unter Ampify.", "done.setting": "{name}: {setting} geändert", "action.settingsOf": "Einstellungen von {name}",
+    "detail.settings": "Einstellungen", "detail.reset": "Zurücksetzen", "detail.settingsNote": "Änderungen gelten sofort. Sie finden sie auch in den Einstellungen von Apple Music unter Ampify.", "done.setting": "{name}: {setting} geändert", "action.settingsOf": "Einstellungen von {name}",
     "detail.readmeLoading": "Beschreibung wird gelesen…",
     "action.settings": "Einstellungen", "action.openSettings": "Ampify-Einstellungen öffnen", "detail.can": "Was es kann", "detail.about": "Info", "detail.kind": "Typ", "detail.author": "Erstellt von", "detail.version": "Version", "detail.tags": "Stichwörter", "detail.gone": "Dieses Element ist weder im Katalog noch installiert.", "detail.noDescription": "Noch keine Beschreibung.",
   },
   es: {
-    "tab.theme": "Temas", "tab.extension": "Extensiones", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.installed": "Instalados",
+    "tab.theme": "Temas", "tab.extension": "Extensiones", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.developer": "Desarrolladores", "tab.installed": "Instalados",
     "empty.theme": "Todavía no hay ningún tema en el catálogo.",
     "empty.extension": "Todavía no hay ninguna extensión en el catálogo.",
     "empty.app": "Todavía no hay ninguna app en el catálogo.",
     "empty.snippet": "Todavía no hay ningún snippet en el catálogo.",
+    "empty.developer": "Todavía no hay ningún ejemplo para desarrolladores en el catálogo.",
     "empty.installed": "Todavía no hay nada instalado. Elige un tema o una extensión en las otras pestañas.",
     "intro.theme": "Un tema cambia el aspecto de Apple Music: colores, formas y fuentes. Se usa uno a la vez.",
     "intro.extension": "Una extensión añade una función a Apple Music. Muestra lo que puede hacer antes de que la actives.",
     "intro.app": "Una app es una página propia dentro de Apple Music, con su entrada en la barra lateral.",
     "intro.snippet": "Un snippet es un pequeño ajuste de aspecto: unas líneas de estilo que activas además de un tema.",
+    "intro.developer": "Ejemplos para quien crea extensiones: pequeños fragmentos de código para leer y empezar. Apenas añaden nada a Apple Music.",
     "broken.title": "Por qué no se puede cargar",
     "broken.hint": "Desinstálalo y vuelve a instalarlo. Si el problema vuelve, avisa a su autor.",
     "kind.theme": "Tema", "kind.palette": "Colores", "kind.extension": "Extensión", "kind.app": "App", "kind.snippet": "Snippet",
@@ -181,7 +183,7 @@ Ampify.i18n.define({
     "scheme": "Variante", "tags": "Etiquetas: {tags}",
     "theme.none": "Ningún tema: el aspecto propio de Apple Music.", "theme.inUse": "Tema en uso: {name}",
     "search.theme": "Buscar temas", "search.extension": "Buscar extensiones", "search.app": "Buscar apps",
-    "search.snippet": "Buscar snippets", "search.installed": "Buscar entre lo instalado",
+    "search.snippet": "Buscar snippets", "search.developer": "Buscar ejemplos", "search.installed": "Buscar entre lo instalado",
     "search.none": "Nada coincide con «{search}»",
     "search.where": "La búsqueda mira los nombres, autores, descripciones y etiquetas.",
     "catalog.unreadable": "No se puede leer el catálogo",
@@ -192,27 +194,27 @@ Ampify.i18n.define({
     "status.unreadable": "No se puede leer el estado de Ampify: {error}", "status.unreadableReply": "respuesta ilegible",
     "status.failed": "Error: {error}", "status.failedCode": "Error (código {code})",
     "done.installedInUse": "Instalado y en uso: {name}", "done.installedOn": "Instalado y activado: {name}",
-    "done.installedUse": "Instalado: {name}. Lee lo que puede hacer y luego úsalo.",
-    "done.installedTurnOn": "Instalado: {name}. Lee lo que puede hacer y luego actívalo.",
     "done.updated": "Actualizado a {version}: {name}", "done.inUse": "{name} en uso",
     "done.inUseScheme": "{name} en uso, variante {scheme}", "done.appleLook": "Ha vuelto el aspecto propio de Apple Music",
     "done.on": "Activado: {name}", "done.off": "Desactivado: {name}", "done.removed": "Desinstalado: {name}",
     "preview": "Vista previa de {name}",
-    "detail.settings": "Ajustes", "detail.settingsNote": "Los cambios se aplican al instante. También están en los Ajustes de Apple Music, en Ampify.", "done.setting": "{name}: ajuste «{setting}» cambiado", "action.settingsOf": "Ajustes de {name}",
+    "detail.settings": "Ajustes", "detail.reset": "Restablecer", "detail.settingsNote": "Los cambios se aplican al instante. También están en los Ajustes de Apple Music, en Ampify.", "done.setting": "{name}: ajuste «{setting}» cambiado", "action.settingsOf": "Ajustes de {name}",
     "detail.readmeLoading": "Leyendo su presentación…",
     "action.settings": "Ajustes", "action.openSettings": "Abrir los ajustes de Ampify", "detail.can": "Lo que puede hacer", "detail.about": "Información", "detail.kind": "Tipo", "detail.author": "Creado por", "detail.version": "Versión", "detail.tags": "Etiquetas", "detail.gone": "Este elemento ya no está en el catálogo ni instalado.", "detail.noDescription": "Todavía no hay descripción.",
   },
   pt: {
-    "tab.theme": "Temas", "tab.extension": "Extensões", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.installed": "Instalados",
+    "tab.theme": "Temas", "tab.extension": "Extensões", "tab.app": "Apps", "tab.snippet": "Snippets", "tab.developer": "Desenvolvedores", "tab.installed": "Instalados",
     "empty.theme": "Ainda não há nenhum tema no catálogo.",
     "empty.extension": "Ainda não há nenhuma extensão no catálogo.",
     "empty.app": "Ainda não há nenhum app no catálogo.",
     "empty.snippet": "Ainda não há nenhum snippet no catálogo.",
+    "empty.developer": "Ainda não há nenhum exemplo para desenvolvedores no catálogo.",
     "empty.installed": "Ainda não há nada instalado. Escolha um tema ou uma extensão nas outras abas.",
     "intro.theme": "Um tema muda a aparência do Apple Music: cores, formas e fontes. Usa-se um de cada vez.",
     "intro.extension": "Uma extensão adiciona uma função ao Apple Music. Ela lista o que pode fazer antes de você ativá-la.",
     "intro.app": "Um app é uma página própria dentro do Apple Music, com uma entrada na barra lateral.",
     "intro.snippet": "Um snippet é um pequeno ajuste de aparência: algumas linhas de estilo que você ativa além de um tema.",
+    "intro.developer": "Exemplos para quem cria extensões: pequenos trechos de código para ler e começar. Quase não acrescentam nada ao Apple Music.",
     "broken.title": "Por que não carrega",
     "broken.hint": "Desinstale e instale de novo. Se o problema voltar, avise o autor.",
     "kind.theme": "Tema", "kind.palette": "Cores", "kind.extension": "Extensão", "kind.app": "App", "kind.snippet": "Snippet",
@@ -230,7 +232,7 @@ Ampify.i18n.define({
     "scheme": "Variante", "tags": "Etiquetas: {tags}",
     "theme.none": "Nenhum tema: o visual próprio do Apple Music.", "theme.inUse": "Tema em uso: {name}",
     "search.theme": "Buscar temas", "search.extension": "Buscar extensões", "search.app": "Buscar apps",
-    "search.snippet": "Buscar snippets", "search.installed": "Buscar entre os instalados",
+    "search.snippet": "Buscar snippets", "search.developer": "Buscar exemplos", "search.installed": "Buscar entre os instalados",
     "search.none": "Nada corresponde a “{search}”",
     "search.where": "A busca olha nomes, autores, descrições e etiquetas.",
     "catalog.unreadable": "Não foi possível ler o catálogo",
@@ -241,27 +243,27 @@ Ampify.i18n.define({
     "status.unreadable": "Não foi possível ler o estado do Ampify: {error}", "status.unreadableReply": "resposta ilegível",
     "status.failed": "Falhou: {error}", "status.failedCode": "Falhou (código {code})",
     "done.installedInUse": "Instalado e em uso: {name}", "done.installedOn": "Instalado e ativado: {name}",
-    "done.installedUse": "Instalado: {name}. Leia o que este item pode fazer e depois use-o.",
-    "done.installedTurnOn": "Instalado: {name}. Leia o que este item pode fazer e depois ative-o.",
     "done.updated": "Atualizado para {version}: {name}", "done.inUse": "{name} em uso",
     "done.inUseScheme": "{name} em uso, variante {scheme}", "done.appleLook": "O visual próprio do Apple Music voltou",
     "done.on": "Ativado: {name}", "done.off": "Desativado: {name}", "done.removed": "Desinstalado: {name}",
     "preview": "Prévia de {name}",
-    "detail.settings": "Ajustes", "detail.settingsNote": "As mudanças valem na hora. Também estão nos Ajustes do Apple Music, em Ampify.", "done.setting": "{name}: ajuste “{setting}” alterado", "action.settingsOf": "Ajustes de {name}",
+    "detail.settings": "Ajustes", "detail.reset": "Repor", "detail.settingsNote": "As mudanças valem na hora. Também estão nos Ajustes do Apple Music, em Ampify.", "done.setting": "{name}: ajuste “{setting}” alterado", "action.settingsOf": "Ajustes de {name}",
     "detail.readmeLoading": "Lendo a apresentação…",
     "action.settings": "Ajustes", "action.openSettings": "Abrir os ajustes do Ampify", "detail.can": "O que ele pode fazer", "detail.about": "Sobre", "detail.kind": "Tipo", "detail.author": "Criado por", "detail.version": "Versão", "detail.tags": "Etiquetas", "detail.gone": "Este elemento não está mais no catálogo nem instalado.", "detail.noDescription": "Ainda não há descrição.",
   },
   ru: {
-    "tab.theme": "Темы", "tab.extension": "Расширения", "tab.app": "Приложения", "tab.snippet": "Сниппеты", "tab.installed": "Установлено",
+    "tab.theme": "Темы", "tab.extension": "Расширения", "tab.app": "Приложения", "tab.snippet": "Сниппеты", "tab.developer": "Разработчикам", "tab.installed": "Установлено",
     "empty.theme": "В каталоге пока нет тем.",
     "empty.extension": "В каталоге пока нет расширений.",
     "empty.app": "В каталоге пока нет приложений.",
     "empty.snippet": "В каталоге пока нет сниппетов.",
+    "empty.developer": "В каталоге пока нет примеров для разработчиков.",
     "empty.installed": "Пока ничего не установлено. Выберите тему или расширение на других вкладках.",
     "intro.theme": "Тема меняет внешний вид Apple Music: цвета, формы и шрифты. Одновременно используется одна.",
     "intro.extension": "Расширение добавляет Apple Music новую функцию. Перед включением оно показывает, что ему разрешено делать.",
     "intro.app": "Приложение — это отдельная страница внутри Apple Music со своим пунктом в боковой панели.",
     "intro.snippet": "Сниппет — небольшая правка оформления: несколько строк стиля, которые включаются вместе с темой.",
+    "intro.developer": "Примеры для тех, кто пишет расширения: небольшие фрагменты кода, чтобы прочитать их и начать с них. Почти ничего не добавляют в Apple Music.",
     "broken.title": "Почему не загружается",
     "broken.hint": "Удалите и установите заново. Если проблема повторится, сообщите автору.",
     "kind.theme": "Тема", "kind.palette": "Цвета", "kind.extension": "Расширение", "kind.app": "Приложение", "kind.snippet": "Сниппет",
@@ -279,7 +281,7 @@ Ampify.i18n.define({
     "scheme": "Вариант", "tags": "Теги: {tags}",
     "theme.none": "Без темы: собственный вид Apple Music.", "theme.inUse": "Используемая тема: {name}",
     "search.theme": "Поиск тем", "search.extension": "Поиск расширений", "search.app": "Поиск приложений",
-    "search.snippet": "Поиск сниппетов", "search.installed": "Поиск среди установленного",
+    "search.snippet": "Поиск сниппетов", "search.developer": "Поиск примеров", "search.installed": "Поиск среди установленного",
     "search.none": "Ничего не найдено по запросу «{search}»",
     "search.where": "Поиск идёт по названиям, авторам, описаниям и тегам.",
     "catalog.unreadable": "Не удаётся прочитать каталог",
@@ -290,27 +292,27 @@ Ampify.i18n.define({
     "status.unreadable": "Не удаётся прочитать состояние Ampify: {error}", "status.unreadableReply": "нечитаемый ответ",
     "status.failed": "Ошибка: {error}", "status.failedCode": "Ошибка (код {code})",
     "done.installedInUse": "{name} установлено и используется", "done.installedOn": "{name} установлено и включено",
-    "done.installedUse": "{name} установлено. Прочитайте, что оно умеет, и начните использовать.",
-    "done.installedTurnOn": "{name} установлено. Прочитайте, что оно умеет, и включите его.",
     "done.updated": "{name} обновлено до {version}", "done.inUse": "{name} используется",
     "done.inUseScheme": "{name} используется, вариант {scheme}", "done.appleLook": "Вернулся собственный вид Apple Music",
     "done.on": "{name} включено", "done.off": "{name} выключено", "done.removed": "{name} удалено",
     "preview": "Предпросмотр: {name}",
-    "detail.settings": "Настройки", "detail.settingsNote": "Изменения применяются сразу. Они есть и в настройках Apple Music, в разделе Ampify.", "done.setting": "{name}: «{setting}» изменено", "action.settingsOf": "Настройки {name}",
+    "detail.settings": "Настройки", "detail.reset": "Сбросить", "detail.settingsNote": "Изменения применяются сразу. Они есть и в настройках Apple Music, в разделе Ampify.", "done.setting": "{name}: «{setting}» изменено", "action.settingsOf": "Настройки {name}",
     "detail.readmeLoading": "Чтение описания…",
     "action.settings": "Настройки", "action.openSettings": "Открыть настройки Ampify", "detail.can": "Что оно умеет", "detail.about": "Сведения", "detail.kind": "Тип", "detail.author": "Автор", "detail.version": "Версия", "detail.tags": "Теги", "detail.gone": "Этого элемента больше нет ни в каталоге, ни среди установленных.", "detail.noDescription": "Описания пока нет.",
   },
   ja: {
-    "tab.theme": "テーマ", "tab.extension": "拡張機能", "tab.app": "アプリ", "tab.snippet": "スニペット", "tab.installed": "インストール済み",
+    "tab.theme": "テーマ", "tab.extension": "拡張機能", "tab.app": "アプリ", "tab.snippet": "スニペット", "tab.developer": "開発者向け", "tab.installed": "インストール済み",
     "empty.theme": "カタログにはまだテーマがありません。",
     "empty.extension": "カタログにはまだ拡張機能がありません。",
     "empty.app": "カタログにはまだアプリがありません。",
     "empty.snippet": "カタログにはまだスニペットがありません。",
+    "empty.developer": "カタログにはまだ開発者向けのサンプルがありません。",
     "empty.installed": "まだ何もインストールされていません。ほかのタブからテーマや拡張機能を選んでください。",
     "intro.theme": "テーマは Apple Music の見た目 (色、形、フォント) を変えます。一度に使えるのは 1 つです。",
     "intro.extension": "拡張機能は Apple Music に機能を追加します。オンにする前に、許可される操作が一覧で表示されます。",
     "intro.app": "アプリは Apple Music の中にある専用ページで、サイドバーに項目が追加されます。",
     "intro.snippet": "スニペットは見た目の小さな調整です。テーマに加えてオンにできる数行のスタイルです。",
+    "intro.developer": "拡張機能を作る人のためのサンプルです。読んで出発点にできる、小さなコードです。Apple Music にはほとんど何も加えません。",
     "broken.title": "読み込めない理由",
     "broken.hint": "いったんアンインストールして、もう一度インストールしてください。再発する場合は作者にお知らせください。",
     "kind.theme": "テーマ", "kind.palette": "カラー", "kind.extension": "拡張機能", "kind.app": "アプリ", "kind.snippet": "スニペット",
@@ -328,7 +330,7 @@ Ampify.i18n.define({
     "scheme": "バリエーション", "tags": "タグ： {tags}",
     "theme.none": "テーマなし： Apple Music 本来の見た目です。", "theme.inUse": "使用中のテーマ： {name}",
     "search.theme": "テーマを検索", "search.extension": "拡張機能を検索", "search.app": "アプリを検索",
-    "search.snippet": "スニペットを検索", "search.installed": "インストール済みから検索",
+    "search.snippet": "スニペットを検索", "search.developer": "サンプルを検索", "search.installed": "インストール済みから検索",
     "search.none": "「{search}」に一致するものはありません",
     "search.where": "検索の対象は、名前、作者、説明、タグです。",
     "catalog.unreadable": "カタログを読み込めません",
@@ -339,27 +341,27 @@ Ampify.i18n.define({
     "status.unreadable": "Ampify の状態を読み取れません： {error}", "status.unreadableReply": "読み取れない応答",
     "status.failed": "失敗しました： {error}", "status.failedCode": "失敗しました（コード {code}）",
     "done.installedInUse": "{name} をインストールして使用中です", "done.installedOn": "{name} をインストールしてオンにしました",
-    "done.installedUse": "{name} をインストールしました。できることを確認してから使ってください。",
-    "done.installedTurnOn": "{name} をインストールしました。できることを確認してからオンにしてください。",
     "done.updated": "{name} を {version} に更新しました", "done.inUse": "{name} を使用中です",
     "done.inUseScheme": "{name} を使用中（バリエーション： {scheme}）", "done.appleLook": "Apple Music 本来の見た目に戻しました",
     "done.on": "{name} をオンにしました", "done.off": "{name} をオフにしました", "done.removed": "{name} をアンインストールしました",
     "preview": "{name} のプレビュー",
-    "detail.settings": "設定", "detail.settingsNote": "変更はすぐに反映されます。Apple Music の設定の「Ampify」にもあります。", "done.setting": "{name}：{setting} を変更しました", "action.settingsOf": "{name} の設定",
+    "detail.settings": "設定", "detail.reset": "初期値に戻す", "detail.settingsNote": "変更はすぐに反映されます。Apple Music の設定の「Ampify」にもあります。", "done.setting": "{name}：{setting} を変更しました", "action.settingsOf": "{name} の設定",
     "detail.readmeLoading": "説明を読み込んでいます…",
     "action.settings": "設定", "action.openSettings": "Ampify の設定を開く", "detail.can": "できること", "detail.about": "情報", "detail.kind": "種類", "detail.author": "作者", "detail.version": "バージョン", "detail.tags": "タグ", "detail.gone": "この要素はカタログにもインストール済みにもありません。", "detail.noDescription": "説明はまだありません。",
   },
   zh: {
-    "tab.theme": "主题", "tab.extension": "扩展", "tab.app": "应用", "tab.snippet": "代码片段", "tab.installed": "已安装",
+    "tab.theme": "主题", "tab.extension": "扩展", "tab.app": "应用", "tab.snippet": "代码片段", "tab.developer": "开发者", "tab.installed": "已安装",
     "empty.theme": "目录中暂时没有主题。",
     "empty.extension": "目录中暂时没有扩展。",
     "empty.app": "目录中暂时没有应用。",
     "empty.snippet": "目录中暂时没有代码片段。",
+    "empty.developer": "目录中暂时没有面向开发者的示例。",
     "empty.installed": "还没有安装任何内容。请在其他标签页中选择主题或扩展。",
     "intro.theme": "主题会改变 Apple Music 的外观：颜色、形状和字体。同一时间只使用一个。",
     "intro.extension": "扩展会为 Apple Music 增加功能。开启前，它会列出自己被允许做的事。",
     "intro.app": "应用是 Apple Music 里的独立页面，在侧边栏中有自己的入口。",
     "intro.snippet": "代码片段是对外观的小调整：几行样式，可在主题之外额外开启。",
+    "intro.developer": "为制作扩展的人准备的示例：可以阅读并以此起步的小段代码。它们几乎不会给 Apple Music 增加任何功能。",
     "broken.title": "无法加载的原因",
     "broken.hint": "请卸载后重新安装。如果问题再次出现，请告知其作者。",
     "kind.theme": "主题", "kind.palette": "配色", "kind.extension": "扩展", "kind.app": "应用", "kind.snippet": "代码片段",
@@ -377,7 +379,7 @@ Ampify.i18n.define({
     "scheme": "配色方案", "tags": "标签：{tags}",
     "theme.none": "没有主题：Apple Music 原本的外观。", "theme.inUse": "正在使用的主题：{name}",
     "search.theme": "搜索主题", "search.extension": "搜索扩展", "search.app": "搜索应用",
-    "search.snippet": "搜索代码片段", "search.installed": "在已安装的内容中搜索",
+    "search.snippet": "搜索代码片段", "search.developer": "搜索示例", "search.installed": "在已安装的内容中搜索",
     "search.none": "没有与“{search}”匹配的内容",
     "search.where": "搜索范围包括名称、作者、描述和标签。",
     "catalog.unreadable": "无法读取目录",
@@ -388,18 +390,122 @@ Ampify.i18n.define({
     "status.unreadable": "无法读取 Ampify 的状态：{error}", "status.unreadableReply": "无法识别的响应",
     "status.failed": "失败：{error}", "status.failedCode": "失败（代码 {code}）",
     "done.installedInUse": "{name} 已安装并正在使用", "done.installedOn": "{name} 已安装并开启",
-    "done.installedUse": "{name} 已安装。请先看看它能做什么，再使用它。",
-    "done.installedTurnOn": "{name} 已安装。请先看看它能做什么，再开启它。",
     "done.updated": "{name} 已更新到 {version}", "done.inUse": "正在使用 {name}",
     "done.inUseScheme": "正在使用 {name}，配色方案：{scheme}", "done.appleLook": "已恢复 Apple Music 原本的外观",
     "done.on": "{name} 已开启", "done.off": "{name} 已关闭", "done.removed": "{name} 已卸载",
     "preview": "{name} 的预览",
-    "detail.settings": "设置", "detail.settingsNote": "更改会立即生效。也可以在 Apple Music 的“设置”中的 Ampify 下找到。", "done.setting": "{name}：已更改 {setting}", "action.settingsOf": "{name} 的设置",
+    "detail.settings": "设置", "detail.reset": "恢复默认", "detail.settingsNote": "更改会立即生效。也可以在 Apple Music 的“设置”中的 Ampify 下找到。", "done.setting": "{name}：已更改 {setting}", "action.settingsOf": "{name} 的设置",
     "detail.readmeLoading": "正在读取介绍…",
     "action.settings": "设置", "action.openSettings": "打开 Ampify 设置", "detail.can": "它可以做什么", "detail.about": "关于", "detail.kind": "类型", "detail.author": "作者", "detail.version": "版本", "detail.tags": "标签", "detail.gone": "该内容已不在目录中，也未安装。", "detail.noDescription": "暂无描述。",
   },
+  it: {
+    "tab.theme": "Temi", "tab.extension": "Estensioni", "tab.app": "App", "tab.snippet": "Snippet", "tab.developer": "Sviluppatori", "tab.installed": "Installati",
+    "empty.theme": "Ancora nessun tema nel catalogo.",
+    "empty.extension": "Ancora nessuna estensione nel catalogo.",
+    "empty.app": "Ancora nessuna app nel catalogo.",
+    "empty.snippet": "Ancora nessuno snippet nel catalogo.",
+    "empty.developer": "Ancora nessun esempio per sviluppatori nel catalogo.",
+    "empty.installed": "Ancora nulla di installato. Scegli un tema o un'estensione nelle altre schede.",
+    "intro.theme": "Un tema cambia l'aspetto di Apple Music: colori, forme e caratteri. Se ne usa uno alla volta.",
+    "intro.extension": "Un'estensione aggiunge una funzione ad Apple Music. Elenca ciò che può fare prima che tu la attivi.",
+    "intro.app": "Un'app è una pagina a sé dentro Apple Music, con una voce nella barra laterale.",
+    "intro.snippet": "Uno snippet è un piccolo ritocco all'aspetto: poche righe di stile da attivare oltre a un tema.",
+    "intro.developer": "Esempi per chi crea estensioni: piccoli pezzi di codice da leggere e da cui partire. Aggiungono poco o nulla ad Apple Music.",
+    "broken.title": "Perché non si carica",
+    "broken.hint": "Disinstallalo e installalo di nuovo. Se il problema si ripresenta, avvisa l'autore.",
+    "kind.theme": "Tema", "kind.palette": "Colori", "kind.extension": "Estensione", "kind.app": "App", "kind.snippet": "Snippet",
+    "by": "di {author}", "version": "versione {version}",
+    "state.broken": "Non si carica: apri Dettagli per vedere perché", "state.installed": "Installato", "state.inUse": "In uso",
+    "state.on": "Attivo", "state.off": "Disattivo", "state.update": "Aggiorna alla {version}",
+    "action.install": "Installa", "action.update": "Aggiorna", "action.use": "Usa", "action.turnOff": "Disattiva",
+    "action.turnOn": "Attiva", "action.details": "Dettagli", "action.uninstall": "Disinstalla",
+    "action.confirmUninstall": "Conferma la disinstallazione", "action.refresh": "Aggiorna elenco",
+    "action.clearSearch": "Cancella la ricerca", "action.appleLook": "Usa l'aspetto di Apple Music",
+    "action.previous": "Precedente", "action.next": "Successiva",
+    "uninstall.themeFirst": "Disattiva prima il tema",
+    "perm.none": "Non richiede alcun permesso.", "perm.can": "Può:", "perm.one": "Richiede 1 permesso", "perm.count": "Richiede {count} permessi",
+    "perm.new": "novità della versione {version}",
+    "scheme": "Variante", "tags": "Tag: {tags}",
+    "theme.none": "Nessun tema: l'aspetto di Apple Music.", "theme.inUse": "Tema in uso: {name}",
+    "search.theme": "Cerca temi", "search.extension": "Cerca estensioni", "search.app": "Cerca app",
+    "search.snippet": "Cerca snippet", "search.developer": "Cerca esempi", "search.installed": "Cerca tra gli installati",
+    "search.none": "Nessun risultato per «{search}»",
+    "search.where": "La ricerca guarda nomi, autori, descrizioni e tag.",
+    "catalog.unreadable": "Impossibile leggere il catalogo",
+    "catalog.unreadableText": "Controlla la connessione, poi aggiorna. Ciò che è installato continua a funzionare e resta in Installati.",
+    "catalog.offline": "Impossibile leggere il catalogo in questo momento: queste sono le copie installate.",
+    "empty.title": "Ancora nulla qui", "page": "Pagina {page} di {pages}",
+    "status.reading": "Lettura del catalogo…", "status.working": "In corso…",
+    "status.unreadable": "Impossibile leggere lo stato di Ampify: {error}", "status.unreadableReply": "risposta illeggibile",
+    "status.failed": "Non riuscito: {error}", "status.failedCode": "Non riuscito (codice {code})",
+    "done.installedInUse": "{name} installato e in uso", "done.installedOn": "{name} installato e attivo",
+    "done.updated": "{name} aggiornato alla {version}", "done.inUse": "{name} in uso",
+    "done.inUseScheme": "{name} in uso, variante {scheme}", "done.appleLook": "È tornato l'aspetto di Apple Music",
+    "done.on": "{name} attivato", "done.off": "{name} disattivato", "done.removed": "{name} disinstallato",
+    "preview": "Anteprima di {name}",
+    "detail.settings": "Impostazioni", "detail.reset": "Ripristina", "detail.settingsNote": "Le modifiche si applicano subito. Le trovi anche nelle Impostazioni di Apple Music, sotto Ampify.", "done.setting": "{name}: {setting} modificato", "action.settingsOf": "Impostazioni di {name}",
+    "detail.readmeLoading": "Lettura della descrizione…",
+    "action.settings": "Impostazioni", "action.openSettings": "Apri le impostazioni di Ampify", "detail.can": "Cosa può fare", "detail.about": "Informazioni", "detail.kind": "Tipo", "detail.author": "Creato da", "detail.version": "Versione", "detail.tags": "Tag", "detail.gone": "Questo elemento non è più nel catalogo né installato.", "detail.noDescription": "Ancora nessuna descrizione.",
+  },
+  ko: {
+    "tab.theme": "테마", "tab.extension": "확장 기능", "tab.app": "앱", "tab.snippet": "스니펫", "tab.developer": "개발자용", "tab.installed": "설치됨",
+    "empty.theme": "카탈로그에 아직 테마가 없습니다.",
+    "empty.extension": "카탈로그에 아직 확장 기능이 없습니다.",
+    "empty.app": "카탈로그에 아직 앱이 없습니다.",
+    "empty.snippet": "카탈로그에 아직 스니펫이 없습니다.",
+    "empty.developer": "카탈로그에 아직 개발자용 예제가 없습니다.",
+    "empty.installed": "아직 설치된 것이 없습니다. 다른 탭에서 테마나 확장 기능을 골라 보세요.",
+    "intro.theme": "테마는 Apple Music의 모양(색, 형태, 글꼴)을 바꿉니다. 한 번에 하나만 사용합니다.",
+    "intro.extension": "확장 기능은 Apple Music에 기능을 더합니다. 켜기 전에 허용된 작업 목록을 보여 줍니다.",
+    "intro.app": "앱은 Apple Music 안의 별도 페이지이며, 사이드바에 항목이 생깁니다.",
+    "intro.snippet": "스니펫은 모양을 살짝 바꾸는 몇 줄의 스타일로, 테마와 함께 켤 수 있습니다.",
+    "intro.developer": "확장 기능을 만드는 분을 위한 예제입니다. 읽고 시작점으로 삼을 수 있는 작은 코드이며, Apple Music에는 거의 아무것도 더하지 않습니다.",
+    "broken.title": "로드되지 않는 이유",
+    "broken.hint": "제거한 뒤 다시 설치하세요. 문제가 계속되면 제작자에게 알려 주세요.",
+    "kind.theme": "테마", "kind.palette": "색상", "kind.extension": "확장 기능", "kind.app": "앱", "kind.snippet": "스니펫",
+    "by": "{author} 제작", "version": "버전 {version}",
+    "state.broken": "로드할 수 없음: 자세히를 열어 이유 확인", "state.installed": "설치됨", "state.inUse": "사용 중",
+    "state.on": "켜짐", "state.off": "꺼짐", "state.update": "{version}(으)로 업데이트",
+    "action.install": "설치", "action.update": "업데이트", "action.use": "사용", "action.turnOff": "끄기",
+    "action.turnOn": "켜기", "action.details": "자세히", "action.uninstall": "제거",
+    "action.confirmUninstall": "제거 확인", "action.refresh": "새로 고침",
+    "action.clearSearch": "검색 지우기", "action.appleLook": "Apple Music 기본 모양 사용",
+    "action.previous": "이전", "action.next": "다음",
+    "uninstall.themeFirst": "먼저 테마를 끄세요",
+    "perm.none": "권한이 필요하지 않습니다.", "perm.can": "할 수 있는 일:", "perm.one": "권한 1개 필요", "perm.count": "권한 {count}개 필요",
+    "perm.new": "버전 {version}에서 추가됨",
+    "scheme": "변형", "tags": "태그: {tags}",
+    "theme.none": "테마 없음: Apple Music 기본 모양.", "theme.inUse": "사용 중인 테마: {name}",
+    "search.theme": "테마 검색", "search.extension": "확장 기능 검색", "search.app": "앱 검색",
+    "search.snippet": "스니펫 검색", "search.developer": "예제 검색", "search.installed": "설치된 항목에서 검색",
+    "search.none": "“{search}”와(과) 일치하는 항목이 없습니다",
+    "search.where": "이름, 제작자, 설명, 태그에서 검색합니다.",
+    "catalog.unreadable": "카탈로그를 읽을 수 없습니다",
+    "catalog.unreadableText": "연결을 확인한 뒤 새로 고치세요. 설치된 항목은 계속 작동하며 설치됨에 남아 있습니다.",
+    "catalog.offline": "지금은 카탈로그를 읽을 수 없습니다. 설치된 사본을 보여 줍니다.",
+    "empty.title": "아직 아무것도 없습니다", "page": "{page} / {pages} 페이지",
+    "status.reading": "카탈로그 읽는 중…", "status.working": "처리 중…",
+    "status.unreadable": "Ampify의 상태를 읽을 수 없습니다: {error}", "status.unreadableReply": "읽을 수 없는 응답",
+    "status.failed": "실패: {error}", "status.failedCode": "실패 (코드 {code})",
+    "done.installedInUse": "{name}을(를) 설치하고 사용 중", "done.installedOn": "{name}을(를) 설치하고 켬",
+    "done.updated": "{name}을(를) {version}(으)로 업데이트했습니다", "done.inUse": "{name} 사용 중",
+    "done.inUseScheme": "{name} 사용 중, {scheme} 변형", "done.appleLook": "Apple Music 기본 모양으로 돌아왔습니다",
+    "done.on": "{name}을(를) 켰습니다", "done.off": "{name}을(를) 껐습니다", "done.removed": "{name}을(를) 제거했습니다",
+    "preview": "{name} 미리보기",
+    "detail.settings": "설정", "detail.reset": "초기화", "detail.settingsNote": "변경은 바로 적용됩니다. Apple Music 설정의 Ampify에서도 볼 수 있습니다.", "done.setting": "{name}: {setting} 변경됨", "action.settingsOf": "{name} 설정",
+    "detail.readmeLoading": "설명 읽는 중…",
+    "action.settings": "설정", "action.openSettings": "Ampify 설정 열기", "detail.can": "할 수 있는 일", "detail.about": "정보", "detail.kind": "종류", "detail.author": "제작자", "detail.version": "버전", "detail.tags": "태그", "detail.gone": "이 항목은 카탈로그에도 없고 설치되어 있지도 않습니다.", "detail.noDescription": "아직 설명이 없습니다.",
+  },
 });
-const t = (key, values) => Ampify.i18n.t(key, values);
+// French elides "de" before a vowel: "Réglages d'Égaliseur animé", not "de Égaliseur". A name that starts with an h
+// keeps "de" (aspirated or not, it cannot be told from the letters).
+const ELIDES = /^[AEIOUYÀÂÄÉÈÊËÎÏÔÖŒÙÛÜaeiouyàâäéèêëîïôöœùûü]/;
+const t = (key, values) => {
+  const text = Ampify.i18n.t(key, values);
+  const name = values && typeof values.name === "string" ? values.name : "";
+  if (Ampify.i18n.language !== "fr" || !ELIDES.test(name)) return text;
+  return text.replace("de " + name, "d'" + name);
+};
 
 // One sentence per permission, shown before the installation and before turning it on.
 const PERMISSIONS = {
@@ -643,6 +749,66 @@ const PERMISSIONS = {
     "clipboard.write": "将文本复制到剪贴板",
     network: "向 {host} 发送请求",
   },
+  it: {
+    "player.read": "vedere il brano in riproduzione",
+    "player.control": "riprodurre, mettere in pausa e cambiare brano",
+    "audio.analyze": "analizzare il suono (tempo, volume)",
+    "audio.gain": "alzare o abbassare il volume del suono",
+    "audio.eq": "impostare un equalizzatore",
+    storage: "conservare le proprie impostazioni",
+    notifications: "mostrare notifiche",
+    "ipc.discord": "parlare con Discord (stato)",
+    "midi.input": "leggere un controller MIDI",
+    "library.read": "leggere la libreria",
+    "library.write": "modificare la libreria",
+    "services.read": "leggere lo stato dei servizi di Ampify",
+    "ui.keyboard": "aggiungere scorciatoie da tastiera",
+    "ui.topbar": "aggiungere un pulsante in alto",
+    "ui.playbar": "aggiungere un pulsante nella barra di riproduzione",
+    "ui.sidebar": "aggiungere una voce nella barra laterale",
+    "ui.menu": "aggiungere voci di menu",
+    "ui.popup": "aprire finestre popup",
+    "ui.panel": "mostrare un pannello a destra",
+    "ui.page": "aggiungere una pagina",
+    "ui.window": "aprire una finestra",
+    "ui.tray": "aggiungere un'icona vicino all'orologio",
+    "ui.fullscreen": "coprire la finestra con una vista a schermo intero",
+    "fs.output": "scrivere file di testo nella propria cartella Ampify",
+    "kit.manage": "installare e rimuovere elementi tramite ampify",
+    "clipboard.read": "leggere ciò che hai copiato",
+    "clipboard.write": "copiare testo negli appunti",
+    network: "inviare richieste a {host}",
+  },
+  ko: {
+    "player.read": "재생 중인 곡 보기",
+    "player.control": "재생, 일시 정지, 곡 전환하기",
+    "audio.analyze": "소리 분석하기 (템포, 음량)",
+    "audio.gain": "소리를 크게 또는 작게 하기",
+    "audio.eq": "이퀄라이저 설정하기",
+    storage: "자체 설정 저장하기",
+    notifications: "알림 표시하기",
+    "ipc.discord": "Discord와 통신하기 (상태)",
+    "midi.input": "MIDI 컨트롤러 읽기",
+    "library.read": "라이브러리 읽기",
+    "library.write": "라이브러리 수정하기",
+    "services.read": "Ampify 서비스의 상태 읽기",
+    "ui.keyboard": "키보드 단축키 추가하기",
+    "ui.topbar": "위쪽에 버튼 추가하기",
+    "ui.playbar": "재생 막대에 버튼 추가하기",
+    "ui.sidebar": "사이드바에 항목 추가하기",
+    "ui.menu": "메뉴 항목 추가하기",
+    "ui.popup": "팝업 창 열기",
+    "ui.panel": "오른쪽에 패널 표시하기",
+    "ui.page": "페이지 추가하기",
+    "ui.window": "창 열기",
+    "ui.tray": "시계 옆에 아이콘 추가하기",
+    "ui.fullscreen": "창을 전체 화면 보기로 덮기",
+    "fs.output": "자체 Ampify 폴더에 텍스트 파일 쓰기",
+    "kit.manage": "ampify로 항목 설치 및 제거하기",
+    "clipboard.read": "복사한 내용 읽기",
+    "clipboard.write": "클립보드에 텍스트 복사하기",
+    network: "{host}에 요청 보내기",
+  },
 };
 const permissionTexts = PERMISSIONS[Ampify.i18n.language] || PERMISSIONS.en;
 const fill = (pattern, values) => pattern.replace(/\{(\w+)\}/g, (all, name) => (name in values ? values[name] : all));
@@ -652,7 +818,7 @@ const describePermission = (permission) =>
     ? fill(permissionTexts.network, { host: permission.slice(8) })
     : permissionTexts[permission] || PERMISSIONS.en[permission] || permission;
 
-const TABS = ["theme", "extension", "app", "snippet", "installed"];
+const TABS = ["theme", "extension", "app", "snippet", "installed", "developer"];
 const KIND_ORDER = ["theme", "extension", "app", "snippet"];
 // The kit's icon of each kind (Ampify.icons), for an element without a preview picture.
 const KIND_ICONS = { theme: "drop", extension: "puzzle", app: "apps", snippet: "code" };
@@ -683,7 +849,8 @@ function newer(a, b) {
 // The catalog entry and the installed copy of one element, as one card. The installed picture comes first: it is local.
 function merge(entry, installed) {
   const source = entry || installed;
-  const update = Boolean(entry && installed && newer(entry.version, installed.version));
+  // A copy that cannot load has no version to compare: its card says why, not that an update waits.
+  const update = Boolean(entry && installed && installed.valid && newer(entry.version, installed.version));
   // The translation for Windows' language, from the catalog or else the installed copy (a catalog published before the
   // element was translated has none), else the English name and description.
   const translationOf = (copy) => (copy && copy.translations && copy.translations[Ampify.i18n.language]) || null;
@@ -723,6 +890,19 @@ function itemsOf(state) {
   return items.sort((a, b) => a.sortName.localeCompare(b.sortName));
 }
 
+// The examples for people who make extensions, by their "developer" tag: they have a tab of their own.
+const forDevelopers = (item) => item.tags.includes("developer");
+
+// What a tab lists: everything installed, the examples, or the elements of one kind that are not examples.
+function itemsInTab(items, tab) {
+  if (tab === "installed") {
+    return items.filter((item) => item.installed)
+      .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name));
+  }
+  if (tab === "developer") return items.filter(forDevelopers);
+  return items.filter((item) => item.kind === tab && !forDevelopers(item));
+}
+
 const matches = (item, search) => {
   const wanted = search.trim().toLowerCase();
   return !wanted || [item.name, item.id, item.description, item.author, item.tags.join(" ")]
@@ -755,7 +935,8 @@ function permissionsToGrant(item, activeTheme) {
 }
 
 
-// The scheme a menu shows: the one in use when the theme has it ("auto" or a stale name does not), else its default.
+// The scheme a menu shows: the one on screen, which ampify works out as the kernel does ("auto" follows Windows,
+// theme.schedule the clock), else the stored one when the theme has it, else its default.
 function shownScheme(theme, scheme) {
   const schemes = theme.installed.schemes || [];
   if (schemes.includes(scheme)) return scheme;
@@ -776,14 +957,15 @@ function Preview({ item, height, onClick }) {
                 align: "center", valign: "center", grow: true }));
 }
 
-// The main action of an element, from its state: install, update, use a theme, or turn it on and off. On a card, an
-// action that grants permissions opens the detail view instead, where they are all written; its label ends with an
-// ellipsis, as a Windows button that asks more before acting.
+// The main action of an element, from its state: install (which also puts it on), update, use a theme, or turn it on
+// and off. On a card, an action that grants permissions opens the detail view instead, where they are all written; its
+// label ends with an ellipsis, as a Windows button that asks more before acting.
 function MainAction({ item, activeTheme, busy, act, open }) {
-  if (!item.installed) return h(ButtonPrimary, { label: t("action.install"), disabled: busy, onClick: () => act.install(item) });
-  const ask = Boolean(open) && permissionsToGrant(item, activeTheme).length > 0;
+  const granted = item.installed ? permissionsToGrant(item, activeTheme) : item.permissions;
+  const ask = Boolean(open) && granted.length > 0;
   const primary = (label, onClick) =>
     h(ButtonPrimary, { label: ask ? label + "…" : label, disabled: busy, onClick: ask ? open : onClick });
+  if (!item.installed) return primary(t("action.install"), () => act.install(item));
   if (item.update) return primary(t("action.update"), () => act.update(item));
   if (!item.installed.valid) return null;
   if (item.kind === "theme") {
@@ -804,7 +986,8 @@ function ItemCard({ item, activeTheme, busy, act, open, previewHeight }) {
   const state = stateOf(item, activeTheme);
   const count = item.permissions.length;
   // Every line keeps its height, so the buttons of a row of cards line up.
-  return h(Card, { grow: true, valign: "stretch", padding: 14 },
+  // The whole card opens the element's page, and lights up under the pointer; its buttons keep their own clicks.
+  return h(Card, { grow: true, valign: "stretch", padding: 14, onClick: open },
     h(Preview, { item, height: previewHeight, onClick: open }),
     h(Text, { weight: 600, wrap: false }, item.name),
     h(Text, { variant: "caption", wrap: false }, meta),
@@ -1027,7 +1210,23 @@ function settingTexts(item) {
   return {
     label: (setting) => (translated.settings && translated.settings[setting.key]) || setting.label,
     option: (value) => (translated.options && translated.options[value]) || value,
+    description: (setting) => (translated.settingDescriptions && translated.settingDescriptions[setting.key])
+      || setting.description || "",
+    group: (name) => (translated.groups && translated.groups[name]) || name,
   };
+}
+
+// The settings under their headings, as Ampify's settings page shows them: those without a group first, then each
+// group in the order its first setting is declared (settings_panel::GroupSettings).
+function settingGroups(settings) {
+  const groups = [{ name: "", settings: [] }];
+  for (const setting of settings) {
+    const name = setting.group || "";
+    let group = groups.find((each) => each.name === name);
+    if (!group) groups.push(group = { name, settings: [] });
+    group.settings.push(setting);
+  }
+  return groups.filter((group) => group.settings.length);
 }
 
 const SETTING_DELAY_MS = 600;  // a slider or a field is written once the hand stops, not at every step
@@ -1043,15 +1242,13 @@ function changeLater(key, change) {
 
 // One declared setting as the control of its type: a switch, a menu, a slider when a number has both bounds, else a
 // field. The control shows the new value at once; ampify writes it, then the state is read again.
-function SettingControl({ item, setting, texts, act }) {
-  const [value, setValue] = useState(setting.value);
-  const label = texts.label(setting);
+function controlOf({ item, setting, label, texts, value, setValue, act }) {
   const later = (next) => {
-    setValue(next);
+    setValue(String(next));
     changeLater(item.key + ":" + setting.key, () => act.setting(item, setting, label, String(next)));
   };
   if (setting.type === "toggle") {
-    return h(Toggle, { label, checked: value === "true" || value === true,
+    return h(Toggle, { label, checked: value === "true",
                        onChange: (on) => { setValue(String(on)); act.setting(item, setting, label, String(on)); } });
   }
   if (setting.type === "choice") {
@@ -1066,15 +1263,46 @@ function SettingControl({ item, setting, texts, act }) {
   return h(TextField, { label, value, onChange: later });
 }
 
-// The element's settings on its own page, changed in place: the same ones as in Apple Music's Settings.
+// One declared setting as the control of its type (a switch, a menu, a slider when a number has both bounds, else a
+// field), its description under it, and Reset while it is not at its default, as on Ampify's settings page. The
+// control shows the new value at once; ampify writes it to settings.txt, the file both places read.
+function SettingControl({ item, setting, texts, act }) {
+  const [value, setValue] = useState(String(setting.value));
+  const label = texts.label(setting);
+  const description = texts.description(setting);
+  const fallback = setting.default === undefined ? null : String(setting.default);
+  const changed = fallback !== null && value !== fallback;
+  const reset = () => {
+    setValue(fallback);
+    act.setting(item, setting, label, fallback);
+  };
+  return h("row", { gap: 12 },
+    h("stack", { gap: 4, grow: true },
+      controlOf({ item, setting, label, texts, value, setValue, act }),
+      description ? h(Text, { key: "help", variant: "caption" }, description) : null),
+    // Kept in place and faded, so the row does not move when the value comes back to its default.
+    h("stack", { valign: "end", opacity: changed ? 1 : 0, inert: !changed, transition: "opacity 150ms" },
+      h(ButtonTertiary, { label: t("detail.reset"), tooltip: t("detail.reset") + " " + label, onClick: reset })));
+}
+
+// The element's settings on its own page, changed in place: the same ones, grouped the same way, as on Ampify's
+// settings page in Apple Music. The card fades in, so opening it from a card's gear does not flash.
 function SettingsPanel({ item, act, named }) {
+  const [shown, setShown] = useState(false);
+  useEffect(() => { setShown(true); }, []);
   const settings = (item.installed && item.installed.settings) || [];
   if (!settings.length) return null;
   const texts = settingTexts(item);
-  return h(Card, { title: named ? t("action.settingsOf", { name: item.name }) : t("detail.settings"), padding: 16 },
-    h("stack", { gap: 12 },
+  // Flat, the card itself fading and the groups' headings among the controls: the interface takes 8 levels at most,
+  // and a setting's row with its description nested one more (the equalizer's card stayed empty).
+  return h(Card, { title: named ? t("action.settingsOf", { name: item.name }) : t("detail.settings"), padding: 16,
+                   opacity: shown ? 1 : 0, transition: "opacity 200ms" },
+    h("stack", { gap: 16 },
       h(Text, { key: "note", variant: "caption" }, t("detail.settingsNote")),
-      settings.map((setting) => h(SettingControl, { key: setting.key, item, setting, texts, act }))));
+      settingGroups(settings).flatMap((group) => [
+        group.name ? h(Text, { key: "heading:" + group.name, weight: 600 }, texts.group(group.name)) : null,
+        ...group.settings.map((setting) => h(SettingControl, { key: setting.key, item, setting, texts, act })),
+      ])));
 }
 
 // The detail page of an element: its name, what it does and its actions first, then what it may do and where it
@@ -1127,7 +1355,7 @@ function Details({ item, activeTheme, scheme, busy, act, message }) {
     item.author ? h(Fact, { label: t("detail.author"), value: item.author }) : null,
     item.version ? h(Fact, { label: t("detail.version"), value: item.version }) : null,
     item.tags.length ? h(Fact, { label: t("detail.tags"), value: item.tags.join(", ") }) : null,
-    item.installed && item.kind !== "snippet"
+    item.installed
       ? h("row", { gap: 8 }, h(Button, { label: t("action.openSettings"), onClick: openSettings }), h("stack", { grow: true }))
       : null);
 
@@ -1255,18 +1483,14 @@ function useMarket(onItemPage) {
       .finally(() => setBusy(false));
   };
 
-  // An element without permissions is installed and put on in one click. One with permissions stays off: its detail
-  // page opens, with the list of what it may do above the button that turns it on.
+  // Installing puts the element on: a theme in use, anything else turned on. One with permissions is installed from
+  // its detail page, which lists what it may do (the card's button opens it).
   const act = {
     install: (item) => {
       const theme = item.kind === "theme";
       const turnOn = theme ? ["theme", "set", item.id] : [item.kind, "enable", item.id];
-      if (!item.permissions.length) {
-        return run([["install", item.id, "--yes"], turnOn],
-                   t(theme ? "done.installedInUse" : "done.installedOn", { name: item.name }));
-      }
-      const note = t(theme ? "done.installedUse" : "done.installedTurnOn", { name: item.name });
-      return run([["install", item.id, "--yes"]], note).then((ok) => ok && !onItemPage && openItem(item, note));
+      return run([["install", item.id, "--yes"], turnOn],
+                 t(theme ? "done.installedInUse" : "done.installedOn", { name: item.name }));
     },
     update: (item) => run([["update", item.id, "--yes"]], t("done.updated", { name: item.name, version: item.entry.version })),
     use: (item, scheme) => run([["theme", "set", item.id].concat(scheme ? ["--scheme", scheme] : [])],
@@ -1296,7 +1520,7 @@ function MarketItem() {
   if (!state) return h(Text, null, message);
   const item = itemsOf(state).find((candidate) => candidate.key === view.item);
   if (!item) return h(Empty, { title: t("empty.title"), text: t("detail.gone") });
-  return h(Details, { item, activeTheme, scheme: state.scheme, busy, act, message });
+  return h(Details, { item, activeTheme, scheme: state.schemeInUse || state.scheme, busy, act, message });
 }
 
 function Marketplace() {
@@ -1326,11 +1550,7 @@ function Marketplace() {
 
   const items = itemsOf(state);
   const current = TABS.includes(tab) ? tab : TABS[0];
-  const inTab = current === "installed"
-    ? items.filter((item) => item.installed)
-        .sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || a.name.localeCompare(b.name))
-    : items.filter((item) => item.kind === current);
-  const shown = inTab.filter((item) => matches(item, search));
+  const shown = itemsInTab(items, current).filter((item) => matches(item, search));
   const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
   const shownPage = Math.min(page, pages - 1);
   const visible = shown.slice(shownPage * PAGE_SIZE, (shownPage + 1) * PAGE_SIZE);
@@ -1359,7 +1579,7 @@ function Marketplace() {
     // a line of its own above the grid moved every card when it came, under the pointer that had just clicked.
     h(StatusLine, { key: "status", text: message || (offline ? t("catalog.offline") : catalogTab ? t("intro." + current) : "") }),
     current === "theme" || current === "installed"
-      ? h(ThemeBar, { key: "theme", items, activeTheme, scheme: state.scheme, busy, act })
+      ? h(ThemeBar, { key: "theme", items, activeTheme, scheme: state.schemeInUse || state.scheme, busy, act })
       : null,
     visible.length
       ? h(Grid, { key: "grid", items: visible,

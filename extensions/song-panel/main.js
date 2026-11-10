@@ -37,6 +37,16 @@ Ampify.i18n.define({
   zh: { label: "歌曲面板", lyrics: "歌词", noLyrics: "这首歌暂时没有歌词", artist: "关于艺人", credits: "制作人员",
         next: "接下来播放", nothing: "没有在播放", performer: "演唱", composer: "词曲", albumArtist: "专辑艺人",
         inLibrary: "资料库中有 {count} 首歌", plays: "播放 {count} 次", top: "最常播放：{title}", empty: "这首歌之后没有内容" },
+  it: { label: "Pannello del brano", lyrics: "Testi", noLyrics: "Ancora nessun testo per questo brano",
+        artist: "Info sull'artista", credits: "Crediti", next: "Prossimi in coda", nothing: "Non è in riproduzione nulla",
+        performer: "Eseguito da", composer: "Scritto da", albumArtist: "Artista dell'album",
+        inLibrary: "{count} brani nella tua libreria", plays: "{count} riproduzioni", top: "Il più ascoltato: {title}",
+        empty: "Nulla dopo questo brano" },
+  ko: { label: "곡 패널", lyrics: "가사", noLyrics: "이 곡의 가사가 아직 없습니다",
+        artist: "아티스트 정보", credits: "크레딧", next: "다음 곡", nothing: "재생 중인 곡이 없습니다",
+        performer: "연주", composer: "작곡", albumArtist: "앨범 아티스트",
+        inLibrary: "보관함에 곡 {count}개", plays: "{count}회 재생", top: "가장 많이 들은 곡: {title}",
+        empty: "이 곡 다음에는 아무것도 없습니다" },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
 
@@ -51,13 +61,64 @@ const TEXT = "#FFFFFF";
 const SOFT = "#BFFFFFFF";         // secondary text, white at 75 %
 const FAINT = "#80FFFFFF";
 const CARD = "#40000000";         // a dark card over the tinted column
+const GRADIENT_TOP = 0.85;        // the song's colour at the top of the panel, darkened this much
+const GRADIENT_BOTTOM = 0.4;      // and at its foot
+const LEAST_BRIGHT = 0x90;        // the panel's colour is raised to this brightest channel at least (dark covers)
 
-// The song's colour, darkened so white text stays readable on it (contrast above 4.5:1 on the darkest cards).
+// "#RRGGBB" as its three channels, nothing for any other text.
+function channels(color) {
+  const match = /^#([0-9A-Fa-f]{6})$/.exec(color || "");
+  return match ? [0, 2, 4].map((i) => parseInt(match[1].slice(i, i + 2), 16)) : null;
+}
+
+const NEARLY_BLACK = 0x30;        // a dominant colour whose brightest channel is below this reads as black
+const WHITE_CONTRAST = 4.5;       // white text keeps at least this contrast on the panel's brightest colour
+
+const hex = (rgb) => "#" + rgb.map((value) => Math.min(255, Math.round(value)).toString(16).padStart(2, "0")).join("");
+
+// The cover's dominant colour, as before; only a cover dark enough to draw an almost black panel takes its lyrics'
+// colour instead, raised (lifted) so the gradient shows.
+function panelColor(dominant, lyrics) {
+  const rgb = channels(dominant);
+  if (rgb && Math.max(...rgb) >= NEARLY_BLACK) return dominant;
+  return lifted(lyrics || dominant);
+}
+
+// `color` darkened by `factor`, then darker still if white text would read on it below WHITE_CONTRAST (WCAG).
+function readableShade(color, factor) {
+  const rgb = (channels(color) || [0x2A, 0x2A, 0x2E]).map((value) => value * factor);
+  const linear = (value) => {
+    const c = value / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = (parts) => 0.2126 * linear(parts[0]) + 0.7152 * linear(parts[1]) + 0.0722 * linear(parts[2]);
+  const most = 1.05 / WHITE_CONTRAST - 0.05;
+  let shade = rgb;
+  for (let step = 0; step < 20 && luminance(shade) > most; step++) shade = shade.map((value) => value * 0.95);
+  return hex(shade);
+}
+
+// The colour with its hue kept and raised until its brightest channel reaches LEAST_BRIGHT, so the gradient shows.
+function lifted(color) {
+  const found = channels(color);
+  if (!found) return color;
+  const rgb = Math.max(...found) === 0 ? [0x70, 0x70, 0x78] : found;  // a black cover: a neutral slate
+  const top = Math.max(...rgb);
+  if (top >= LEAST_BRIGHT) return color;
+  const scale = LEAST_BRIGHT / top;
+  return hex(rgb.map((value) => value * scale));
+}
+
+const SEE_THROUGH = "B3";        // 70 %: under a theme, its glass and veil show through the song's colour
+
+// The song's colour, darkened so white text stays readable on it (contrast above 4.5:1 on the darkest cards). Under a
+// theme the column is the theme's glass, with its own veil: the colour lets it show through, like the pages around it.
 function tint(color, factor) {
   const match = /^#([0-9A-Fa-f]{6})$/.exec(color || "");
   const rgb = match ? match[1] : "2A2A2E";
   const part = (i) => Math.round(parseInt(rgb.slice(i, i + 2), 16) * factor).toString(16).padStart(2, "0");
-  return "#FF" + part(0) + part(2) + part(4);
+  const alpha = Ampify.activeTheme() ? SEE_THROUGH : "FF";
+  return "#" + alpha + part(0) + part(2) + part(4);
 }
 
 const same = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
@@ -168,7 +229,12 @@ function SongPanel() {
   const queue = useQueue(trackKey);
   const colors = useCoverColors(trackKey);
   if (!track) return h("text", { text: t("nothing"), size: 14, color: SOFT });
-  const base = tint(colors ? colors.DARK_VIBRANT : track.artworkColor, 0.7);
+  // The song's colour over the whole card (Ampify gives a panel's root background to its card), from bright at the
+  // top to deep at the bottom.
+  const songColor = panelColor(colors ? colors.DARK_VIBRANT : track.artworkColor,
+                               colors ? colors.VIBRANT_NON_ALARMING : null);
+  const base = "linear-gradient(" + tint(readableShade(songColor, GRADIENT_TOP), 1) + ", " +
+               tint(readableShade(songColor, GRADIENT_BOTTOM), 1) + ")";
   const lyricsTint = tint(colors ? colors.VIBRANT_NON_ALARMING : track.artworkColor, 0.5);
   return h("stack", { background: base, cornerRadius: 12, padding: 12, gap: 12 },
     h("image", { src: "artwork", fit: "cover", cornerRadius: 8, width: SIDE - 24, height: SIDE - 24,

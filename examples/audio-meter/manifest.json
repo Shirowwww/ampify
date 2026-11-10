@@ -2,10 +2,11 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "audio-meter",
   "name": "Audio meter, example",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "For people who make extensions: writes the loudness and the peak of the sound to Ampify's log. It changes no sound and shows nothing in Apple Music.",
+  "translations": {"fr": {"name": "Indicateur audio, exemple", "description": "Pour qui crée des extensions : écrit le volume sonore et le pic du son dans le journal d'Ampify. Elle ne change aucun son et ne montre rien dans Apple Music."}, "de": {"name": "Audiopegel, Beispiel", "description": "Für Entwickler von Erweiterungen: schreibt die Lautheit und den Spitzenpegel des Tons in das Ampify-Protokoll. Sie verändert keinen Ton und zeigt nichts in Apple Music an."}, "es": {"name": "Medidor de audio, ejemplo", "description": "Para quien crea extensiones: escribe el volumen sonoro y el pico del sonido en el registro de Ampify. No cambia ningún sonido y no muestra nada en Apple Music."}, "pt": {"name": "Medidor de áudio, exemplo", "description": "Para quem cria extensões: escreve a sonoridade e o pico do som no registro do Ampify. Não altera nenhum som e não mostra nada no Apple Music."}, "ru": {"name": "Измеритель звука, пример", "description": "Для тех, кто пишет расширения: записывает громкость и пик звука в журнал Ampify. Звук не меняет и в Apple Music ничего не показывает."}, "ja": {"name": "オーディオメーター(例)", "description": "拡張機能を作る人向けです。音のラウドネスとピークを Ampify のログに書き込みます。音は変えず、Apple Music には何も表示されません。"}, "zh": {"name": "音频电平表（示例）", "description": "面向扩展作者：将声音的响度和峰值写入 Ampify 日志。它不改变任何声音，也不在 Apple Music 中显示任何内容。"}, "it": {"name": "Misuratore audio, esempio", "description": "Per chi crea estensioni: scrive la sonorità e il picco del suono nel registro di Ampify. Non cambia alcun suono e non mostra nulla in Apple Music."}, "ko": {"name": "오디오 미터, 예제", "description": "확장 기능을 만드는 분을 위한 예제입니다. 소리의 음량과 피크를 Ampify의 로그에 기록합니다. 소리를 바꾸지 않으며 Apple Music에는 아무것도 표시되지 않습니다."}},
   "kitApi": "1.0",
   "main": "main.js",
   "permissions": [

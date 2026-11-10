@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "ab-loop",
   "name": "A-B loop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Loops a passage of the song playing, like Spicetify's Loopy Loop: the playback bar button marks its start, then its end, and the song goes back to the start each time it reaches the end.",
@@ -13,7 +13,9 @@
     "pt": {"name": "Loop A-B", "description": "Repete um trecho da música que toca, como o Loopy Loop no Spicetify: o botão da barra de reprodução marca o início, depois o fim, e a música volta ao início sempre que chega ao fim."},
     "ru": {"name": "Повтор A-B", "description": "Повторяет фрагмент играющего трека, как Loopy Loop в Spicetify: кнопка на панели воспроизведения отмечает начало, затем конец, и трек возвращается к началу каждый раз, когда доходит до конца."},
     "ja": {"name": "A-B ループ", "description": "Spicetify の Loopy Loop のように、再生中の曲の一部分をループします。再生バーのボタンで開始位置、続いて終了位置を設定すると、終了位置に達するたびに開始位置へ戻ります。"},
-    "zh": {"name": "A-B 循环", "description": "像 Spicetify 的 Loopy Loop 一样循环播放当前歌曲的一段：用播放栏的按钮先标记起点，再标记终点，歌曲每次到达终点都会回到起点。"}
+    "zh": {"name": "A-B 循环", "description": "像 Spicetify 的 Loopy Loop 一样循环播放当前歌曲的一段：用播放栏的按钮先标记起点，再标记终点，歌曲每次到达终点都会回到起点。"},
+    "it": {"name": "Loop A-B", "description": "Ripete un passaggio del brano in riproduzione, come Loopy Loop di Spicetify: il pulsante della barra di riproduzione ne segna l'inizio, poi la fine, e il brano torna all'inizio ogni volta che raggiunge la fine."},
+    "ko": {"name": "A-B 반복", "description": "Spicetify의 Loopy Loop처럼 재생 중인 곡의 한 구간을 반복합니다. 재생 바의 버튼으로 시작 지점과 끝 지점을 차례로 표시하면, 곡이 끝에 닿을 때마다 시작 지점으로 돌아갑니다."}
   },
   "preview": "preview.jpg",
   "kitApi": "1.0",

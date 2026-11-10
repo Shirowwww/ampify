@@ -10,6 +10,8 @@ Ampify.i18n.define({
   ru: { label: "Сейчас играет" },
   ja: { label: "再生中" },
   zh: { label: "正在播放" },
+  it: { label: "In riproduzione" },
+  ko: { label: "지금 재생 중" },
 });
 
 Ampify.ui.playbar.addButton({

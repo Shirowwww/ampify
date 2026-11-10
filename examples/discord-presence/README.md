@@ -12,7 +12,7 @@ cover, title and artist.
   public search leaves out; without it, the Apple Music logo.
 - **Animated covers, for the few albums that have one** (off at first): an album with a motion artwork in Apple Music
   shows it moving in Discord, as Music Presence does. Discord shows no video, so Ampify makes the video a GIF on your
-  PC (200 pixels, 10 frames a second, lighter for a busy video; about a second of work) and puts it on the same free
+  PC (200 pixels, 15 frames a second, lighter for a busy video; about a second of work) and puts it on the same free
   host as the covers below, once per album. Apple gives a motion artwork to few albums (Currents, SOS or Midnights
   have one, most albums and singles do not): the others keep their still cover.
 - **Put your own files' covers online**: a song neither catalog has (a file of your own) has its cover sent to a free

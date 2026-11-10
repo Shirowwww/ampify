@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "skip-list",
   "name": "Skip list",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Never hear a song, album or artist again, like Spicetify's Trash Bin and Auto Skip. Add from the context menu or the playback bar, manage the list from the main menu, optionally skip live versions, remixes and intros, and export or import the list as JSON.",
@@ -68,6 +68,24 @@
         "skip-live": "跳过现场版",
         "skip-remixes": "跳过混音版",
         "skip-intros": "跳过前奏、间奏和 skit"
+      }
+    },
+    "it": {
+      "name": "Lista di esclusione",
+      "description": "Non sentire mai più un brano, un album o un artista, come Trash Bin e Auto Skip di Spicetify. Aggiungi dal menu contestuale o dalla barra di riproduzione, gestisci la lista dal menu principale, salta a scelta versioni live, remix e intro, ed esporta o importa la lista in JSON.",
+      "settings": {
+        "skip-live": "Salta le versioni live",
+        "skip-remixes": "Salta i remix",
+        "skip-intros": "Salta intro, interludi e skit"
+      }
+    },
+    "ko": {
+      "name": "건너뛰기 목록",
+      "description": "Spicetify의 Trash Bin과 Auto Skip처럼 곡, 앨범, 아티스트를 다시는 듣지 않습니다. 컨텍스트 메뉴나 재생 바에서 추가하고, 메인 메뉴에서 목록을 관리하며, 원하면 라이브 버전, 리믹스, 인트로를 건너뛰고, 목록을 JSON으로 내보내거나 가져올 수 있습니다.",
+      "settings": {
+        "skip-live": "라이브 버전 건너뛰기",
+        "skip-remixes": "리믹스 건너뛰기",
+        "skip-intros": "인트로, 인터루드, 스킷 건너뛰기"
       }
     }
   },

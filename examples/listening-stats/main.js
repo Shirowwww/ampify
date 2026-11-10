@@ -13,7 +13,8 @@ Ampify.i18n.define({
     byDay: "Day by day", byHour: "Hour by hour", lastDays: "The last 28 days",
     empty: "Nothing yet: songs count after 30 seconds of listening.", hours: "{hours} h {minutes} min",
     minutes: "{minutes} min", noAlbums: "Albums are counted from now on.", openDetails: "See its stats",
-    openInApple: "Open in Apple Music", notFound: "Not found on Apple Music.",
+    listen: "Play in Apple Music", openAlbum: "Open the album", openArtist: "Open the artist",
+    firstPlay: "First listen", lastPlay: "Last listen", added: "Added to the library", notFound: "Not found on Apple Music.",
     "kind.artist": "Artist", "kind.song": "Song", "kind.album": "Album",
     library: "All plays (Apple Music)", reading: "Reading your library…",
     libraryError: "Apple Music's library could not be read. The other periods show what plays on this device.",
@@ -28,7 +29,9 @@ Ampify.i18n.define({
     byDay: "Jour par jour", byHour: "Heure par heure", lastDays: "Les 28 derniers jours",
     empty: "Rien pour l'instant : un morceau compte après 30 secondes d'écoute.", hours: "{hours} h {minutes} min",
     minutes: "{minutes} min", noAlbums: "Les albums sont comptés à partir de maintenant.",
-    openDetails: "Voir ses statistiques", openInApple: "Ouvrir dans Apple Music", notFound: "Introuvable sur Apple Music.",
+    openDetails: "Voir ses statistiques", listen: "Écouter dans Apple Music", openAlbum: "Ouvrir l'album",
+    openArtist: "Ouvrir l'artiste", firstPlay: "Première écoute", lastPlay: "Dernière écoute",
+    added: "Ajouté à la bibliothèque", notFound: "Introuvable sur Apple Music.",
     "kind.artist": "Artiste", "kind.song": "Morceau", "kind.album": "Album",
     library: "Toutes les écoutes (Apple Music)", reading: "Lecture de votre bibliothèque…",
     libraryError: "La bibliothèque d'Apple Music n'a pas pu être lue. Les autres périodes montrent ce qui joue sur cet appareil.",
@@ -42,7 +45,9 @@ Ampify.i18n.define({
     topSongs: "Meistgehörte Titel", topAlbums: "Meistgehörte Alben", byDay: "Nach Tag", byHour: "Nach Stunde",
     lastDays: "Die letzten 28 Tage", empty: "Noch nichts: Ein Titel zählt nach 30 Sekunden.",
     hours: "{hours} Std. {minutes} Min.", minutes: "{minutes} Min.", noAlbums: "Alben werden ab jetzt gezählt.",
-    openDetails: "Statistik ansehen", openInApple: "In Apple Music öffnen", notFound: "Nicht in Apple Music gefunden.",
+    openDetails: "Statistik ansehen", listen: "In Apple Music hören", openAlbum: "Album öffnen",
+    openArtist: "Künstler öffnen", firstPlay: "Zuerst gehört", lastPlay: "Zuletzt gehört",
+    added: "Zur Mediathek hinzugefügt", notFound: "Nicht in Apple Music gefunden.",
     "kind.artist": "Künstler", "kind.song": "Titel", "kind.album": "Album",
     library: "Alle Wiedergaben (Apple Music)", reading: "Mediathek wird gelesen …",
     libraryError: "Die Mediathek von Apple Music konnte nicht gelesen werden. Die anderen Zeiträume zeigen, was auf diesem Gerät läuft.",
@@ -57,7 +62,9 @@ Ampify.i18n.define({
     topAlbums: "Álbumes más escuchados", byDay: "Por día", byHour: "Por hora", lastDays: "Los últimos 28 días",
     empty: "Nada todavía: una canción cuenta tras 30 segundos de escucha.", hours: "{hours} h {minutes} min",
     minutes: "{minutes} min", noAlbums: "Los álbumes se cuentan a partir de ahora.", openDetails: "Ver sus estadísticas",
-    openInApple: "Abrir en Apple Music", notFound: "No encontrado en Apple Music.",
+    listen: "Escuchar en Apple Music", openAlbum: "Abrir el álbum", openArtist: "Abrir el artista",
+    firstPlay: "Primera escucha", lastPlay: "Última escucha", added: "Añadida a la biblioteca",
+    notFound: "No encontrado en Apple Music.",
     "kind.artist": "Artista", "kind.song": "Canción", "kind.album": "Álbum",
     library: "Todas las reproducciones (Apple Music)", reading: "Leyendo tu biblioteca…",
     libraryError: "No se pudo leer la biblioteca de Apple Music. Los demás periodos muestran lo que suena en este dispositivo.",
@@ -72,7 +79,9 @@ Ampify.i18n.define({
     byDay: "Por dia", byHour: "Por hora", lastDays: "Os últimos 28 dias",
     empty: "Nada ainda: uma música conta após 30 segundos de audição.", hours: "{hours} h {minutes} min",
     minutes: "{minutes} min", noAlbums: "Os álbuns são contados a partir de agora.", openDetails: "Ver as estatísticas",
-    openInApple: "Abrir no Apple Music", notFound: "Não encontrado no Apple Music.",
+    listen: "Ouvir no Apple Music", openAlbum: "Abrir o álbum", openArtist: "Abrir o artista",
+    firstPlay: "Primeira audição", lastPlay: "Última audição", added: "Adicionada à biblioteca",
+    notFound: "Não encontrado no Apple Music.",
     "kind.artist": "Artista", "kind.song": "Música", "kind.album": "Álbum",
     library: "Todas as reproduções (Apple Music)", reading: "Lendo sua biblioteca…",
     libraryError: "Não foi possível ler a biblioteca do Apple Music. Os outros períodos mostram o que toca neste dispositivo.",
@@ -87,7 +96,9 @@ Ampify.i18n.define({
     topSongs: "Самые слушаемые песни", topAlbums: "Самые слушаемые альбомы", byDay: "По дням", byHour: "По часам",
     lastDays: "Последние 28 дней", empty: "Пока ничего: песня засчитывается после 30 секунд прослушивания.",
     hours: "{hours} ч {minutes} мин", minutes: "{minutes} мин", noAlbums: "Альбомы считаются с этого момента.",
-    openDetails: "Открыть статистику", openInApple: "Открыть в Apple Music", notFound: "Не найдено в Apple Music.",
+    openDetails: "Открыть статистику", listen: "Слушать в Apple Music", openAlbum: "Открыть альбом",
+    openArtist: "Открыть исполнителя", firstPlay: "Первое прослушивание", lastPlay: "Последнее прослушивание",
+    added: "Добавлено в медиатеку", notFound: "Не найдено в Apple Music.",
     "kind.artist": "Исполнитель", "kind.song": "Песня", "kind.album": "Альбом",
     library: "Все прослушивания (Apple Music)", reading: "Чтение медиатеки…",
     libraryError: "Не удалось прочитать медиатеку Apple Music. Другие периоды показывают то, что играет на этом устройстве.",
@@ -100,7 +111,9 @@ Ampify.i18n.define({
     play: "1回", playCount: "{count}回", topArtists: "よく聴くアーティスト", topSongs: "よく聴く曲",
     topAlbums: "よく聴くアルバム", byDay: "日別", byHour: "時間別", lastDays: "過去28日間",
     empty: "まだありません：30秒聴くと1回と数えます。", hours: "{hours}時間{minutes}分", minutes: "{minutes}分",
-    noAlbums: "アルバムはこれから数えます。", openDetails: "統計を見る", openInApple: "Apple Musicで開く",
+    noAlbums: "アルバムはこれから数えます。", openDetails: "統計を見る", listen: "Apple Musicで再生",
+    openAlbum: "アルバムを開く", openArtist: "アーティストを開く", firstPlay: "初めて聴いた日", lastPlay: "最後に聴いた日",
+    added: "ライブラリに追加した日",
     notFound: "Apple Musicで見つかりません。", "kind.artist": "アーティスト", "kind.song": "曲", "kind.album": "アルバム",
     library: "すべての再生（Apple Music）", reading: "ライブラリを読み込んでいます…",
     libraryError: "Apple Music のライブラリを読み込めませんでした。ほかの期間では、このデバイスで再生した曲を表示します。",
@@ -113,12 +126,41 @@ Ampify.i18n.define({
     playCount: "{count} 次播放", topArtists: "最常听的艺人", topSongs: "最常听的歌曲", topAlbums: "最常听的专辑",
     byDay: "按天", byHour: "按小时", lastDays: "最近 28 天", empty: "还没有记录：收听 30 秒后计为一次播放。",
     hours: "{hours} 小时 {minutes} 分钟", minutes: "{minutes} 分钟", noAlbums: "专辑从现在开始计数。",
-    openDetails: "查看统计", openInApple: "在 Apple Music 中打开", notFound: "在 Apple Music 中未找到。",
+    openDetails: "查看统计", listen: "在 Apple Music 中播放", openAlbum: "打开专辑", openArtist: "打开艺人",
+    firstPlay: "首次收听", lastPlay: "最近收听", added: "加入资料库", notFound: "在 Apple Music 中未找到。",
     "kind.artist": "艺人", "kind.song": "歌曲", "kind.album": "专辑",
     library: "全部播放（Apple Music）", reading: "正在读取资料库…",
     libraryError: "无法读取 Apple Music 资料库。其他时段显示在此设备上播放的内容。",
     libraryNote: "Apple Music 自己的播放次数，包含你所有的设备；其他时间段统计在此设备上播放的内容。",
     deviceNote: "仅统计 Ampify 在此设备上记录的播放：收听 30 秒计为一次。如需所有设备，请选择“全部播放（Apple Music）”。",
+  },
+  it: {
+    title: "Statistiche di ascolto", period: "Periodo", week: "Ultimi 7 giorni (questo dispositivo)", month: "Ultime 4 settimane (questo dispositivo)",
+    all: "Dall'inizio (questo dispositivo)", time: "Tempo di ascolto", plays: "Riproduzioni", songs: "Brani", artists: "Artisti",
+    play: "1 riproduzione", playCount: "{count} riproduzioni", topArtists: "Artisti più ascoltati", topSongs: "Brani più ascoltati", topAlbums: "Album più ascoltati",
+    byDay: "Giorno per giorno", byHour: "Ora per ora", lastDays: "Gli ultimi 28 giorni",
+    empty: "Ancora nulla: i brani contano dopo 30 secondi di ascolto.", hours: "{hours} h {minutes} min",
+    minutes: "{minutes} min", noAlbums: "Gli album vengono contati da adesso in poi.", openDetails: "Vedi le sue statistiche",
+    openInApple: "Apri in Apple Music", notFound: "Non trovato su Apple Music.",
+    "kind.artist": "Artista", "kind.song": "Brano", "kind.album": "Album",
+    library: "Tutte le riproduzioni (Apple Music)", reading: "Lettura della libreria…",
+    libraryError: "Non è stato possibile leggere la libreria di Apple Music. Gli altri periodi mostrano ciò che viene riprodotto su questo dispositivo.",
+    libraryNote: "Le riproduzioni di Apple Music stesso, con tutti i dispositivi; gli altri periodi contano ciò che viene riprodotto su questo dispositivo.",
+    deviceNote: "Solo ciò che viene riprodotto su questo dispositivo, contato da Ampify: un brano conta dopo 30 secondi. Per tutti i dispositivi, scegli Tutte le riproduzioni (Apple Music).",
+  },
+  ko: {
+    title: "청취 통계", period: "기간", week: "최근 7일(이 기기)", month: "최근 4주(이 기기)",
+    all: "처음부터(이 기기)", time: "청취 시간", plays: "재생 횟수", songs: "곡", artists: "아티스트",
+    play: "1회 재생", playCount: "{count}회 재생", topArtists: "많이 들은 아티스트", topSongs: "많이 들은 곡", topAlbums: "많이 들은 앨범",
+    byDay: "일별", byHour: "시간별", lastDays: "최근 28일",
+    empty: "아직 아무것도 없습니다. 곡은 30초 이상 들어야 집계됩니다.", hours: "{hours}시간 {minutes}분",
+    minutes: "{minutes}분", noAlbums: "앨범은 지금부터 집계됩니다.", openDetails: "통계 보기",
+    openInApple: "Apple Music에서 열기", notFound: "Apple Music에서 찾을 수 없습니다.",
+    "kind.artist": "아티스트", "kind.song": "곡", "kind.album": "앨범",
+    library: "전체 재생(Apple Music)", reading: "보관함을 읽는 중…",
+    libraryError: "Apple Music 보관함을 읽을 수 없습니다. 다른 기간은 이 기기에서 재생한 내용을 보여 줍니다.",
+    libraryNote: "모든 기기를 포함한 Apple Music 자체의 재생 횟수입니다. 다른 기간은 이 기기에서 재생한 내용을 집계합니다.",
+    deviceNote: "Ampify가 집계한, 이 기기에서 재생한 내용만 표시합니다. 곡은 30초 후에 집계됩니다. 모든 기기를 보려면 전체 재생(Apple Music)을 선택하세요.",
   },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
@@ -155,11 +197,11 @@ function add(bucket, song, plays, ms, limit) {
   if (!known && Object.keys(bucket.songs).length >= limit) return bucket;
   const entry = known || { title: song.title, artist: song.artist, album: song.album, plays: 0, ms: 0 };
   const hours = (bucket.hours || noHours()).map((value, hour) => (hour === new Date().getHours() ? value + ms : value));
-  return {
-    ...bucket,
-    songs: { ...bucket.songs, [song.key]: { ...entry, album: song.album || entry.album, plays: entry.plays + plays, ms: entry.ms + ms } },
-    hours,
-  };
+  const now = Date.now();
+  // first and last: when it was heard first and last (songs counted before 1.1 have no first).
+  const heard = { ...entry, album: song.album || entry.album, plays: entry.plays + plays, ms: entry.ms + ms,
+                  first: entry.first || now, last: now };
+  return { ...bucket, songs: { ...bucket.songs, [song.key]: heard }, hours };
 }
 
 function record(song, plays, ms) {
@@ -213,9 +255,12 @@ function readLibrary(done) {
   if (library !== null) return done();
   libraryRead = libraryRead || Ampify.library.tracks().then(
     (tracks) => {
-      library = tracks.filter((track) => track.playCount > 0).map((track) => ({
-        title: track.title, artist: track.artist, album: track.album,
-        plays: track.playCount, ms: track.playCount * (track.durationMs || 0),
+      // Every track, played or not, for the details of a song counted on this device; the tops keep the played ones.
+      library = tracks.map((track) => ({
+        title: track.title, artist: track.artist, album: track.album, albumArtist: track.albumArtist || "",
+        year: track.year || 0, genre: track.genre || "", durationMs: track.durationMs || 0,
+        plays: track.playCount || 0, ms: (track.playCount || 0) * (track.durationMs || 0),
+        last: track.lastPlayed || 0, added: track.dateAdded || 0,
       }));
     },
     (error) => {
@@ -227,7 +272,7 @@ function readLibrary(done) {
 }
 
 function summaryOf(period) {
-  if (period === "library") return { songs: library || [], hours: null };
+  if (period === "library") return { songs: (library || []).filter((song) => song.plays > 0), hours: null };
   if (period === "all") return { songs: Object.values(all.songs), hours: all.hours || noHours() };
   const merged = {};
   const hours = noHours();
@@ -348,12 +393,12 @@ function openDetail(target) {
 }
 
 // The store of the interface's language: the US one found other artists, and no song, for a French rapper.
-const STOREFRONTS = { fr: "fr", de: "de", es: "es", pt: "br", ru: "ru", ja: "jp", zh: "cn" };
+const STOREFRONTS = { fr: "fr", de: "de", es: "es", pt: "br", ru: "ru", ja: "jp", zh: "cn", it: "it", ko: "kr" };
 const storefront = () => STOREFRONTS[Ampify.i18n.language] || "us";
 
 // The iTunes search's hits ("search?term=..." or "lookup?id=..."), [] when the network or the reply fails.
 async function search(query, entity) {
-  const reply = await Ampify.http.get(ITUNES + query + "&entity=" + entity + "&limit=5&country=" + storefront());
+  const reply = await Ampify.http.get(ITUNES + query + "&entity=" + entity + "&limit=25&country=" + storefront());
   if (reply.status !== 200) return [];
   try {
     return JSON.parse(reply.text).results || [];
@@ -362,66 +407,140 @@ async function search(query, entity) {
   }
 }
 
-const same = (a, b) => String(a || "").toLowerCase() === String(b || "").toLowerCase();
-const largeCover = (hit) => (hit && hit.artworkUrl100 ? hit.artworkUrl100.replace("100x100bb", "300x300bb") : "");
+// Lower case, without accents, punctuation or a "(feat. ...)": "Beyoncé - Halo (feat. X)" ~ "beyonce halo".
+const plain = (text) => String(text || "").normalize("NFD").replace(/\p{M}/gu, "").toLowerCase()
+  .replace(/[([][^)\]]*\b(feat|ft|with|avec)\b[^)\]]*[)\]]/g, " ").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+// A name made only of signs ("÷", "!!!") has nothing left once plain: it then has to match as written.
+const same = (a, b) => {
+  const left = plain(a);
+  if (left !== "") return left === plain(b);
+  const raw = String(a || "").trim();
+  return raw !== "" && raw === String(b || "").trim();
+};
+// One of the artists credited: "A & B" or "A, B" plays as A, and B's own songs too.
+const credits = (credited, artist) => same(credited, artist) ||
+  String(credited || "").split(/\s*(?:&|,|\band\b|\bet\b|\bx\b)\s*/i).some((name) => same(name, artist));
+const largeCover = (hit) => (hit && hit.artworkUrl100 ? hit.artworkUrl100.replace(/\d+x\d+bb/, COVER_SIZE) : "");
+const COVER_SIZE = "600x600bb";  // the page shows it at 200 pixels: sharp on a screen at 300 %
+const appleLink = (url) => (String(url || "").startsWith(APPLE_MUSIC) ? url : "");
 
-// Its Apple Music page and artwork, found by the iTunes search: null when nothing matches or the network fails.
+// The hit that is this very artist, album or song, never merely the first answer: "Capuche" by its artist, not a
+// song of the same name by someone else.
+function matchOf(target, hits) {
+  if (target.kind === "artist") return hits.find((hit) => same(hit.artistName, target.name));
+  const name = (hit) => (target.kind === "album" ? hit.collectionName : hit.trackName);
+  const byName = hits.filter((hit) => same(name(hit), target.name));
+  return byName.find((hit) => !target.artist || credits(hit.artistName, target.artist));
+}
+
+// Its artwork and its Apple Music pages (the song's, its album's and its artist's), found by the iTunes search: null
+// when nothing matches or the network fails.
 async function findOnAppleMusic(target) {
   const entity = { artist: "musicArtist", song: "song", album: "album" }[target.kind];
-  const results = await search("search?term=" + encodeURIComponent([target.name, target.artist].filter(Boolean).join(" ")), entity);
-  const nameOf = (hit) => (target.kind === "artist" ? hit.artistName : target.kind === "album" ? hit.collectionName : hit.trackName);
-  const hit = results.find((candidate) => same(nameOf(candidate), target.name)) || results[0];
+  const words = [target.name, target.artist].filter(Boolean).join(" ");
+  const hit = matchOf(target, await search("search?term=" + encodeURIComponent(words), entity));
   if (!hit) return null;
-  const url = hit.trackViewUrl || hit.collectionViewUrl || hit.artistLinkUrl || hit.artistViewUrl || "";
   let cover = largeCover(hit);
-  // The search gives an artist no picture: the cover of one of their own albums stands in (a feature's otherwise),
-  // rather than an empty page. Their songs came first as features of others.
+  // The search gives an artist no picture: the cover of one of their own albums stands in, rather than an empty page.
   if (!cover && target.kind === "artist" && hit.artistId) {
     const albums = (await search("lookup?id=" + hit.artistId, "album")).filter((album) => album.wrapperType === "collection");
-    cover = largeCover(albums.find((album) => same(album.artistName, hit.artistName)) || albums[0]);
+    cover = largeCover(albums.find((album) => same(album.artistName, hit.artistName)));
   }
-  return { url: url.startsWith(APPLE_MUSIC) ? url : "", cover };
+  return {
+    cover,
+    song: appleLink(hit.trackViewUrl),
+    album: appleLink(hit.collectionViewUrl),
+    artist: appleLink(hit.artistViewUrl || hit.artistLinkUrl),
+  };
 }
 
 // The songs of the period that belong to the target, the most played first.
 function songsOf(target, songs) {
   const mine = songs.filter((song) =>
-    target.kind === "artist" ? song.artist === target.name
-      : target.kind === "album" ? song.album === target.name
-        : song.title === target.name && song.artist === target.artist);
+    target.kind === "artist" ? same(song.artist, target.name)
+      : target.kind === "album" ? same(song.album, target.name)
+        : same(song.title, target.name) && same(song.artist, target.artist));
   return mine.sort((a, b) => b.plays - a.plays || b.ms - a.ms);
+}
+
+// The library's entry of a song: its year, genre and length, which this device's counts do not keep.
+const libraryEntry = (target) => (library || []).find((song) => same(song.title, target.name) && same(song.artist, target.artist));
+
+// A date in the interface's language, from numbers only: the script engine has no locale data.
+const DATE_ORDER = { en: "mdy", de: "dmy.", ja: "ymd/", zh: "ymd/" };
+function dateOf(time) {
+  if (!time) return "";
+  const date = new Date(time);
+  const parts = { d: String(date.getDate()).padStart(2, "0"), m: String(date.getMonth() + 1).padStart(2, "0"), y: String(date.getFullYear()) };
+  const order = DATE_ORDER[Ampify.i18n.language] || "dmy/";
+  const separator = order[3] || "/";
+  return [...order.slice(0, 3)].map((part) => parts[part]).join(separator);
+}
+
+const clock = (ms) => (ms > 0 ? Math.floor(ms / 60000) + ":" + String(Math.floor(ms / 1000) % 60).padStart(2, "0") : "");
+
+// First and last listen: Ampify's own record, then Apple's last play and the day the song joined the library.
+function datesOf(mine, entry) {
+  const firsts = mine.map((song) => song.first || 0).filter(Boolean);
+  const lasts = mine.map((song) => song.last || 0).concat(entry ? [entry.last] : []).filter(Boolean);
+  const first = firsts.length ? Math.min(...firsts) : 0;
+  return { first, added: !first && entry ? entry.added : 0, last: lasts.length ? Math.max(...lasts) : 0 };
+}
+
+function Action({ label, url, primary }) {
+  return h(Button, { label, variant: primary ? "primary" : "secondary", disabled: !url, onClick: () => Ampify.http.open(url) });
+}
+
+function Header({ target, found, entry, mine }) {
+  const details = target.kind === "song"
+    ? [entry && entry.album || (mine[0] && mine[0].album), entry && entry.year ? String(entry.year) : "",
+       entry && entry.genre, clock(entry && entry.durationMs)]
+    : [t("kind." + target.kind), target.artist];
+  const round = target.kind === "artist";
+  return h("row", { gap: 24 },
+    found && found.cover
+      ? h("image", { src: found.cover, label: target.name, width: 200, height: 200, cornerRadius: round ? 100 : 10, fit: "cover" })
+      : h("stack", { width: 200, height: 200, cornerRadius: round ? 100 : 10, background: "#22FFFFFF" }),
+    h("stack", { gap: 8, grow: true, valign: "center" },
+      h(Text, { variant: "caption" }, t("kind." + target.kind)),
+      h(Text, { variant: "title", maxLines: 2 }, target.name),
+      target.kind === "song" ? h(Text, { size: 16, weight: 600, maxLines: 1 }, target.artist) : null,
+      h(Text, { variant: "caption", maxLines: 1 }, details.filter(Boolean).join(" · ")),
+      h("row", { gap: 8 },
+        target.kind === "song" ? h(Action, { label: t("listen"), url: found && found.song, primary: true }) : null,
+        target.kind !== "artist" ? h(Action, { label: t("openAlbum"), url: found && found.album, primary: target.kind === "album" }) : null,
+        h(Action, { label: t("openArtist"), url: found && found.artist, primary: target.kind === "artist" })),
+      found === null ? h(Text, { variant: "caption" }, t("notFound")) : null));
 }
 
 function DetailPage() {
   const target = detail;
   const [found, setFound] = useState(undefined);  // undefined while it is searched
+  const [, setStamp] = useState(0);
   useEffect(() => {
     if (!target) return;
     findOnAppleMusic(target).then(setFound, () => setFound(null));
+    readLibrary(() => setStamp(Date.now()));
   }, []);
   if (!target) return h(Text, null, t("empty"));
 
   const { songs } = summaryOf(lastPeriod);
   const mine = songsOf(target, songs);
+  const entry = target.kind === "song" ? libraryEntry(target) : null;
   const listened = mine.reduce((sum, song) => sum + song.ms, 0);
   const plays = mine.reduce((sum, song) => sum + song.plays, 0);
-  const subtitle = [t("kind." + target.kind), target.artist, t(lastPeriod)].filter(Boolean).join(" · ");
-  return h("stack", { gap: 16, padding: "0,0,24,0" },
-    h("row", { gap: 20 },
-      found && found.cover
-        ? h("image", { src: found.cover, label: target.name, width: 160, height: 160, cornerRadius: target.kind === "artist" ? 80 : 8, fit: "cover" })
-        : null,
-      h("stack", { gap: 6, grow: true, valign: "center" },
-        h(Text, { variant: "title", maxLines: 2 }, target.name),
-        h(Text, { variant: "caption" }, subtitle),
-        h("row", { gap: 8 },
-          h(Button, { label: t("openInApple"), disabled: !(found && found.url), onClick: () => Ampify.http.open(found.url) }),
-          h("stack", { grow: true })),
-        found === null ? h(Text, { variant: "caption" }, t("notFound")) : null)),
+  const dates = datesOf(mine, entry);
+  return h("stack", { gap: 20, padding: "0,8,24,0" },
+    h(Header, { target, found, entry, mine }),
+    h(Text, { variant: "caption" }, t(lastPeriod)),
     h("row", { gap: 12 },
-      h(Tile, { value: duration(listened), label: t("time") }),
       h(Tile, { value: String(plays), label: t("plays") }),
+      h(Tile, { value: duration(listened), label: t("time") }),
       target.kind === "song" ? null : h(Tile, { value: String(mine.length), label: t("songs") })),
+    h("row", { gap: 12 },
+      dates.first || dates.added
+        ? h(Tile, { value: dateOf(dates.first || dates.added), label: t(dates.first ? "firstPlay" : "added") }) : null,
+      dates.last ? h(Tile, { value: dateOf(dates.last), label: t("lastPlay") }) : null),
     target.kind === "song"
       ? null
       : h(Card, { title: t("topSongs") },

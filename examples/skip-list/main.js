@@ -98,6 +98,28 @@ Ampify.i18n.define({
     added: "已添加 {added} 项，跳过 {skipped} 项。", invalid: "这不是有效的 JSON。",
     notList: "文本必须是条目的 JSON 列表。", tooLong: "此文本太长，无法导入。",
   },
+  it: {
+    menu: "Non riprodurre mai", button: "Salta e non riprodurre più", empty: "Non è stato escluso ancora nulla. Usa «Non riprodurre mai» in un menu.",
+    remove: "Rimuovi", more: "Ultimi {shown} di {count}.", live: "versione live", remix: "remix",
+    filler: "intro o interludio", listed: "nella tua lista", list: "Lista di esclusione",
+    export: "Esporta", import: "Importa", exportLabel: "Lista di esclusione in JSON", importLabel: "Lista di esclusione da importare",
+    exportHint: "Seleziona il testo, copialo e incollalo in Importa su un altro PC.",
+    importHint: "Incolla una lista esportata da Lista di esclusione, poi aggiungila alla tua.",
+    part: "Parte {part} di {parts}", previous: "Indietro", next: "Avanti", done: "Fatto", merge: "Aggiungi alla lista",
+    added: "Aggiunti {added}, saltati {skipped}.", invalid: "Questo non è un JSON valido.",
+    notList: "Il testo deve essere una lista JSON di voci.", tooLong: "Questo testo è troppo lungo da importare.",
+  },
+  ko: {
+    menu: "다시는 재생하지 않기", button: "건너뛰고 다시는 재생하지 않기", empty: "아직 건너뛰는 항목이 없습니다. 메뉴의 \"다시는 재생하지 않기\"를 사용하세요.",
+    remove: "삭제", more: "전체 {count}개 중 최신 {shown}개를 표시합니다.", live: "라이브 버전", remix: "리믹스",
+    filler: "인트로 또는 인터루드", listed: "내 목록에 있음", list: "건너뛰기 목록",
+    export: "내보내기", import: "가져오기", exportLabel: "JSON 형식의 건너뛰기 목록", importLabel: "가져올 건너뛰기 목록",
+    exportHint: "텍스트를 선택해 복사한 다음 다른 PC의 \"가져오기\"에 붙여넣으세요.",
+    importHint: "건너뛰기 목록에서 내보낸 목록을 붙여넣어 내 목록에 추가합니다.",
+    part: "{parts}개 중 {part}번째", previous: "이전", next: "다음", done: "완료", merge: "목록에 추가",
+    added: "{added}개를 추가하고 {skipped}개를 건너뛰었습니다.", invalid: "올바른 JSON이 아닙니다.",
+    notList: "텍스트는 항목의 JSON 목록이어야 합니다.", tooLong: "이 텍스트는 너무 길어서 가져올 수 없습니다.",
+  },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
 

@@ -56,12 +56,24 @@ Ampify.i18n.define({
     none: "最近 {days} 天你的艺术家没有新发行。", single: "单曲", ep: "EP", album: "专辑",
     checked: "{hours} 小时前检查", checkedNow: "刚刚检查", failed: "Apple 目录没有响应，请稍后再试。",
   },
+  it: {
+    title: "Nuove uscite", period: "Periodo", days: "Ultimi {days} giorni", singles: "Includi i singoli", checking: "Controllo in corso…",
+    empty: "Ancora nessun artista. Ascolta un po' di musica: gli artisti che ascolti vengono controllati per le nuove uscite.",
+    none: "Nessuna novità dai tuoi artisti negli ultimi {days} giorni.", single: "Singolo", ep: "EP", album: "Album",
+    checked: "Controllato {hours} h fa", checkedNow: "Controllato proprio ora", failed: "Il catalogo di Apple non ha risposto. Riprova più tardi.",
+  },
+  ko: {
+    title: "신규 발매", period: "기간", days: "최근 {days}일", singles: "싱글 포함", checking: "확인 중…",
+    empty: "아직 아티스트가 없습니다. 음악을 들어 보세요. 재생한 아티스트의 신규 발매를 확인합니다.",
+    none: "최근 {days}일 동안 내 아티스트의 새 발매가 없습니다.", single: "싱글", ep: "EP", album: "앨범",
+    checked: "{hours}시간 전에 확인함", checkedNow: "방금 확인함", failed: "Apple 카탈로그가 응답하지 않았습니다. 나중에 다시 시도하세요.",
+  },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
 
 const ITUNES = "https://itunes.apple.com/";
 const APPLE_MUSIC = "https://music.apple.com/";
-const STOREFRONTS = { fr: "fr", de: "de", es: "es", pt: "br", ru: "ru", ja: "jp", zh: "cn" };  // English: the US store
+const STOREFRONTS = { fr: "fr", de: "de", es: "es", pt: "br", ru: "ru", ja: "jp", zh: "cn", it: "it", ko: "kr" };  // English: the US store
 const MAX_ARTISTS = 50;
 const PERIODS = [30, 60, 90];
 const DEFAULT_DAYS = 60;

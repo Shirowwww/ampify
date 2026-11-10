@@ -45,6 +45,16 @@ Ampify.i18n.define({
     empty: "还没有书签。请在菜单中使用“添加书签”，或使用播放栏中的按钮。",
     more: "显示最新的 {shown} 项，共 {count} 项。",
   },
+  it: {
+    menu: "Aggiungi ai segnalibri", button: "Segna questo istante", list: "Segnalibri", open: "Apri", remove: "Rimuovi",
+    empty: "Ancora nessun segnalibro. Usa «Aggiungi ai segnalibri» in un menu, o il pulsante nella barra di riproduzione.",
+    more: "Ultimi {shown} di {count}.",
+  },
+  ko: {
+    menu: "북마크에 추가", button: "이 시점을 북마크", list: "북마크", open: "열기", remove: "삭제",
+    empty: "아직 북마크가 없습니다. 메뉴의 \"북마크에 추가\"나 재생 바의 버튼을 사용하세요.",
+    more: "전체 {count}개 중 최신 {shown}개를 표시합니다.",
+  },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
 
@@ -187,5 +197,6 @@ function Panel() {
 
 Ampify.player.on("trackchange", () => watchers.forEach((watcher) => watcher()));
 
-// The list opens from Apple Music's main menu, never on its own: a panel would show at every start.
-Ampify.ui.menu.addItem("app", { label: t("list"), onClick: () => Ampify.ReactDOM.render(h(Panel), "popup:bookmarks") });
+// The list opens from Apple Music's main menu, never on its own: a panel would show at every start. It has the playback
+// bar button's icon, as Apple's own entries in that menu have one.
+Ampify.ui.menu.addItem("app", { label: t("list"), icon: "", onClick: () => Ampify.ReactDOM.render(h(Panel), "popup:bookmarks") });
