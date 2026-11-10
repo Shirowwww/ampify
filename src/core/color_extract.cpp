@@ -116,6 +116,11 @@ bool IsAlarming(const Rgb& color) {
     return (hsl.h < 20 || hsl.h > 340) && hsl.s > 0.5 && hsl.l > 0.25 && hsl.l < 0.75;
 }
 
+// Near black or near white, a colour's hue is noise: (0,0,1) reads as a fully saturated blue. Such swatches never
+// stand for a vibrant or muted colour (Android Palette's default filter); they can still be the prominent one.
+constexpr double kNearBlack = 0.05;
+constexpr double kNearWhite = 0.95;
+
 // The best swatch for a target that is not taken yet, or -1.
 int Pick(const std::vector<Swatch>& palette, const Target& target, const std::vector<bool>& taken,
          bool avoidAlarming = false) {
@@ -127,6 +132,7 @@ int Pick(const std::vector<Swatch>& palette, const Target& target, const std::ve
         if (taken[i]) continue;
         if (avoidAlarming && IsAlarming(palette[i].color)) continue;
         Hsl hsl = ToHsl(palette[i].color);
+        if (hsl.l <= kNearBlack || hsl.l >= kNearWhite) continue;
         if (hsl.s < target.minS || hsl.s > target.maxS || hsl.l < target.minL || hsl.l > target.maxL) continue;
         double score = 3.0 * (1 - std::fabs(hsl.s - target.targetS)) + 6.5 * (1 - std::fabs(hsl.l - target.targetL)) +
                        0.5 * static_cast<double>(palette[i].population) / static_cast<double>(maxPopulation);
@@ -138,8 +144,15 @@ int Pick(const std::vector<Swatch>& palette, const Target& target, const std::ve
     return best;
 }
 
-Rgb WithLightness(const Rgb& color, double lightness, double minSaturation = 0) {
+// The HSL of a colour, its saturation dropped when its hue is noise (near black or white): a black cover gives greys.
+Hsl HueSafe(const Rgb& color) {
     Hsl hsl = ToHsl(color);
+    if (hsl.l <= kNearBlack || hsl.l >= kNearWhite) hsl.s = 0;
+    return hsl;
+}
+
+Rgb WithLightness(const Rgb& color, double lightness, double minSaturation = 0) {
+    Hsl hsl = HueSafe(color);
     hsl.l = lightness;
     hsl.s = std::max(hsl.s, minSaturation);
     return FromHsl(hsl);
@@ -224,7 +237,7 @@ std::optional<ExtractedColors> ExtractColors(const uint8_t* rgba, size_t size, s
     if (!dark) dark = WithLightness(*vibrant, kDarkVibrant.targetL);
     if (!light) light = WithLightness(*vibrant, kLightVibrant.targetL);
     if (!muted) {
-        Hsl hsl = ToHsl(out.prominent);
+        Hsl hsl = HueSafe(out.prominent);
         hsl.s = std::min(hsl.s, kMuted.targetS);
         hsl.l = std::clamp(hsl.l, kMuted.minL, kMuted.maxL);
         muted = FromHsl(hsl);
@@ -279,7 +292,7 @@ std::map<std::string, std::string> ArtworkVariables(const ExtractedColors& color
         return std::string(text);
     };
     variables["art-luma"] = fraction((0.299 * base.r + 0.587 * base.g + 0.114 * base.b) / 255.0);
-    variables["art-sat"] = fraction(ToHsl(base).s);
+    variables["art-sat"] = fraction(HueSafe(base).s);
     return variables;
 }
 

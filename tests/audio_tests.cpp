@@ -457,6 +457,47 @@ TEST_CASE(ColorExtract_EveryKeyIsFilledAndTransparencyIgnored) {
     CHECK(!ampify::ExtractColors(image.data(), image.size() - 1, 16, 16).has_value());
 }
 
+namespace {
+
+bool IsGrey(const std::string& hex) { return hex.size() == 7 && hex.substr(1, 2) == hex.substr(3, 2) && hex.substr(3, 2) == hex.substr(5, 2); }
+
+}  // namespace
+
+TEST_CASE(ColorExtract_NearBlackCoverGivesGreysNotNeon) {
+    // Damso's Ipséité read off the play bar: black, with specks a hair off black. Their hue is noise: they once
+    // gave art-2 #0000ff, or #ffff00 with art-3 #020200.
+    for (ampify::Rgb speck : {ampify::Rgb{0, 0, 1}, ampify::Rgb{2, 2, 0}}) {
+        std::vector<uint8_t> image = TwoColours(48, 48, {0, 0, 0}, speck, 30);
+        auto colors = ampify::ExtractColors(image.data(), image.size(), 48, 48);
+        CHECK(colors.has_value());
+        if (!colors) continue;
+        auto variables = ampify::ArtworkVariables(*colors);
+        CHECK(IsGrey(variables["art-2"]));
+        CHECK(IsGrey(variables["art-3"]));
+        CHECK(variables["art-sat"] == "0.00");
+    }
+}
+
+TEST_CASE(ColorExtract_NearWhiteCoverGivesGreysNotNeon) {
+    std::vector<uint8_t> image = TwoColours(48, 48, {255, 255, 255}, {255, 255, 252}, 30);
+    auto colors = ampify::ExtractColors(image.data(), image.size(), 48, 48);
+    CHECK(colors.has_value());
+    if (!colors) return;
+    CHECK(IsGrey(colors->vibrant.Hex()));
+    CHECK(IsGrey(colors->desaturated.Hex()));
+}
+
+TEST_CASE(ColorExtract_DarkCoverKeepsItsRealAccent) {
+    // Black, with a candle-orange light: the orange is still the vibrant colour.
+    const ampify::Rgb orange{216, 141, 39};
+    std::vector<uint8_t> image = TwoColours(48, 48, {0, 0, 0}, orange, 40);
+    auto colors = ampify::ExtractColors(image.data(), image.size(), 48, 48);
+    CHECK(colors.has_value());
+    if (!colors) return;
+    CHECK(colors->prominent == (ampify::Rgb{0, 0, 0}));
+    CHECK(colors->vibrant == orange);
+}
+
 TEST_CASE(ColorExtract_LargeImageIsSampled) {
     std::vector<uint8_t> image = TwoColours(1000, 1000, {10, 200, 30}, {250, 250, 250}, 500);
     auto colors = ampify::ExtractColors(image.data(), image.size(), 1000, 1000);
