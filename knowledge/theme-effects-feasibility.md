@@ -1,8 +1,29 @@
 # Theme effects: what is left, and how it could be done
 
-Two effects of Spicetify themes are still missing from Ampify's theme engine: a colour filter on an image (duotone
-artwork, `filter: grayscale()`), and themes in the mini player. Neither is built; this note records what each would
-take, so the next attempt starts from the facts.
+Colour filters on images (`filter: grayscale()`, `duotone()`...) and a liquid glass backdrop are built; themes in the
+mini player are still missing. This note records how the first were done and what the second would take, so the next
+attempt starts from the facts.
+
+## Colour filters and liquid glass: how they are built
+
+- One set of effect descriptions for both, in `src/win/image_effects.*`: Direct2D's Gaussian blur, colour matrix and
+  composite, written by hand as `IGraphicsEffectD2D1Interop` classes (the Windows App SDK ships none of these and
+  Win2D is not loaded in Apple Music). Compositor effect factories accept them.
+- `filter` (`src/win/element_blur.*`) keeps the blur's route: the element's single child drawn into a
+  `CompositionVisualSurface`, shown from the parent's child visual, the element clipped away. The colour filters fold
+  into one 5x4 matrix in the core (`src/core/theme/color_matrix.*`, tested), applied before the blur in the same
+  brush: blur and colour matrix commute (the blur's weights sum to 1), so the order written does not change the image.
+- Composition animates no 5x4 matrix, and an effect's fixed properties are compiled into its factory. A change of
+  colours is therefore a new "look" (a container visual over the surface) faded in over the old one, which goes when
+  the fade ends; a blur still eases on its brush. Factories are cached per matrix (64 at most).
+- The route over a backdrop brush placed over the image (route 1 of the first study) was not taken: it samples the
+  window each frame and feeds back over Apple's own backdrop blur in the full-screen player.
+- `backdrop: liquid-glass()` (`src/win/glass_brush.*`) is a `XamlCompositionBrushBase` subclass, made without IDL
+  through the projection's `XamlCompositionBrushBaseT`: backdrop brush, saturation matrix, blur, then the tint and a
+  sheen gradient composited over. A brush, not a visual, because the panes it targets hold many children. It eases its
+  blur and tint in when connected. No refraction: Composition has no displacement effect.
+- Still to measure on screen: the cost of a filter on a card artwork recycled by Apple's lists, and liquid glass over
+  the moving-artwork background of Glass.
 
 ## Clips: why `UIElement.Clip` and not the composition visual
 
@@ -12,33 +33,6 @@ the size by itself. It worked on an artwork and failed on cards: WinUI refuses t
 uses the facade properties (`Translation`, `Scale`, `Rotation`), and Apple Music animates many elements that way.
 Taking the hand-out visual first would also make Apple's own facade writes on that element throw later. Ampify
 therefore never asks for an element's hand-out visual.
-
-## Colour filter on an image (duotone, grayscale)
-
-What it needs:
-
-- A `CompositionEffectBrush` with Direct2D's colour matrix (`CLSID_D2D1ColorMatrix`) or its tint and grayscale
-  effects. The Windows App SDK ships no effect classes for these (`Microsoft.UI.Composition.Effects` has only lighting),
-  and Win2D is not loaded in Apple Music. The effect description must be written by hand: a small WinRT class that
-  implements `IGraphicsEffect`, `IGraphicsEffectSource` and `IGraphicsEffectD2D1Interop` (effect CLSID, property
-  count, the 5x4 matrix as a property, one named source). Compositor effect factories accept such a class.
-- A source for the brush. Two routes:
-  1. A `SpriteVisual` placed over the image with `ElementCompositionPreview.SetElementChildVisual`, painted by the
-     effect brush whose source is `Compositor.CreateBackdropBrush()`: it filters whatever is drawn under it. Its size
-     must follow the element (an `ExpressionAnimation` on the element's size is not available without the hand-out
-     visual, so a `SizeChanged` handler). It is not known whether `SetElementChildVisual` conflicts with Apple's
-     facade animations the way `GetElementVisual` does: test on a card artwork first.
-  2. A `CompositionSurfaceBrush` over a `LoadedImageSurface` of the same image: needs the image's URI, which Apple's
-     artworks do not expose (they are `SoftwareBitmapSource` or streams).
-- A property, for example `filter: grayscale(1)` or `filter: duotone(#dark, #light)` on `.artwork`, converted into the
-  matrix in the core (testable), and written by the backend as the child visual.
-
-Risks: a child visual over every artwork of a page is one more visual per card (hundreds in a long shelf); the backdrop
-brush samples the window at each frame. Lesson 5 of `docs/development/xaml-lessons.md` does not apply (no resource is
-re-read), but the cost per card must be measured with the "passes after changes" lines of the log before shipping.
-
-Estimate: the interop class and the matrix are a day; the visual's lifetime (cards recycled by Apple's lists, the
-element destroyed while the visual is held) is where the time goes.
 
 ## Themes in the mini player
 

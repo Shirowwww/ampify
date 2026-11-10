@@ -88,7 +88,7 @@ detail, the row says so.
 | `ReactHook.useExtractedColor` | `Ampify.hooks.useArtworkColor()` | Partial | The cover playing now, not a cover of one's choice |
 | `ReactHook.useTheme`, other React hooks | `Ampify.hooks.usePlayer()`, `useState`, `useEffect`, ... and `Ampify.activeTheme()` | Partial | No `useTheme`: `activeTheme()` gives the theme's id |
 | `ReactComponent.ConfirmDialog` | `Ampify.components.ConfirmDialog` | Same | Rendered into a popup |
-| Spotify's own React components (`Button`, `Toggle`...) | `Ampify.components.Button`, `Toggle`, `Slider`, `Dropdown`... | Different | Ampify's own, drawn with WinUI controls |
+| Spotify's own React components (`Button`, `Toggle`...) | `Ampify.components.Button`, `Toggle`, `Checkbox`, `Slider`, `Dropdown`, `ProgressBar`, `Spinner`, `Divider`... | Different | Ampify's own, drawn with WinUI controls |
 | `Config` (extension settings) | `Ampify.config.get/set` and the manifest `settings` | Same | The manifest declares the settings page |
 | `LocalStorage` | `Ampify.storage.get/set/remove/clear` (permission `storage`) | Same | One JSON file per element |
 | `Ampify.link` (app and extension talking) | `Ampify.link.post/on/connected` | Different | Spicetify's `subfiles_extension` idea; messages are JSON |

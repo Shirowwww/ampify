@@ -125,7 +125,7 @@ Ampify.i18n.t("hello", { name: "Lea" }) // the text in that language, else Engli
 Ampify.i18n.t("kit.tray.next")          // Ampify's own texts, prefix kit.
 ```
 
-`Ampify.i18n.language` is one of `en`, `fr`, `de`, `es`, `pt`, `ru`, `ja`, `zh`, or another code when Windows uses a
+`Ampify.i18n.language` is one of `en`, `fr`, `de`, `es`, `pt`, `ru`, `ja`, `zh`, `it`, `ko`, or another code when Windows uses a
 language Ampify does not translate. It follows the Windows display language, or the `language` setting.
 
 ### 5.2 Settings and storage [stable]
@@ -278,7 +278,11 @@ written by hand as in a React one.
 | `text` | `text`, `variant` (`title`, `subtitle`, `body`, `caption`) and the text style below |
 | `button` | `label`, `icon` (SVG), `disabled`, `variant` (`primary`, `secondary`, `tertiary`), `onClick` |
 | `toggle` | `label`, `checked`, `disabled`, `onChange` |
+| `checkbox` | `label`, `checked`, `disabled`, `onChange` (`true` or `false`): Apple's check box |
 | `slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange` |
+| `progress` | `value`, `max` (100 by default), `label`: a bar filled to `value`; without `value` it moves on its own |
+| `spinner` | `size` (16 to 128, 32 by default), `label`: the spinning ring, for a wait of unknown length |
+| `divider` | A thin line across its container, in Apple's divider colour |
 | `textfield` | `label`, `value`, `placeholder`, `disabled`, `onChange` |
 | `dropdown`, `option` | `label`, `value`, `disabled`, `onChange`; children are `option` nodes with `value`, `label` |
 | `image` | `src` (https, a file path, `"artwork"`: Apple's image of the song playing, following it, the previous cover fading out in 500 ms on a new song except in eco glass or with Windows' animation effects off, or `"artwork:<id>"`: the cover of a queue entry, as `queue.list()` gives it), `label`, `onClick`, `fit` (`cover`, `contain`, `fill`), `cornerRadius`, `width`, `height` |
@@ -301,7 +305,7 @@ stretch it: every child gets one cell of the same width.
 | any | `align`, `valign` | `start`, `center`, `end`, `stretch` (on a `text`, `align` is `left`, `center`, `right`) |
 | any | `grow` | `true`: takes the space left in its `row` or `stack` |
 | any | `inert` | `true`: the node and everything under it take no click, no hover and no keyboard focus, and the pointer reaches what lies beneath. It is still drawn: pair it with `opacity: 0` for controls that fade out, which would take clicks otherwise |
-| `stack`, `row`, `layer`, `card` | `background` | `#RRGGBB`, `#AARRGGBB`, `acrylic`, or `acrylic(#AARRGGBB, 0.6)` |
+| `stack`, `row`, `layer`, `card` | `background` | `#RRGGBB`, `#AARRGGBB`, `acrylic`, `acrylic(#AARRGGBB, 0.6)`, or `linear-gradient(#top, #bottom)`. A panel's root gives its background to the panel's whole card |
 | `stack`, `row`, `layer`, `card` | `padding` | A number, or `"top,right,bottom,left"` |
 | containers, `image` | `cornerRadius`, `width`, `height`, `minWidth`, `maxWidth` | Pixels |
 | `text` | `size`, `weight`, `color`, `wrap`, `maxLines` | 8 to 120 px; 100 to 900; `#RRGGBB`; `false` for one line; 0 to 100 |
@@ -331,6 +335,7 @@ Ampify.ui.title.reset()                // back to the element's name
 Ampify.ui.setLabel(id, label)          // new text of a top bar or play bar button, by the id addButton returned
 Ampify.ui.setActive(id, on)            // on or off: a button or sidebar entry that is on takes Apple Music's accent colour
 Ampify.ui.setDisabled(id, disabled)    // a top bar or play bar button, or a menu entry, greyed: it ignores clicks
+Ampify.ui.playbar.mark(id, from, to)   // a stretch of the progress line for a play bar button it added (1.3)
 Ampify.ui.page.register(path, view)    // for an app
 Ampify.ui.navigate(path)
 ```
@@ -348,6 +353,11 @@ Ampify.ui.navigate(path)
   Spicetify's `shouldAdd`: Apple's menu opens on the interface thread before an element could answer, so the choice is
   given beforehand. `disabled: true` (or `setDisabled`) shows an entry or a button greyed. `remove` takes out an entry
   or a button with its click handler, and a submenu with its entries.
+- `playbar.mark(id, from, to)` draws two ticks on the progress line of the playback bar and shades the stretch between
+  them, as the A-B loop does with its passage. `from` and `to` are parts of the song, from 0 to 1 (a position divided by
+  `state().durationMs`), in either order; without `to` only the first tick shows, and without `from` the line is clear
+  again. The marks take the accent colour, fade in and out, and go with the button. Ampify before 1.3 has no `mark`:
+  check that it is a function before calling it.
 - `popup.close(name)` closes a popup opened with `popup.show(name, ...)` or `ReactDOM.render(..., "popup:<name>")`, as
   the user's Close would. A popup of `popup.open` has no name and only closes by the user's hand. Names are lowercase
   letters, digits and dashes.
@@ -365,6 +375,9 @@ Ampify.ui.navigate(path)
   its own. Give it room, as a growing child of a `stack` of fixed `height`. An `image` with `src: "artwork"` shows
   the cover loaded large by Apple's own loader, not the play bar's small one.
 - `ReactDOM` unmounting a `panel:` target removes the panel, as `panel.remove` does.
+- A panel takes the corners of the theme's panels (its `--panel-radius`), square ones included, and nothing drawn
+  inside it gets a larger radius. A theme can also give the panels a column of their own
+  ([format](../themes/format.md#a-column-for-the-panels)). The element does nothing for either.
 - Extensions cannot inject raw XAML. Themes are the only elements that ship XAML.
 
 ### 5.6 Services [preview]
@@ -519,7 +532,7 @@ Ampify.ready                                          // resolves once the eleme
 
 - Types: a node name, a component function, `Fragment`, or a context's `Provider`/`Consumer`. A few HTML names map
   to nodes (`div` → `stack`, `span`/`p` → `text`, `h1` → title text, `img` → `image`, `select` → `dropdown`, `ul` →
-  `list`). No class components.
+  `list`, `hr` → `divider`). No class components.
 - Props that are text, numbers or booleans become attributes; `style`, objects and other functions are ignored.
 - Handlers get `{ type: "click", id }` or `{ type: "change", id, value, target: { value, checked } }`.
 - State changes in one handler give one render. More than 50 renders in a row are stopped. An error in a later render
@@ -533,9 +546,13 @@ Ampify.ready                                          // resolves once the eleme
 |---|---|
 | `Button` (`ButtonPrimary`, `ButtonSecondary`, `ButtonTertiary`) | `label` or a text child, `icon`, `disabled`, `variant`, `onClick` |
 | `Toggle` | `label`, `value` or `checked`, `disabled`, `onChange(checked)` |
+| `Checkbox` | The props of `Toggle`, drawn as Apple's check box |
 | `Slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange(number)` |
 | `TextField` | `label`, `value`, `placeholder`, `disabled`, `onChange(text)` |
 | `Dropdown` | `label`, `value`, `options` (texts or `{ value, label }`), `disabled`, `onChange(value)` |
+| `ProgressBar` | `value`, `max` (100 by default), `label`: filled to `value`; without `value` it moves on its own |
+| `Spinner` | `size` (16 to 128, 32 by default), `label`: Apple's turning ring |
+| `Divider` | No props of its own: a thin line in Apple's divider colour |
 | `Grid` | `columns` (1 to 12), `gap` (0 to 1000), children |
 | `Tabs` | `value`, `options` (texts or `{ value, label }`), `onChange(value)`: a tab per option, the one of `value` on |
 | `Menu` | `label`, `disabled`, `items` (`{ label, disabled, onClick }` each): a flyout under a button |
@@ -545,7 +562,9 @@ Ampify.ready                                          // resolves once the eleme
 | `Tooltip` (`TooltipWrapper`) | `label` or `content`, `placement`, `delay`, children |
 | `ConfirmDialog` | `isOpen`, `titleText`, `descriptionText`, `confirmText`, `cancelText` (Ampify's "Confirm" and "Cancel" in the display language by default), `onConfirm`, `onClose`: render it into a popup; it closes when the element renders it with `isOpen: false` or unmounts it |
 
-Every component accepts `tooltip`, `tooltipPlacement` and `tooltipDelay`. Full example: `examples/react-panel/`.
+Each component draws the node of section 5.5 that has its name, so a tree written by hand and a React tree look the
+same. Every component but `Divider` accepts `tooltip`, `tooltipPlacement` and `tooltipDelay`. Full example:
+`examples/react-panel/`.
 
 `useArtworkColor()` reads the cover again at each new track. Right after the change, Windows may still give the
 previous cover for a second or two (`player.artwork`).

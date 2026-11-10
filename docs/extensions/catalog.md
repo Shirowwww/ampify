@@ -26,7 +26,8 @@ For an update, raise `version` in the manifest and publish again.
   script looks minified or obfuscated, or whose pull request touches `packages/` or `catalog.json`.
 - A maintainer then reads the code before merging. That review is the main protection against a malicious element.
 - After the merge, a bot packs the element with `tools/pack.py`, writes `packages/<id>-<version>.zip`, its preview and
-  its README, and updates `catalog.json` with the archive's address and SHA-256. A published archive never changes.
+  its README, and updates `catalog.json` with the archive's address and SHA-256 (a later version of a listed element
+  goes to its `newer` list, see below). A published archive never changes.
 
 A `README.md` at the root of the element's folder is shown on its page in the Marketplace, below what it can do: what
 it is for, how to use it, its settings. It is published next to the archive as `packages/<id>-<version>.md`, with no
@@ -66,6 +67,27 @@ catalog's archives are always packed by the bot.
 | `homepage`, `license`, `tags`, `permissions` | no | Copies of the manifest fields |
 | `preview` | no | An `https://` `.png`/`.jpg`/`.jpeg` address on the catalog's host or the archive's host |
 | `translations` | no | A copy of the manifest's. Not written by `tools/pack.py` nor `ampify build` (see Compatibility) |
+| `minAmpify` | no | The oldest Ampify release that takes this version, like `1.3.0`. Read from Ampify 1.3.0 on |
+| `newer` | no | Later versions of the same element (see below) |
+
+### Several versions of one element
+
+An entry can list later versions of its element in `newer`. Each item is a full entry with the same `id`, `kind` and
+`author`, a higher `version`, and a `minAmpify`. Ampify 1.3.0 and later take the newest version whose `minAmpify` they
+reach, and leave out an element when they reach none. Ampify 1.2.1 and older do not know `newer` and read only the
+entry itself, so the entry keeps the version they understand.
+
+```json
+{
+  "id": "glass", "version": "1.2.1", "url": "https://.../glass-1.2.1.zip", "...": "...",
+  "newer": [
+    {"id": "glass", "version": "1.3.0", "minAmpify": "1.3.0", "url": "https://.../glass-1.3.0.zip", "...": "..."}
+  ]
+}
+```
+
+The bot writes this: the first version of an element becomes its entry, and every later one goes to `newer`, with
+the release of Ampify whose `tools/pack.py` packed it as `minAmpify`. Old archives stay where they are.
 
 `kit.manage` is refused in a catalog entry, by the clients and by the public check alike: only Ampify's own Marketplace
 holds it. Next to the entries, `versions.json` lists the Apple Music versions tested after a release; `catalog.json`
@@ -77,6 +99,8 @@ pins its address and SHA-256, and `ampify versions update` reads it. Schema:
 - Ampify 1.0.0 and later read a catalog and leave aside any field they do not know. Builds before 1.0.0 refuse the
   whole catalog for one. That is why the entries written by `tools/pack.py` and `ampify build` leave `translations`
   out; the archive's manifest keeps them. Once no build before 1.0.0 is in use, the entries can carry them.
+- An Ampify release reads one catalog address and cannot be told apart from another by it, so a version that only a
+  newer release understands goes to `newer`, never into the entry itself.
 - `ampify build` prints the fields every entry needs. The bot, through `tools/pack.py`, also writes `homepage`,
   `license`, `preview` and the real address.
 - Both tools write the same archive: files sorted by name, hidden files and `node_modules` left out, every file stored
@@ -96,6 +120,9 @@ pins its address and SHA-256, and `ampify versions update` reads it. Schema:
    shown (in any order). A permission reserved for Ampify's Marketplace (`kit.manage`) is refused in either.
 6. Only then is the folder put in place; an older version stays until this succeeds.
 
-Nothing downloaded runs during an install, and the new element starts off. In the Marketplace, an element that asks for
-permissions opens its detail view after install, where switching it on is a second click under its permissions. An
-update keeps the element's settings.
+Nothing downloaded runs during an install, and `ampify install` leaves the new element off. The Marketplace puts it
+on right after: a theme in use, anything else turned on. For an element that asks for permissions, the card's
+**Install…** opens its detail view first, which lists what it may do. An update keeps the element's settings.
+
+An element tagged `developer` (with `example`, for the examples of `examples/`) is listed in the Marketplace's
+**Developers** tab instead of the tab of its kind.

@@ -40,7 +40,7 @@ Marketplace.
 
 1. Cliquez sur **Ampify** en bas de la barre latérale. Le Marketplace s'ouvre.
 2. Sous **Thèmes** (il faut internet), cliquez sur **Installer** pour celui qui vous plaît, par exemple Glass ou
-   Artwork, puis sur **Utiliser**.
+   Artwork : il est utilisé tout de suite.
 3. Choisissez une variante dans le menu si le thème en propose plusieurs, par exemple Dark ou Light.
 
 Le changement est immédiat. **Désactiver** (sur le thème utilisé) et **Revenir au look d'Apple Music** (en bas de la
@@ -48,7 +48,12 @@ liste) rendent l'apparence d'origine. Un thème déjà installé continue de mar
 
 Les mots employés : un **thème** change l'apparence d'Apple Music, une **extension** ajoute une fonction, une **app**
 est une page à part avec son entrée dans la barre latérale, un **snippet** est quelques lignes de style à activer en
-plus d'un thème. La **variante** est la version claire ou sombre qu'un thème peut proposer.
+plus d'un thème. L'onglet **Développeurs** réunit les exemples pour qui crée des extensions. La **variante** est la
+version claire ou sombre qu'un thème peut proposer.
+
+La barre de lecture se place une fois pour tous les thèmes, dans les réglages d'Ampify, onglet
+Fenêtre, à « Barre de lecture ». « Selon le thème »
+garde la place de chaque thème ; En haut, En bas et En bas, centrée valent pour tous.
 
 ## Revenir à Apple Music
 
@@ -57,8 +62,10 @@ Trois façons, de la plus légère à la plus complète :
 1. **Seulement le thème.** Dans le Marketplace, **Désactiver** sur le thème utilisé, ou **Revenir au look d'Apple Music**.
 2. **Ampify éteint un moment**, rien de supprimé. Il n'y a pas encore de bouton : dans un terminal, `ampify restore`
    pour l'éteindre, `ampify apply` pour le rallumer.
-3. **Désinstaller.** Paramètres > Applications > Applications installées > « Ampify for Apple Music ». Le
-   désinstallateur demande s'il faut garder vos thèmes et réglages.
+3. **Désinstaller.** `ampify uninstall` dans un terminal, ou Paramètres > Applications > Applications installées >
+   « Ampify for Apple Music ». Les deux ouvrent le même désinstallateur, qui ferme Apple Music s'il est ouvert. Une
+   case, décochée au départ, supprime aussi vos thèmes, extensions et réglages de `%USERPROFILE%\Ampify`.
+   `ampify uninstall --yes` désinstalle sans fenêtre et garde vos fichiers (`--delete-data` les supprime).
 
 ## Quand Apple Music se met à jour
 

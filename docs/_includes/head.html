@@ -1,6 +1,9 @@
 {%- assign t = site.data.site[page.lang] -%}
-{%- assign root = '/' -%}{%- assign other = 'fr' -%}
-{%- if page.lang == 'fr' -%}{%- assign root = '/fr/' -%}{%- assign other = 'en' -%}{%- endif -%}
+{%- assign root = t.root -%}
+{%- comment -%} The same page in another language when it has one (the pages of every language's folder), else that
+language's home. {%- endcomment -%}
+{%- assign translated = ",index.html,themes.html,extensions.html,getting-started.html,create.html" | split: "," -%}
+{%- assign here = page.url | remove_first: root -%}{%- if page.url == root -%}{%- assign here = "" -%}{%- endif -%}
 <!doctype html>
 <html lang="{{ page.lang }}">
 <head>
@@ -23,7 +26,7 @@
 <link rel="stylesheet" href="{{ '/assets/site.css' | relative_url }}">
 </head>
 <body class="{{ include.kind }}" data-base="{{ '/' | relative_url }}" data-repo="https://github.com/{{ site.repository }}">
-<a class="skip" href="#main">{% if page.lang == 'fr' %}Aller au contenu{% else %}Skip to content{% endif %}</a>
+<a class="skip" href="#main">{{ t.skip }}</a>
 <header class="top">
   <div class="top-in">
     <a class="brand" href="{{ root | relative_url }}"><img src="{{ '/assets/logo.svg' | relative_url }}" alt="" width="26" height="26"> Ampify</a>
@@ -33,7 +36,15 @@
       <a href="{{ root | append: 'create.html' | relative_url }}">{{ t.create }}</a>
       <a href="{{ '/documentation.html' | relative_url }}">{{ t.docs }}</a>
       <a href="https://github.com/{{ site.repository }}">GitHub</a>
-      <a class="lang" href="{{ t.other_path | relative_url }}" hreflang="{{ other }}">{{ t.other_lang }}</a>
+      <details class="lang">
+        <summary aria-label="{{ t.language }}: {{ t.name }}">{{ t.name }}</summary>
+        <ul>
+        {%- for code in site.data.site.languages -%}{%- if code != page.lang -%}{%- assign l = site.data.site[code] -%}
+          {%- if translated contains here -%}{%- assign target = l.root | append: here -%}{%- else -%}{%- assign target = l.root -%}{%- endif %}
+          <li><a href="{{ target | relative_url }}" hreflang="{{ code }}" lang="{{ code }}">{{ l.name }}</a></li>
+        {%- endif -%}{%- endfor %}
+        </ul>
+      </details>
     </nav>
   </div>
 </header>

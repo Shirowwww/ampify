@@ -31,7 +31,16 @@ code, pre { font-family: var(--mono); }
 .top nav { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-left: auto; font-size: 15px; }
 .top nav a { text-decoration: none; color: var(--muted); }
 .top nav a:hover, .top nav a[aria-current] { color: var(--ink); }
-.top nav .lang { color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 0 10px; }
+.top nav .lang { position: relative; }
+.top nav .lang summary { list-style: none; cursor: pointer; color: var(--ink); border: 1px solid var(--line);
+  border-radius: 999px; padding: 0 10px; }
+.top nav .lang summary::-webkit-details-marker { display: none; }
+.top nav .lang summary::after { content: " \25BE"; color: var(--muted); }
+.top nav .lang ul { position: absolute; right: 0; top: calc(100% + 6px); z-index: 10; margin: 0; padding: 6px 0;
+  list-style: none; min-width: 9em; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / .18); }
+.top nav .lang li a { display: block; padding: 4px 14px; }
+.top nav .lang[open] summary, .top nav .lang li a:hover { color: var(--ink); }
 
 main { max-width: 1180px; margin: 0 auto; padding: 0 var(--gutter); }
 h1, h2, h3 { font-family: var(--display); line-height: 1.1; text-wrap: balance; }

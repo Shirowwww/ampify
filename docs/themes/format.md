@@ -49,8 +49,9 @@ itself is never replaced, and a rule in `user.css` on those elements wins.
 
 ## resources.xaml
 
-A XAML resource dictionary. When `%USERPROFILE%\Ampify\resource-keys.txt` exists, each `x:Key` must be listed in it
-(one key per line); a single key outside the list refuses the whole theme, and the log names it.
+A XAML resource dictionary. Each `x:Key` must be one of the colour keys Apple Music and WinUI hold (the list
+`ampify inspect` reads), or, when `%USERPROFILE%\Ampify\resource-keys.txt` exists, one of the keys listed in it (one
+key per line). A single key outside the list refuses the whole theme, and the log names it.
 
 ## user.css
 
@@ -87,14 +88,21 @@ Grid#NowPlayingBar {
 | `A:nth-child(2)`, `A:nth-last-child(2)` | The second child of its parent, from the start or from the end (counting from 1) |
 | `A:first-child`, `A:last-child`, `A:only-child` | Position among its parent's children |
 | `A:playing` | The list row of the song playing (the one that shows Apple's moving bars), and the elements between that row and the bars: `.list-item:playing` is the row (see [The row playing](#the-row-playing)) |
+| `A:checked` | A toggle, check box, radio button or switch that is on (a settings switch, Apple's shuffle); also a button Apple shows on with a lit dot under it (repeat, `.repeat-button:checked`) |
+| `A:selected` | A selected list row (`.list-item:selected`) or sidebar entry: the row's presenter, as `.list-item` names it, is selected with its item. A row draws its selection over its background, so `background` on a selected row goes to its selection colours (`selected-background` and the two others) |
+| `A:disabled` | A control that takes no input |
 | `A:not(B)` | An `A` that does not match `B`, where `B` is one part: a type, a `#name` and the pseudo-classes above |
+| `A:has(B)`, `A:has(> B)` | An `A` with an element inside that matches the selector `B` (with `>`, a child of `A`), as in CSS: `StackPanel:has(TileControl)` |
 | `A::before`, `A::after` | A decorative image put into `A` (see [Decorative images](#decorative-images)) |
 
 - One state (`:hover`, `:active`, `:focus` or `:current`) per selector, on any part: on an earlier part, it is the
   state of that ancestor (see [A state on an ancestor](#a-state-on-an-ancestor)).
 - `:not()` takes no state, no `::before`/`::after`, no combinator and no class.
-- `:playing` goes on any part and counts as a pseudo-class.
-- Not supported: attributes (`[x=y]`), `An+B` forms (`odd`, `2n+1`) and other pseudo-classes (`:checked`...). A rule
+- `:has()` takes no state and no `::before`/`::after`; it counts what its selector counts, and goes inside `:not()`.
+- `:playing`, `:checked`, `:selected` and `:disabled` go on any part and count as pseudo-classes. A toggle or a
+  selection that changes restyles at once; a control that turns disabled is restyled at the next pass (a few seconds at
+  most). Ampify reads these states only while the theme has a rule that uses one.
+- Not supported: attributes (`[x=y]`), `An+B` forms (`odd`, `2n+1`) and other pseudo-classes (`:visited`...). A rule
   that uses one is ignored, with a line in the log.
 - Names from WinUI templates (`Grid#RootGrid`, `Border#Root`, `Grid#ContentRoot`) appear many times: always put them
   under a named parent.
@@ -173,7 +181,7 @@ explain them in one line; the page also resets them, and exports or imports them
 | CSS | XAML | Values |
 |---|---|---|
 | `background` | `Background` | Color, `$name`, `transparent`, `url(images/file.png) [cover\|contain\|fill]`, `artwork`, `linear-gradient(...)` |
-| `backdrop` | `Background` | `acrylic(tint, opacity)` |
+| `backdrop` | `Background` | `acrylic(tint, opacity)` or `liquid-glass(tint, opacity[, blur[, saturation]])` |
 | `color` or `foreground` | `Foreground` | Same as `background` |
 | `border-color` | `BorderBrush` | Same as `background` |
 | `checked-color` | `CheckedForeground` | A toggle's icon while on (`.shuffle-button`), a color or `$name`. Themes with an accent give it to shuffle |
@@ -217,9 +225,10 @@ explain them in one line; the page also resets them, and exports or imports them
 | `transform` | `RenderTransform` | `scale(x[, y])`, `scaleX`, `scaleY`, `rotate(Ndeg)`, `translate(x[, y])`, `translateX`, `translateY`, `none` |
 | `transform-origin` | `RenderTransformOrigin` | Percentages or `left`, `center`, `right`, `top`, `bottom` (no pixels) |
 | `box-shadow` | `Shadow`, `Translation` | A depth from 0 to 100 pixels, or `none` |
+| `filter` | The element drawn blurred or recoloured | `blur(Npx)` from 0 to 20 pixels, optionally followed by `edges(N% [N%])` (up to 50% each); `saturate`, `grayscale`, `sepia`, `brightness`, `contrast`, `invert`, `hue-rotate`, `tint(color[, amount])`, `duotone(dark, light)`; or `none` |
 | `overflow` | `Clip` | `hidden` (or `clip`): the element and its children are cut to its own rectangle; `visible` |
 | `clip-path` | `Clip` | `inset(top [right [bottom [left]]])` in pixels, in CSS order (negative reaches past the edges), or `none` |
-| `transition` | Implicit transitions | `<property> <duration>, ...` for `transform`, `opacity`, `background` or `all`; or `none` |
+| `transition` | Implicit transitions | `<property> <duration>, ...` for `transform`, `opacity`, `background`, `filter`, `width` or `all`; or `none` |
 | `animation` | Composition animations | Runs a `@keyframes` block (see [Animations](#animations)) |
 | `font-role` | `FontFamily`, `FontWeight`, `FontSize` | A font role, such as `title` |
 | `content` | Image of `::before`/`::after` | `url(images/file.gif) [cover\|contain\|fill]` or `none` |
@@ -235,7 +244,7 @@ explain them in one line; the page also resets them, and exports or imports them
 - An unknown property is ignored, and the log suggests the equivalent when there is one: `background-color` →
   `background`, `backdrop-filter` → `backdrop`, `justify-content`/`align-items` → alignment on the children, `gap` →
   `margin` on the children, `border` → `border-width` and `border-color`, `overflow-x`/`overflow-y` → `overflow` or
-  `clip-path: inset(...)`. `filter`, `pointer-events`, `cursor`, `user-select`, `mix-blend-mode` and `text-transform`
+  `clip-path: inset(...)`. `pointer-events`, `cursor`, `user-select`, `mix-blend-mode` and `text-transform`
   have no equivalent.
 
 ### Gradients, images and acrylic
@@ -253,6 +262,13 @@ explain them in one line; the page also resets them, and exports or imports them
   folder and cannot leave it.
 - `acrylic(tint, opacity)` blurs the window's elements behind (not the desktop). With transparency effects off in
   Windows, only the tint shows.
+- `liquid-glass(tint, opacity[, blur[, saturation]])`, Ampify's own, is a lighter glass: what lies behind is blurred
+  by `blur` (12px when left out, up to 40px), its colours made `saturation` times more vivid (1.8 when left out, 0 to
+  4; 1 keeps them), under the tint at `opacity`, with a sheen of light along the top edge and a faint rim at the
+  bottom. It eases in over a third of a second when the pane appears or the rule starts to apply (a `:hover` rule,
+  say). A `border` of a light colour, such as `rgba(255, 255, 255, 0.25)`, completes the rim. It paints any panel,
+  border or control, whatever its children. Nothing bends what lies behind (no refraction), and over Apple's own
+  blurred full-screen background it blurs that background again: keep it to the main window's panes.
 
 ### The artwork of the playing song
 
@@ -339,7 +355,8 @@ its children. Animated GIFs play.
   (`:hover::after` is refused).
 - The image never takes the pointer. Give a `width` and `height`, or it takes the panel's size.
 - Properties that apply: size and min/max sizes, `margin`, alignments, grid placement, `z-index`, `opacity`,
-  `visibility`, `transform`, `transform-origin` and `animation`.
+  `visibility`, `transform`, `transform-origin`, `animation` and `transition` (it animates a change of values while
+  the picture stays the same).
 - Selectors and the inspector do not see these images.
 
 Example: [`themes/snippets/spinning-artwork/`](../../themes/snippets/spinning-artwork/).
@@ -362,7 +379,25 @@ default. The other properties of `::before` and `::after` apply.
 }
 ```
 
-The sound is analysed only while bars are on screen. With Windows' animation effects off, they stand still. Example:
+After the count come, in any order, a shape, how high the bars may reach (10% to 100% of the decor's height, 100% by
+default) and their width: `bars(16, line, 60%)`, `bars(10, mirror, thick)`. `thin`, the default, keeps each bar a few
+pixels wide, centred in its column, so that bars across a wide decor do not read as grey blocks; `thick` makes them as
+wide as their column, as before Ampify 1.3. A ring and a line keep their own thickness. When only the width changes
+(a setting switched), the bars stay in place and ease to their new width.
+
+| Shape | What it draws |
+| --- | --- |
+| `bars` | Bars side by side, rising from the bottom (the default) |
+| `line` | One smooth line through the tops of the bars, `color` its stroke |
+| `circle` | A ring of bars pointing outwards from the middle of the decor; give it a square size |
+| `mirror` | Bars growing up and down from the middle, the low notes in the centre and the high ones at both ends |
+
+Bars move by their transform only, and the line within its own fixed size, so the panel around them is never laid out
+again while they play. Ampify versions that do not know a shape
+skip the whole declaration: put a plain `content: bars(n)` (or an image) before it.
+
+The sound is analysed only while bars are on screen. With Windows' animation effects off, they stand still. The
+Animated equalizer snippet is built on this same `content: bars()`, with its places and shapes as settings:
 [`themes/snippets/display-equalizer/`](../../themes/snippets/display-equalizer/).
 
 ### An image that follows the song's progress
@@ -388,6 +423,11 @@ takes in its column (its `height` plus its top and bottom margins) when that is 
 gained, so the line stays where it was and the image shows whole. Negative margins, as above, take no room. A theme
 that sets the line's own `height` or `transform` keeps them. At the very start
 and end of a song, the half of the image past the bar is cut by the display around it.
+
+A `::before` or `::after` whose picture stays the same while its values change (its `transform`, its size) is updated
+in place, not made again, so a `transition` declared on it animates the change. The Progress line snippet grows its
+mascot that way between its two sizes (`transform: scale(...)` with `transition: transform 200ms`):
+[`themes/snippets/progress-line/`](../../themes/snippets/progress-line/).
 
 ### The row playing
 
@@ -425,7 +465,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 |---|---|
 | `ampify:floating-panels` | The sidebar and the pages become two rounded panels on the window's background, with even gaps |
 | `ampify:bottom-bar` | The playback bar goes to the bottom across the window: the song left, buttons in the middle of the window, volume right. It hides the column Apple keeps for the window buttons, so a theme needs no rule of its own for it. Import it after `floating-panels` |
-| `ampify:centre-bar` | `bottom-bar` with the buttons centred and the progress line under them, the elapsed time at its left end and the length at its right end. The line and the times move into the middle cell with `move-to`. Import it after `bottom-bar` |
+| `ampify:centre-bar` | `bottom-bar` with the buttons centred and the progress line under them, the elapsed time at its left end (the length stays hidden, as `bottom-bar` keeps it). The line and the time move into the middle cell with `move-to`. Import it after `bottom-bar` |
 | `ampify:scrollbars` | Scroll bars inside their panel, clear of its rounded corners, without Windows' arrows, out of sight until the pointer reaches them. Part of `floating-panels` |
 
 | Variable | Default | Meaning |
@@ -435,11 +475,14 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | `--panel-radius` | `10px` | Their corners |
 | `--band-background` | `#1E1E22` | `floating-panels`: the band under an album's tracks |
 | `--gap` | `8` | Space around and between the panels |
-| `--content-top` | `64` | `floating-panels`: where the pages start |
+| `--content-top` | `64` and two gaps | `floating-panels`: where the pages start, a gap under the bar at the top |
+| `--bar-top-end` | `150` | `floating-panels`: the room the bar leaves at the top right for the window's buttons |
 | `--compact-pane` | `48` | `floating-panels`: width of the folded sidebar |
+| `--artwork-veil` | none (Apple's opaque veil) | Strength, 0 to 1, of the veil over the bar's artwork under the pointer: lower, the artwork (and a zoom on `.lcd-artwork-picture`) shows through it, its icon still white |
+| `--bar-band-reach` | `--compact-pane`, `0` without `floating-panels` | How far a band painted edge to edge at the top (Cover ambience, reach Bar) reaches back under the floating column, to the window's left edge |
 | `--page-top` | `8`, or `40` with `bottom-bar` | Space above a page's first line |
 | `--bar-height` | `72` | `bottom-bar`: height of the bar |
-| `--bar-room` | `80` | `bottom-bar`: space the panels leave at the bottom |
+| `--bar-room` | `--bar-height` + two `--gap` | `bottom-bar`: space the panels leave at the bottom (the bar stands a gap above the window's foot, and a gap under the panels) |
 | `--bar-reach` | `calc(var(--gap) - 290)` | `bottom-bar`: how far left the bar reaches past the page column |
 | `--bar-reach-folded` | `calc(var(--gap) - var(--compact-pane))` | `bottom-bar`: the same with the sidebar folded |
 | `--bar-reach-end` | `0` | `bottom-bar`: how far right the bar reaches past the page column, for a sidebar on the right |
@@ -449,7 +492,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | `--caption-room` | `40` | `bottom-bar`: the strip the panels leave at the top for the window's buttons |
 | `--sidebar-top` | `var(--caption-room)` | `bottom-bar`: where the sidebar starts. The back arrow and the folded menu button follow it |
 | `--song-width` | `560` | `bottom-bar`: width of the song (artwork, title, progress line), a clear space short of the buttons |
-| `--song-width-medium`, `-folded`, `-narrow`, `-small` | `460`, `380`, `340`, `270` | The same in a window 1600, 1324, 1100 and 960 pixels wide or less |
+| `--song-width-medium`, `-folded`, `-narrow`, `-small` | `460`, `380`, `340`, `270` | The same in a window 1600, 1323, 1100 and 960 pixels wide (1323: the window's width, whether the sidebar is folded or not) or less |
 
 `@import url(ampify:bottom-bar);` works too, in a theme or in a snippet. Other `@import` targets (files, URLs) are ignored.
 
@@ -464,6 +507,44 @@ What the layouts take care of, so that a theme needs no rule for it:
   have their place at the end of the artist's line, not over the artist. Apple Music shows those times under the
   pointer only while its display is in the bar at the top: with the bar at the bottom they stay hidden. The Playback
   bar times snippet shows them there, under the pointer or always (`visibility: visible`, then `opacity`).
+
+The layouts are plain CSS, in `src/core/theme/layouts/` (one file each, built into Ampify). To change one beyond its
+variables, copy its file into your theme's `user.css` instead of importing it, and edit the copy. A few of its rules
+work with Ampify's own code: keep them in a copy, or the matching behaviour stops.
+
+| Rule | What Ampify's code does with it |
+|---|---|
+| `.now-playing { grid-column-span: 2; }` (`floating-panels`) | The song spans the toggles' column, and Ampify ends it a clear space short of the first toggle, whatever their number. A `width` instead (`bottom-bar`) keeps the song's own size, kept clear of the buttons |
+| `@media (max-width: 1324px)` and `(min-width: 1325px)` | The width where Apple Music folds its sidebar. With `apple.sidebar = hover`, Ampify keeps it folded and these bounds follow that, not the window |
+| `--caption-room` of `40` (`bottom-bar`) | The strip the top search bar and its veil are drawn in |
+| `Grid#ShadowCaster { visibility: collapsed; }` (`floating-panels`) | Without Apple's square shadow, Ampify draws a hairline round the sidebar opened over the pages, where nothing else draws an edge |
+| `.apple-logo { opacity: 0; }` (`bottom-bar`), never `visibility` | Apple Music sets the logo's visibility from what plays: the value Ampify restores when the theme goes would come back stale and show the logo over the title |
+
+#### The playback bar's place
+
+Where the bar goes is one setting of Ampify for every theme, `apple.playbar` (Settings > Ampify > Playback bar):
+`theme`, the default, leaves it where the theme plans it; `top`, `bottom` and `centred` hold whatever the theme. A
+theme names its own place in its manifest, `"playbar": "bottom"` (or `"centred"`; `top` when it says nothing), and
+every `user.css`, a theme's or a snippet's, reads the place in use as the setting `bar-position`, with the values
+`Top`, `Bottom` and `Centred`. The theme declares no such setting itself:
+
+```css
+@import "ampify:floating-panels";
+
+@setting bar-position = Bottom {
+    @import "ampify:bottom-bar";
+}
+
+@setting bar-position = Centred {
+    @import "ampify:bottom-bar";
+    @import "ampify:centre-bar";
+}
+```
+
+A theme with at least one `@setting bar-position` block lays out the bar itself, at every place. Under any other theme,
+and with no theme, Ampify puts the bar at the bottom by itself while the place is `Bottom` or `Centred`: `bottom-bar`,
+plus `centre-bar` when centred, applied before the snippets. Themes made before 1.3.0 declared a `bar-position` setting
+of their own: its value still holds while `apple.playbar` is `theme`.
 
 #### A column for the panels
 
@@ -482,9 +563,21 @@ Without the room (the setting off, a narrower margin), the panels float again.
 }
 ```
 
-Two variables tell snippets about the theme's shapes: `--bar-radius` (the playback bar's corners) and `--lcd-radius`
-(the song's display). A theme that rounds them sets both in its `:root`, and a snippet that draws over them, such as
-Cover ambience, follows those corners.
+#### What a theme tells snippets and extensions
+
+Each shared shape or place has one way to be set, read by everything that needs it. A theme sets the variables in its
+`:root` (or inside a `@setting` block); a snippet that changes the same shape sets them too, and wins, since it comes
+after the theme.
+
+| Set with | Read by |
+|---|---|
+| `"playbar"` in the manifest, and the user's `apple.playbar` | Every `user.css` as `@setting bar-position` ([The playback bar's place](#the-playback-bars-place)) |
+| `--panel-radius` | The layouts' panels, and the panels of extensions (`Ampify.ui.panel`), which take no larger radius inside. Corners sets it to `0` for square corners |
+| `--bar-radius`, `--lcd-radius` | Snippets that draw over the playback bar or the song's display, such as Cover ambience's glow |
+| `--artwork-size` | Spinning artwork, which turns a record of that size. Set it only while the theme resizes the bar's artwork |
+| A right margin on `.content` | The panels of extensions, docked in that room ([A column for the panels](#a-column-for-the-panels)) |
+| The accent (`AccentFillColorDefaultBrush`, or `theme.accent`) | Apple's controls, the progress line, the marks of `Ampify.ui.playbar.mark`, and `$AccentFillColorDefaultBrush` in any rule ([Chosen accent](#chosen-accent)) |
+| The cover playing (nothing to set) | `--art-1` and the other artwork variables, in themes and snippets ([The artwork of the playing song](#the-artwork-of-the-playing-song)), and `Ampify.color.playing()` in extensions |
 
 ### Window size (`@media`)
 
@@ -522,7 +615,8 @@ background colour), whatever Windows' mode; it joins the sizes with `and`:
 - `order` is not allowed under a state. A control that keeps the pointer for itself does not react to `:hover`.
 - Apple Music's buttons, menu entries and sliders change their own colors under the pointer. A `background`, `color` or
   `border-color` you give them stays in those states; a `:hover` color goes to both hover and pressed, an `:active`
-  color to pressed only. Checked and selected states keep Apple Music's colors.
+  color to pressed only. A toggle that is on, a selected row and a greyed control keep Apple Music's colours until a
+  rule names that state with `:checked`, `:selected` or `:disabled` ([Selectors](#selectors)).
 - On a slider, `color` fills the part left of the thumb and `background` the rest of the track.
 
 #### A state on an ancestor
@@ -559,7 +653,18 @@ ancestor is in the state:
 - Leave the line's room alone: Apple sets a word-by-word line's text width when it builds the line, so a `margin`,
   `padding` or `border` on `.lyrics-line-content` cuts off the end of its words.
 
-Example: the [`lyrics-spotlight`](../../themes/snippets/lyrics-spotlight/) snippet.
+To blur the lyrics away from the sung line, blur their column towards its edges: Apple keeps the sung line near the
+top of the side panel and a little above the middle of the full-screen player, and one blur serves every line.
+
+```css
+.lyrics-panel .lyrics-synced { filter: blur(9px) edges(8% 50%); }
+.fullscreen-lyrics .lyrics-synced { filter: blur(9px) edges(28% 40%); }
+```
+
+Examples: the [`lyrics-style`](../../themes/snippets/lyrics-style/) and
+[`focused-lyrics`](../../themes/snippets/focused-lyrics/) snippets; colour filters in
+[`artwork-filters`](../../themes/snippets/artwork-filters/), liquid glass in the "Liquid glass" setting of
+[`glass`](../../themes/glass/).
 
 ### Flyouts, menus and tooltips
 
@@ -578,10 +683,23 @@ what opened it. A popup takes the theme the first time it opens.
 .card:hover { transform: scale(1.04); }
 ```
 
-`transform`, `opacity` and `background` (plain colors only) animate, `all` means the three, from 0 to 5 s. Easing words
-and delays are accepted and ignored: XAML's own ease-out is used. A few elements Apple Music animates itself (such as the
+`transform`, `opacity`, `background` (plain colors only) and `filter` animate, `all` means the four, from 0 to 5 s. Easing words
+and delays are accepted and ignored: XAML's own ease-out is used.
+
+`width` is apart, never part of `all`: the widths Apple Music writes to the element glide there in a straight line,
+over the time each write took to come (at most the duration), instead of jumping; a move back, or forward by more than
+8 % of the parent's width (a seek, a new song), still jumps. It runs on the interface thread, one layout per frame, so
+keep it to small elements. Every theme has it on the played part of the progress line
+(`.scrubber Rectangle#HorizontalDecreaseRect { transition: width 1s linear; }`, the smooth progress bar); `transition:
+none` there brings Apple's steps back. A few elements Apple Music animates itself (such as the
 playback bar's play button and the sidebar's entries) take a transition of `transform` alone; `opacity` and
 `background` are refused there.
+
+`transition: background` on a control (a menu entry, a button) goes to the root of its template, which is what
+paints its background in each state; an element with no background starts from a transparent one, since a brush
+eases only from another brush. The artwork of the playback bar (`.lcd-artwork-image`) and its area (`.lcd-artwork`)
+refuse a transform of their own, and the display cuts whatever grows past the artwork's place: to zoom on hover, scale
+the picture inside its frame (`.lcd-artwork:hover .lcd-artwork-picture`), as the Artwork theme does.
 
 A `scale()` without `transform-origin` grows from the element's centre, as in CSS.
 
@@ -636,15 +754,9 @@ A font role names the font of a kind of text. Set it in `:root` and use it with 
 .page-title { font-role: title; }
 ```
 
-| Role | Default family | Weight | Size |
-|---|---|---|---|
-| `caption` | Segoe UI Variable Small | 400 | 12 |
-| `body` | Segoe UI Variable Text | 400 | 14 |
-| `body-strong` | Segoe UI Variable Text | 600 | 14 |
-| `subtitle` | Segoe UI Variable Display | 600 | 20 |
-| `title` | Segoe UI Variable Display | 600 | 28 |
-| `title-large` | Segoe UI Variable Display | 600 | 40 |
-| `display` | Segoe UI Variable Display | 600 | 68 |
+Seven roles exist by default: `caption`, `body`, `body-strong`, `subtitle`, `title`, `title-large` and `display`, with the
+family, weight and size of Microsoft's Windows typography guidance. The values are in `src/core/font_roles.cpp`
+(`DefaultFontRoles`); `Ampify.fonts` reads the ones in force.
 
 A theme can create its own roles (`--font-lyrics`). Extensions read them with `Ampify.fonts`
 ([API](../extensions/api.md#56-services-preview)).
@@ -653,6 +765,27 @@ A theme can create its own roles (`--font-lyrics`). Extensions read them with `A
 
 - `box-shadow: 24px` puts a Windows `ThemeShadow` under the element at that depth. Color, offset and blur come from
   Windows, and the shadow may not show on every element.
+- `filter: blur(3px)` draws the element blurred, with the same standard deviation as in CSS; what lies behind it
+  stays sharp. `filter: blur(9px) edges(30%)`, Ampify's own, blurs only towards the top and bottom, over 30% of the
+  height each (`edges(10% 50%)`: top, then bottom), fading to sharp in the middle.
+- The colour filters of CSS go in the same `filter`, before or after the blur, applied in the order written:
+  `saturate()`, `grayscale()`, `sepia()`, `brightness()`, `contrast()`, `invert()` (a number or a percentage, as in
+  CSS, up to 10) and `hue-rotate(90deg)`. Ampify adds `tint(color[, amount])`, which multiplies the colours by
+  `color` (white leaves them; `amount` from 0 to 1, 1 when left out), and `duotone(dark, light)`, which prints the
+  image in two inks, black becoming `dark` and white `light`. Colours are those of the theme or hexadecimal values,
+  `var(--art-1)` included. `drop-shadow()`, `opacity()` and `url()` are not available.
+
+  ```css
+  .artwork { filter: duotone(#1B1035, var(--accent, #FA2D48)); transition: filter 400ms; }
+  .card-artwork:hover { filter: saturate(1.4) brightness(1.05); }
+  .lyrics-panel .lyrics-synced { filter: blur(9px) edges(8% 50%) grayscale(0.6); }
+  ```
+- With `transition: filter <duration>`, a blur eases from where it is, and a change of colours fades the new ones in
+  over the old: both run on the compositor, so they stay smooth while Apple Music is busy. Without a transition the
+  filter changes at once. A filter applies to one element only: the element must hold a single child, and its parent
+  no composition layer of its own, or the value is refused. A filtered element is drawn again on every frame it
+  changes (twice with `edges()`): filter a column, a panel or the artwork of the song playing, not every row of a
+  long list.
 - `overflow: hidden` cuts what spills out of an element (a child moved by `transform`, a decorative image); many of
   Apple's panels already cut their children. `clip-path: inset(0 0 40px 0)` cuts 40 pixels off the bottom. The clip
   follows the element's size. Only rectangles: no `round`, `circle()` or `polygon()` (use `corner-radius`).
@@ -668,18 +801,26 @@ A snippet is a small style that people switch on by itself, in `%USERPROFILE%\Am
 `manifest.json` with `"kind": "snippet"`, plus a `user.css`, a `resources.xaml` (named by `"resources"`), or both.
 
 - It applies on top of the active theme (or alone), and its rules win. Several snippets apply in alphabetical order.
-- It can import a ready-made layout too: `@import "ampify:bottom-bar";` is the whole of
-  [`bottom-playbar`](../../themes/snippets/bottom-playbar/), which works with any theme or none.
+- It can import a ready-made layout too (`@import "ampify:bottom-bar";`), and read where the playback bar is with
+  `@setting bar-position` (see [The playback bar's place](#the-playback-bars-place)).
 - It sees the theme's colors, variables, settings, `@keyframes` and font roles. A `colors.ini` or `color.ini` in a
   snippet is ignored.
 - `theme.parts.*` do not affect snippets. A refused key in its `resources.xaml` refuses the snippet only.
+- A snippet's `::before` or `::after` with a `content` of its own never replaces the theme's in the same slot: the
+  theme's image or bars stay as the theme draws them, and the snippet's declarations for that slot are set aside. On a
+  slot the theme leaves empty (or `content: none`), the snippet's go in; without a `content`, a snippet's declarations
+  still tune the theme's decor.
 - It can declare settings of its own, like a theme ([Theme settings](#theme-settings)): the Ampify
   card shows them while the snippet is on, they are stored as `snippets.<id>.<key>`, and its `user.css` reads them
-  with `@setting` and `--setting-<key>`. A key the theme declares too is the snippet's there. Example:
-  [`themes/snippets/display-equalizer/`](../../themes/snippets/display-equalizer/).
+  with `@setting` and `--setting-<key>`. A key the theme declares too is the snippet's there. Example: the Animated
+  equalizer, [`themes/snippets/display-equalizer/`](../../themes/snippets/display-equalizer/).
+- A snippet that changes a shared shape (the panels' corners, the bar's) sets the same variable as a theme would
+  ([What a theme tells snippets and extensions](#what-a-theme-tells-snippets-and-extensions)), so the other snippets
+  and the extensions' panels follow it.
 
-Switch it with `ampify snippet enable <id>` / `disable <id>`. Example:
-[`themes/snippets/square-corners/`](../../themes/snippets/square-corners/).
+Switch it with `ampify snippet enable <id>` / `disable <id>`. Example: Corners,
+[`themes/snippets/round-corners/`](../../themes/snippets/round-corners/), which sets `--panel-radius: 0` for square
+corners.
 
 ## Automatic scheme
 
@@ -710,8 +851,8 @@ the theme keeps its own accent. The colour is kept between a lightness of 30% an
 or white on a dark or a light page: a very dark or very pale cover gives a grey-tinted accent of that lightness. Text
 on the accent is still chosen for it as above.
 
-A theme's own "Artwork" accent setting (Ember, Fluent) and `theme.accent` do not fight: the theme's other choice
-(Amber, Windows) is written as `$AccentFillColorDefaultBrush`, so it follows `theme.accent`; its Artwork choice uses
+A theme's own "Artwork" accent setting (Fluent's) and `theme.accent` do not fight: the theme's other choice
+(Windows) is written as `$AccentFillColorDefaultBrush`, so it follows `theme.accent`; its Artwork choice uses
 `--art-2` where the theme names its accent, whatever `theme.accent` says, and Apple's own accented controls keep
 `theme.accent`. A new theme needs no setting of its own for this: `theme.accent = artwork` does it for every theme.
 
@@ -720,8 +861,9 @@ A theme's own "Artwork" accent setting (Ember, Fluent) and `theme.accent` do not
 `theme.glass` lightens what every theme and snippet asks of the graphics card, for a laptop on battery or an older
 card. `full` (or nothing) keeps the theme as written. `balanced` stops the animations that never end (a turning
 artwork) and leaves out the depth shadows of `box-shadow`; acrylic keeps its blur. `eco` does the same and paints
-acrylic panes as plain colours, the tint made more opaque so the text keeps its contrast, and an acrylic window
-(`--window-material: acrylic`) as Mica. A theme needs nothing for
+acrylic panes as plain colours, the tint made more opaque so the text keeps its contrast, an acrylic window
+(`--window-material: acrylic`) as Mica, liquid glass as a plain colour too, and leaves out the blur of `filter`
+(its colour filters stay, they cost one light pass). A theme needs nothing for
 it: write the effects as usual. People choose it under the accent in Settings > Ampify ("Glass effects").
 
 ## What Ampify adjusts for every theme

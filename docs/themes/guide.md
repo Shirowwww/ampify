@@ -117,6 +117,11 @@ Two traps:
 - A `z-index` below 10 on `.playbar` slides it under the pages.
 - A text size on every `TextBlock` also changes page titles. Scope it: `.track-row TextBlock`.
 
+People choose where the playback bar goes once, for every theme. If yours plans it at the bottom, write
+`"playbar": "bottom"` in `manifest.json` and lay the bar out under `@setting bar-position = Bottom`
+([the bar's place](format.md#the-playback-bars-place)). Rows, toggles and greyed buttons take their states as classes
+do: `.list-item:selected`, `.shuffle-button:checked`, `.next-button:disabled`.
+
 ## 5. Check it and share it
 
 ```bash

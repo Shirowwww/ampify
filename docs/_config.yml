@@ -28,3 +28,7 @@ defaults:
     values: { layout: doc, lang: en }
   - scope: { path: "fr" }
     values: { lang: fr }
+  - scope: { path: "it" }
+    values: { lang: it }
+  - scope: { path: "ko" }
+    values: { lang: ko }

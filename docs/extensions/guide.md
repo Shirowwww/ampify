@@ -60,6 +60,7 @@ it throws `PermissionDenied`, and the log names the missing permission.
 | To | Call | Permission |
 |---|---|---|
 | Add a button to the playback bar | `Ampify.ui.playbar.addButton({ label, icon, onClick })` | `ui.playbar` |
+| Mark a stretch of the progress line for that button | `Ampify.ui.playbar.mark(id, from, to)` | `ui.playbar` |
 | Add an entry to a song's, album's or playlist's menu | `Ampify.ui.menu.addItem("context", { label, onClick })` | `ui.menu` |
 | Read the song playing | `Ampify.player.state()` | `player.read` |
 | React when the song changes | `Ampify.player.on("trackchange", fn)` | `player.read` |
@@ -125,6 +126,9 @@ globalThis.render = () => h(Page);
 
 The building blocks (`stack`, `row`, `text`, `button`, `card`, `image`...) are drawn with Apple Music's own WinUI
 controls, so the page follows the theme and the light or dark mode ([API, section 5.5](api.md#55-interface-stable)).
+`Ampify.components` wraps them as React components: `Button`, `Toggle`, `Checkbox`, `Slider`, `TextField`,
+`Dropdown`, `ProgressBar`, `Spinner`, `Divider`, `Grid`, `Tabs`, `Menu`, `Card` and a few more
+([section 5.9](api.md#59-react-and-components-stable)).
 
 ## From Spicetify
 
@@ -136,6 +140,7 @@ controls, so the page follows the theme and the light or dark mode ([API, sectio
 | `Spicetify.showNotification` | `Ampify.notify` |
 | `Spicetify.LocalStorage` | `Ampify.storage` |
 | `Spicetify.React`, `Spicetify.ReactDOM` | `Ampify.React`, `Ampify.ReactDOM` |
+| `Spicetify.ReactComponent` | `Ampify.components` |
 | Waiting for `Spicetify.Player` | `await Ampify.ready` |
 
 The full comparison is in [spicetify-parity.md](../spicetify-parity.md).

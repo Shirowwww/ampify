@@ -42,6 +42,27 @@ créer. La documentation détaillée est en anglais.
    dans le Marketplace de chaque Ampify et dans [la galerie](themes.html).
 {: .steps}
 
+## Une seule façon pour chaque chose
+
+Thèmes, snippets et extensions partagent leurs outils. Quand deux sortes d'éléments savent faire la même chose, elles
+la font de la même manière : ce que vous apprenez pour l'une sert pour les autres.
+
+| Pour... | Utiliser | Où |
+|---|---|---|
+| Proposer des réglages | Le champ `settings` du manifeste ([manifeste](../extensions/manifest.md#settings)) : le CSS les lit avec `@setting` et `--setting-<clé>`, le JavaScript avec `Ampify.config.get(clé)` | Thèmes, snippets, extensions, apps |
+| Traduire le nom, la description et les réglages | Le champ `translations` du manifeste | Tous les éléments |
+| Savoir où est la barre de lecture | `@setting bar-position`, choisi par l'utilisateur pour tous les thèmes, ou par le `"playbar"` du thème | Thèmes, snippets |
+| Suivre les coins des panneaux | `--panel-radius` (et `--bar-radius`, `--lcd-radius` pour la barre et l'afficheur) | Thèmes et snippets le fixent ; les snippets et les panneaux des extensions le suivent |
+| Prendre les couleurs de la pochette en cours | `--art-1` à `--art-3` et leurs variantes en CSS, `Ampify.color.playing()` en JavaScript | Tous |
+| Dessiner des barres qui suivent la musique | `content: bars(n, forme, hauteur)` | Thèmes, snippets |
+| Flouter, recolorer ou poser du verre sur un élément | `filter` et `backdrop` | Thèmes, snippets |
+| Styler une ligne, un interrupteur ou un contrôle selon son état | `:hover`, `:active`, `:focus`, `:current`, `:playing`, `:checked`, `:selected`, `:disabled` | Thèmes, snippets |
+| Marquer un passage de la ligne de progression | `Ampify.ui.playbar.mark(id, from, to)` | Extensions |
+| Construire une interface | Les nœuds d'`Ampify.ui`, ou `Ampify.React` avec `Ampify.components` (boutons, interrupteurs, cases à cocher, curseurs, champs, menus, onglets, barres de progression, anneaux d'attente, séparateurs...) | Extensions, apps |
+
+[Le format des thèmes](../themes/format.md#what-a-theme-tells-snippets-and-extensions) liste ce qu'un thème transmet
+aux autres éléments, et [l'API](../extensions/api.md#55-interface-stable) chaque nœud et chaque composant.
+
 ## En venant de Spicetify
 
 Un `color.ini` de Spicetify marche tel quel : posé dans le dossier d'un thème, ses couleurs habillent Apple Music. Le

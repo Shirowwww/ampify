@@ -63,6 +63,7 @@ Apple Music element ([names.md](names.md)):
   `:not(...)`, `:hover`, `:focus`, `:active`.
 
 `backdrop-filter` becomes `backdrop: acrylic(tint, opacity)`, and `justify-content`, `align-items` and `gap` become
-alignment or margins on the children. `filter`, `pointer-events`, `cursor`, `overflow`, `mix-blend-mode`, `clip-path`
+alignment or margins on the children. `overflow: hidden` and `clip-path: inset(...)` cut an element to a rectangle
+(rounded or shaped clips do not work). `filter` takes `blur()` only. `pointer-events`, `cursor`, `mix-blend-mode`
 and `text-transform` have no equivalent. Colors written `${xrdb:...}` (pywal) are refused. `theme.js` does not run:
 an Ampify theme can have a `main.js` that uses the `Ampify` API instead.

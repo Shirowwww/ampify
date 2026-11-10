@@ -56,31 +56,15 @@ Apple's lyrics are richer than they look in the side panel:
 `SungColor`, `UnsungColor`, `LyricsOpacity_*`, `LineFontSize` and `ArtworkMaxSize` are not in the application's resources:
 each view defines them for itself. A theme cannot reach them with `colors.ini` today.
 
-## Against Ampify's lyrics view
+## What Ampify reaches
 
-Now Playing (`extensions/now-playing`) opens Apple's player since 0.5.0. Before, Ampify drew its own lyrics view, an
-example extension that has since been removed. The comparison that led to the switch:
-
-| | Apple's full-screen player | Ampify's former lyrics view |
-|---|---|---|
-| Getting there | two clicks in Apple Music (artwork, then full screen); one with Now Playing | one button in the playback bar, over the main window |
-| Background | animated artwork (`ImmersionLockup`) | the cover, blurred, still |
-| Lyrics | line states, word by word, background vocals, translation, pronunciation, instrumental dots | the current line highlighted, two lines before and four after |
-| Lyrics source | Apple's, always | Apple's once its lyrics panel has been open for the song, otherwise LRCLIB |
-| Controls | the whole transport, scrubber, volume, AirPlay, reactions, audio badge | none: Escape or Close |
-| Reached by themes | no: the theme engine walks the main window only | yes, through the style attributes of the view |
-
-Apple's view is the better player. What Ampify's view brings is one-click access, a place extensions can draw on, and
-lyrics from LRCLIB when Apple has none.
-
-## What Ampify could do with Apple's views
-
-1. **Reach `MiniPlayerWindow` with themes.** The interface service already binds that window for extension surfaces
-   (`src/win/ui_service.cpp`, its own DispatcherQueue); the theme engine would need a second tree backend posted to that
-   thread, and stable names for the parts above (`.mini-player`, `.fullscreen-player`, `.fullscreen-artwork`,
-   `.fullscreen-lyrics`...).
-2. **Element-scoped resources.** Writing `SungColor`, `UnsungColor`, `LyricsOpacity_Current` or `LineFontSize` into a
-   view's own resources would let a theme recolour and resize Apple's karaoke lyrics, the same way Ampify already keeps
-   a button's colours under the pointer (it writes `{Control}{Property}PointerOver` keys into that button's resources).
-3. **One click to Apple's full screen.** Done: `Ampify.ui.applePlayer.open()` (`src/win/apple_player.cpp`), used by Now
-   Playing, opens it as a window over the main one.
+- The interface service binds `MiniPlayerWindow` for extension surfaces (`src/win/ui_service.cpp`, its own
+  DispatcherQueue).
+- Themes reach the mini player through a second copy of the theme engine on its thread
+  (`src/win/mini_player_theme.cpp`), fed the theme service's request. It expects WinUI to give each interface thread
+  its own copy of the application's resources, as UWP did for each view (not yet seen on screen): the log line "bound
+  on its own interface thread" says which case holds, and when the copy is shared ("the colour keys are the main
+  window's") only element rules apply there.
+- `Ampify.ui.applePlayer.open()` (`src/win/apple_player.cpp`) opens Apple's full-screen player as a window over the
+  main one; Now Playing uses it.
+- The class names themes use for these views are in [names.md](../docs/themes/names.md).

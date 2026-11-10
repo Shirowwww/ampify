@@ -1,7 +1,7 @@
 {%- assign h = site.data.home[page.lang] -%}
 {%- assign t = site.data.site[page.lang] -%}
-{%- assign root = '/' -%}{%- if page.lang == 'fr' -%}{%- assign root = '/fr/' -%}{%- endif -%}
-{%- assign shots = "glass:Glass,palettes:Palettes,mirror:Mirror,console:Console,cinema:Cinema,artwork:Artwork,paper-light:Paper,greenroom:Greenroom,high-contrast:High contrast" | split: "," -%}
+{%- assign root = t.root -%}
+{%- assign shots = "glass:Glass,palettes:Palettes,mirror:Mirror,console:Console,cinema:Cinema,artwork:Artwork,paper-light:Paper,greenroom:Greenroom,fluent:Fluent" | split: "," -%}
 {%- assign raw = "https://raw.githubusercontent.com/Shirowwww/ampify/main/themes/" -%}
 <section class="hero" aria-labelledby="hero-title">
   <div class="hero-text">

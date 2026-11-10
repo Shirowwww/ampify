@@ -16,6 +16,11 @@ A class goes anywhere a part of a selector goes: `.sidebar`, `.card:hover`, `.al
 its part (`Grid.card` is refused). An unknown class makes the rule ignored, with a line in the log. The names were
 read on Apple Music 1.1792.
 
+A class takes the same states as any part: `:hover`, `:active`, `:focus`, `:playing`, and the control states
+`:checked` (a toggle or switch that is on), `:selected` (a selected row or sidebar entry) and `:disabled` (a control
+that takes no input). `.list-item:selected` and `.next-button:disabled` work as written; the full list is in
+[the selector table](format.md#selectors).
+
 ## Window
 
 | Class | Zone |
@@ -122,6 +127,9 @@ read on Apple Music 1.1792.
 | Class | Zone |
 |---|---|
 | `.section-header` | The header of a section |
+| `.section-grid` | A section of a stacked page laid out as large tiles, such as the picks for you at the top of Home: since Apple 1.1792, a shelf whose rows hold large posters |
+| `.section-single` | A section of a stacked page made of large banners, such as the carousel at the top of New: since Apple 1.1792, a shelf of tiles under no title |
+| `.section-shelf` | A section of a stacked page that is a shelf (Home, New), the two kinds above included; the shelves under an album are `.list-page-shelves` |
 | `.shelf` | A row of cards that scrolls sideways |
 | `.shelf-title` | Its title row: the title and the subtitles |
 | `.shelf-title-link` | The title as Apple's link control |
@@ -171,7 +179,7 @@ read on Apple Music 1.1792.
 | `.artist-picture` | The picture of an artist |
 | `.radio-play-button` | The play button of a station |
 | `.track-list` | The list of songs |
-| `.track-row` | One song of that list, on a playlist page and on an album page. Its light under the pointer is the only one: Apple's own (`.track-list-item`) is off |
+| `.track-row` | One song of that list, on a playlist page and on an album page. Its light under the pointer is the only one: Apple's own (`.track-list-item`) is off. The library's Songs page keeps Apple's light |
 | `.track-list-item` | The list row that holds a song of that list, as wide as the list |
 | `.track-play-button` | The play button of a song |
 | `.reactions-button` | The reactions button of a song |
@@ -205,6 +213,11 @@ read on Apple Music 1.1792.
 | `.mini-player-lyrics`, `.mini-player-queue` | Its lyrics and Up Next views, when open |
 | `.mini-player-volume` | Its volume control |
 
+The players' windows only take the rules that name them: `.playbar` or a bare `TextBlock` never reach them, but
+`.mini-lcd` or `MiniPlayerPage TextBlock` do. The mini player runs on an interface thread of its own, where Ampify
+applies the same theme and snippets with a second copy of its engine: the theme's colours and scheme reach it, and
+`ampify devtools` writes its tree to `logs\inspector-mini.txt` and `inspector-mini.json` while it is open.
+
 ## Playback bar
 
 | Class | Zone |
@@ -222,6 +235,7 @@ read on Apple Music 1.1792.
 | `.lcd` | The display of the song playing |
 | `.lcd-artwork` | Its artwork area |
 | `.lcd-artwork-image`, `.lcd-placeholder` | The artwork, and what shows when there is none |
+| `.lcd-artwork-picture` | The picture inside the artwork's frame: a `transform` zooms it within the frame (the frame itself refuses one) |
 | `.lcd-artwork-hover` | The layer Apple shows over the artwork under the pointer |
 | `.lcd-loading` | The line that runs along the display while a song loads |
 | `.track-text` | The title and the artist |

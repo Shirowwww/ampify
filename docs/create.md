@@ -40,6 +40,27 @@ installed, Apple Music, and a terminal open in a working folder. Nothing to comp
    it shows in the Marketplace of every Ampify and in [the gallery](themes.html).
 {: .steps}
 
+## One way for each thing
+
+Themes, snippets and extensions share their tools. When two kinds of element can do the same thing, they do it the
+same way, so what you learn for one works for the others.
+
+| To... | Use | Works in |
+|---|---|---|
+| Offer settings | The `settings` field of the manifest ([manifest](extensions/manifest.md#settings)): CSS reads them with `@setting` and `--setting-<key>`, JavaScript with `Ampify.config.get(key)` | Themes, snippets, extensions, apps |
+| Translate the name, the description and the settings | The `translations` field of the manifest | Every element |
+| Know where the playback bar is | `@setting bar-position`, set by the user for every theme, or by the theme's `"playbar"` | Themes, snippets |
+| Follow the panels' corners | `--panel-radius` (and `--bar-radius`, `--lcd-radius` for the bar and the display) | Themes and snippets set it; snippets and extensions' panels follow it |
+| Use the colours of the cover playing | `--art-1` to `--art-3` and their kin in CSS, `Ampify.color.playing()` in JavaScript | All |
+| Draw bars that move with the music | `content: bars(n, shape, height)` | Themes, snippets |
+| Blur, recolour or put glass on an element | `filter` and `backdrop` | Themes, snippets |
+| Style a row, a toggle or a control by its state | `:hover`, `:active`, `:focus`, `:current`, `:playing`, `:checked`, `:selected`, `:disabled` | Themes, snippets |
+| Mark a stretch of the progress line | `Ampify.ui.playbar.mark(id, from, to)` | Extensions |
+| Build an interface | The nodes of `Ampify.ui`, or `Ampify.React` with `Ampify.components` (buttons, toggles, check boxes, sliders, fields, menus, tabs, progress bars, spinners, dividers...) | Extensions, apps |
+
+[Theme format](themes/format.md#what-a-theme-tells-snippets-and-extensions) lists what a theme passes on to the other
+elements, and [the API](extensions/api.md#55-interface-stable) lists every node and component.
+
 ## Coming from Spicetify
 
 A Spicetify `color.ini` works as it is: put it in a theme folder and its colors dress Apple Music. The `user.css`

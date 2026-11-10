@@ -9,7 +9,7 @@ en:
   get:
     - name: Themes
       text: Colors, glass panels, the artwork of the song behind everything, rounded corners, motion. Pick one in the Marketplace and it applies at once, no restart.
-      fact: 12 themes, 31 light and dark schemes
+      fact: 10 themes, 28 light and dark schemes
     - name: Extensions
       text: Your Discord status with the cover and buttons, Last.fm scrobbling, a sleep timer, global shortcuts. Each one says what it needs before you switch it on.
       fact: Permissions shown before anything runs
@@ -36,7 +36,7 @@ fr:
   get:
     - name: Thèmes
       text: Couleurs, panneaux en verre, la pochette du morceau derrière tout, coins arrondis, mouvement. Choisissez-en un dans le Marketplace, il s'applique tout de suite, sans redémarrer.
-      fact: 12 thèmes, 31 schémas clairs et sombres
+      fact: 10 thèmes, 28 schémas clairs et sombres
     - name: Extensions
       text: Votre statut Discord avec la pochette et des boutons, le scrobbling Last.fm, une minuterie de veille, des raccourcis globaux. Chacune dit ce dont elle a besoin avant d'être activée.
       fact: Permissions affichées avant que rien ne tourne
@@ -52,3 +52,57 @@ fr:
     - La protection contre la copie n'est jamais touchée.
     - Sur une version d'Apple Music pas encore testée, Ampify reste éteint jusqu'à ce qu'elle le soit.
     - Chaque thème et extension du Marketplace a son code sur GitHub, relu avant d'être listé.
+it:
+  title: Apple Music a modo tuo
+  lede: Temi, estensioni e un Marketplace per l'app ufficiale Apple Music su Windows. Lossless, Dolby Atmos, testi e libreria funzionano come prima.
+  install_cmd: irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
+  install_note: Senza diritti di amministratore. Ampify si carica poi insieme ad Apple Music a ogni avvio, e `ampify restore` lo spegne.
+  or_zip: oppure scarica il programma di installazione
+  theme_label: Tema mostrato
+  get_title: Cosa cambia in Apple Music
+  get:
+    - name: Temi
+      text: Colori, pannelli di vetro, la copertina del brano dietro a tutto, angoli arrotondati, movimento. Scegline uno nel Marketplace e si applica subito, senza riavviare.
+      fact: 10 temi, 28 schemi chiari e scuri
+    - name: Estensioni
+      text: Il tuo stato su Discord con la copertina e i pulsanti, lo scrobbling su Last.fm, un timer di spegnimento, scorciatoie globali. Ognuna dice di cosa ha bisogno prima di essere attivata.
+      fact: Permessi mostrati prima che giri qualsiasi cosa
+    - name: Integrato
+      text: Un pulsante Now Playing che apre il lettore a schermo intero di Apple con i testi in stile karaoke, e un livellatore che porta i brani Dolby Atmos al volume dei brani stereo.
+      fact: Livellato al volume stereo, in LUFS
+  make_title: Crea i tuoi
+  make_text: Un tema sono poche righe di CSS sugli elementi di Apple Music. Un'estensione è JavaScript (o TypeScript) con l'oggetto `Ampify`. `ampify dev` ricarica il tuo lavoro a ogni salvataggio, e `ampify publish` lo invia al Marketplace.
+  make_cta: Inizia in cinque minuti
+  safe_title: Apple Music resta Apple Music
+  safe:
+    - Non viene scritto nulla nel pacchetto di Apple Music; disinstallare rimette tutto com'era.
+    - La protezione dalla copia non viene mai toccata.
+    - Su una versione di Apple Music non ancora provata, Ampify resta spento finché non lo è.
+    - Ogni tema ed estensione del Marketplace ha il suo codice su GitHub, rivisto prima di essere inserito nell'elenco.
+ko:
+  title: 나만의 Apple Music
+  lede: Windows용 공식 Apple Music 앱을 위한 테마, 확장 기능, 그리고 Marketplace입니다. 무손실 오디오, Dolby Atmos, 가사, 라이브러리는 그대로 작동합니다.
+  install_cmd: irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
+  install_note: 관리자 권한이 필요 없습니다. 이후 Ampify는 Apple Music이 시작될 때마다 함께 로드되며, `ampify restore`로 끌 수 있습니다.
+  or_zip: 또는 설치 프로그램 다운로드
+  theme_label: 표시된 테마
+  get_title: Apple Music에서 달라지는 점
+  get:
+    - name: 테마
+      text: 색, 유리 패널, 모든 것 뒤에 깔리는 현재 곡의 앨범 아트, 둥근 모서리, 움직임. Marketplace에서 하나 고르면 다시 시작하지 않아도 바로 적용됩니다.
+      fact: 테마 10개, 밝고 어두운 구성표 28개
+    - name: 확장 기능
+      text: 앨범 아트와 버튼이 들어간 Discord 상태, Last.fm 스크로블링, 취침 타이머, 전역 단축키. 켜기 전에 각각 무엇이 필요한지 알려 줍니다.
+      fact: 아무것도 실행되기 전에 권한을 보여 줍니다
+    - name: 기본 제공
+      text: Apple의 전체 화면 플레이어를 노래방 스타일 가사와 함께 여는 Now Playing 버튼, 그리고 Dolby Atmos 곡의 음량을 스테레오 곡 수준으로 맞춰 주는 레벨러.
+      fact: 스테레오 음량에 맞춰 평준화, LUFS 기준
+  make_title: 직접 만들어 보세요
+  make_text: 테마는 Apple Music 요소에 적용하는 몇 줄의 CSS입니다. 확장 기능은 `Ampify` 객체를 쓰는 JavaScript(또는 TypeScript)입니다. `ampify dev`는 저장할 때마다 작업물을 다시 불러오고, `ampify publish`는 Marketplace로 보냅니다.
+  make_cta: 5분 만에 시작하기
+  safe_title: Apple Music은 그대로 Apple Music입니다
+  safe:
+    - Apple Music 패키지에는 아무것도 쓰지 않으며, 제거하면 모든 것이 원래대로 돌아갑니다.
+    - 복사 방지는 절대 건드리지 않습니다.
+    - 아직 테스트하지 않은 Apple Music 버전에서는 테스트가 끝날 때까지 Ampify가 꺼진 채로 있습니다.
+    - Marketplace의 모든 테마와 확장 기능은 소스가 GitHub에 있으며, 목록에 오르기 전에 검토를 거칩니다.

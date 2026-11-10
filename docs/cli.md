@@ -58,7 +58,7 @@ ampify doctor                            check that everything is in order
 | `ampify install <id> [--yes]` | Downloads, checks the SHA-256, validates and installs. The element starts off ([what is checked](extensions/catalog.md#what-install-checks)) |
 | `ampify update <id> [--yes]` | Updates an element when the catalog has a newer version |
 | `ampify remove <id>` | Removes an element, after a backup |
-| `ampify update` | Downloads the latest Ampify release and checks it. `--check` only says whether one exists, `--apply` installs it (Apple Music closed). `--auto` follows `kit_update`, at most one look a day: the background launcher runs it every hour while Apple Music is closed, with its output in `logs\update.log` |
+| `ampify update` | Downloads the latest Ampify release and checks it. `--check` only says whether one exists, `--apply` installs it (Apple Music closed). `--auto` follows `kit_update`, at most one look a day: the launcher runs it once at each sign-in, and every hour while Apple Music is closed where it stays in the background (Windows refused to start it with Apple Music), with its output in `logs\update.log` |
 | `ampify install-kit <version> [--apply]` | Installs a given Ampify release, even an older one |
 | `ampify versions [list]` | The tested Apple Music versions, and the installed one: every build of a tested family (same first two numbers, such as 1.1792) is accepted when its player library still exports what Ampify needs |
 | `ampify versions update` | Downloads the list of tested versions published with the catalog into `versions.txt` |
@@ -71,6 +71,7 @@ ampify doctor                            check that everything is in order
 | `ampify apply` | Writes what must load (`active.txt`), tells a running Apple Music, and makes Ampify load each time Apple Music starts |
 | `ampify restore` | Ampify no longer loads with Apple Music. An open Apple Music keeps it until it closes |
 | `ampify restore --backup <name>` | Puts back the settings and elements of a backup |
+| `ampify uninstall` | Opens the uninstaller, the same one as Settings > Apps: the program, its start at sign-in, its loading in Apple Music and its Settings > Apps entry go, and Apple Music is back as it was. It asks whether to delete your themes, settings and extensions too (No by default). `--yes` removes it without a window and keeps them; add `--delete-data` to delete them |
 | `ampify launch` (or `auto`) | Applies, then starts Apple Music with the kernel now |
 | `ampify backup` / `ampify backup list` | Backs up the settings and elements, or lists the backups |
 | `ampify watch [--interval ms]` | Applies again at each change of a theme, extension or setting |
@@ -96,7 +97,7 @@ Commands without arguments can follow each other: `ampify backup apply launch`. 
 
 | Command | What it does |
 |---|---|
-| `ampify doctor` | Checks settings, elements, safe mode, logs, tools and Apple Music versions. On Windows it also gives the installed Apple Music version, warns about a library agent running without Apple Music, about programs known to crash Apple Music (3Dconnexion's driver, RivaTuner, which draws MSI Afterburner's on-screen display) with their fix, and about Apple Music crash dumps of the last 7 days. Lines start with `[OK]`, `[WARNING]` or `[ERROR]`; exit code 1 on an error |
+| `ampify doctor` | Checks settings, elements, safe mode, logs, tools and Apple Music versions. On Windows it also gives the installed Apple Music version, warns about a library agent running without Apple Music, about programs known to crash Apple Music (3Dconnexion's driver, RivaTuner, which draws MSI Afterburner's on-screen display) with their fix, and about Apple Music crash dumps of the last 7 days. With the freeze log on (`apple.watchdog`), it gives the stalls each log holds, the longest, and the last lines. Lines start with `[OK]`, `[WARNING]` or `[ERROR]`; exit code 1 on an error |
 | `ampify logs [count] [--follow]` | The last lines (50 by default) of each log; `--follow` keeps printing |
 | `ampify report [file.zip] [--tree] [--dir]` | Writes an anonymised zip to attach to an issue (see below) |
 | `ampify profile list` | Lists settings profiles |
@@ -104,7 +105,7 @@ Commands without arguments can follow each other: `ampify backup apply launch`. 
 | `ampify export <file.zip>` | Exports the settings and installed elements, without `remote.token` (an import keeps the current one) |
 | `ampify import <file.zip> [--dry-run] [--yes]` | Imports an export after validating every element. Writes nothing if one fails |
 
-`ampify report` puts `system.txt` (versions, language, displays), `doctor.txt`, the settings, the logs and, on Windows,
+`ampify report` puts `system.txt` (versions, language, displays), `doctor.txt`, the settings, the logs, every line of the freeze log (`freezes.txt`) and, on Windows,
 recent crashes of Apple Music or Ampify in one zip under `reports\`. The user and computer names, e-mail addresses, what
 was played and secret-looking values are masked first. Nothing is sent: look through the zip, then attach it.
 
@@ -114,8 +115,9 @@ was played and secret-looking values are masked first. Nothing is sent: look thr
 |---|---|
 | `--kit-dir <folder>` | Ampify folder (default `%USERPROFILE%\Ampify`) |
 | `--catalog <source>` | Catalog: a local file, `file://` or `https://` |
-| `--dry-run` | Shows what would happen and writes nothing: `apply`, `launch`, `restore`, `import`, `publish`, `devtools`, `config --dir`. Other commands refuse it |
+| `--dry-run` | Shows what would happen and writes nothing: `apply`, `launch`, `restore`, `uninstall`, `import`, `publish`, `devtools`, `config --dir`. Other commands refuse it |
 | `--yes`, `-y` | Answers yes to every question |
+| `--delete-data` | With `uninstall`: deletes the Ampify folder (themes, settings, extensions) too |
 | `--scheme <name>` | Color scheme, with `theme set`, `theme check` and `theme watch` |
 | `--max-cycles <n>` | Stops `watch`, `theme watch`, `dev` or `logs --follow` after n passes |
 | `--json` | `market`: prints the catalog, the installed elements and the active theme as JSON |
@@ -144,7 +146,7 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `theme.live_reload` | `1` or `0`: apply the theme again when its files change | `1` |
 | `theme.inspect` | `1`: the kernel writes the interface tree once, then sets `0` | `0` |
 | `xaml.watcher` | `1`: WinUI tells Ampify of each element it adds, and the theme reaches it at once. No flash measured, but the interface slows down over a long session (Apple Music keeps a record of every element): leave it off | `0` |
-| `language` | `en`, `fr`, `de`, `es`, `pt`, `ru`, `ja` or `zh`; empty follows the Windows display language | empty |
+| `language` | `en`, `fr`, `de`, `es`, `pt`, `ru`, `ja`, `zh`, `it` or `ko`; empty follows the Windows display language | empty |
 | `apple.notifications` | `apple`, `background` (only while Apple Music is not in front) or `never` | `apple` |
 | `apple.close` | `quit`, or `tray` to keep playing behind a notification-area icon | `quit` |
 | `apple.network` | `ipv4-first` tries a server's IPv4 address before its IPv6 one (songs stuck at 0:00 where IPv6 does not answer), `system` keeps Windows' order; applies at the next start | `ipv4-first` |
@@ -154,14 +156,17 @@ ones. Services (`discord`, `tray`, `remote`, `midi`) are read when Apple Music s
 | `apple.artwork` | The full-screen player's cover: `sharp` shows a sharper copy where Apple Music stretches a small one, `apple` leaves Apple's | `sharp` |
 | `apple.marquee` | A text cut with "…": `hover` scrolls it while the pointer is on it, `off` leaves it cut | `hover` |
 | `apple.sidebar` | Apple Music's sidebar: `open` leaves it as Apple Music shows it, `hover` folds it to its icons and opens it over the pages while the pointer is on it; the pin button left of "···" in the open sidebar's header pins it open for the session (it then shows an unpin icon, and a second click, or the hamburger, folds it again; the hamburger otherwise keeps its own role), beside the pages in a window wider than 1324 px and over them in a narrower one, and the Library and Playlists groups fold with it | `open` |
-| `apple.watchdog` | `on` writes to `logs\AppleMusic.log` each freeze of Apple Music's window of 0.3 s or more, with what Ampify was doing, and a summary each minute. It also writes, in `AppleMusic.log` and `AMPLibraryAgent.log`, each name lookup and automatic proxy detection that took 0.3 s or more (20 lines at most per process, "on the interface thread" when the window waited for it), and the private memory of each process, once at start and again at each new step of 512 MB. `off` writes nothing. Applies at the next start of Apple Music | `off` |
-| `apple.orphanAgent` | `on` ends a library agent left running by a killed Apple Music, so the library opens again (error 9039): when Apple Music is started from Ampify's launcher, after giving the agent 10 s to leave, and also 10 s after Apple Music is closed where the background launcher runs (Windows refused to start the launcher with Apple Music). Never while Apple Music runs. Applies the next time Apple Music starts | `off` |
+| `apple.watchdog` | `on` writes to `logs\AppleMusic.log` each freeze of Apple Music's window of 0.3 s or more, with what Ampify was doing, and a summary each minute. It also writes, in `AppleMusic.log` and `AMPLibraryAgent.log`, each name lookup and automatic proxy detection that took 0.3 s or more (20 lines at most per process, "on the interface thread" when the window waited for it), and the private memory of each process, once at start and again at each new step of 512 MB. `off` writes nothing. `ampify doctor` shows its last lines and `ampify report` keeps them all in `freezes.txt`. Applies at the next start of Apple Music | `on` |
+| `apple.orphanAgent` | `on` ends a library agent left running by a killed Apple Music, so the library opens again (error 9039): when Apple Music is started from Ampify's launcher, after giving the agent 10 s to leave, and also 10 s after Apple Music is closed where the background launcher runs (Windows refused to start the launcher with Apple Music). Never while Apple Music runs; `off` leaves it. Applies the next time Apple Music starts | `on` |
+| `apple.playbar` | Where the playback bar goes, for every theme and with none: `theme` leaves it where the theme plans it (its manifest's `playbar`, else at the top), `top` keeps Apple Music's place, `bottom` puts it along the bottom of the window, `centred` along the bottom with the buttons centred and the progress line under them. A theme that writes `@setting bar-position` lays the bar out itself; under any other, and with no theme, Ampify applies its own bottom bar. Replaces the Bottom playback bar snippet and the themes' own `bar-position` settings of 1.2, which Ampify moves here once | `theme` |
+| `apple.lyricsBefore` | In the full-screen player, how many lyrics lines show above the line being sung: `all` (Apple's own), `0`, `1`, `2`, `3`, `4` or `5`. The lines faded out take no click, and the lines shown stay centred on the sung one | `all` |
+| `apple.lyricsAfter` | The same below the line being sung: `all`, `0`, `1`, `2`, `3`, `4` or `5` | `all` |
 | `apple.topbar` | `search` puts Apple Music's own search field, centred, and a back arrow in the empty strip at the top of the window, next to the window buttons, and hides the sidebar's field; `off` keeps Apple Music's layout. The strip shows only while the playback bar is at the bottom (a theme with a bottom bar) and the window is at least 612 pixels wide; otherwise Apple's layout comes back until it does. No forward arrow: Apple Music keeps a back history only | `off` |
 | `ampify.entry` | Where the entry that opens the Marketplace stands: `sidebar`, or `header` next to Apple's "···" at the top of the open sidebar | `sidebar` |
 | `catalog.url` | `https://...` or `file://...` | the public catalog |
 | `app_launch_flags` | Arguments added when `ampify launch` starts Apple Music | empty |
 | `check_kit_update` | `1`: some commands say when a new Ampify exists (checked once a day, nothing downloaded) | `0` |
-| `kit_update` | New Ampify releases: `auto` installs them while Apple Music is closed, `ask` asks first, `off` never looks | `auto` |
+| `kit_update` | New Ampify releases: `auto` installs them while Apple Music is closed, `ask` offers them in a notification (a click installs; left alone, it comes back a week later), `off` never looks | `auto` |
 | `expose_api` | `0`: no JavaScript element starts | `1` |
 | `discord.enabled` | `1`: elements with `ipc.discord` can show a Discord presence | `0` |
 | `tray.enabled` | `1`: an Ampify icon in the notification area | `0` |

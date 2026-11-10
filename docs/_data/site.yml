@@ -1,12 +1,17 @@
-# Interface texts of the site, per language. Page content lives in the pages themselves.
+# Interface texts of the site, per language. Page content lives in the pages themselves. A language is a block here, one
+# in home.yml, a folder of pages (index, themes, extensions, getting-started, create) and a line in _config.yml's
+# defaults; the language menu lists every block in the order of `languages`.
+languages: [en, fr, it, ko]
 en:
   home: Home
   themes: Themes
   extensions: Extensions
   create: Create
   docs: Documentation
-  other_lang: Français
-  other_path: /fr/
+  name: English
+  root: /
+  skip: Skip to content
+  language: Language
   install: Install
   install_line: Close Apple Music, paste this line in PowerShell, then open Apple Music as usual.
   copy: Copy
@@ -27,8 +32,10 @@ fr:
   extensions: Extensions
   create: Créer
   docs: Documentation
-  other_lang: English
-  other_path: /
+  name: Français
+  root: /fr/
+  skip: Aller au contenu
+  language: Langue
   install: Installer
   install_line: Fermez Apple Music, collez cette ligne dans PowerShell, puis ouvrez Apple Music comme d'habitude.
   copy: Copier
@@ -43,3 +50,51 @@ fr:
   search: Rechercher
   gallery_empty: Rien ne correspond.
   by: Par
+it:
+  home: Home
+  themes: Temi
+  extensions: Estensioni
+  create: Crea
+  docs: Documentazione
+  name: Italiano
+  root: /it/
+  skip: Vai al contenuto
+  language: Lingua
+  install: Installa
+  install_line: Chiudi Apple Music, incolla questa riga in PowerShell, poi apri Apple Music come al solito.
+  copy: Copia
+  copied: Copiato
+  footer: Ampify è gratuito per qualsiasi uso non commerciale, con licenza PolyForm Noncommercial 1.0.0. Apple Music è un marchio di Apple Inc.; Ampify non è affiliato ad Apple.
+  gallery_loading: Lettura del catalogo…
+  gallery_error: Impossibile leggere il catalogo. Aprilo su GitHub.
+  install_with: Installalo dal Marketplace, oppure
+  permissions: Richiede
+  no_permission: Non richiede nulla
+  schemes: Schemi di colori
+  search: Cerca
+  gallery_empty: Nessun risultato.
+  by: Di
+ko:
+  home: 홈
+  themes: 테마
+  extensions: 확장 기능
+  create: 만들기
+  docs: 문서
+  name: 한국어
+  root: /ko/
+  skip: 본문으로 건너뛰기
+  language: 언어
+  install: 설치
+  install_line: Apple Music을 닫고, 이 줄을 PowerShell에 붙여 넣은 다음, 평소처럼 Apple Music을 여세요.
+  copy: 복사
+  copied: 복사됨
+  footer: Ampify는 PolyForm Noncommercial 1.0.0 라이선스에 따라 모든 비상업적 용도로 무료입니다. Apple Music은 Apple Inc.의 상표이며, Ampify는 Apple과 관련이 없습니다.
+  gallery_loading: 카탈로그 읽는 중…
+  gallery_error: 카탈로그를 읽을 수 없습니다. GitHub에서 열어 보세요.
+  install_with: Marketplace에서 설치하거나,
+  permissions: 필요한 권한
+  no_permission: 필요한 것 없음
+  schemes: 색상 구성표
+  search: 검색
+  gallery_empty: 일치하는 항목이 없습니다.
+  by: 제작

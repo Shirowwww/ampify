@@ -32,7 +32,7 @@ element's id. Schema: [schemas/manifest.schema.json](../../schemas/manifest.sche
 | `translations` | no | Name, description and setting labels in other languages (below) |
 | `homepage` | no | An `https://` URL |
 | `license` | no | 1 to 64 characters |
-| `tags` | no | Up to 5 unique words, each `[a-z0-9][a-z0-9-]{0,19}` (`dark`, `glass`, `lyrics`) |
+| `tags` | no | Up to 5 unique words, each `[a-z0-9][a-z0-9-]{0,19}` (`dark`, `glass`, `lyrics`); `developer` lists it in the Marketplace's Developers tab |
 | `preview` | no | A `.png`, `.jpg` or `.jpeg` at the root of the folder, 2 MB at most, shown on the Marketplace card |
 | `appVersions` | no | Up to 16 Apple Music versions the element was tested on |
 | `permissions` | no | Up to 32 values from [the API](api.md#4-permissions), shown before activation |
@@ -47,16 +47,22 @@ element's id. Schema: [schemas/manifest.schema.json](../../schemas/manifest.sche
 | `icon` | | optional | | | An `.svg` icon |
 | `colors` | | | required, or `resources` | | An `.ini` file of color schemes |
 | `defaultScheme` | | | optional | | The scheme used by default |
+| `playbar` | | | optional | | `top` (default), `bottom` or `centred`: where the playback bar goes while `apple.playbar` leaves it to the theme ([format](../themes/format.md)) |
 | `resources` | | | required, or `colors` | required, or a `user.css` | A `.xaml` resource dictionary |
-| `settings` | optional | forbidden | optional | forbidden | Settings shown in Ampify's settings page (below) |
+| `settings` | optional | forbidden | optional | optional | Settings shown in Ampify's settings page (below) |
 
 Files named in the manifest sit at the root of the folder (no subfolder, no `../`, no leading dot). The folder may hold
 subfolders for files that `main` imports. A symbolic link anywhere in the folder is refused.
 
 ## Settings
 
-An extension, a theme or a snippet can declare settings. Ampify's settings page shows them under the
-extension's switch, or under the extensions for the active theme and the snippets switched on.
+An extension, a theme or a snippet can declare settings. Ampify's settings page folds them under the extension's
+switch (Sound and extensions tab), or under the theme's or snippet's name for the active theme and the snippets
+switched on (Look tab). The fold shows how many settings it holds and opens with a click; the page's search looks
+through every label and description, so write them with the words people will type. The element's page in the
+Marketplace (its gear, or a click on its card) shows the same settings, under the same group headings, with their
+descriptions and a Reset for each one changed: both places read and write the same `settings.txt` keys, so a change
+in one shows in the other the next time it opens.
 
 ```json
 "settings": [
@@ -105,7 +111,7 @@ file leaves out keeps its value.
 ## Translations
 
 `name`, `description` and labels are in English. `translations` gives them in the other languages Ampify speaks:
-`fr`, `de`, `es`, `pt`, `ru`, `ja` and `zh`.
+`fr`, `de`, `es`, `pt`, `ru`, `ja`, `zh`, `it` and `ko`.
 
 ```json
 "translations": {
@@ -121,7 +127,7 @@ file leaves out keeps its value.
 
 | Member | Rule |
 |---|---|
-| language key | One of `fr`, `de`, `es`, `pt`, `ru`, `ja`, `zh`. Any other key is refused |
+| language key | One of `fr`, `de`, `es`, `pt`, `ru`, `ja`, `zh`, `it`, `ko`. Any other key is refused |
 | `name`, `description` | Required, same lengths as the English ones |
 | `settings` | Optional: a label per setting `key`, 1 to 60 characters |
 | `options` | Optional: a text per choice value, 1 to 60 characters. The stored value stays the English one |

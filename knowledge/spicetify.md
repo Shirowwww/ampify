@@ -77,14 +77,14 @@ From the 18 most used themes and 20 most used extensions and apps:
 
 ## Lessons for Ampify
 
-| Lesson | Evidence in Spicetify | For Ampify |
-|---|---|---|
-| A stable-names table is versioned data with a regeneration tool | the derivation script came years late | keep the names table as the source; propose names for a new Apple Music build from two trees, never invent them |
-| One name, one role | the divider and button sharing a name | flag a class that matches elements of different types |
-| A silent no-match is the main failure | `Replace` is silent | count and report how many rules matched, in the log and `ampify doctor` |
-| A version gate beats best-effort patching | the unmerged allowlist branch | Ampify stays off on an untested Apple Music version |
-| One readiness signal | polling everywhere | `Ampify.ready`, and a "not ready" error that names the subsystem |
-| Ship an API self-check | `Spicetify.test()` | check the documented API against the real one in CI |
-| Live reload with a clear result line | `watch` | "reloaded in N ms" or the reason it failed |
-| Keep shims for what the host removed | the compat CSS | aliases in the names table, with a "deprecated name" warning |
-| Isolation is an asset | shared page and `localStorage` in Spicetify | one QuickJS context and scoped storage per element |
+| Lesson | Evidence in Spicetify |
+|---|---|
+| A stable-names table is versioned data with a regeneration tool | the derivation script came years late |
+| One name, one role | the divider and button sharing a name |
+| A silent no-match is the main failure | `Replace` is silent |
+| A version gate beats best-effort patching | the unmerged allowlist branch |
+| One readiness signal | polling everywhere |
+| Ship an API self-check | `Spicetify.test()` |
+| Live reload with a clear result line | `watch` |
+| Keep shims for what the host removed | the compat CSS |
+| Isolation is an asset | shared page and `localStorage` in Spicetify |

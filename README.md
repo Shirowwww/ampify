@@ -26,16 +26,17 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 
 ## What you get
 
-- 12 themes with 31 colour schemes, light and dark, applied at once without a restart, and an accent colour of your
+- 10 themes with 28 colour schemes, light and dark, applied at once without a restart, and an accent colour of your
   choice. Spicetify `color.ini` palettes work as they are.
 - A Marketplace inside Apple Music (the Ampify entry at the bottom of the sidebar) with themes, extensions and
   snippets, previews, and one-click installs.
 - Extensions for Discord presence, Last.fm scrobbling, a sleep timer and global shortcuts, and pages for your
   listening stats and the new releases of the artists you listen to. Each one shows the permissions it needs before
   you switch it on.
-- Now Playing (Apple's full-screen player with karaoke lyrics), an Atmos leveler that brings Dolby Atmos songs to the
-  loudness of stereo ones, and a playback guard for songs Apple Music leaves stuck, all shipped with Ampify.
-- English, French, German, Spanish, Portuguese, Russian, Japanese and Simplified Chinese.
+- Now Playing (Apple's full-screen player with karaoke lyrics), a Song panel (a column about the song playing), an
+  Atmos leveler that brings Dolby Atmos songs to the loudness of stereo ones, and a playback guard for songs Apple
+  Music leaves stuck, all shipped with Ampify.
+- English, French, German, Spanish, Portuguese, Russian, Japanese, Simplified Chinese, Italian and Korean.
 - Updates install themselves while Apple Music is closed, or after a question, as you choose in Settings > Ampify.
 - Nothing is written into Apple Music's package, and uninstalling gives the original app back. On an Apple Music
   version of a family that was not tested (1.1792 is), Ampify stays off.
@@ -86,7 +87,7 @@ Then open Apple Music as usual, from its own icon: there is no special shortcut.
 Apple Music looks the same right after the install: no theme is on yet.
 
 1. Open Apple Music and click **Ampify** at the bottom of the sidebar.
-2. Under **Themes** (this needs the internet), click **Install** on the one you like, then **Use**.
+2. Under **Themes** (this needs the internet), click **Install** on the one you like: it is in use at once.
 3. Switch extensions on and off in Apple Music's **Settings > Ampify**.
 
 To go back to Apple Music's own look, click **Use Apple Music's look** in the Marketplace. More ways back, from a

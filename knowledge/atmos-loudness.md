@@ -52,9 +52,26 @@ applies its gain to the samples.
 
 ## Leveling settings
 
-- Target: the median of the last 30 stereo songs measured.
-- Gain between 0 and 15 dB.
-- Peak ceiling 0.95, soft knee from 0.94.
+- Target: the median of the latest stereo songs measured.
+- The gain is bounded, with a peak ceiling and a soft knee. The numbers are in `extensions/atmos-leveler/leveler.hpp`
+  (`LevelerConfig`); the knee is in `src/core/audio/gain_ramp.cpp`.
 - One value kept per stable variant of the song (`AVCFPlayerItemCopyCurrentStableVariantID`).
-- Starting gain for a new Atmos song: 5.0 dB, then it converges as the measurement builds.
+- A new Atmos song starts at a fixed gain, then it converges as the measurement builds.
 - With AMExclusive active (exclusive output), leveling pauses ([amexclusive-notes.md](amexclusive-notes.md)).
+
+## A seek opens a new spatial stream, and the renderer starts too loud
+
+Measured on `1.1792.39942.0` with Dolby Atmos for Headphones, by recording the endpoint (WASAPI loopback) while an A-B
+loop came back to the same passage, and comparing with that passage played through:
+
+- Every seek (an A-B loop return, a click in the scrubber) makes Apple Music activate a new
+  `ISpatialAudioObjectRenderStreamForMetadata`. A change of song keeps the same stream.
+- For the first 0.8 s of a new stream the output is 10 to 15 dB louder than the same passage played through, then it
+  matches within 1 dB. Same result with the leveler off (no gain), so it is not the leveler.
+- The objects the hooks see are not louder over that time: the burst comes after them, in the renderer.
+
+`ObjectPass` is made again for each new stream, so it fades its gain in: held at -12 dB for 0.4 s, then up to the
+gain by 0.8 s (`object_pass.cpp`). It only does so while it gains the objects: at unity the samples stay untouched.
+
+Apple Music's own "Dolby Atmos" setting (Settings > Playback) can come up empty; Apple Music then plays every song in
+stereo, with no spatial stream at all. Choosing "Automatic" again brings Atmos back.

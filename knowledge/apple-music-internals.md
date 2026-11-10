@@ -8,9 +8,7 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
 
 - The MSIX package is installed in `C:\Program Files\WindowsApps\AppleInc.AppleMusicWin_<version>_x64__nzyj5cx40ttqa\`.
   The folder is read-only and protected, so a proxy DLL cannot be placed there. Launch command:
-  `explorer shell:AppsFolder\AppleInc.AppleMusicWin_nzyj5cx40ttqa!App`. The list of binaries is in
-  [package-binaries.txt](package-binaries.txt).
-- Two processes (verified):
+  `explorer shell:AppsFolder\AppleInc.AppleMusicWin_nzyj5cx40ttqa!App`.- Two processes (verified):
   - `AppleMusic.exe`: the interface. **WinUI 3 / embedded Windows App SDK** (`Microsoft.UI.Xaml.dll` from the package),
     views and models in C++/WinRT: `AMP.UI.Views.dll`, `AMP.UI.Controls.dll`, `AMP.UI.ViewModels.dll`,
     `AMP.Services.dll`. It also contains V8 / `JavaScriptCoreV8.dll`, `JetEngine32.dll` (Apple's "Jet" engine, used for
@@ -28,7 +26,7 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   playback, queue, equalizer, lyrics, Atmos and lossless badges, settings...). The content of `AMP.Services` (types,
   methods, fields) is in `winmd/AMP.Services.txt`, and that of the player views in `winmd/AMP.UI.Views.txt`. It is the
   map of the app: an interface or a mod can call these services instead of guessing.
-- Protocols handled ([protocols.txt](protocols.txt)): `music:`, `musics:`, `itms:`, `itmss:`... A link
+- Protocols handled: `music:`, `musics:`, `itms:`, `itmss:`... A link
   `music://music.apple.com/...` opens the page in the app but does not start playback.
 - A module scan of a running `AppleMusic.exe` showed about 250 modules, including `Microsoft.Web.WebView2.Core.dll`,
   `JavaScriptCoreV8.dll`, `Microsoft.UI.Xaml.dll`, `Microsoft.UI.Xaml.Controls.dll`, `Microsoft.UI.Xaml.Internal.dll` and
@@ -84,8 +82,11 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
 
 - **Lyrics without the pane (1.1792, slot read from the winmd).** Apple loads a song's lyrics only when its lyrics
   pane opens: until then `ILyricsInfo.HaveLyrics` is false. Its pane calls `IPlayer.GetNowPlayingLyricsAsync(LyricsSource)`
-  (slot 49, an `IAsyncAction`; `LyricsSource` is Any, None, UserCustom, Store, StoreSyllable = 4). Ampify calls it with
-  StoreSyllable at each new item (`src/win/amp_player.cpp`). `GetLyricsAsync(descriptor, StoreSyllable)` (slot 50)
+  (slot 49, an `IAsyncAction`; `LyricsSource` is Any, None, UserCustom, Store, StoreSyllable = 4). Ampify called it with
+  StoreSyllable at each new item and every 3 s after until 09/11/2026, from its own thread, while Apple's panes make
+  the same call on the interface thread: the likely cause of a full-screen lyrics pane left empty until the next song,
+  and of a freeze at a song change with the side pane open. It is now left to Apple's panes; Ampify asks only
+  `GetLyricsAsync(descriptor, StoreSyllable)` (slot 50, three times at most, `src/win/amp_player.cpp`). That call
   completes, but on 1.1792 it gave `timing="Line"` TTML for every library song tried (05/11/2026): Apple Music on
   Windows had no word timing for them. The karaoke then spreads a line's span over its words by length
   (`KaraokeWords`, `src/core/lyrics.cpp`), the parsed lyrics keep only what Apple gave.
@@ -125,9 +126,10 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   (slot 11) gives an `Artwork`, queried as `IArtwork`: `get_Uri` is a `Windows.Foundation.Uri` whose absolute address is
   probably an `mzstatic.com` template with `{w}`, `{h}`, `{c}` and `{f}`; `get_BGColor` is a `Windows.UI.Color` (A, R, G, B).
   `get_LyricsInfo` (slot 46) gives `ILyricsInfo`: `HaveLyrics`, `GetTTML` (timed lines and words), `GetStaticLyrics`,
-  `GetLanguage`. Lyrics may come some seconds after the track starts. None of this is confirmed on a real Apple Music yet.
-- Versions: `1.1540.23042.0` and `1.1792.39682.0` are both in the tested list. In 1.1792 the interfaces of
-  `AMP.Services.Player` changed ("IPlayer absent" in the log), so the player read falls back to SMTC.
+  `GetLanguage`. Lyrics may come some seconds after the track starts.
+- Versions: `1.1540.23042.0` and `1.1792.39682.0` are both in the tested list (`facts/apple.json`). 1.1792 changed the
+  interface identifiers of `IPlayer` and `INowPlayingItem` but not their slots, so the player is read by trying each
+  identifier in turn (`src/core/amp_abi.hpp`); the Windows media session (SMTC) is the fallback when none answers.
 - Windows media session (SMTC), seen in 1.1792: the artist field holds "Artist — Album" and the album field is empty, so
   the player model splits it. The length often arrives a poll after the track change. The thumbnail is the cover as a
   JPEG of about 40 to 170 KB; its content type reads "image/jpeg,image/jpe,image/jpg", keep the first entry.
@@ -193,7 +195,10 @@ the pages. Not verified on a real Apple Music. Ranked by how often users report 
 4. **Freeze with the lyrics or the queue open** (AMWin-RP #193, reported 2025, still open in May 2026). A maintainer
    suspects UI Automation tree searches block the app. This is the one case where Ampify's own code can be the cause:
    see "UI-thread audit" below.
-5. **Slow start, first song blocked**: already described above (the 15 s block, Apple's bug).
+5. **Slow start, first song blocked**: already described above (the 15 s block, Apple's bug). Still reported on
+   Apple's forums in 2025 ("songs stop after 15 seconds", often the first song after the PC starts, more with
+   Lossless); the workarounds given there are restarting the song or jumping past 15 s, which is what the playback
+   guard does. No fix from Apple found (2026-11-09).
 6. **Lyrics** (black background, sync, word timing): Apple announced word-by-word lyrics for Windows in its
    1792 build (October 2026, press report, not checked on screen).
 7. **Scroll at about 30 frames a second** on WinUI 3 scroll bars (microsoft-ui-xaml #5850). A framework limit.
@@ -204,7 +209,7 @@ the pages. Not verified on a real Apple Music. Ranked by how often users report 
 10. **Dolby Atmos not offered** (Dolby Access): Apple and Dolby's problem, out of Ampify's scope (Atmos is never touched).
 11. **iPhone sync and playlist folders**: Apple Devices, out of scope.
 
-### Freeze watch (`apple.watchdog`, off by default)
+### Freeze watch (`apple.watchdog`, on by default)
 
 - The kernel queues a heartbeat to the interface thread about every 200 ms (`PostToUiThread`, one at a time) and a
   monitor thread looks every 100 ms. Each beat is stamped when queued: the wait until it runs is the block, without
@@ -215,8 +220,17 @@ the pages. Not verified on a real Apple Music. Ranked by how often users report 
   tick), "theme pass after a change" (`Reapply` on each XAML change), "inspector tree", "element picker", "player
   buttons read", "player buttons press", "player volume" and "player command" (every `PlayerBridge` call run on the
   interface thread), and since 2026-11-06 the four tree searches of the audit below: "player buttons tree search",
-  "full-screen player tree search", "player display tree search" and "sharp artwork tree search". Add a marker to any
-  other interface-thread path that should be named.
+  "full-screen player tree search", "player display tree search" and "sharp artwork tree search". Since 2026-11-09:
+  "interface refresh" (`ui_service`'s refresh: the buttons, menus, sidebar items and pages Ampify places, which was
+  unnamed and so read as "no Ampify work"), and the steps of the theme tick ("theme tick: attach to the window",
+  "...: Apple Music tweaks", "...: apply the theme", "...: light or dark mode"). The first tick also logs its length
+  (`Themes: first tick, N ms on the interface thread`), a part of the start-up time. Add a marker to any other
+  interface-thread path that should be named.
+- Measured from 17 saved `AppleMusic.log` files (2026-11-06 to 09, freeze log on, Ampify loaded): 31 stalls, 29
+  "no Ampify work" (before the refresh had its name) and 2 "theme tick" (1152 ms 2.3 s after load, 885 ms at 82 s).
+  The start-up block is steady: 1.4 to 2.9 s around 2.5 to 4 s after the kernel loads, 19 stalls and 19.6 s in all in
+  the first 15 s of the 17 runs. No name lookup or proxy detection reached 300 ms, and the playback guard logged no
+  frozen song in those runs.
 - The same setting times name lookups and the automatic proxy detection (`Network: ... took N ms`, with "on the
   interface thread" when the window waited) and follows each process's private memory (`Memory: <process> uses N MB`,
   then `grew to` at each new step of 512 MB). See "Where Apple Music waits" below.
@@ -238,7 +252,7 @@ Work that runs on the interface thread and could block it for long, found by rea
   the cache waits for a stall line that names one of them.
 - `element_picker.cpp` (inspector) hit-tests on the interface thread only when asked to pick.
 
-### Stuck library agent (`apple.orphanAgent`, off by default)
+### Stuck library agent (`apple.orphanAgent`, on by default)
 
 - A killed Apple Music can leave `AMPLibraryAgent.exe` running. It holds the library, so Apple Music cannot open it
   (error 9039). Detection: an agent of the package runs and no `AppleMusic.exe` of the package runs.
