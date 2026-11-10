@@ -474,7 +474,7 @@ function dateOf(time) {
   const parts = { d: String(date.getDate()).padStart(2, "0"), m: String(date.getMonth() + 1).padStart(2, "0"), y: String(date.getFullYear()) };
   const order = DATE_ORDER[Ampify.i18n.language] || "dmy/";
   const separator = order[3] || "/";
-  return [...order.slice(0, 3)].map((part) => parts[part]).join(separator);
+  return order.slice(0, 3).split("").map((part) => parts[part]).join(separator);
 }
 
 const clock = (ms) => (ms > 0 ? Math.floor(ms / 60000) + ":" + String(Math.floor(ms / 1000) % 60).padStart(2, "0") : "");

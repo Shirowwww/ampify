@@ -4,6 +4,10 @@
 
 #include "theme_service.hpp"
 
+#ifdef GetCurrentTime
+#undef GetCurrentTime  // windows.h macro that breaks Storyboard::GetCurrentTime in the projection
+#endif
+
 #include <chrono>
 #include <fstream>
 #include <functional>
