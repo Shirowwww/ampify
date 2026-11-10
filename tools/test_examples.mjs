@@ -3089,3 +3089,15 @@ test("hover-time takes the readout away while no song is loaded, and waits for a
   fake.emit("statechange", { playing: false, positionMs: 0, durationMs: 200_000, track: null });
   assert.deepEqual(fake.world.readouts, [0, 200_000, 0], "the queue ended: no song, no readout");
 });
+
+test("the site hides the same retired elements as the kernel", () => {
+  const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const site = readFileSync(join(root, "docs", "assets", "site.js"), "utf8");
+  const listed = site.match(/RETIRED = new Set\(\[([\s\S]*?)\]\)/)[1].match(/"[a-z0-9-]+"/g).map((id) => id.slice(1, -1));
+  const table = readFileSync(join(root, "src", "core", "theme", "retired.cpp"), "utf8");
+  const start = table.indexOf("kRetired[] = {");
+  const block = table.slice(start, table.indexOf("};", start));
+  const retired = [...block.matchAll(/\.id = "([a-z0-9-]+)"/g)].map((m) => m[1]);
+  assert.ok(retired.length > 0);
+  assert.deepEqual([...new Set(listed)].sort(), [...new Set(retired)].sort());
+});

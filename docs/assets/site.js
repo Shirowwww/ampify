@@ -11,6 +11,17 @@
     "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog.json",
   ];
   const KINDS = ["theme", "snippet", "extension", "app"];
+  // Retired in 1.3 (src/core/theme/retired.cpp): the catalog still lists them for Ampify 1.2.1, Ampify hides them.
+  const RETIRED = new Set([
+    "animated-artwork", "bottom-playbar", "centred-lyrics", "compact-sidebar", "cover-ambience", "dark-lyrics",
+    "ember", "focused-lyrics", "hide-buttons", "hide-explicit", "high-contrast", "hover-row-actions", "hover-search",
+    "lyrics-spotlight", "playbar-times", "progress-mascot", "progress-thickness", "sidebar-icons", "square-corners",
+  ]);
+  // An entry is its first version; later ones are in `newer`, oldest first. The page shows the latest.
+  const newestVersion = (item) => {
+    const newer = Array.isArray(item.newer) ? item.newer.filter((v) => v && typeof v === "object") : [];
+    return newer.length ? { ...item, ...newer[newer.length - 1], kind: item.kind, id: item.id } : item;
+  };
   const REFRESH_MS = 5 * 60 * 1000;
   const ROTATE_MS = 5000;
   const COPIED_MS = 1600;
@@ -170,7 +181,9 @@
         const text = await response.text();
         const catalog = JSON.parse(text);
         const items = (Array.isArray(catalog.extensions) ? catalog.extensions : [])
-          .filter((item) => item && KINDS.includes(item.kind) && typeof item.id === "string" && typeof item.name === "string")
+          .filter((item) => item && KINDS.includes(item.kind) && typeof item.id === "string" && !RETIRED.has(item.id))
+          .map(newestVersion)
+          .filter((item) => typeof item.name === "string")
           .sort((a, b) => a.name.localeCompare(b.name));
         return { text, items };
       } catch (error) {
