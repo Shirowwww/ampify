@@ -1,5 +1,175 @@
 # Changelog
 
+## 1.3.0 (2026-11-10)
+
+Ampify 1.3 brings a new installer, a settings page in tabs, fewer snippets with more settings, one place for the
+playback bar under every theme, and colour filters and liquid glass for theme authors.
+
+### Install, uninstall and updates
+
+- The installer and the uninstaller have a window of their own in Ampify's colours: what is about to happen, then each
+  step ticked as it goes, then the result. It follows the keyboard (Tab, Space, Enter, Escape) and screen readers, and
+  its motion stays still when Windows' animations are off.
+- New `ampify uninstall`: it opens the same uninstaller as Settings > Apps, which removes the program, its start with
+  Windows, its loading in Apple Music and its Settings > Apps entry. A box, unticked by default, deletes your themes,
+  settings and extensions too. `--yes` removes Ampify without a window; `--delete-data` deletes your files as well.
+- An Apple Music version that was not tested no longer leaves the install in doubt: the installer says so and installs
+  anyway. Ampify stays off in that version until it is tested, as before.
+- With "Ask me first" for Ampify updates, a new version is offered in a notification instead of a window that waited
+  for an answer. A click installs it; left alone, it comes back a week later.
+- `ampify update`, `ampify install-kit`, `ampify uninstall` and the PowerShell install line show their steps in Ampify's
+  colours in a terminal that shows colours: a turning mark while a step runs, and a live progress bar for the install
+  line's download. Elsewhere (a pipe, a file,
+  `NO_COLOR`) the output stays plain text.
+
+### Settings page
+
+- Ampify's settings page has five tabs (Look, Window, Player, Sound and extensions, Advanced) instead of seven sections
+  in one long column, and a search box that looks through all of them, the settings of themes, snippets and
+  extensions included.
+- The settings of each theme, snippet and extension are folded under its name, with how many there are, and open with
+  a click. A fold left open stays open when the page comes back.
+- An element's page in the Marketplace shows its settings as the settings page does: under their group headings,
+  with their descriptions, and a Reset for each one changed. Snippets get the "Open Ampify's settings" button too.
+- The accent colour is chosen from round swatches; the plus opens the #RRGGBB field as before.
+- Changing tab slides the accent line under the tabs and fades the new tab in; folds slide open. Motion stays still
+  when Windows' animations are off, and the page follows every theme's colours.
+
+### Marketplace
+
+- **Install** also turns the element on: a theme is in use, an extension, an app or a snippet is on, with no second
+  click. For an element that asks for permissions, the card's **Install…** first opens its page, which lists what
+  it may do.
+- The examples for people who make extensions (Hello extension, React panel, UI palette, Audio meter) have a
+  **Developers** tab of their own and no longer sit among the extensions.
+- The scheme menu names the scheme on screen: with the scheme set to follow Windows or a schedule, it showed the
+  theme's default one, so Glass read "Dark" while it was light.
+- A page of the Marketplace (or of any app) drawn empty is drawn again at once, instead of waiting for a second visit.
+- A click anywhere on a card opens the element's page, and the card lights up softly under the pointer. Its buttons
+  keep their own action.
+
+### Interface
+
+- The search suggestions open right against the search box, under every theme: Apple's frame left a band of 3 pixels
+  between them.
+- With the top bar off (`apple.topbar = off`) or a window too narrow for it, the strip under the window's buttons keeps
+  its veil over a theme's artwork: the white buttons no longer vanish on a white cover.
+- A sidebar pinned open in a narrow window no longer flashes a squashed column for a few frames after a click on one
+  of its items.
+- The top bar's back arrow lights up under the pointer under light themes too (it was white on white under Glass).
+- Closing the mini player with its cross brings Apple Music's window back instead of leaving it in the taskbar.
+- Glass: the pages stop just above the rim of their panel, which the last row of tiles used to cover.
+
+### Themes
+
+- Apple's mini player takes the theme and the snippets too: its colours, its light or dark mode, and the rules that
+  name it (`.mini-player`, `.mini-lcd`, `.mini-player-lyrics`...). `ampify devtools` saves its tree as well
+  (`logs\inspector-mini.txt`).
+- Fluent 2.0.0: rebuilt on Windows 11's two layers (Mica base, one content layer), its 8/4-pixel corners and type
+  ramp; the playback bar starts bottom-centred.
+- One setting now places the playback bar for every theme, and with no theme: Settings > Ampify > Playback bar. "As
+  the theme plans" keeps each theme's own place (Glass, Greenroom, Console, Cinema and Cosy at the bottom, the others
+  at the top). Top, Bottom and Bottom, centred apply to every theme. The setting replaces the Bottom playback bar
+  snippet and the themes' own position settings, and a choice made with those carries over. Console can now have its
+  bar at the top.
+- At the top, the bar sits like the panels: lined up with the pages, a small gap above them, and ending before the
+  window's buttons. It used to run past the pages on both sides and into those buttons.
+- A background on the bar, such as Cover ambience's glow, now covers the whole bar. Apple paints each of the bar's
+  three parts with its own colour, so the glow showed only behind the shuffle and previous buttons.
+- The centred bar shows only the elapsed time, at the left end of the progress line, and a progress mascot shows on
+  that line again: it was cut to its bottom edge.
+- Ember is now part of Artwork, as the "Accent in the artwork's colours" setting. If you used Ember, Artwork takes its
+  place with your settings and keeps the bar at the bottom.
+- High contrast is gone. If you used it, Apple Music's own look comes back.
+- Greenroom and Palettes no longer have their own setting to hide the Explicit and Lossless badges: Declutter hides
+  them under every theme, and its two settings are switched on for you if you used it.
+- A bar at the bottom stands a small gap above the window's edge and clear of its sides, as the bar at the top does.
+- Mirror follows the bar's place too: at the top, its bar sits above the pages; at the bottom, under them as before.
+- Cinema's column setting is now called "Widest page width" and says what it does.
+- For theme authors: a theme names its bar's place with `"playbar"` in its manifest and reads the place in use with
+  `@setting bar-position`. Under a theme that writes no `@setting bar-position`, Ampify lays out the bottom bar itself.
+- Glass has a "Liquid glass" setting: clearer panes, what lies behind blurred less and in more vivid colours, with a
+  sheen along their top edge.
+- For theme authors: `filter` takes the colour filters of CSS (`saturate`, `grayscale`, `sepia`, `brightness`,
+  `contrast`, `invert`, `hue-rotate`) and Ampify's `tint()` and `duotone()`, with or without a blur; with
+  `transition: filter`, a change fades smoothly. `backdrop: liquid-glass(tint, opacity)` paints a pane of liquid glass.
+- For theme authors: three new states, `:checked` (a toggle or switch that is on, such as shuffle), `:selected` (a
+  selected row or sidebar entry) and `:disabled` (a control that takes no input), on any class or type:
+  `.list-item:selected`, `.next-button:disabled`. Ampify reads them only while a rule uses one, and `ampify devtools`
+  shows them on each element of the tree.
+- Artwork: "Space around the panels" also sets the space between the playback bar at the top and the pages, which
+  stayed at 10 pixels.
+- For theme authors: `--panel-radius` now reaches the panels of extensions too, so a theme or the Corners snippet sets
+  their corners along with its own panels.
+
+### Snippets
+
+- The animated equalizer (formerly Display equalizer) comes in four shapes: bars, a smooth line, a ring, or bars
+  mirrored from the middle with the low notes in the centre. Besides the song's display and the artwork, it can run
+  along the whole playback bar or at the bottom of the page, and the Ampify card sets how high it reaches and how
+  strong it shows. Themes get the same with `content: bars(n, line, 60%)`.
+
+- Fewer snippets, each with more settings. Your choices carry over on the first start of Ampify 1.3:
+  - Corners joins Round corners and Square corners: one radius, or square corners everywhere.
+  - Lyrics style joins Centred lyrics, Lyrics spotlight and Dark lyrics. Centred lines and the spotlight now work
+    together, word-by-word lyrics included.
+  - Progress line joins Progress mascot and Progress line thickness.
+  - Sidebar style joins Compact sidebar and Sidebar icons.
+  - Declutter takes in Hide buttons and Hide explicit.
+- New Artwork filters: the artwork of the song playing in two inks of the accent, in black and white, in sepia or
+  more vivid, in the playback bar, at the top of its album and in full screen.
+- Actions on hover is gone: Apple Music already shows a row's buttons under the pointer.
+- Large album artwork loads the cover at the size it shows, so it is as sharp as Apple's.
+- Spinning artwork with no song playing shows the empty record alone: its label no longer cuts Apple's small note.
+- Cover ambience keeps the theme's own colour for the times under a light scheme (Paper light), where white times
+  read as a stray colour on the bar.
+- Cover ambience on the bar fills a bar at the bottom out to its edges, its glow rising from the bottom with no hard
+  line.
+
+### Extensions
+
+- For extension authors: four new building blocks, `checkbox`, `progress` (a bar filled to a value, or moving on its
+  own), `spinner` and `divider`, with their components `Ampify.components.Checkbox`, `ProgressBar`, `Spinner` and
+  `Divider`. `ampify types` knows them.
+- A-B loop draws its passage on the progress line: a tick at A, a tick at B and a light shade between them. Extensions
+  can do the same with the new `Ampify.ui.playbar.mark(id, from, to)`.
+- Song panel: the wheel scrolls the panel, and scrolls the lyrics only once the panel goes no further. Lyrics you
+  moved stay where you put them; a small arrow brings back the line being sung, and the view follows the song again
+  when that line comes into view. The panel slides out as smoothly as it slides in, lets a theme's glass and veil show
+  through, and takes the theme's panel corners, square ones included. Its card takes the cover's main colour from top
+  to bottom, raised for a nearly black cover so that the white text always reads.
+- Discord Presence waits up to three seconds for the cover before it first shows a song, so the first song after
+  turning it on shows its cover instead of Ampify's logo. Animated covers play at 15 frames a second instead of 10.
+- Listening stats opens the page of the song, album or artist you clicked, never another one with the same name. A
+  song's page shows its cover, album, year, genre and length, its plays, listening time, first and last listen, and
+  buttons to play it, open its album or open its artist.
+- Bookmarks has its icon in Apple Music's main menu.
+- The playback guard is on from the start.
+
+### Full-screen player
+
+- The cover is sharp at every opening: Apple's image, decoded at the size of the player's first frame, sometimes stayed
+  that small once the player had grown. It is now decoded again at the size shown.
+- New settings: how many lyrics lines show above and below the line being sung (all, or 0 to 5). The lines shown
+  stay centred on the sung one.
+
+### Settings
+
+- Labels and help lines are shorter. Every menu has the same width, so choosing an option no longer moves the row or
+  the ones below it.
+- "Stuck library agent" and "Freeze log" are now on by default. `ampify doctor` shows, for each log, how many freezes
+  it holds, the longest, and the last lines; `ampify report` keeps every line of the freeze log in `freezes.txt`.
+- With the sidebar set to open under the pointer and no theme, the open sidebar keeps the colour of the folded one
+  instead of taking a tint from the page under it.
+- With Ampify's entry next to "···", the entry shows there as soon as the sidebar opens, instead of a moment later.
+- Ampify speaks Italian and Korean, in Apple Music, the installer, the Marketplace and every element of the
+  repository. All elements now have their name and description in the ten languages.
+
+### Reliability
+
+- Safe mode keeps Apple Music's library agent without Ampify too, `ampify launch` says when a start runs in safe mode,
+  and `ampify doctor` says so during that start.
+
 ## 1.2.1 (2026-11-07)
 
 This is the stable release of the 1.2.0 work, and every user can update to it. It also fixes three things.
