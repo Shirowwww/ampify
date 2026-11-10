@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "mirror",
   "name": "Mirror",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Apple Music turned around: the sidebar on the right, the pages on the left, and the playback bar under them at the bottom left. Calm neutral greys, light text on dark, one sea-green accent. A setting puts the sidebar back on the left.",

@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "palettes",
   "name": "Palettes",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "One calm layout, one colour scheme per family: Catppuccin, Tokyo Night, Rose Pine, Nord, Gruvbox, Dracula, Rose gold and Midnight. One setting rounds every corner, from square to round; the playback bar goes at the top or across the bottom.",
