@@ -164,6 +164,29 @@ void InstallReplacements(std::vector<ElementRef> wanted, std::filesystem::path k
                           });
 }
 
+constexpr const char* kElementsUpdatedKey = "elements_updated_for";  // state.txt: the release that last updated them
+
+// At the first start of a new release, once the retired elements are replaced: every element from the catalog goes to
+// its version there, so that one taking in a retired element has what it took in, and active.txt is written again
+// (ampify update --elements). Offline, the next start tries again.
+void UpdateElementsForRelease(const std::filesystem::path& kit, Journal& journal) {
+    const std::string state = (kit / "state.txt").string();
+    Settings current;
+    current.Load(state);
+    if (current.GetString(kElementsUpdatedKey, "") == kKitVersion) return;
+    journal.Write("Themes: updating the elements from the catalog for Ampify " + std::string(kKitVersion));
+    RunAmpifyInBackground({"update", "--elements", "--kit-dir", ToUtf8(kit.wstring())}, [state, &journal](int code) {
+        if (code != 0) {
+            journal.Write("Themes: elements not updated (code " + std::to_string(code) + "), tried again at the next start");
+            return;
+        }
+        std::string error;
+        bool written = Settings::UpdateFile(state, kElementsUpdatedKey, std::string(kKitVersion), error);
+        journal.Write(written ? "Themes: elements updated from the catalog"
+                              : "Themes: elements updated from the catalog, state.txt not written, " + error);
+    });
+}
+
 }  // namespace
 
 // Owned by the service, touched only by the posted tasks, which run on the interface thread.
@@ -236,9 +259,16 @@ void ThemeService::Run(HINSTANCE module) {
     }
     // Once the replacements are in, the elements that waited for them move, in the same session.
     auto replaced = std::make_shared<std::atomic<bool>>(false);
-    if (std::vector<ElementRef> wanted = MoveRetiredElements(m_kit, m_journal); !wanted.empty()) {
-        InstallReplacements(std::move(wanted), m_kit, m_journal, [replaced] { *replaced = true; });
+    std::vector<ElementRef> wanted = MoveRetiredElements(m_kit, m_journal);
+    // The elements are updated after the replacements are in and the elements that waited for them moved.
+    auto migrated = std::make_shared<std::atomic<bool>>(wanted.empty());
+    if (!wanted.empty()) {
+        InstallReplacements(std::move(wanted), m_kit, m_journal, [replaced, migrated] {
+            *replaced = true;
+            *migrated = true;
+        });
     }
+    bool elementsAsked = false;
 
     // Reads the settings, the theme, the snippets, sidebar.json and home.json, and reloads only what changed. The
     // Windows mode and the local time choose the scheme for theme.scheme = auto and theme.schedule.
@@ -250,6 +280,10 @@ void ThemeService::Run(HINSTANCE module) {
 
     while (m_running) {
         if (replaced->exchange(false)) MoveRetiredElements(m_kit, m_journal);  // what failed is tried at the next start
+        if (!elementsAsked && *migrated && !*replaced) {
+            elementsAsked = true;
+            UpdateElementsForRelease(m_kit, m_journal);
+        }
         auto stamp = ChangeStamp(m_kit);
         Settings settings;
         settings.Load((m_kit / "settings.txt").string());

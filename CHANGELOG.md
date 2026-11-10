@@ -181,6 +181,10 @@ playback bar under every theme, and colour filters and liquid glass for theme au
 
 - Safe mode keeps Apple Music's library agent without Ampify too, `ampify launch` says when a start runs in safe mode,
   and `ampify doctor` says so during that start.
+- The first start of Ampify 1.3 sets up what you used in 1.2 on its own: each retired snippet is replaced by the one
+  that takes it in, installed from the catalog with your settings, and every element from the catalog moves to its 1.3
+  version. Offline, your old elements stay and the next start tries again. `ampify update --elements` does the same by
+  hand.
 
 ## 1.2.1 (2026-11-07)
 

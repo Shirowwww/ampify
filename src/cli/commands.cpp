@@ -492,6 +492,8 @@ std::optional<Options> ParseOptions(const std::vector<std::string>& arguments, s
             options.apply = true;
         } else if (arg == "--auto") {
             options.autoUpdate = true;
+        } else if (arg == "--elements") {
+            options.elements = true;
         } else if (arg == "--follow") {
             options.follow = true;
         } else if (arg == "--json") {

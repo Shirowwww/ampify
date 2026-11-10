@@ -315,6 +315,17 @@ std::optional<int> UpdateInstalledElements(Context& ctx) {
     return updated;
 }
 
+// ampify update --elements, which the kernel runs at the first start of a new release: every installed element at its
+// catalog version, then active.txt written again, as apply does, so that it names what loads. 1 when the catalog
+// could not be read.
+int UpdateAllElements(Context& ctx) {
+    std::optional<int> updated = UpdateInstalledElements(ctx);
+    if (!updated) return 1;
+    ctx.out << *updated << " element(s) updated from the catalog.\n";
+    ApplyNow(ctx);
+    return 0;
+}
+
 std::string DefaultReleaseUrl(std::string_view version) {
     // A given release, by its tag: `ampify install-kit 0.1.0` reads .../releases/tags/v0.1.0.
     if (version.empty()) return std::string(kReleaseApiUrl) + "/latest";
@@ -808,6 +819,7 @@ int CmdInstallKit(Context& ctx) {
 int CmdUpdate(Context& ctx) {
     const std::vector<std::string>& args = ctx.options.positional;
     if (args.size() == 1 && ctx.options.autoUpdate) return CmdAutoUpdate(ctx);
+    if (args.size() == 1 && ctx.options.elements) return UpdateAllElements(ctx);
     if (args.size() == 1) {
         return InstallKitRelease(ctx, ctx.options.releaseUrl ? *ctx.options.releaseUrl : DefaultReleaseUrl(""), "");
     }

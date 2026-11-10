@@ -47,6 +47,7 @@ Marketplace
   market readme <id>           prints an element's README.md (installed copy, or the one published with it)
   install <id> [--yes]         installs from the catalog (SHA-256 checked)
   update <id> [--yes]          updates an installed element from the catalog
+  update --elements            updates every installed element from the catalog, then writes active.txt
   update [--check] [--apply]   updates Ampify from the latest GitHub release
   install-kit <version> [--apply]   installs a given version of Ampify (even an older one), SHA-256 checked
   versions [list]              Apple Music versions the kernel accepts, and the installed one
