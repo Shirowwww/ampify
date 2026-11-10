@@ -20,11 +20,13 @@ namespace {
 namespace xaml = winrt::Microsoft::UI::Xaml;
 namespace dispatching = winrt::Microsoft::UI::Dispatching;
 
-// The state of the DispatcherQueue backend. The queue is agile: any thread may enqueue.
+// The state of the DispatcherQueue backend. The queue is agile: any thread may enqueue. No reference to the window
+// is kept: resolving one from the posting threads (the freeze log posts every 200 ms) could end the window's last
+// reference off its thread while Apple Music closed, and crashed it in Microsoft.UI.Xaml.dll.
 struct DispatchState {
     std::mutex mutex;
-    winrt::weak_ref<xaml::Window> window;
     dispatching::DispatcherQueue queue{nullptr};
+    bool ended = false;  // the queue refused work: its thread is ending with the process, never attached again
     Journal* journal = nullptr;
     std::atomic<DWORD> threadId{0};
     std::atomic<bool> firstRun{false};
@@ -45,7 +47,8 @@ bool XamlAttach() {
     DispatchState& state = State();
     {
         std::lock_guard<std::mutex> lock(state.mutex);
-        if (state.queue && state.window.get()) return true;
+        if (state.queue) return true;
+        if (state.ended) return false;
     }
     rt::EnsureMultithreaded();
     xaml::Window window = AppWindowOf(WindowRole::Main);
@@ -65,7 +68,6 @@ bool XamlAttach() {
     if (!queue) return false;
     {
         std::lock_guard<std::mutex> lock(state.mutex);
-        state.window = winrt::make_weak(window);
         state.queue = queue;
     }
     Log("Interface: main window obtained through AMP.Utils (GetAppProperty \"MainWindow\"), work goes "
@@ -77,29 +79,26 @@ void XamlDetach() {
     DispatchState& state = State();
     std::lock_guard<std::mutex> lock(state.mutex);
     state.queue = nullptr;
-    state.window = {};
     state.threadId = 0;
 }
 
 bool XamlPost(std::function<void()> work) {
     DispatchState& state = State();
     dispatching::DispatcherQueue queue{nullptr};
-    bool windowGone = false;
     {
-        std::lock_guard<std::mutex> lock(state.mutex);
-        queue = state.queue;
-        windowGone = queue && !state.window.get();
-    }
-    if (windowGone) {
-        // The main window was closed and maybe replaced: take the current one.
-        XamlDetach();
-        if (!XamlAttach()) return false;
         std::lock_guard<std::mutex> lock(state.mutex);
         queue = state.queue;
     }
     if (!queue) return false;
+    // A main window closed and opened again on the same thread keeps this queue; a refusal means the thread ends.
+    auto refused = [&state] {
+        std::lock_guard<std::mutex> lock(state.mutex);
+        state.queue = nullptr;
+        state.ended = true;
+        return false;
+    };
     try {
-        return queue.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [work = std::move(work)]() noexcept {
+        if (queue.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [work = std::move(work)]() noexcept {
             DispatchState& current = State();
             try {
                 current.threadId = GetCurrentThreadId();
@@ -113,10 +112,13 @@ bool XamlPost(std::function<void()> work) {
             } catch (...) {
                 Log("Interface: a task on the interface thread failed (unknown exception)");
             }
-        });
+        })) {
+            return true;
+        }
     } catch (...) {
-        return false;  // the queue may be shutting down while the window closes
+        // The queue is shutting down while the window closes.
     }
+    return refused();
 }
 
 bool XamlAttached() {
