@@ -16,6 +16,13 @@
     </div>
   </div>
   <figure class="stage" data-rotate>
+    {%- comment -%} The current theme's picture, blurred and faint behind the window: the page takes the colours of
+    the theme shown, the way Ampify's themes take the colours of the song. {%- endcomment -%}
+    <div class="glow" aria-hidden="true">
+      {%- for shot in shots -%}{%- assign s = shot | split: ":" -%}
+      <img src="{{ raw }}{{ s[0] }}/preview.jpg" alt="" width="64" height="36" loading="lazy"{% if forloop.first %} class="on"{% endif %}>
+      {%- endfor -%}
+    </div>
     <div class="window">
       {%- for shot in shots -%}{%- assign s = shot | split: ":" -%}
       <img src="{{ raw }}{{ s[0] }}/preview.jpg" alt="Apple Music with the {{ s[1] }} theme" width="1280" height="720"
@@ -34,8 +41,8 @@
 </section>
 
 <section class="get" aria-labelledby="get-title">
-  <h2 id="get-title">{{ h.get_title }}</h2>
-  <ol class="get-list">
+  <h2 id="get-title" data-reveal>{{ h.get_title }}</h2>
+  <ol class="get-list" data-reveal-children>
   {%- for item in h.get -%}
     <li>
       <h3>{{ item.name }}</h3>
@@ -44,17 +51,25 @@
     </li>
   {%- endfor -%}
   </ol>
-  <p class="more"><a href="{{ root | append: 'themes.html' | relative_url }}">{{ t.themes }} →</a>
-    <a href="{{ root | append: 'extensions.html' | relative_url }}">{{ t.extensions }} →</a></p>
+</section>
+
+<section class="market" aria-labelledby="market-title">
+  <div class="market-text" data-reveal>
+    <h2 id="market-title">{{ h.market_title }}</h2>
+    <p>{{ h.market_text }}</p>
+    <p class="total" data-total="{{ h.market_total }}"></p>
+    <p><a class="button" href="{{ root | append: 'marketplace.html' | relative_url }}">{{ h.market_cta }}</a></p>
+  </div>
+  <div class="strip" data-strip data-market="{{ root | append: 'marketplace.html' | relative_url }}"></div>
 </section>
 
 <section class="make" aria-labelledby="make-title">
-  <div class="make-text">
+  <div class="make-text" data-reveal>
     <h2 id="make-title">{{ h.make_title }}</h2>
     <p>{{ h.make_text | markdownify | remove: '<p>' | remove: '</p>' }}</p>
-    <p><a class="button" href="{{ root | append: 'create.html' | relative_url }}">{{ h.make_cta }}</a></p>
+    <p><a class="button ghost" href="{{ root | append: 'create.html' | relative_url }}">{{ h.make_cta }}</a></p>
   </div>
-  <div class="code-pair">
+  <div class="code-pair" data-reveal-children>
 <pre class="code" aria-label="user.css"><span class="file">themes/my-theme/user.css</span><code>.sidebar {
   background: $card;
   corner-radius: 12px;
@@ -73,8 +88,8 @@
 </section>
 
 <section class="safe" aria-labelledby="safe-title">
-  <h2 id="safe-title">{{ h.safe_title }}</h2>
-  <ul>
+  <h2 id="safe-title" data-reveal>{{ h.safe_title }}</h2>
+  <ul data-reveal-children>
   {%- for line in h.safe -%}<li>{{ line }}</li>{%- endfor -%}
   </ul>
 </section>

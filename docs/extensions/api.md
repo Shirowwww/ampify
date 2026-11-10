@@ -336,6 +336,8 @@ Ampify.ui.setLabel(id, label)          // new text of a top bar or play bar butt
 Ampify.ui.setActive(id, on)            // on or off: a button or sidebar entry that is on takes Apple Music's accent colour
 Ampify.ui.setDisabled(id, disabled)    // a top bar or play bar button, or a menu entry, greyed: it ignores clicks
 Ampify.ui.playbar.mark(id, from, to)   // a stretch of the progress line for a play bar button it added (1.3)
+Ampify.ui.playbar.readout(totalMs)     // the time under the pointer on the progress line, for a span that long (1.3)
+Ampify.ui.playbar.onHover(fn)          // fn(part): where the pointer is on the line, 0 to 1, null when it leaves (1.3)
 Ampify.ui.page.register(path, view)    // for an app
 Ampify.ui.navigate(path)
 ```
@@ -356,8 +358,18 @@ Ampify.ui.navigate(path)
 - `playbar.mark(id, from, to)` draws two ticks on the progress line of the playback bar and shades the stretch between
   them, as the A-B loop does with its passage. `from` and `to` are parts of the song, from 0 to 1 (a position divided by
   `state().durationMs`), in either order; without `to` only the first tick shows, and without `from` the line is clear
-  again. The marks take the accent colour, fade in and out, and go with the button. Ampify before 1.3 has no `mark`:
-  check that it is a function before calling it.
+  again. The marks take the text colour of the bar, in its light or dark mode, fade in and out, and go with the
+  button. Ampify before 1.3 has no `mark`: check that it is a function before calling it.
+- `playbar.readout(totalMs)` shows, while the pointer is over the progress line, a thin marker where it is and, above
+  it, the time at that point of a span `totalMs` long (`m:ss`, or `h:mm:ss` from an hour on). Ampify draws both at the
+  pointer's own pace, so the element only says how long the line is: `state().durationMs` for the song playing, as the
+  bundled Time on hover does. `readout()` or `readout(0)` takes it away. The label takes the colours of Apple Music's
+  tooltips, the marker the text colour of the bar; both follow the light and dark modes and every theme's line, and
+  the label goes under the line when the bar sits at the top of the window. When several elements ask, the last one
+  shows.
+- `playbar.onHover(fn)` calls `fn(part)` as the pointer moves over the progress line, at most every 50 ms, with `part`
+  from 0 to 1 (a position divided by the line's length), and `fn(null)` once it leaves. It returns the function that
+  stops listening. Both need `ui.playbar`; Ampify before 1.3 has neither.
 - `popup.close(name)` closes a popup opened with `popup.show(name, ...)` or `ReactDOM.render(..., "popup:<name>")`, as
   the user's Close would. A popup of `popup.open` has no name and only closes by the user's hand. Names are lowercase
   letters, digits and dashes.

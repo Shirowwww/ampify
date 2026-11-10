@@ -16,6 +16,10 @@ en:
     - name: Built in
       text: A Now Playing button that opens Apple's full-screen player with karaoke lyrics, and an Atmos leveler that brings Dolby Atmos songs to the loudness of stereo ones.
       fact: Leveled to the stereo loudness, in LUFS
+  market_title: The Marketplace
+  market_text: Themes, snippets, extensions and apps, each with a picture of what it does. This page reads the same catalog as Apple Music, so what you see here is what you can install now.
+  market_total: "{n} elements in the catalog"
+  market_cta: Open the Marketplace
   make_title: Make your own
   make_text: A theme is a few lines of CSS on Apple Music's own elements. An extension is JavaScript (or TypeScript) with the `Ampify` object. `ampify dev` reloads your work at every save, and `ampify publish` sends it to the Marketplace.
   make_cta: Start in five minutes
@@ -43,6 +47,10 @@ fr:
     - name: Intégré
       text: Un bouton À l'écoute qui ouvre le lecteur plein écran d'Apple avec les paroles karaoké, et un niveleur qui ramène les morceaux Dolby Atmos au volume des morceaux stéréo.
       fact: Nivelé au volume stéréo, en LUFS
+  market_title: Le Marketplace
+  market_text: "Des thèmes, des snippets, des extensions et des apps, chacun avec une image de ce qu'il fait. Cette page lit le même catalogue qu'Apple Music, donc ce que vous voyez ici s'installe dès maintenant."
+  market_total: "{n} éléments dans le catalogue"
+  market_cta: Ouvrir le Marketplace
   make_title: Créez les vôtres
   make_text: Un thème, ce sont quelques lignes de CSS sur les éléments d'Apple Music. Une extension, c'est du JavaScript (ou du TypeScript) avec l'objet `Ampify`. `ampify dev` recharge votre travail à chaque sauvegarde, et `ampify publish` l'envoie au Marketplace.
   make_cta: Commencer en cinq minutes
@@ -70,6 +78,10 @@ it:
     - name: Integrato
       text: Un pulsante Now Playing che apre il lettore a schermo intero di Apple con i testi in stile karaoke, e un livellatore che porta i brani Dolby Atmos al volume dei brani stereo.
       fact: Livellato al volume stereo, in LUFS
+  market_title: Il Marketplace
+  market_text: Temi, snippet, estensioni e app, ognuno con un'immagine di quello che fa. Questa pagina legge lo stesso catalogo di Apple Music, quindi quello che vedi qui si installa subito.
+  market_total: "{n} elementi nel catalogo"
+  market_cta: Apri il Marketplace
   make_title: Crea i tuoi
   make_text: Un tema sono poche righe di CSS sugli elementi di Apple Music. Un'estensione è JavaScript (o TypeScript) con l'oggetto `Ampify`. `ampify dev` ricarica il tuo lavoro a ogni salvataggio, e `ampify publish` lo invia al Marketplace.
   make_cta: Inizia in cinque minuti
@@ -97,6 +109,10 @@ ko:
     - name: 기본 제공
       text: Apple의 전체 화면 플레이어를 노래방 스타일 가사와 함께 여는 Now Playing 버튼, 그리고 Dolby Atmos 곡의 음량을 스테레오 곡 수준으로 맞춰 주는 레벨러.
       fact: 스테레오 음량에 맞춰 평준화, LUFS 기준
+  market_title: Marketplace
+  market_text: 테마, 스니펫, 확장 기능, 앱이 각각 무엇을 하는지 보여 주는 이미지와 함께 있습니다. 이 페이지는 Apple Music과 같은 카탈로그를 읽으므로, 여기서 보이는 것은 지금 바로 설치할 수 있습니다.
+  market_total: "카탈로그의 요소 {n}개"
+  market_cta: Marketplace 열기
   make_title: 직접 만들어 보세요
   make_text: 테마는 Apple Music 요소에 적용하는 몇 줄의 CSS입니다. 확장 기능은 `Ampify` 객체를 쓰는 JavaScript(또는 TypeScript)입니다. `ampify dev`는 저장할 때마다 작업물을 다시 불러오고, `ampify publish`는 Marketplace로 보냅니다.
   make_cta: 5분 만에 시작하기

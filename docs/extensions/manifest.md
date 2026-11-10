@@ -29,6 +29,7 @@ element's id. Schema: [schemas/manifest.schema.json](../../schemas/manifest.sche
 | `author` | yes | A GitHub id |
 | `description` | yes | 1 to 300 characters |
 | `kitApi` | yes | `MAJOR.MINOR`, such as `1.0`: the API version it targets |
+| `minAmpify` | no | The oldest Ampify release this version runs on, such as `1.3.0`. The catalog then lists it for that release and later only ([catalog](catalog.md)) |
 | `translations` | no | Name, description and setting labels in other languages (below) |
 | `homepage` | no | An `https://` URL |
 | `license` | no | 1 to 64 characters |

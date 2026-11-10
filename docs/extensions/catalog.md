@@ -4,6 +4,28 @@ The Marketplace lists what is in the public catalog,
 [Shirowwww/ampify-catalog](https://github.com/Shirowwww/ampify-catalog): its `catalog.json`, the archives, and the
 readable sources of every element.
 
+## Propose an element in five steps
+
+Anyone can propose a theme, a snippet, an extension or an app. You need Ampify and a GitHub account; you do not need
+to know git.
+
+1. Start from a template: `ampify new theme my-theme` (or `snippet`, `extension`, `app`). The folder name is the
+   element's id.
+2. Add a picture of the element at work: `preview.jpg` or `preview.png`, 1280 by 720, taken in Apple Music, and
+   `"preview": "preview.jpg"` in the manifest. Blur the lyrics or cover them with grey bars, and hide anything
+   personal, such as your name. The check refuses an element without a preview.
+3. Run `ampify validate my-theme`, and `ampify test my-extension` for an extension or an app.
+4. Install the [GitHub CLI](https://cli.github.com) and sign in once with `gh auth login`, then run
+   `ampify publish my-theme`. It opens the pull request for you.
+5. Read the comment the check leaves on the pull request. If it lists a problem, fix it and run `ampify publish`
+   again. A maintainer then reads the code and merges it.
+
+After the merge, the element shows in the Marketplace as soon as the bot has packed it. The bot writes it to
+`catalog-1.3.json`, the catalog that Ampify 1.3.0 and later read, and to `catalog.json`, read by Ampify 1.2.1 and
+older, only when those can install it. Your pull request touches neither file. To send a new version later, raise `version`
+in the manifest and publish again: everyone who installed it gets it on their own within a day (see
+[Updates](#updates)).
+
 ## Publish an element
 
 ```bash
@@ -86,8 +108,10 @@ entry itself, so the entry keeps the version they understand.
 }
 ```
 
-The bot writes this: the first version of an element becomes its entry, and every later one goes to `newer`, with
-the release of Ampify whose `tools/pack.py` packed it as `minAmpify`. Old archives stay where they are.
+The bot writes this from the element's manifest: a version whose manifest names a `minAmpify` goes to `newer` with it
+(or becomes the entry when it is the first one), a version without replaces the entry. Old archives stay where they
+are. An archive already published under a version must hold the same files; packed by other tools, its bytes may
+differ.
 
 `kit.manage` is refused in a catalog entry, by the clients and by the public check alike: only Ampify's own Marketplace
 holds it. Next to the entries, `versions.json` lists the Apple Music versions tested after a release; `catalog.json`
@@ -126,3 +150,14 @@ on right after: a theme in use, anything else turned on. For an element that ask
 
 An element tagged `developer` (with `example`, for the examples of `examples/`) is listed in the Marketplace's
 **Developers** tab instead of the tab of its kind.
+
+## Updates
+
+Installed elements follow the catalog on their own. Once a day, while Apple Music is closed, the background launcher
+runs `ampify update --auto`, which brings each installed element to the newest version the catalog offers for this
+release of Ampify, with the same checks as an install. Its settings stay, and so does whether it is on. This does not
+depend on `kit_update`, which only concerns Ampify itself.
+
+A new version that asks for a permission the installed one did not have is not installed this way: the Marketplace
+shows **Update** on its card, and the detail view lists what it may do before you accept. `ampify update <id>`
+updates one element by hand. What happened is in `logs\update.log`.

@@ -37,6 +37,10 @@ playback bar under every theme, and colour filters and liquid glass for theme au
 
 ### Marketplace
 
+- Themes, snippets, extensions and apps from the Marketplace update on their own, once a day while Apple Music is
+  closed, keeping their settings and whether they are on. A new version that asks for a new permission waits for you
+  on its card instead.
+- Every element of the Marketplace has a picture on its card, the lyrics hidden.
 - **Install** also turns the element on: a theme is in use, an extension, an app or a snippet is on, with no second
   click. For an element that asks for permissions, the card's **Install…** first opens its page, which lists what
   it may do.
@@ -113,18 +117,22 @@ playback bar under every theme, and colour filters and liquid glass for theme au
   - Corners joins Round corners and Square corners: one radius, or square corners everywhere.
   - Lyrics style joins Centred lyrics, Lyrics spotlight and Dark lyrics. Centred lines and the spotlight now work
     together, word-by-word lyrics included.
-  - Progress line joins Progress mascot and Progress line thickness.
-  - Sidebar style joins Compact sidebar and Sidebar icons.
+  - Progress line joins Progress mascot, Progress line thickness and Playback bar times.
+  - Sidebar style joins Compact sidebar, Sidebar icons and Search on hover.
   - Declutter takes in Hide buttons and Hide explicit.
+  - Album colours becomes Artwork colours and takes in Cover ambience and Animated artwork: the pages, the song
+    playing and the window's background, each its own setting.
+  - Lyrics style takes in Focused lyrics, as a blur setting.
+  - A snippet merged into one you did not use turns on only what it did: Cover ambience alone does not tint your
+    album pages, Search on hover alone keeps Apple's sidebar rows.
 - New Artwork filters: the artwork of the song playing in two inks of the accent, in black and white, in sepia or
   more vivid, in the playback bar, at the top of its album and in full screen.
 - Actions on hover is gone: Apple Music already shows a row's buttons under the pointer.
 - Large album artwork loads the cover at the size it shows, so it is as sharp as Apple's.
 - Spinning artwork with no song playing shows the empty record alone: its label no longer cuts Apple's small note.
-- Cover ambience keeps the theme's own colour for the times under a light scheme (Paper light), where white times
-  read as a stray colour on the bar.
-- Cover ambience on the bar fills a bar at the bottom out to its edges, its glow rising from the bottom with no hard
-  line.
+- The glow of Artwork colours keeps the theme's own colour for the times under a light scheme (Paper light), where
+  white times read as a stray colour on the bar.
+- The glow on the bar fills a bar at the bottom out to its edges, rising from the bottom with no hard line.
 
 ### Extensions
 
@@ -132,7 +140,11 @@ playback bar under every theme, and colour filters and liquid glass for theme au
   own), `spinner` and `divider`, with their components `Ampify.components.Checkbox`, `ProgressBar`, `Spinner` and
   `Divider`. `ampify types` knows them.
 - A-B loop draws its passage on the progress line: a tick at A, a tick at B and a light shade between them. Extensions
-  can do the same with the new `Ampify.ui.playbar.mark(id, from, to)`.
+  can do the same with the new `Ampify.ui.playbar.mark(id, from, to)`. The marks follow the bar's light or dark mode
+  when it changes.
+- New, on by default: Time on hover. Over the progress line, a thin marker follows the pointer with the time of the
+  song at that point above it, in every theme. Extensions can show the same readout with
+  `Ampify.ui.playbar.readout(totalMs)`, and hear where the pointer is with `Ampify.ui.playbar.onHover(fn)`.
 - Song panel: the wheel scrolls the panel, and scrolls the lyrics only once the panel goes no further. Lyrics you
   moved stay where you put them; a small arrow brings back the line being sung, and the view follows the song again
   when that line comes into view. The panel slides out as smoothly as it slides in, lets a theme's glass and veil show

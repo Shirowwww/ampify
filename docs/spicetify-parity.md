@@ -108,14 +108,14 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Hover panels, dynamic sidebar | `:hover` works; a hidden panel keeps its room | Partial |
 | Nyan Cat, Kirby, bee progress bars | An image in the column of the bar's hidden thumb rides at the song's position ([recipe](themes/format.md#an-image-that-follows-the-songs-progress)); snippet `progress-line` (a comet, a note, a heart, a cat) | Done |
 | Duotone artwork | `artwork-filters`: the artwork of the song playing in two inks of the accent, black and white, sepia or vivid (`filter: duotone()`) | Partial: checked by tests only, not on screen |
-| Cover Ambience | `cover-ambience`: the display glows in the artwork's colours | Done |
+| Cover Ambience | `album-colors` (Artwork colours), setting Glow: the display or the whole bar glows in the artwork's colours | Done |
 | Colourful album pages | `album-colors`: an album or a playlist takes the colours of its own artwork | Done |
 | Hide the filter bar of playlists | `declutter`, setting "Hide the search bar of albums and playlists" | Done |
 | Spotify's playback bar at the bottom, across the window | Settings > Ampify > Playback bar (`apple.playbar`), over any theme or none; `ampify:bottom-bar` for a theme | Done |
 | Thin or thick progress bar | `progress-line`: the display's progress line from 1 to 6 pixels, round ends | Done |
 | Compact sidebar (Comfy) | `sidebar-style`: rows of 32 pixels instead of 40, Ampify's entries included (`.sidebar-entry`) | Done |
 | Highlight the lyrics line being sung | `lyrics-style`: a tile of the song's colour under the line, through `:current` | Done |
-| Blur the lyrics lines not being sung | `focused-lyrics`: `filter: blur() edges()` on the lyrics column | Done |
+| Blur the lyrics lines not being sung | `lyrics-style`, setting Blur: `filter: blur() edges()` on the lyrics column | Done |
 | Hide the explicit badge | `declutter`, setting "Hide the E of explicit songs" | Done |
 | Centred lyrics | `lyrics-style`: the lines and the static text sit in the middle of the panel | Partial: the line being sung keeps Apple's own fade, checked by tests only |
 | Bigger album artwork | `large-album-artwork`: a size setting, 120 to 360 pixels, on the album or playlist header | Partial: checked by tests only, not on screen |
@@ -124,7 +124,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Hide the profile name, the playing GIF, the playlist cover, the top gradient | `declutter` settings: account name, moving bars of the song playing, cover of the album or playlist header, backdrop and video behind pages | Partial: the account name collapses in a replay of the recorded home page (`lowerAccountName`) and in a unit test; not on screen |
 | Thicker or rounded volume bar | `progress-line`: a volume slider thickness from 2 to 10 pixels, round ends, only when its switch is on (Apple's own otherwise) | Partial: checked by tests only, not on screen |
 | Dark Lyrics, Pretty Lyrics | `lyrics-style`: the lyrics and Up Next pane dark with light text, plain or from the artwork's colours | Partial: checked by tests only, not on screen |
-| Dynamic search bar | `hover-search`: the search box fades out until the pointer reaches it, in the sidebar or the top bar | Partial: checked by tests only, not on screen |
+| Dynamic search bar | `sidebar-style`, setting "Show the search box only under the pointer": it fades out until the pointer reaches it, in the sidebar or the top bar | Partial: checked by tests only, not on screen |
 | Full screen: hide "playing from" and "next up" | Apple's player has no such cards; `minimal-fullscreen` hides its title and artist, times or lyrics and shows its buttons under the pointer only | Partial: checked by tests only, not on screen |
 | Circular album art that does not turn | `spinning-artwork` with "Turn" and "Grooves" off | Partial: checked by tests only, not on screen |
 | Sonic, Pokémon, Kirby and other mascots | `progress-line` has Ampify's own drawings (a comet, a note, a heart, a cat), small or large, and a rainbow trail; other characters belong to their owners | Done |
@@ -172,7 +172,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Spicetify | Ampify | Status |
 |---|---|---|
 | Full Screen | The Now Playing button opens Apple's full-screen player, karaoke lyrics included | Done |
-| Cover Ambience | Snippet `cover-ambience` | Done |
+| Cover Ambience | Snippet `album-colors` (Artwork colours), setting Glow | Done |
 | Volume Percentage | Extension `volume-percentage`: the volume of Apple Music as a percentage, in the playback bar | Done |
 | Lyrics Plus | Apple's synced lyrics and translation, in its full-screen player and lyrics pane | Done |
 | Stats | App `listening-stats`: listening time, plays, top artists, songs and albums over 7 days, 4 weeks or since the start, day by day and hour by hour, kept on the PC; no account-wide history | Done |

@@ -210,7 +210,7 @@ explain them in one line; the page also resets them, and exports or imports them
 | `track-height`, `track-radius` | `TrackHeight`, `TrackRectRadius` | On `.scrubber`: properties of Apple's progress line itself, the height and corner radius its template gives the track. A length, not negative and not `auto`. Unlike `height`, they leave the control's place in the display alone. A track thicker than 2 pixels, set here or by `height` on `.scrubber Rectangle#HorizontalTrackRect` and `#HorizontalDecreaseRect`, makes Ampify grow the line's slot upwards so the whole track shows and its bottom stays in place (checked from 1 to 6 pixels with the rectangles' `height`) |
 | `thumb-visibility` | `ThumbVisibility` | On `.scrubber`: `visible` or `collapsed`, the line's thumb (Apple hides it in the play bar). Not yet checked on screen |
 | `opacity` | `Opacity` | 0 to 1. On `.sidebar` or `.sidebar-column`, it holds only while the sidebar does not stand over the pages: open over them (under the pointer, or pinned in a narrow window), the pane stays opaque |
-| `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`). `visible` holds over Apple's visual states that collapse the element (the play bar's times, shown only under the pointer) |
+| `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`). `visible` holds over Apple's visual states that collapse the element or fade it out (the play bar's times, shown only under the pointer) |
 | `display` | `Visibility` | `none` hides; `block`, `flex`, `grid`... show (use them to undo a `display: none`) |
 | `template` | `Template` | `url(templates/file.xaml)`, a full `ControlTemplate`. Skipped on a control with a negative padding or border |
 | `flow-direction` or `direction` | `FlowDirection` | `ltr` or `rtl` |
@@ -314,8 +314,11 @@ Ampify also gives the artwork's colors as variables. Before the first artwork th
 The engine does no arithmetic on these numbers: a value takes one as it is, as above. Without a cover, `--art-luma`
 and `--art-sat` have no value, so give a fallback.
 
+A cover that is almost all black (or white), with no real colour in it, gives greys for `--art-2` and `--art-3`
+rather than a colour made up from the noise of its darkest pixels.
+
 Snippets get the artwork's colours too, even with no theme active. A snippet using `var(--art-1)` (or `--page-art-1`)
-works on its own, as the [`cover-ambience`](../../themes/snippets/cover-ambience/) snippet does.
+works on its own, as the glow of the [`album-colors`](../../themes/snippets/album-colors/) snippet does.
 
 The album or playlist on screen gives the same five colours of its own artwork, read from its page's header, with the
 prefix `page-`: `--page-art-1`, `--page-art-2`, `--page-art-3`, `--page-art-text` and their `-hex` forms. They change
@@ -479,7 +482,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | `--bar-top-end` | `150` | `floating-panels`: the room the bar leaves at the top right for the window's buttons |
 | `--compact-pane` | `48` | `floating-panels`: width of the folded sidebar |
 | `--artwork-veil` | none (Apple's opaque veil) | Strength, 0 to 1, of the veil over the bar's artwork under the pointer: lower, the artwork (and a zoom on `.lcd-artwork-picture`) shows through it, its icon still white |
-| `--bar-band-reach` | `--compact-pane`, `0` without `floating-panels` | How far a band painted edge to edge at the top (Cover ambience, reach Bar) reaches back under the floating column, to the window's left edge |
+| `--bar-band-reach` | `--compact-pane`, `0` without `floating-panels` | How far a band painted edge to edge at the top (Artwork colours, glow Bar) reaches back under the floating column, to the window's left edge |
 | `--page-top` | `8`, or `40` with `bottom-bar` | Space above a page's first line |
 | `--bar-height` | `72` | `bottom-bar`: height of the bar |
 | `--bar-room` | `--bar-height` + two `--gap` | `bottom-bar`: space the panels leave at the bottom (the bar stands a gap above the window's foot, and a gap under the panels) |
@@ -573,7 +576,7 @@ after the theme.
 |---|---|
 | `"playbar"` in the manifest, and the user's `apple.playbar` | Every `user.css` as `@setting bar-position` ([The playback bar's place](#the-playback-bars-place)) |
 | `--panel-radius` | The layouts' panels, and the panels of extensions (`Ampify.ui.panel`), which take no larger radius inside. Corners sets it to `0` for square corners |
-| `--bar-radius`, `--lcd-radius` | Snippets that draw over the playback bar or the song's display, such as Cover ambience's glow |
+| `--bar-radius`, `--lcd-radius` | Snippets that draw over the playback bar or the song's display, such as the glow of Artwork colours |
 | `--artwork-size` | Spinning artwork, which turns a record of that size. Set it only while the theme resizes the bar's artwork |
 | A right margin on `.content` | The panels of extensions, docked in that room ([A column for the panels](#a-column-for-the-panels)) |
 | The accent (`AccentFillColorDefaultBrush`, or `theme.accent`) | Apple's controls, the progress line, the marks of `Ampify.ui.playbar.mark`, and `$AccentFillColorDefaultBrush` in any rule ([Chosen accent](#chosen-accent)) |
@@ -661,8 +664,7 @@ top of the side panel and a little above the middle of the full-screen player, a
 .fullscreen-lyrics .lyrics-synced { filter: blur(9px) edges(28% 40%); }
 ```
 
-Examples: the [`lyrics-style`](../../themes/snippets/lyrics-style/) and
-[`focused-lyrics`](../../themes/snippets/focused-lyrics/) snippets; colour filters in
+Examples: the Blur setting of the [`lyrics-style`](../../themes/snippets/lyrics-style/) snippet; colour filters in
 [`artwork-filters`](../../themes/snippets/artwork-filters/), liquid glass in the "Liquid glass" setting of
 [`glass`](../../themes/glass/).
 

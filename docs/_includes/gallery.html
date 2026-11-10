@@ -1,12 +1,21 @@
 {%- assign t = site.data.site[page.lang] -%}
-<header class="page-head">
+<header class="page-head" data-reveal>
   <h1>{{ page.heading }}</h1>
   <p>{{ page.lede }}</p>
+  {%- if page.tabs != true %}
+  <p class="page-more"><a href="{{ t.root | append: 'marketplace.html' | relative_url }}">{{ t.whole_market }} →</a></p>
+  {%- endif %}
 </header>
-<section class="gallery" aria-label="{{ page.heading }}" data-gallery data-kinds="{{ page.kinds }}"
+<section class="gallery" aria-label="{{ page.heading }}" data-gallery data-kinds="{{ page.kinds }}"{% if page.tabs %} data-tabs{% endif %}
   data-search="{{ t.search }}" data-empty="{{ t.gallery_empty }}" data-error="{{ t.gallery_error }}"
   data-copy="{{ t.copy }}" data-copied="{{ t.copied }}" data-by="{{ t.by }}"
-  data-permissions="{{ t.permissions }}" data-no-permission="{{ t.no_permission }}">
+  data-permissions="{{ t.permissions }}" data-no-permission="{{ t.no_permission }}"
+  data-all="{{ t.all }}" data-details="{{ t.details }}" data-close="{{ t.close }}" data-version="{{ t.version }}"
+  data-in-app="{{ t.in_app }}" data-updated="{{ t.gallery_updated }}" data-count="{{ t.count }}"
+  data-kind-theme="{{ t.kind_theme }}" data-kind-snippet="{{ t.kind_snippet }}"
+  data-kind-extension="{{ t.kind_extension }}" data-kind-app="{{ t.kind_app }}"
+  data-plural-theme="{{ t.themes }}" data-plural-snippet="{{ t.snippets }}"
+  data-plural-extension="{{ t.extensions }}" data-plural-app="{{ t.apps }}">
   <p class="status" role="status">{{ t.gallery_loading }}
     <a href="https://github.com/Shirowwww/ampify-catalog">github.com/Shirowwww/ampify-catalog</a></p>
 </section>

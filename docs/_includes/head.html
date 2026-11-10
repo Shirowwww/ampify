@@ -2,8 +2,9 @@
 {%- assign root = t.root -%}
 {%- comment -%} The same page in another language when it has one (the pages of every language's folder), else that
 language's home. {%- endcomment -%}
-{%- assign translated = ",index.html,themes.html,extensions.html,getting-started.html,create.html" | split: "," -%}
+{%- assign translated = ",index.html,marketplace.html,themes.html,snippets.html,extensions.html,getting-started.html,create.html" | split: "," -%}
 {%- assign here = page.url | remove_first: root -%}{%- if page.url == root -%}{%- assign here = "" -%}{%- endif -%}
+{%- assign nav = "marketplace,themes,snippets,extensions,create" | split: "," -%}
 <!doctype html>
 <html lang="{{ page.lang }}">
 <head>
@@ -21,8 +22,9 @@ language's home. {%- endcomment -%}
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Apple Music on Windows with an Ampify theme">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#fa2d48">
+<meta name="theme-color" content="#0f0d0e">
 <link rel="icon" href="{{ '/assets/logo.svg' | relative_url }}" type="image/svg+xml">
+<link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin>
 <link rel="stylesheet" href="{{ '/assets/site.css' | relative_url }}">
 </head>
 <body class="{{ include.kind }}" data-base="{{ '/' | relative_url }}" data-repo="https://github.com/{{ site.repository }}">
@@ -31,20 +33,20 @@ language's home. {%- endcomment -%}
   <div class="top-in">
     <a class="brand" href="{{ root | relative_url }}"><img src="{{ '/assets/logo.svg' | relative_url }}" alt="" width="26" height="26"> Ampify</a>
     <nav aria-label="Site">
-      <a href="{{ root | append: 'themes.html' | relative_url }}">{{ t.themes }}</a>
-      <a href="{{ root | append: 'extensions.html' | relative_url }}">{{ t.extensions }}</a>
-      <a href="{{ root | append: 'create.html' | relative_url }}">{{ t.create }}</a>
-      <a href="{{ '/documentation.html' | relative_url }}">{{ t.docs }}</a>
-      <a href="https://github.com/{{ site.repository }}">GitHub</a>
-      <details class="lang">
-        <summary aria-label="{{ t.language }}: {{ t.name }}">{{ t.name }}</summary>
-        <ul>
-        {%- for code in site.data.site.languages -%}{%- if code != page.lang -%}{%- assign l = site.data.site[code] -%}
-          {%- if translated contains here -%}{%- assign target = l.root | append: here -%}{%- else -%}{%- assign target = l.root -%}{%- endif %}
-          <li><a href="{{ target | relative_url }}" hreflang="{{ code }}" lang="{{ code }}">{{ l.name }}</a></li>
-        {%- endif -%}{%- endfor %}
-        </ul>
-      </details>
+      {%- for key in nav -%}{%- assign target = root | append: key | append: '.html' -%}
+      <a href="{{ target | relative_url }}"{% if page.url == target %} aria-current="page"{% endif %}>{{ t[key] }}</a>
+      {%- endfor %}
+      <a href="{{ '/documentation.html' | relative_url }}"{% if include.kind == "doc" %} aria-current="page"{% endif %}>{{ t.docs }}</a>
+      <a class="gh" href="https://github.com/{{ site.repository }}">GitHub</a>
     </nav>
+    <details class="lang">
+      <summary aria-label="{{ t.language }}: {{ t.name }}">{{ t.name }}</summary>
+      <ul>
+      {%- for code in site.data.site.languages -%}{%- if code != page.lang -%}{%- assign l = site.data.site[code] -%}
+        {%- if translated contains here -%}{%- assign target = l.root | append: here -%}{%- else -%}{%- assign target = l.root -%}{%- endif %}
+        <li><a href="{{ target | relative_url }}" hreflang="{{ code }}" lang="{{ code }}">{{ l.name }}</a></li>
+      {%- endif -%}{%- endfor %}
+      </ul>
+    </details>
   </div>
 </header>

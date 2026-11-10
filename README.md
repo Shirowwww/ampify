@@ -6,8 +6,8 @@
 
 **Themes, extensions and a Marketplace for Apple Music on Windows.**
 
-Ampify does for the official Apple Music app what Spicetify does for Spotify. Change how it looks, add what it lacks,
-and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, your library and sync.
+The official Apple Music app, dressed and extended the way Spicetify does it for Spotify. Lossless, Dolby Atmos,
+lyrics, your library and its sync all keep working.
 
 [![Latest release](https://img.shields.io/github/v/release/Shirowwww/ampify?display_name=tag&sort=semver&style=flat-square&color=fa233b)](https://github.com/Shirowwww/ampify/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Shirowwww/ampify/total?style=flat-square&color=2ea043)](https://github.com/Shirowwww/ampify/releases)
@@ -20,53 +20,52 @@ and keep everything Apple Music already does: lossless, Dolby Atmos, lyrics, you
 
 </div>
 
-> [!NOTE]
-> Ampify is experimental. Apple updates Apple Music on its own schedule, so an update can break something. Bug reports
-> and pull requests are welcome: see [Contributing](CONTRIBUTING.md) or open an [issue](https://github.com/Shirowwww/ampify/issues).
-
 ## What you get
 
-- 10 themes with 28 colour schemes, light and dark, applied at once without a restart, and an accent colour of your
-  choice. Spicetify `color.ini` palettes work as they are.
-- A Marketplace inside Apple Music (the Ampify entry at the bottom of the sidebar) with themes, extensions and
-  snippets, previews, and one-click installs.
-- Extensions for Discord presence, Last.fm scrobbling, a sleep timer and global shortcuts, and pages for your
-  listening stats and the new releases of the artists you listen to. Each one shows the permissions it needs before
-  you switch it on.
-- Now Playing (Apple's full-screen player with karaoke lyrics), a Song panel (a column about the song playing), an
-  Atmos leveler that brings Dolby Atmos songs to the loudness of stereo ones, and a playback guard for songs Apple
-  Music leaves stuck, all shipped with Ampify.
-- English, French, German, Spanish, Portuguese, Russian, Japanese, Simplified Chinese, Italian and Korean.
-- Updates install themselves while Apple Music is closed, or after a question, as you choose in Settings > Ampify.
-- Nothing is written into Apple Music's package, and uninstalling gives the original app back. On an Apple Music
-  version of a family that was not tested (1.1792 is), Ampify stays off.
+| Change the look | Add what is missing | Keep it safe |
+|---|---|---|
+| 10 themes and 28 colour schemes, light and dark, switched without a restart | Discord presence, Last.fm scrobbling, a sleep timer, global shortcuts, an A-B loop | Nothing is written into Apple Music's package: uninstall and the original app is back |
+| 11 snippets to layer on any theme: corners, lyrics style, artwork filters, an equalizer that moves with the music | Pages for your listening stats and the new releases of the artists you play | Every extension lists its permissions before you switch it on |
+| One accent colour of your choice, or the colours of the song playing | A Song panel, a full-screen player with karaoke lyrics, and an Atmos leveler that plays Dolby Atmos songs as loud as stereo ones | A new Apple Music version stays untouched until Ampify has been tested on it |
+| The playback bar at the top, the bottom or centred, under every theme | A Marketplace inside Apple Music, one click to install | Updates check their SHA-256 and install while Apple Music is closed |
+
+Ampify speaks English, French, German, Spanish, Portuguese, Russian, Japanese, Simplified Chinese, Italian and Korean.
+Spicetify `color.ini` palettes work as they are.
 
 <div align="center">
 <table>
 <tr>
-<td align="center"><img src="docs/assets/screens/marketplace.png" height="240" alt="The Marketplace inside Apple Music"><br><sub>Marketplace</sub></td>
-<td align="center"><img src="docs/assets/screens/settings-card.png" height="240" alt="The Ampify card in Apple Music's settings"><br><sub>Ampify in Apple Music's settings</sub></td>
+<td align="center"><img src="docs/assets/screens/marketplace.png" height="240" alt="The Marketplace inside Apple Music"><br><sub>The Marketplace</sub></td>
+<td align="center"><img src="docs/assets/screens/settings-card.png" height="240" alt="Ampify's settings in Apple Music"><br><sub>Ampify in Apple Music's settings</sub></td>
 </tr>
 </table>
 </div>
 
+### New in 1.3
+
+A new installer and uninstaller with a window of their own. A settings page in five tabs, with a search box that finds
+any setting. Fewer snippets with more settings each, and your choices carry over. One place for the playback bar under
+every theme. Liquid glass for Glass, and colour filters for the artwork. The full list is in the
+[changelog](CHANGELOG.md).
+
 ## Install
 
-You need Windows 10 or 11 (x64) and Apple Music from the Microsoft Store. Close Apple Music first (also from the
-notification area, next to the clock), then:
+You need Windows 10 or 11 (x64) and Apple Music from the Microsoft Store.
 
-1. Download `ampify-<version>-windows-x64.zip` from the [latest release](https://github.com/Shirowwww/ampify/releases/latest).
-2. Extract the whole zip (right-click, Extract All), then double-click `ampify_setup.exe` in the new folder. Running it
-   from inside the zip does not work.
+1. Close Apple Music, including its icon in the notification area next to the clock.
+2. Download `ampify-<version>-windows-x64.zip` from the [latest release](https://github.com/Shirowwww/ampify/releases/latest).
+3. Extract the whole zip (right-click, Extract All) and double-click `ampify_setup.exe` in the new folder. It will not
+   run from inside the zip.
 
-Or, if you prefer a terminal, paste this line in PowerShell (Start menu, type "PowerShell"):
+Or paste one line in PowerShell. It downloads the latest release, checks its SHA-256 and installs it for your Windows
+account, without administrator rights:
 
 ```powershell
 irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
 ```
 
-It downloads the latest release, checks its SHA-256 and installs it for your Windows account, with no administrator
-rights. To read the script before it runs, save it, open it, then start it yourself:
+<details>
+<summary>Read the script before it runs</summary>
 
 ```powershell
 irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 -OutFile install.ps1
@@ -74,71 +73,89 @@ notepad install.ps1
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-Then open Apple Music as usual, from its own icon: there is no special shortcut.
+</details>
+
+Then open Apple Music from its own icon, as usual.
 
 > [!WARNING]
-> **Windows Defender or SmartScreen warns about a file?** The programs are not code-signed yet, and the launcher loads
-> Ampify's DLL into Apple Music, which some malware also does. Each release is scanned with Microsoft Defender before it
-> is published, and its SHA-256 is on the release page, so a warning is a false positive: allow the file Defender names
-> (SmartScreen: "More info", then "Run anyway"), or build Ampify from source. Never switch protection off.
+> Windows Defender or SmartScreen may warn about a file. The programs are not code-signed yet, and the launcher loads
+> Ampify's DLL into Apple Music, which some malware also does. Each release is scanned with Microsoft Defender before
+> it is published and its SHA-256 is on the release page, so the warning is a false positive. Allow the file Defender
+> names (SmartScreen: "More info", then "Run anyway"), or build Ampify from source. Never switch protection off.
 
-## Use it
+## Your first five minutes
 
-Apple Music looks the same right after the install: no theme is on yet.
+Right after the install, Apple Music looks the same: no theme is on yet.
 
-1. Open Apple Music and click **Ampify** at the bottom of the sidebar.
-2. Under **Themes** (this needs the internet), click **Install** on the one you like: it is in use at once.
-3. Switch extensions on and off in Apple Music's **Settings > Ampify**.
+1. Click **Ampify** at the bottom of the sidebar. The Marketplace opens.
+2. Under **Themes**, click **Install** on one you like. It is in use at once.
+3. Open Apple Music's **Settings > Ampify** to switch extensions on, pick an accent or move the playback bar.
 
-To go back to Apple Music's own look, click **Use Apple Music's look** in the Marketplace. More ways back, from a
-single theme to a full uninstall, are in [Getting started](https://shirowwww.github.io/ampify/getting-started.html#go-back-to-apple-music).
+**Use Apple Music's look**, at the bottom of the themes, brings the original look back. Every other way back, up to a
+full uninstall, is in [Getting started](https://shirowwww.github.io/ampify/getting-started.html#go-back-to-apple-music).
 
-The same from a terminal:
+Everything also works from a terminal:
 
 ```
 ampify install glass                      # get a theme from the Marketplace
 ampify theme set glass --scheme Light     # use it
 ampify theme clear                        # back to Apple Music's look
-ampify install sleep-timer                # install from the Marketplace
-ampify report                             # an anonymous diagnostic report, to attach to an issue
+ampify install sleep-timer                # get an extension
+ampify doctor                             # check that everything is in order
+ampify report                             # an anonymous report to attach to an issue
 ```
 
-More in [Getting started](https://shirowwww.github.io/ampify/getting-started.html) and
-[the command line](https://shirowwww.github.io/ampify/cli.html).
+The [command line](https://shirowwww.github.io/ampify/cli.html) page lists every command and setting.
 
 ## Make your own
 
-`ampify new theme my-theme` (or `extension`, `snippet`, `app`) writes a working starter, `ampify dev my-theme` reloads
-it in Apple Music at every save (an extension can be TypeScript or JSX), and `ampify publish my-theme` sends it to the
-[catalog](https://github.com/Shirowwww/ampify-catalog). Start with [Create](https://shirowwww.github.io/ampify/create.html).
+A theme is a folder of text files. An extension is one JavaScript file (TypeScript and JSX work too) and a manifest.
+Three commands take you from nothing to the Marketplace:
+
+```
+ampify new theme my-theme      # a starter that already runs (or extension, snippet, app)
+ampify dev my-theme            # Apple Music reloads it each time you save
+ampify publish my-theme        # checks it and opens a pull request on the catalog
+```
+
+Themes style Apple Music's zones by stable names such as `.sidebar`, `.playbar` or `.card`, in CSS you already know.
+Extensions call the `Ampify` API for the player, menus, panels, storage and a set of ready-made components. Start with
+[Create](https://shirowwww.github.io/ampify/create.html), then see how an element reaches the Marketplace in
+[Publishing](https://shirowwww.github.io/ampify/extensions/catalog.html).
 
 ## Documentation
 
 | Use | Create | Work on Ampify |
 |---|---|---|
-| [Getting started](https://shirowwww.github.io/ampify/getting-started.html) | [Themes](https://shirowwww.github.io/ampify/themes/guide.html) | [Contributing](CONTRIBUTING.md) |
-| [Command line](https://shirowwww.github.io/ampify/cli.html) | [Extensions](https://shirowwww.github.io/ampify/extensions/guide.html) | [Building](https://shirowwww.github.io/ampify/development/building.html) |
-| [Spicetify and Cider](https://shirowwww.github.io/ampify/spicetify-parity.html) | [Publishing](https://shirowwww.github.io/ampify/extensions/catalog.html) | [How it works](https://shirowwww.github.io/ampify/development/how-it-works.html) |
+| [Getting started](https://shirowwww.github.io/ampify/getting-started.html) | [Your first theme](https://shirowwww.github.io/ampify/themes/guide.html) | [Contributing](CONTRIBUTING.md) |
+| [Command line](https://shirowwww.github.io/ampify/cli.html) | [Your first extension](https://shirowwww.github.io/ampify/extensions/guide.html) | [Building](https://shirowwww.github.io/ampify/development/building.html) |
+| [Ampify, Spicetify and Cider](https://shirowwww.github.io/ampify/spicetify-parity.html) | [Theme format](https://shirowwww.github.io/ampify/themes/format.html) and [API](https://shirowwww.github.io/ampify/extensions/api.html) | [How it works](https://shirowwww.github.io/ampify/development/how-it-works.html) |
 | [Changelog](CHANGELOG.md) | [All the docs](https://shirowwww.github.io/ampify/documentation.html) | [Issues](https://github.com/Shirowwww/ampify/issues) |
+
+> [!NOTE]
+> Ampify is experimental. Apple updates Apple Music on its own schedule, and an update can break something. Bug
+> reports and pull requests are welcome: read [Contributing](CONTRIBUTING.md) or open an
+> [issue](https://github.com/Shirowwww/ampify/issues).
 
 ## Build from source
 
-Windows 10 or 11 x64, Visual Studio 2022 or later (C++ workload) and the Windows SDK, then
-`pwsh -File scripts\build-msvc.ps1`. Details: [Building](https://shirowwww.github.io/ampify/development/building.html).
+Windows 10 or 11 x64, Visual Studio 2022 or later with the C++ workload, and the Windows SDK. Then run
+`pwsh -File scripts\build-msvc.ps1`. [Building](https://shirowwww.github.io/ampify/development/building.html) has the
+details.
 
 ## Support the project
 
-Ampify is free and stays free. If you want to help, you can buy me a coffee:
+Ampify is free and stays free. If it makes your music nicer, you can buy me a coffee:
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/shirowww)
 
 ## Credits and license
 
-Ampify is free to use, read and change under the [PolyForm Noncommercial License 1.0.0](LICENSE): anything except
-commercial use, and any copy or fork keeps the credit line at the top of that file. What you make for it is yours:
-themes, snippets, extensions and apps that only use Ampify's documented formats and `Ampify` API are not covered by
-Ampify's license, and their authors choose their own, commercial or not. The [examples](examples) and the starters made
+You can use, read and change Ampify under the [PolyForm Noncommercial License 1.0.0](LICENSE), for anything except
+commercial use; any copy or fork keeps the credit line at the top of that file. What you make for Ampify is yours.
+Themes, snippets, extensions and apps that only use its documented formats and the `Ampify` API are not covered by
+Ampify's license, and their authors pick their own, commercial or not. The [examples](examples) and the starters made
 by `ampify new` are under the [MIT license](examples/LICENSE).
 
-Ampify builds on QuickJS-ng and on what AMExclusive learned about Apple Music's player; full list in
+Ampify builds on QuickJS-ng and on what AMExclusive learned about Apple Music's player. The full list is in
 [CREDITS.md](CREDITS.md). Apple Music is a trademark of Apple Inc. Ampify is not affiliated with Apple.
