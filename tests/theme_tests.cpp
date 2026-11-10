@@ -2723,10 +2723,12 @@ TEST_CASE(Snippets_TheDisplayEqualizerLoadsWithoutProblems) {
     CHECK(contents.size() == 2 && contents[0].ends_with("/images/dance.gif") && contents[1] == "bars:10");
 }
 
-TEST_CASE(Snippets_AnimatedArtworkDrawsApplesImmersionBackgroundWithTheArtworkAsFallback) {
-    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "animated-artwork";
+TEST_CASE(Snippets_TheMovingBackgroundDrawsApplesImmersionBackgroundWithTheArtworkAsFallback) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "album-colors";
     th::FolderFiles files(folder);
-    th::Theme snippet = th::LoadSnippet("animated-artwork", folder.generic_string(), files, nullptr);
+    th::LoadOptions options;
+    options.settings = {{"moving-background", "true"}};
+    th::Theme snippet = th::LoadSnippet("album-colors", folder.generic_string(), files, nullptr, options);
 
     CHECK(snippet.usable);
     for (const std::string& problem : snippet.problems) ampify::test::ReportFailure(__FILE__, __LINE__, problem);

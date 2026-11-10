@@ -279,8 +279,9 @@ private:
     // `visibility: visible` held over Apple's own value, binding and visual states (xaml_states.cpp); ReleaseVisible lets
     // them decide again, and says whether a hold was there on `element` (any element when null): an id is an address,
     // so a new element may get the id of one that died holding. DropDeadHolds lets go of elements gone from the tree.
-    void HoldVisible(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element) noexcept;
+    void HoldVisible(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element, bool restart = true) noexcept;
     void OnHeldVisibility(theme::NodeId id) noexcept;
+    void OnHeldStateChanged(theme::NodeId id) noexcept;
     bool ReleaseVisible(theme::NodeId id, const winrt::Microsoft::UI::Xaml::UIElement& element = nullptr) noexcept;
     void DropDeadHolds() noexcept;
     void UpdateStates(theme::NodeId id, const winrt::Microsoft::UI::Xaml::DependencyObject& object,
@@ -363,6 +364,8 @@ private:
         winrt::Microsoft::UI::Xaml::Media::Animation::Storyboard story{nullptr};  // Ampify's: held strongly
         std::int64_t token = 0;  // the Visibility callback, removed by token
         std::chrono::steady_clock::time_point begun{};
+        // The state groups above it whose storyboards fade or collapse it: each change of theirs begins the hold again.
+        std::vector<winrt::Microsoft::UI::Xaml::VisualStateGroup::CurrentStateChanged_revoker> stateChanges;
     };
     std::map<theme::NodeId, VisibleHold> m_visibleHolds;
     std::size_t m_refusedStates = 0;

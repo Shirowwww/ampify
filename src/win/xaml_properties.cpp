@@ -390,7 +390,8 @@ std::optional<bool> XamlTreeBackend::WriteShown(theme::NodeId id, const xaml::De
             std::optional<bool> visible = th::DecodeVisible(value.text);
             if (!visible) return false;
             if (*visible) {
-                if (element.Visibility() != xaml::Visibility::Visible) HoldVisible(id, element);
+                // Even shown: a state of Apple's may have faded it out, which its Visibility does not say.
+                HoldVisible(id, element, false);
             } else if (!ReleaseVisible(id, element)) {
                 element.Visibility(xaml::Visibility::Collapsed);
             }

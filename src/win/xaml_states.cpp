@@ -792,7 +792,9 @@ std::size_t XamlTreeBackend::HeldStateCount() const {
 
 namespace {
 
-// Visible from the start and kept there (a storyboard holds its end by default).
+// Visible from the start and kept there (a storyboard holds its end by default). Apple's states may also fade the
+// element out with a theme animation, which its Opacity does not show (the play bar's times, ExitStoryboard): a fade
+// in of Ampify's, begun later, takes it back.
 animation::Storyboard ShownStory(const xaml::UIElement& element) {
     animation::DiscreteObjectKeyFrame frame;
     frame.KeyTime(animation::KeyTimeHelper::FromTimeSpan(winrt::Windows::Foundation::TimeSpan{0}));
@@ -801,26 +803,65 @@ animation::Storyboard ShownStory(const xaml::UIElement& element) {
     shown.KeyFrames().Append(frame);
     animation::Storyboard::SetTarget(shown, element);
     animation::Storyboard::SetTargetProperty(shown, L"(UIElement.Visibility)");
+    animation::FadeInThemeAnimation fade;
+    animation::Storyboard::SetTarget(fade, element);
     animation::Storyboard story;
     story.Children().Append(shown);
+    story.Children().Append(fade);
     return story;
 }
 
 // Two re-starts closer than this are a fight with Apple's states: the next pass writes the value again instead.
 constexpr std::chrono::milliseconds kHoldRetry{250};
 
+// How far up the states that animate an element are looked for: the play bar's times are 3 levels under theirs.
+constexpr int kStateOwnerDepth = 6;
+
+// The visual state groups, on the element's ancestors, whose storyboards name it: a fade of theirs leaves its
+// Visibility as it is, so only their changes say when the hold must begin again.
+std::vector<xaml::VisualStateGroup> StateGroupsAnimating(const xaml::UIElement& element) {
+    std::vector<xaml::VisualStateGroup> found;
+    auto named = element.try_as<xaml::FrameworkElement>();
+    if (!named || named.Name().empty()) return found;
+    const winrt::hstring name = named.Name();
+    xaml::DependencyObject current = media::VisualTreeHelper::GetParent(element);
+    for (int depth = 0; current && depth < kStateOwnerDepth; depth++) {
+        if (auto owner = current.try_as<xaml::FrameworkElement>()) {
+            for (const xaml::VisualStateGroup& group : xaml::VisualStateManager::GetVisualStateGroups(owner)) {
+                bool names = false;
+                for (const xaml::VisualState& state : group.States()) {
+                    animation::Storyboard board = state.Storyboard();
+                    if (!board) continue;
+                    for (const animation::Timeline& child : board.Children()) {
+                        names = names || animation::Storyboard::GetTargetName(child) == name;
+                    }
+                }
+                if (names) found.push_back(group);
+            }
+        }
+        current = media::VisualTreeHelper::GetParent(current);
+    }
+    return found;
+}
+
 }  // namespace
 
 // `visibility: visible` as an animation of Ampify's: it ranks above a local value, a binding and a visual state begun
 // before it, and leaves them all in place under it. A later state of Apple's collapses the element again, and the hold
-// begins again.
-void XamlTreeBackend::HoldVisible(theme::NodeId id, const xaml::UIElement& element) noexcept {
+// begins again. Without `restart`, a hold already running on a shown element is left as it is.
+void XamlTreeBackend::HoldVisible(theme::NodeId id, const xaml::UIElement& element, bool restart) noexcept {
     try {
         auto known = m_visibleHolds.find(id);
         if (known != m_visibleHolds.end() && known->second.element.get() != element) {
             ReleaseVisible(id);
             known = m_visibleHolds.end();
         }
+        const bool shown = element.Visibility() == xaml::Visibility::Visible;
+        if (!restart && shown && known != m_visibleHolds.end()) return;
+        std::vector<xaml::VisualStateGroup> groups =
+            known == m_visibleHolds.end() ? StateGroupsAnimating(element) : std::vector<xaml::VisualStateGroup>{};
+        // Shown, and no state of Apple's to fade it: nothing to hold.
+        if (!restart && shown && known == m_visibleHolds.end() && groups.empty()) return;
         if (known == m_visibleHolds.end()) {
             VisibleHold hold{winrt::make_weak(element), ShownStory(element)};
             std::weak_ptr<bool> alive = m_alive;
@@ -829,11 +870,37 @@ void XamlTreeBackend::HoldVisible(theme::NodeId id, const xaml::UIElement& eleme
                 [this, alive, id](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
                     if (!alive.expired()) OnHeldVisibility(id);
                 });
+            for (const xaml::VisualStateGroup& group : groups) {
+                hold.stateChanges.push_back(group.CurrentStateChanged(
+                    winrt::auto_revoke,
+                    [this, alive, id](IInspectable const&, xaml::VisualStateChangedEventArgs const&) noexcept {
+                        if (!alive.expired()) OnHeldStateChanged(id);
+                    }));
+            }
             known = m_visibleHolds.emplace(id, std::move(hold)).first;
         }
         known->second.begun = std::chrono::steady_clock::now();
         known->second.story.Stop();
         known->second.story.Begin();
+    } catch (...) {
+        // Nothing may escape into Apple Music's XAML frame.
+    }
+}
+
+// A state of Apple's that fades the element began: the hold begins again after it, its visibility unchanged.
+void XamlTreeBackend::OnHeldStateChanged(theme::NodeId id) noexcept {
+    try {
+        auto known = m_visibleHolds.find(id);
+        if (*m_closed || known == m_visibleHolds.end()) return;
+        xaml::UIElement element = known->second.element.get();
+        if (!element) return;
+        std::weak_ptr<bool> alive = m_alive;
+        element.DispatcherQueue().TryEnqueue([this, alive, id]() noexcept {
+            if (alive.expired() || *m_closed) return;
+            auto again = m_visibleHolds.find(id);
+            xaml::UIElement held = again == m_visibleHolds.end() ? nullptr : again->second.element.get();
+            if (held) HoldVisible(id, held);
+        });
     } catch (...) {
         // Nothing may escape into Apple Music's XAML frame.
     }
