@@ -79,6 +79,13 @@ zone de notification), puis rouvrez-le. Sinon, Ampify revient quand la nouvelle 
 version d'Ampify l'apporte (les mises à jour s'installent seules), et `ampify versions update` cherche la liste tout de
 suite. `ampify doctor` donne le même état à tout moment.
 
+## Quand Ampify se met à jour
+
+Vos thèmes, snippets et extensions suivent. Au premier démarrage d'une nouvelle version, Ampify passe chaque élément
+du catalogue à sa nouvelle version, et remplace un snippet retiré par celui qui l'a repris, avec vos réglages. Sans
+internet, ils restent tels quels et le démarrage suivant réessaie. `ampify update --elements` fait la même chose à la
+main.
+
 ## Quelque chose ne va pas
 
 1. Lancez `ampify doctor` : il vérifie Ampify et liste chaque problème.

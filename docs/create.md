@@ -37,7 +37,8 @@ installed, Apple Music, and a terminal open in a working folder. Nothing to comp
 7. **Share it.**
    `ampify publish my-theme` checks it again, then opens a pull request on the
    [public catalog](https://github.com/Shirowwww/ampify-catalog) for you, without cloning anything. Once it is merged,
-   it shows in the Marketplace of every Ampify and in [the gallery](themes.html).
+   it shows in the Marketplace of every Ampify and in [the gallery](themes.html). The whole path, preview included,
+   is in [five steps](extensions/catalog.md#propose-an-element-in-five-steps).
 {: .steps}
 
 ## One way for each thing

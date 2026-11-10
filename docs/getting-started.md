@@ -88,8 +88,9 @@ help). The settings of a theme, a snippet or an extension stay folded under its 
 box above the tabs looks through every tab at once, those folded settings included. Changes take effect at once.
 
 Extensions you install start switched off, and you see the permissions an extension asks for before you switch it on.
-Four ship with Ampify: Now Playing, the Song panel (a column about the song playing, opened from a button of the
-playback bar), the playback guard (restarts a song Apple Music leaves stuck, on from the start) and the Atmos
+Five ship with Ampify: Now Playing, the Song panel (a column about the song playing, opened from a button of the
+playback bar), Time on hover (the time of the song under the pointer on the progress line, on from the start), the
+playback guard (restarts a song Apple Music leaves stuck, on from the start) and the Atmos
 leveler, under **Sound**: Dolby Atmos songs often play quieter than stereo ones, and the
 leveler brings them to the same loudness so you do not reach for the volume between songs. It is off until you switch
 it on.
@@ -150,6 +151,10 @@ first" never opens a window that waits for you: a notification offers the new ve
 
 To update by hand, run the install line again, or `ampify update --apply` with Apple Music closed. Every way keeps your
 settings.
+
+Your themes, snippets and extensions follow. At the first start of a new release, Ampify moves each element from the
+catalog to its new version, and replaces a retired snippet with the one that took it in, your settings included.
+Without internet, they stay as they were and the next start tries again. `ampify update --elements` does it by hand.
 
 ## Uninstall
 

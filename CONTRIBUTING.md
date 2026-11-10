@@ -82,9 +82,10 @@ same lines. For a module `foo`:
 
 ## Add an element to the catalog
 
-`ampify publish <folder>` checks the element and opens the pull request on
-[ampify-catalog](https://github.com/Shirowwww/ampify-catalog) for you. Details:
-[docs/extensions/catalog.md](docs/extensions/catalog.md).
+Themes, snippets, extensions and apps go to [ampify-catalog](https://github.com/Shirowwww/ampify-catalog), not to
+this repository. Follow the five steps of
+[Propose an element](docs/extensions/catalog.md#propose-an-element-in-five-steps): start from `ampify new`, add a
+preview, run `ampify validate`, send it with `ampify publish`, then read the check's comment on the pull request.
 
 ## Documentation
 

@@ -57,6 +57,7 @@ ampify doctor                            check that everything is in order
 | `ampify market readme <id>` | Prints an element's `README.md`: the installed copy's, or the one published next to the catalog's archive. Nothing when it has none |
 | `ampify install <id> [--yes]` | Downloads, checks the SHA-256, validates and installs. The element starts off ([what is checked](extensions/catalog.md#what-install-checks)) |
 | `ampify update <id> [--yes]` | Updates an element when the catalog has a newer version |
+| `ampify update --elements` | Updates every installed element to its catalog version, then writes `active.txt` again. Ampify runs it by itself at the first start of a new release, after it replaced the retired elements; offline, the elements stay as they are and the next start tries again |
 | `ampify remove <id>` | Removes an element, after a backup |
 | `ampify update` | Downloads the latest Ampify release and checks it. `--check` only says whether one exists, `--apply` installs it (Apple Music closed). `--auto` follows `kit_update`, at most one look a day: the launcher runs it once at each sign-in, and every hour while Apple Music is closed where it stays in the background (Windows refused to start it with Apple Music), with its output in `logs\update.log` |
 | `ampify install-kit <version> [--apply]` | Installs a given Ampify release, even an older one |

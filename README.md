@@ -26,7 +26,7 @@ lyrics, your library and its sync all keep working.
 |---|---|---|
 | 10 themes and 28 colour schemes, light and dark, switched without a restart | Discord presence, Last.fm scrobbling, a sleep timer, global shortcuts, an A-B loop | Nothing is written into Apple Music's package: uninstall and the original app is back |
 | 11 snippets to layer on any theme: corners, lyrics style, artwork filters, an equalizer that moves with the music | Pages for your listening stats and the new releases of the artists you play | Every extension lists its permissions before you switch it on |
-| One accent colour of your choice, or the colours of the song playing | A Song panel, a full-screen player with karaoke lyrics, and an Atmos leveler that plays Dolby Atmos songs as loud as stereo ones | A new Apple Music version stays untouched until Ampify has been tested on it |
+| One accent colour of your choice, or the colours of the song playing | A Song panel, the time under the pointer on the progress line, a full-screen player with karaoke lyrics, and an Atmos leveler that plays Dolby Atmos songs as loud as stereo ones | A new Apple Music version stays untouched until Ampify has been tested on it |
 | The playback bar at the top, the bottom or centred, under every theme | A Marketplace inside Apple Music, one click to install | Updates check their SHA-256 and install while Apple Music is closed |
 
 Ampify speaks English, French, German, Spanish, Portuguese, Russian, Japanese, Simplified Chinese, Italian and Korean.
@@ -121,7 +121,7 @@ ampify publish my-theme        # checks it and opens a pull request on the catal
 Themes style Apple Music's zones by stable names such as `.sidebar`, `.playbar` or `.card`, in CSS you already know.
 Extensions call the `Ampify` API for the player, menus, panels, storage and a set of ready-made components. Start with
 [Create](https://shirowwww.github.io/ampify/create.html), then see how an element reaches the Marketplace in
-[Publishing](https://shirowwww.github.io/ampify/extensions/catalog.html).
+[five steps](https://shirowwww.github.io/ampify/extensions/catalog.html#propose-an-element-in-five-steps).
 
 ## Documentation
 

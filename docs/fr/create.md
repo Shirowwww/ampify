@@ -39,7 +39,8 @@ créer. La documentation détaillée est en anglais.
 7. **Le partager.**
    `ampify publish mon-theme` le vérifie encore, puis ouvre pour vous une pull request sur le
    [catalogue public](https://github.com/Shirowwww/ampify-catalog), sans rien cloner. Une fois acceptée, elle apparaît
-   dans le Marketplace de chaque Ampify et dans [la galerie](themes.html).
+   dans le Marketplace de chaque Ampify et dans [la galerie](themes.html). Le chemin complet, aperçu compris, tient
+   en [cinq étapes](../extensions/catalog.md#propose-an-element-in-five-steps).
 {: .steps}
 
 ## Une seule façon pour chaque chose
