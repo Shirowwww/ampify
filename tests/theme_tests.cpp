@@ -1810,6 +1810,27 @@ TEST_CASE(Theme_ATilesArtistLinkReadsLikeItsSubtitle) {
     CHECK(Assigned(Load(none), ".card-subtitle", "Foreground") == "ABSENT");
 }
 
+TEST_CASE(Theme_TheDisplaysLinesReadOnTheThemesBar) {
+    // Apple colours the song's title and artist for the window's mode when it builds them: white on a light theme's
+    // bar under a dark Windows. Both take the theme's text colours.
+    MemoryFiles light;
+    light.files["colors.ini"] = "[Base]\nTextFillColorPrimaryBrush = 1F1E1B\nTextFillColorSecondaryBrush = 5C5A52\n";
+    th::Theme theme = Load(light);
+    CHECK(Assigned(theme, ".track-title TextBlock", "Foreground") == "#FF1F1E1B");
+    CHECK(Assigned(theme, ".track-artist TextBlock", "Foreground") == "#FF5C5A52");
+
+    // A theme that colours a line keeps its colour (Console), and one without colours leaves Apple's.
+    MemoryFiles own;
+    own.files["colors.ini"] = "[Base]\nTextFillColorPrimaryBrush = 1F1E1B\nTextFillColorSecondaryBrush = 5C5A52\n";
+    own.files["user.css"] = ".track-artist TextBlock { color: #FF112233; }\n.track-title { color: #FF445566; }\n";
+    th::Theme kept = Load(own);
+    CHECK(Assigned(kept, ".track-artist TextBlock", "Foreground") == "#FF112233");
+    CHECK(Assigned(kept, ".track-title TextBlock", "Foreground") == "ABSENT");
+    MemoryFiles none;
+    none.files["user.css"] = ".lcd { opacity: 0.9; }\n";
+    CHECK(Assigned(Load(none), ".track-artist TextBlock", "Foreground") == "ABSENT");
+}
+
 TEST_CASE(Theme_ALitCardKeepsRoomAroundItsTitles) {
     // A tile lit under the pointer had its titles against the light's edge.
     MemoryFiles lit;
@@ -2881,6 +2902,47 @@ TEST_CASE(Snippets_ProgressLineGivesAThickLineItsWholeHeight) {
     }
 }
 
+// The thicker line rises above Apple's (its bottom kept): the times set just above it rise as much, else the default
+// 5-pixel line covered their foot, with the bar at the top where Apple shows them above the line.
+TEST_CASE(Snippets_ProgressLineLiftsTheTimesOverAThickLine) {
+    std::filesystem::path folder = std::filesystem::path(AMPIFY_SOURCE_DIR) / "themes" / "snippets" / "progress-line";
+    th::FolderFiles files(folder);
+    th::LoadOptions options;
+    const char* expected[] = {"ABSENT", "ABSENT", "1,1,0,0,-2", "1,1,0,0,-2", "1,1,0,0,-3", "1,1,0,0,-4"};
+    for (int thickness = 1; thickness <= 6; ++thickness) {
+        options.settings = {{"custom-thickness", "true"}, {"thickness", std::to_string(thickness)}};
+        th::Theme snippet = th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options);
+        CHECK(Assigned(snippet, ".current-time", "RenderTransform") == expected[thickness - 1]);
+        CHECK(Assigned(snippet, ".duration", "RenderTransform") == expected[thickness - 1]);
+    }
+
+    options.settings = {{"custom-thickness", "true"}, {"thickness", "5"}, {"mascot", "Note"}};
+    th::Theme mascot = th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options);
+    CHECK(Assigned(mascot, ".current-time", "RenderTransform") == "1,1,0,0,-3");
+
+    // At the bottom the times sit on the artist's line, and in the centred bar beside the line: they stay.
+    options.settings = {{"custom-thickness", "true"}, {"thickness", "5"}};
+    for (const char* place : {"bottom", "centred"}) {
+        options.playbar = place;
+        th::Theme away = th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options);
+        CHECK(Assigned(away, ".duration", "RenderTransform") == "ABSENT");
+    }
+
+    // Under no theme, Ampify's own bottom layout tells where the bar is once the layers are composed.
+    options.playbar = "bottom";
+    auto line = std::make_shared<const th::Theme>(
+        th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options));
+    std::optional<th::Theme> layout = th::LoadPlaybarLayout(nullptr, options);
+    CHECK(layout.has_value());
+    th::Theme composed = th::ComposeTheme(nullptr, {line}, layout ? &*layout : nullptr);
+    CHECK(Assigned(composed, ".scrubber", "Height") == "8");
+    CHECK(Assigned(composed, ".duration", "RenderTransform") == "ABSENT");
+    options.playbar = "top";
+    auto atTop = std::make_shared<const th::Theme>(
+        th::LoadSnippet("progress-line", folder.generic_string(), files, nullptr, options));
+    CHECK(Assigned(th::ComposeTheme(nullptr, {atTop}, nullptr), ".duration", "RenderTransform") == "1,1,0,0,-3");
+}
+
 TEST_CASE(Theme_AThickTrackUnderAnImageKeepsTheLinesBottom) {
     const char* mascot = ".scrubber Grid#HorizontalTemplate::after { content: url(\"cat.gif\"); grid-column: 1; }\n";
     MemoryFiles theme;
@@ -2894,6 +2956,13 @@ TEST_CASE(Theme_AThickTrackUnderAnImageKeepsTheLinesBottom) {
     track.files["user.css"] = ".scrubber { track-height: 5; }\n";
     CHECK(Assigned(Load(track), ".scrubber", "Height") == "8");
     CHECK(Assigned(Load(track), ".scrubber", "RenderTransform") == "ABSENT");
+    CHECK(Assigned(Load(track), ".duration", "RenderTransform") == "1,1,0,0,-3");
+
+    // A theme that moves the times itself keeps its own place for them.
+    MemoryFiles own;
+    own.files["user.css"] = ".scrubber { track-height: 5; }\n.duration { transform: translateY(-8px); }\n";
+    CHECK(Assigned(Load(own), ".duration", "RenderTransform") == "1,1,0,0,-8");
+    CHECK(Assigned(Load(own), ".current-time", "RenderTransform") == "1,1,0,0,-3");
 }
 
 TEST_CASE(Theme_BarsContentTakesACountAndAColour) {

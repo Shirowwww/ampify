@@ -245,13 +245,18 @@ bool DockPanelPopup(WindowContext& context, const winrt::Windows::Foundation::Si
     auto pagesOrigin = pages.TransformToVisual(nullptr).TransformPoint({0, 0});
     winrt::Windows::Foundation::Rect bounds{pagesOrigin.X, pagesOrigin.Y, static_cast<float>(pages.ActualWidth()),
                                             static_cast<float>(pages.ActualHeight())};
-    // Without a theme, Apple's pages run under its see-through play bar at the window's top: the column starts a gap
-    // below the bar instead of over its buttons.
-    constexpr float kBarGap = 8;
+    // Ampify's own room (PushPages), without a theme that leaves one: the column is part of Apple's flat layout, like
+    // its sidebar, so it meets the play bar, the window's right edge and its bottom, and keeps one gap from the pages
+    // only (Victor, 2026-11-10: a frame of grey showed above it and on its right). A theme's room keeps its gaps.
+    controls::Grid parent = PagesParent(pages);
+    const bool ours = parent && context.pushedPages == parent && parent.Padding().Right >= kPanelWidth + 8;
+    // Without a theme, Apple's pages run under its see-through play bar at the window's top: the column starts below
+    // the bar instead of over its buttons, a gap below it in a theme's room.
+    const float barGap = ours ? 0.0f : 8.0f;
     if (auto bar = NamedBounds(context, "TransportBar"); bar && bar->Y < size.Height / 2) {
-        float top = bar->Y + bar->Height + kBarGap;
+        float top = bar->Y + bar->Height + barGap;
         if (bounds.Y < top) {
-            bounds.Height = std::max(0.0f, bounds.Height - (top - bounds.Y) - kBarGap);
+            bounds.Height = std::max(0.0f, bounds.Height - (top - bounds.Y) - barGap);
             bounds.Y = top;
         }
     }
@@ -261,14 +266,13 @@ bool DockPanelPopup(WindowContext& context, const winrt::Windows::Foundation::Si
     // between the pages and the room, so the column takes the parent's right edge.
     double start = bounds.X + bounds.Width;
     double room = std::min(RoomRight(pages), static_cast<double>(size.Width) - start);
-    controls::Grid parent = PagesParent(pages);
     if (double padding = parent ? parent.Padding().Right : 0; padding >= kPanelWidth + 8) {
         double parentRight = parent.TransformToVisual(nullptr).TransformPoint({0, 0}).X + parent.ActualWidth();
         room = std::min(padding, static_cast<double>(size.Width) - (parentRight - padding));
         start = parentRight - padding;
     }
     if (room < kPanelWidth + 8) return false;
-    double gap = (room - kPanelWidth) / 2;
+    double gap = ours ? room - kPanelWidth : (room - kPanelWidth) / 2;  // ours: the gap on the pages' side only
     double width = kPanelWidth;
     if (context.panelHost.Width() != width) context.panelHost.Width(width);
     if (context.panelHost.Height() != bounds.Height) context.panelHost.Height(bounds.Height);
@@ -311,7 +315,7 @@ controls::Grid PagesGrid(const WindowContext& context) {
 }
 
 // Panels take a column of their own instead of floating over the pages: the room on the pages' right grows by a panel
-// and two gaps, and DockPanelPopup docks them there.
+// and a gap, and DockPanelPopup docks them there, against the window's right edge.
 void PushPages(WindowContext& context) {
     if (context.pushedPages) {
         if (context.pushedPages.Padding().Right == context.pushedRight) return;
@@ -324,7 +328,7 @@ void PushPages(WindowContext& context) {
     xaml::Thickness padding = parent.Padding();
     if (!context.pushedPages) context.pagesPadding = padding;
     context.pushedPages = parent;
-    context.pushedRight = context.pagesPadding.Right + kPanelWidth + 2 * kPushGap;
+    context.pushedRight = context.pagesPadding.Right + kPanelWidth + kPushGap;  // the column meets the window's edge
     padding.Right = context.pushedRight;
     parent.Padding(padding);
     parent.UpdateLayout();  // so the column docks at once rather than floating for one refresh
@@ -351,7 +355,7 @@ bool PagesKeepRoom(const WindowContext& context) {
     if (!pages || pages.ActualWidth() <= 0) return true;
     double width = pages.ActualWidth();
     if (context.pushedPages) return width >= kPagesMinWidth;
-    return width - (kPanelWidth + 2 * kPushGap) >= kPagesMinWidth + kDockMargin;
+    return width - (kPanelWidth + kPushGap) >= kPagesMinWidth + kDockMargin;
 }
 
 }  // namespace

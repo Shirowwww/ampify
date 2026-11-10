@@ -210,6 +210,137 @@ void HoldPaneStill(State& state, const controls::NavigationView& navigation, boo
     state.modeGroup = group;
 }
 
+namespace {
+
+using winrt::Windows::Foundation::TimeSpan;
+
+bool StartsWith(const winrt::hstring& text, std::wstring_view start) {
+    return std::wstring_view(text).substr(0, start.size()) == start;
+}
+
+// When the last of a transition's key frames ends.
+TimeSpan Length(const xaml::VisualTransition& transition) {
+    TimeSpan end{0};
+    animation::Storyboard story = transition.Storyboard();
+    if (!story) return end;
+    auto later = [&](TimeSpan at) { end = at > end ? at : end; };
+    for (const animation::Timeline& timeline : story.Children()) {
+        if (auto frames = timeline.try_as<animation::DoubleAnimationUsingKeyFrames>()) {
+            for (const animation::DoubleKeyFrame& frame : frames.KeyFrames()) later(frame.KeyTime().TimeSpan);
+        } else if (auto objects = timeline.try_as<animation::ObjectAnimationUsingKeyFrames>()) {
+            for (const animation::ObjectKeyFrame& frame : objects.KeyFrames()) later(frame.KeyTime().TimeSpan);
+        }
+    }
+    return end;
+}
+
+// Where the SplitView's own fold out of `open` leaves the clip of the pane: its last key frame on
+// PaneClipRectangleTransform (left of the column, or right of it for a pane on the right).
+std::optional<double> FoldedClip(const xaml::VisualStateGroup& group, const winrt::hstring& open) {
+    for (const xaml::VisualTransition& transition : group.Transitions()) {
+        if (transition.From() != open || !StartsWith(transition.To(), L"Closed") || !transition.Storyboard()) continue;
+        for (const animation::Timeline& timeline : transition.Storyboard().Children()) {
+            auto frames = timeline.try_as<animation::DoubleAnimationUsingKeyFrames>();
+            if (!frames || frames.KeyFrames().Size() == 0) continue;
+            if (animation::Storyboard::GetTargetName(timeline) != L"PaneClipRectangleTransform") continue;
+            return frames.KeyFrames().GetAt(frames.KeyFrames().Size() - 1).Value();
+        }
+    }
+    return std::nullopt;
+}
+
+// How long the pane takes to open into `open`: the longest transition into it.
+TimeSpan OpeningLength(const xaml::VisualStateGroup& group, const winrt::hstring& open) {
+    TimeSpan longest{0};
+    for (const xaml::VisualTransition& transition : group.Transitions()) {
+        if (transition.To() != open || !StartsWith(transition.From(), L"Closed")) continue;
+        TimeSpan length = Length(transition);
+        longest = length > longest ? length : longest;
+    }
+    if (longest.count() > 0) return longest;
+    return std::chrono::duration_cast<TimeSpan>(ampify::kFoldSlideFallback);
+}
+
+}  // namespace
+
+// The pane folding under the pointer slides shut, still open, then folds. WinUI's fold could not show it: Apple Music
+// narrows its column to the folded width the moment the pane closes, from a state of its own, so the SplitView's fold
+// slid its clip over an empty pane (seen frame by frame on 2026-11-10). Ampify moves that same clip, the SplitView's
+// PaneClipRectangleTransform, to where the fold leaves it, in the opening's time and along kFoldEase; `shut` then folds
+// the pane at once (HoldPaneStill), its clip already in place. Works for a pane on either side, under any theme. False
+// when the pane is not in an open overlay state or its clip is not found: the caller folds it as before.
+bool SlideShut(State& state, const controls::NavigationView& navigation, std::function<void()> shut) {
+    if (Sliding(state)) return true;
+    if (state.modeGroup) return false;  // pinned over narrow pages: the pane holds still
+    xaml::VisualStateGroup group = FindModeGroup(navigation);
+    if (!group || !group.CurrentState()) return false;
+    const winrt::hstring open = group.CurrentState().Name();
+    if (!StartsWith(open, L"Open")) return false;
+    auto split = FindFirst<controls::SplitView>(navigation, L"RootSplitView", 0);
+    auto root = split && media::VisualTreeHelper::GetChildrenCount(split) > 0
+                    ? media::VisualTreeHelper::GetChild(split, 0).try_as<xaml::FrameworkElement>()
+                    : nullptr;
+    auto clip = root ? root.FindName(L"PaneClipRectangleTransform").try_as<xaml::DependencyObject>() : nullptr;
+    std::optional<double> to = FoldedClip(group, open);
+    if (!clip || !to) return false;
+    const wchar_t* property = nullptr;
+    double from = 0;
+    if (auto translate = clip.try_as<media::TranslateTransform>()) {
+        property = L"X";
+        from = translate.X();
+    } else if (auto composite = clip.try_as<media::CompositeTransform>()) {
+        property = L"TranslateX";
+        from = composite.TranslateX();
+    } else {
+        return false;
+    }
+    animation::DoubleAnimationUsingKeyFrames move;
+    animation::DiscreteDoubleKeyFrame start;
+    start.KeyTime(animation::KeyTimeHelper::FromTimeSpan(TimeSpan{0}));
+    start.Value(from);
+    animation::SplineDoubleKeyFrame end;
+    end.KeyTime(animation::KeyTimeHelper::FromTimeSpan(OpeningLength(group, open)));
+    end.Value(*to);
+    animation::KeySpline ease;
+    ease.ControlPoint1({static_cast<float>(ampify::kFoldEase.x1), static_cast<float>(ampify::kFoldEase.y1)});
+    ease.ControlPoint2({static_cast<float>(ampify::kFoldEase.x2), static_cast<float>(ampify::kFoldEase.y2)});
+    end.KeySpline(ease);
+    move.KeyFrames().Append(start);
+    move.KeyFrames().Append(end);
+    animation::Storyboard::SetTarget(move, clip);
+    animation::Storyboard::SetTargetProperty(move, property);
+    animation::Storyboard story;
+    story.Children().Append(move);
+    story.Completed([shut = std::move(shut), weak = winrt::make_weak(story)](IInspectable const&, IInspectable const&) noexcept {
+        try {
+            auto done = weak.get();
+            if (!done || TheState().slide != done) return;  // stopped, or another slide began
+            shut();
+        } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
+        }
+    });
+    state.slide = story;
+    story.Begin();
+    return true;
+}
+
+bool Sliding(const State& state) {
+    return state.slide != nullptr;
+}
+
+// The slide taken off: the clip goes back to what the pane's state gives it, open (the pointer came back) or folded.
+void StopSlide(State& state) {
+    if (!state.slide) return;
+    animation::Storyboard story = state.slide;
+    state.slide = nullptr;
+    try {
+        story.Stop();
+    } catch (...) {
+        // The template may be torn down already: nothing is left to stop.
+    }
+}
+
 // A brush that shows: a theme's acrylic or image, or a colour that is not see-through.
 bool Paints(const media::Brush& brush) {
     if (!brush || brush.Opacity() <= 0) return false;

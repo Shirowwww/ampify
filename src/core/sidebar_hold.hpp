@@ -63,6 +63,15 @@ inline std::optional<double> LocalOffset(double at, double origin, double unit) 
     return (at - origin) / step;
 }
 
+// The pane folding under the pointer slides shut along this ease, as the control points of a cubic Bezier (x1, y1,
+// x2, y2), in the time the pane takes to open: a standard ease that moves all along. WinUI's own fold lasts a third of
+// its opening and does four fifths of the move in the first 60 ms, which read as a snap (measured 2026-11-10).
+struct Ease {
+    double x1, y1, x2, y2;
+};
+inline constexpr Ease kFoldEase{0.4, 0.0, 0.2, 1.0};
+constexpr auto kFoldSlideFallback = std::chrono::milliseconds(250);  // when the opening's length cannot be read
+
 // Notes when the search text last changed while the keyboard was in the field. The first look is not typing.
 class TypingTracker {
 public:

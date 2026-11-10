@@ -199,6 +199,20 @@ void HoldToggleFocus(State& state) {
     state.refocusUntil = state.keysUsed ? Clock::now() + kRefocusFor : Clock::time_point{};
 }
 
+// The pane has slid shut (SlideShut): it folds at once, its clip already where the fold leaves it, and the slide is
+// taken off so the folded state holds the clip.
+void FoldAfterSlide() {
+    State& live = TheState();
+    auto navigation = live.navigation.get();
+    auto pane = live.pane.get();
+    if (navigation && pane && navigation.IsPaneOpen() && !live.pinned) {
+        HoldPaneStill(live, navigation, true);
+        ClosePane(live, navigation, pane);
+        HoldPaneStill(live, navigation, false);
+    }
+    StopSlide(live);
+}
+
 // Closes the pane once the pointer is off it and nothing holds it; true while it stays open. Pinned, it never closes.
 // Every hold is read on each look, so the search text stays current even while the pointer is over the pane.
 bool CloseIfLeft(State& state) {
@@ -209,12 +223,17 @@ bool CloseIfLeft(State& state) {
     bool cursor = CursorOverPane(state, navigation, pane);
     bool typing = TypingHolds(state, pane);
     bool menu = HoldsForMenu(WindowInFront(state), MenuOpen(pane));
-    if (cursor || typing || menu || KeyboardHolds(state, pane)) return true;
+    if (cursor || typing || menu || KeyboardHolds(state, pane)) {
+        StopSlide(state);  // the pointer came back mid-slide: the pane opens again
+        return true;
+    }
+    if (Sliding(state)) return true;  // still watched, so a pointer coming back stops the slide
     auto at = CursorIn(state, pane);
     Trace("folds, the cursor off the pane (in the pane's own pixels: " +
           (at ? std::to_string(std::lround(at->X)) + "," + std::to_string(std::lround(at->Y)) : std::string("none")) +
           ", the pane " + std::to_string(std::lround(pane.ActualWidth())) + "x" +
           std::to_string(std::lround(pane.ActualHeight())) + ")");
+    if (SlideShut(state, navigation, FoldAfterSlide)) return true;
     ClosePane(state, navigation, pane);
     return false;
 }
@@ -394,6 +413,7 @@ void ReleaseChrome(State& state) {
         RemoveFill(state);
         RemoveEdge(state);
         RestoreAppleShadow(state);
+        StopSlide(state);
         HoldPaneStill(state, nullptr, false);
     } catch (...) {
         // The element may be torn down already: nothing is left to put back.
@@ -685,6 +705,7 @@ void MakePaneHandlers(State& state) {
                 auto navigation = live.navigation.get();
                 if (!navigation) return;
                 Trace(std::string("pointer entered the pane, open ") + (navigation.IsPaneOpen() ? "already" : "now"));
+                StopSlide(live);
                 if (!navigation.IsPaneOpen()) navigation.IsPaneOpen(true);
                 Watch(live);
             } catch (...) {

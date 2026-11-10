@@ -51,11 +51,14 @@ struct FixedSlot {
     double asked;               // what its template asks for: the least room that clips nothing
     double trackTop;            // where its template's row for the track starts, from its top
     double trackRow;            // that row's least height; the track is centred in it
+    double track;               // Apple's own thickness
     std::string_view tracks[2]; // the elements that draw it, whose height is its thickness
+    std::string_view above[2];  // what Apple sets just above the track, which a thicker one rose into
 };
 
 constexpr FixedSlot kFixedSlots[] = {
-    {".scrubber", "ScrubberControl#LCDScrubber", 6, 18, 3, 4, {"HorizontalTrackRect", "HorizontalDecreaseRect"}},
+    {".scrubber", "ScrubberControl#LCDScrubber", 6, 18, 3, 4, 2, {"HorizontalTrackRect", "HorizontalDecreaseRect"},
+     {".current-time", ".duration"}},
 };
 
 bool InSlot(const std::string& selector, const FixedSlot& slot) {
@@ -186,6 +189,30 @@ std::string CardLinksInSecondaryText(const Theme& theme) {
     return declarations.empty() ? std::string() : ".card-subtitle {" + declarations + " }\n";
 }
 
+// The song's title and artist in the display keep the colours Apple gave them for the mode the window was in when they
+// were built: a light theme on Windows in dark mode left the artist's line white on its light bar (Paper light), and a
+// dark theme on a light Windows left it dark on dark. They take the theme's primary and secondary text, unless the
+// theme colours them itself.
+std::string DisplayTextInThemeColours(const Theme& theme) {
+    constexpr struct {
+        const char* name;
+        const char* element;
+        const char* key;
+    } kLines[] = {
+        {".track-title", "TickerTapeControl#TrackTitleTickerTape", "TextFillColorPrimaryBrush"},
+        {".track-artist", "TickerTapeControl#ArtistTitleTickerTape", "TextFillColorSecondaryBrush"},
+    };
+    std::string css;
+    for (const auto& line : kLines) {
+        const std::string name(line.name), element(line.element);
+        bool own = Sets(theme, name, "Foreground") || Sets(theme, name + " TextBlock", "Foreground") ||
+                   Sets(theme, element, "Foreground") || Sets(theme, element + " TextBlock", "Foreground");
+        if (own || !theme.palette.Find(line.key)) continue;
+        css += name + " TextBlock { color: $" + line.key + "; }\n";
+    }
+    return css;
+}
+
 // Apple Music paints the tiles of a search's top results in its own grey, in code: the theme's card colour instead.
 std::string SearchTilesInCardColour(const Theme& theme) {
     if (Sets(theme, ".search-top-result", "Background")) return {};
@@ -275,11 +302,36 @@ bool Sets(const Theme& theme, std::string_view selector, std::string_view proper
     });
 }
 
+// How far a thicker track rose above Apple's, its bottom kept (TrackBottom). With the bar at the top, Apple shows the
+// times just above the line (FixedSlot::above): they go up as much, else a 5-pixel line covered their foot. At the
+// bottom they sit on the artist's line and in the centred bar beside the line (layouts/): they stay. 0 for Apple's
+// own track or a thinner one.
+double TrackRise(const FixedSlot& slot, double track) {
+    if (track <= slot.track) return 0;
+    double bottom = TrackBottom(slot, track);
+    double top = slot.height - bottom + slot.trackTop + (std::max(slot.trackRow, track) - track) / 2;
+    double appleTop = slot.trackTop + (slot.trackRow - slot.track) / 2;
+    return std::max(0.0, std::round(appleTop - top));
+}
+
+// The bar's place for the composed layers: the theme's, else Ampify's own layout's (no theme, apple.playbar), else Top.
+bool BarAtTop(const Theme& theme, const Theme* layout) {
+    for (const Theme* source : {&theme, layout}) {
+        if (!source) continue;
+        if (auto place = source->settings.find("bar-position"); place != source->settings.end()) {
+            return ToLowerAscii(place->second) == "top";
+        }
+    }
+    return true;
+}
+
 // The room a slot needs for its decors and its track, moved down so the track's bottom stays where Apple's is.
-std::string RoomInFixedSlots(const Theme& theme) {
+std::string RoomInFixedSlots(const Theme& theme, const Theme* layout) {
     std::string css;
+    const bool atTop = BarAtTop(theme, layout);
     for (const FixedSlot& slot : kFixedSlots) {
-        double bottom = TrackBottom(slot, TrackThickness(theme, slot));
+        double thickness = TrackThickness(theme, slot);
+        double bottom = TrackBottom(slot, thickness);
         double room = std::max({slot.height, DecorRoom(theme, slot), bottom});
         const std::string full(slot.selector);
         if (room <= slot.height || Sets(theme, slot.name, "Height") || Sets(theme, full, "Height") ||
@@ -290,6 +342,11 @@ std::string RoomInFixedSlots(const Theme& theme) {
         css += std::string(slot.name) + " { height: " + FormatNumber(room) + ";";
         if (shift > 0) css += " transform: translateY(" + FormatNumber(shift) + "px);";
         css += " }\n";
+        double rise = atTop ? TrackRise(slot, thickness) : 0;
+        for (std::string_view name : slot.above) {
+            if (rise <= 0 || Sets(theme, name, "RenderTransform")) continue;
+            css += std::string(name) + " { transform: translateY(-" + FormatNumber(rise) + "px); }\n";
+        }
     }
     return css;
 }
@@ -308,7 +365,7 @@ void AddDerivedRules(const ValueContext& context, Theme& theme, const ThemeParts
     if (parts.colors) {
         css += ScrubberInAccent(theme) + NowPlayingBarsInAccent(theme) + ShuffleInAccent(theme) + UpNextInAccent(theme) +
                ArtistInLinkColour(theme) +
-               CardLinksInSecondaryText(theme) +
+               CardLinksInSecondaryText(theme) + DisplayTextInThemeColours(theme) +
                SearchTilesInCardColour(theme) + SelectedRowsInThemeColour(theme);
     }
     if (css.empty()) return;
@@ -345,10 +402,10 @@ void PutComposedRules(Theme& composed, const char* name, const std::string& css)
 
 }  // namespace
 
-void ShareRoomInFixedSlots(Theme& composed) {
+void ShareRoomInFixedSlots(Theme& composed, const Theme* layout) {
     std::erase_if(composed.assignments,
                   [](const Assignment& assignment) { return assignment.source == kFixedSlotSource; });
-    std::string css = RoomInFixedSlots(composed);
+    std::string css = RoomInFixedSlots(composed, layout);
     if (css.empty()) return;
     struct NoFiles final : FileSource {
         std::optional<std::string> Read(std::string_view) override { return std::nullopt; }

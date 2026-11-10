@@ -83,7 +83,7 @@ Theme ComposeTheme(const Theme* theme, const std::vector<std::shared_ptr<const T
     }
 
     if (layout) AddLayer(*layout, layer, composed);
-    ShareRoomInFixedSlots(composed);
+    ShareRoomInFixedSlots(composed, layout);
     KeepTogglesAtTheRightEnd(composed);
     KeepLcdVeilInItsArtwork(composed);
 

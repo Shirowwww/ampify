@@ -172,7 +172,8 @@ Theme LoadSnippet(const std::string& id, const std::string& folder, FileSource& 
 
 // Works out again, for all the layers of a composed theme together, the room Apple's fixed slots (the progress line)
 // need: each theme and snippet derived its own, and one's height could win while another's shift moved the line.
-void ShareRoomInFixedSlots(Theme& composed);
+// `layout`, Ampify's own bar layout when one applies, tells where the bar is under no theme.
+void ShareRoomInFixedSlots(Theme& composed, const Theme* layout = nullptr);
 
 // Under every theme and snippet, the playback bar's toggles keep to the right end of their cell, a little apart,
 // unless the composed theme places them itself.

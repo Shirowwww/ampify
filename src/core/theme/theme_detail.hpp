@@ -86,7 +86,7 @@ void LoadRuleText(const std::string& css, const ValueContext& context, Theme& th
 bool Sets(const Theme& theme, std::string_view selector, std::string_view property);
 
 // The room a slot needs for its decors and its track, moved down so the track's bottom stays where Apple's is.
-std::string RoomInFixedSlots(const Theme& theme);
+std::string RoomInFixedSlots(const Theme& theme, const Theme* layout = nullptr);
 
 std::string SmoothProgressLine(const Theme& theme);
 std::string SuggestionsAgainstTheBox(const Theme& theme);

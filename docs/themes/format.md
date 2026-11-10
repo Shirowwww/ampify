@@ -207,7 +207,7 @@ explain them in one line; the page also resets them, and exports or imports them
 | `min-width`, `min-height` | `MinWidth`, `MinHeight` | A length, or `auto` |
 | `max-width`, `max-height` | `MaxWidth`, `MaxHeight` | A length, or `none` |
 | `compact-pane-length` | `CompactPaneLength` | On `.navigation`: the width of the folded sidebar (48 in Apple Music) |
-| `track-height`, `track-radius` | `TrackHeight`, `TrackRectRadius` | On `.scrubber`: properties of Apple's progress line itself, the height and corner radius its template gives the track. A length, not negative and not `auto`. Unlike `height`, they leave the control's place in the display alone. A track thicker than 2 pixels, set here or by `height` on `.scrubber Rectangle#HorizontalTrackRect` and `#HorizontalDecreaseRect`, makes Ampify grow the line's slot upwards so the whole track shows and its bottom stays in place (checked from 1 to 6 pixels with the rectangles' `height`) |
+| `track-height`, `track-radius` | `TrackHeight`, `TrackRectRadius` | On `.scrubber`: properties of Apple's progress line itself, the height and corner radius its template gives the track. A length, not negative and not `auto`. Unlike `height`, they leave the control's place in the display alone. A track thicker than 2 pixels, set here or by `height` on `.scrubber Rectangle#HorizontalTrackRect` and `#HorizontalDecreaseRect`, makes Ampify grow the line's slot upwards so the whole track shows and its bottom stays in place (checked from 1 to 6 pixels with the rectangles' `height`); the elapsed and remaining times above it rise by as much as the track did, unless the theme gives them a `transform` of its own |
 | `thumb-visibility` | `ThumbVisibility` | On `.scrubber`: `visible` or `collapsed`, the line's thumb (Apple hides it in the play bar). Not yet checked on screen |
 | `opacity` | `Opacity` | 0 to 1. On `.sidebar` or `.sidebar-column`, it holds only while the sidebar does not stand over the pages: open over them (under the pointer, or pinned in a narrow window), the pane stays opaque |
 | `visibility` | `Visibility` | `visible` or `collapsed` (`hidden` and `none` mean `collapsed`). `visible` holds over Apple's visual states that collapse the element or fade it out (the play bar's times, shown only under the pointer) |
@@ -555,7 +555,9 @@ The panels of elements (`Ampify.ui.panel`) float over the right of the pages. A 
 own leaves room on the right of `.content`: a right margin at least as wide as a panel (380) and two gaps. Ampify
 docks the panels there, as high as the pages, with the pages' background and corners, and the panels' own cards
 melt into the column. Apple's lyrics and queue pane, when open, stands on the right of that room, never under it.
-Without the room (the setting off, a narrower margin), the panels float again.
+Without the room (the setting off, a narrower margin), the panels float again. Without a theme that leaves room, Ampify makes a column
+itself when the window is wide enough: it meets the playback bar, the window's right edge and its bottom, one gap from
+the pages.
 
 ```css
 @import "ampify:floating-panels";
@@ -883,6 +885,7 @@ and the inspector list them as "Ampify (derived from the theme)".
 | has an accent | Up Next's "Clear" (`.queue-clear`) and its autoplay toggle while on (`.queue-autoplay`) take it, not Apple's red and blue |
 | has a link colour or an accent | `.album-artist` takes it (Apple's own blue barely reads on a light page) |
 | has a secondary text colour | `.card-subtitle`, the artist under a tile, takes it (Apple paints that link in code), at full opacity: Apple fades it to 70% for its own grey |
+| has primary and secondary text colours | the song's title and artist in the display (`.track-title`, `.track-artist`) take them: Apple colours them for the window's mode when it builds them, white on a light theme's bar under a dark Windows |
 | has a secondary text colour and a dark scheme | Apple's own `SecondaryTextBrush` (shelf headers, captions, the search field's hint) takes it. A light scheme leaves Apple's: its dark captions over artwork read that key too |
 | has a card colour | the top results of a search take it |
 | has selected-row colours | Apple's lists use them, though their style never reads them |

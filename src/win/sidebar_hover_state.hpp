@@ -102,6 +102,7 @@ struct State {
     ampify::GroupMemory<Group> groups;  // the groups collapsed while the pane is folded
     xaml::VisualStateGroup modeGroup{nullptr};  // the SplitView's DisplayModeStates, while its transitions are out
     std::vector<xaml::VisualTransition> transitions;  // what HoldPaneStill took out of it
+    animation::Storyboard slide{nullptr};  // the pane sliding shut under the pointer (SlideShut), until it folds
 };
 
 State& TheState();
@@ -127,6 +128,9 @@ void RemovePin(State& state);
 void RestoreDismissLayer(State& state);
 void SetDismissLayer(State& state, const controls::NavigationView& navigation, bool hover);
 void HoldPaneStill(State& state, const controls::NavigationView& navigation, bool still);
+bool SlideShut(State& state, const controls::NavigationView& navigation, std::function<void()> shut);
+bool Sliding(const State& state);
+void StopSlide(State& state);
 void RemoveFill(State& state);
 void RemoveEdge(State& state);
 void EdgeOverPages(State& state, const controls::NavigationView& navigation, bool over);

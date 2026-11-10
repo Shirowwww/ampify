@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.3.1 (2026-11-10)
+
+A few fixes to how Ampify 1.3 looks, found in the first hours of use.
+
+### Interface
+
+- The sidebar that opens under the pointer now slides shut when the pointer leaves it, in the time it took to open.
+  It used to snap shut: Apple Music narrows the pane to its folded width the moment it closes. If the pointer comes back
+  while it slides, the pane opens again.
+- Without a theme, the column of the panels (the song panel and the others) meets the playback bar, the window's right
+  edge and its bottom. A grey frame showed above it and on its right.
+
+### Themes
+
+- A theme's colours now reach the song's title and artist in the playback bar. On Light paper under a dark Windows, the
+  artist line was white on the light bar.
+- With the playback bar at the top, the elapsed and remaining times rise above a progress line made thicker (Progress
+  line at 5 pixels, Fluent's 4), which covered their foot. At the bottom and centred, nothing moves.
+
 ## 1.3.0 (2026-11-10)
 
 Ampify 1.3 brings a new installer, a settings page in tabs, fewer snippets with more settings, one place for the

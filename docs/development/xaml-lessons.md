@@ -136,6 +136,7 @@ appear dozens of times. Target them under a named parent.
 | A colour animation made the log say "1 value applied" every 3 seconds | The animation draws the `background` the theme also sets, so the engine read back an animated brush. The backend keeps the background the theme asked for while the animation owns it (`WantBackground`) |
 | A colour animation on the sidebar's root did nothing visible | Its children draw an opaque background over it. Pick the element that draws the colour with `ampify devtools pick` |
 | The spinning record drifted about 2.5 px and was not round | Apple gives the artwork, its placeholder and the grid inside a fixed width of 54, and the turn's centre was an expression on the old size. The snippet sizes those three elements to the record, and `StepLoops` sets `CenterPoint` from `ActualSize` at each step |
+| The sidebar opened under the pointer with a slide and snapped shut | WinUI's SplitView folds in 119 ms against 349 to open, on an ease that does most of the move in the first frames, and Apple narrows its `Grid#PaneContentGrid` to 48 px the moment the pane closes (from no state Ampify can hold), so the fold slid its clip over an empty pane. Stretching the fold's key frames or holding `NotClosedCompact` and `ListSizeFull` changed nothing on screen. Ampify slides the SplitView's own `PaneClipRectangleTransform` while the pane is still open, to where the fold leaves it, then folds it without transitions (`SlideShut` in `src/win/sidebar_pane_dress.cpp`). Measured frame by frame with `PrintWindow` |
 
 ## Fonts and icons
 
