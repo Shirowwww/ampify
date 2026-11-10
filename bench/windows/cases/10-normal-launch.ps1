@@ -1,4 +1,4 @@
-# Step 3 of the M3 test: Apple Music started normally, without the launcher, does not load the kernel.
+# Apple Music started normally, without the launcher, does not load the kernel.
 
 Register-Case -Id 'normal-launch' -Title 'Apple Music started normally: no kernel' -Requires 'apple-music' -Action {
     param($Ctx)

@@ -30,8 +30,9 @@ if (-not (Test-Path -LiteralPath (Join-Path $gen 'winrt\Microsoft.UI.Xaml.h'))) 
 # 3. Configure once, then build what changed.
 # Ninja learns which headers a file includes from cl's "Note: including file:" lines, matched byte for byte against the
 # prefix CMake recorded when it configured. cl writes them in the console's code page, and a localized Visual Studio
-# puts non-ASCII characters in them: the OEM code page for every run (the one CMake reads them in), and a build folder
-# whose prefix differs from what cl writes now is configured again, or a changed header would rebuild nothing.
+# puts non-ASCII characters in them (a no-break space in French): UTF-8 for every run, since CMake 4.3 cannot configure
+# a new folder under the OEM code page (its try_compile writes no rules.ninja), and a build folder whose prefix differs
+# from what cl writes now is configured again, or a changed header would rebuild nothing.
 function Get-ShowIncludesPrefix {
     $probe = Join-Path $out 'showincludes.cpp'
     $answer = Join-Path $out 'showincludes.txt'
@@ -49,7 +50,7 @@ function Get-ShowIncludesPrefix {
 $build = Join-Path $out ($(if ($Bench) { 'bench' } else { 'release' }))
 $benchFlag = if ($Bench) { 'ON' } else { 'OFF' }
 $consoleEncoding = [Console]::OutputEncoding
-[Console]::OutputEncoding = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 try {
     $rules = Join-Path $build 'CMakeFiles\rules.ninja'
     $expected = Get-ShowIncludesPrefix

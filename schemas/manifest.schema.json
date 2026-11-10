@@ -44,6 +44,10 @@
       "pattern": "^[A-Za-z0-9_-]{1,32}$",
       "description": "Name of the colors.ini section used by default."
     },
+    "playbar": {
+      "enum": ["top", "bottom", "centred"],
+      "description": "For a theme: where the playback bar goes while the setting apple.playbar leaves it to the theme. Top when missing."
+    },
     "resources": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\.xaml$",
@@ -100,7 +104,7 @@
     "translations": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Name and description in the languages Ampify speaks (fr, de, es, pt, ru, ja, zh). Shown instead of the English ones when Windows is in that language.",
+      "description": "Name and description in the languages Ampify speaks (fr, de, es, pt, ru, ja, zh, it, ko). Shown instead of the English ones when Windows is in that language.",
       "properties": {
         "fr": {"$ref": "#/$defs/translation"},
         "de": {"$ref": "#/$defs/translation"},
@@ -108,7 +112,9 @@
         "pt": {"$ref": "#/$defs/translation"},
         "ru": {"$ref": "#/$defs/translation"},
         "ja": {"$ref": "#/$defs/translation"},
-        "zh": {"$ref": "#/$defs/translation"}
+        "zh": {"$ref": "#/$defs/translation"},
+        "it": {"$ref": "#/$defs/translation"},
+        "ko": {"$ref": "#/$defs/translation"}
       }
     },
     "translation": {

@@ -34,26 +34,22 @@ Register-Case -Id 'ui-hover-sidebar' -Title 'UI: the hover sidebar setting is kn
     }
 }
 
-Register-Case -Id 'ui-bar-position' -Title 'UI: Glass takes the playback bar at the top or at the bottom' -Requires 'kit:ui' -Action {
+Register-Case -Id 'ui-bar-position' -Title 'UI: the playback bar takes each place, for every theme' -Requires 'kit:ui' -Action {
     param($Ctx)
 
     $cli = Join-Path $script:BenchKitRoot 'ui\ampify.exe'
-    $glass = Join-Path $script:BenchKitRoot 'ui\themes\glass'
 
     $kit = New-UiTestKit
     try {
-        New-Item -ItemType Directory -Force -Path (Join-Path $kit 'themes') | Out-Null
-        Copy-Item -LiteralPath $glass -Destination (Join-Path $kit 'themes\glass') -Recurse
-
-        foreach ($position in @('Top', 'Bottom')) {
-            $out = @(& $cli --kit-dir $kit settings theme glass bar-position $position 2>&1)
+        foreach ($position in @('theme', 'top', 'bottom', 'centred')) {
+            $out = @(& $cli --kit-dir $kit config apple.playbar $position 2>&1)
             $code = $LASTEXITCODE
-            $read = (@(& $cli --kit-dir $kit settings theme glass 2>&1) | Out-String)
-            Add-Check -Ctx $Ctx -Name "bar-position takes $position" -Passed ($code -eq 0 -and $read -match "bar-position = $position") `
+            $read = (@(& $cli --kit-dir $kit config apple.playbar 2>&1) | Out-String).Trim()
+            Add-Check -Ctx $Ctx -Name "apple.playbar takes $position" -Passed ($code -eq 0 -and $read -eq $position) `
                 -Detail "$($out -join ' | ')"
         }
 
-        $refused = @(& $cli --kit-dir $kit settings theme glass bar-position Sideways 2>&1)
+        $refused = @(& $cli --kit-dir $kit config apple.playbar sideways 2>&1)
         $refusedCode = $LASTEXITCODE
         Add-Check -Ctx $Ctx -Name 'a position off the list is refused' -Passed ($refusedCode -ne 0) -Detail "$($refused -join ' | ')"
     } finally {
@@ -61,30 +57,30 @@ Register-Case -Id 'ui-bar-position' -Title 'UI: Glass takes the playback bar at 
     }
 }
 
-Register-Case -Id 'ui-compact-sidebar' -Title 'UI: the Compact sidebar snippet is a valid element' -Requires 'kit:ui' -Action {
+Register-Case -Id 'ui-compact-sidebar' -Title 'UI: the Sidebar style snippet is a valid element' -Requires 'kit:ui' -Action {
     param($Ctx)
 
     $cli = Join-Path $script:BenchKitRoot 'ui\ampify.exe'
-    $snippet = Join-Path $script:BenchKitRoot 'ui\themes\snippets\compact-sidebar'
+    $snippet = Join-Path $script:BenchKitRoot 'ui\themes\snippets\sidebar-style'
 
     $out = @(& $cli validate $snippet 2>&1)
     $code = $LASTEXITCODE
-    Add-Check -Ctx $Ctx -Name 'compact-sidebar: manifest valid' -Passed ($code -eq 0) -Detail "$($out -join ' | ')"
+    Add-Check -Ctx $Ctx -Name 'sidebar-style: manifest valid' -Passed ($code -eq 0) -Detail "$($out -join ' | ')"
     $css = Join-Path $snippet 'user.css'
     $named = (Test-Path -LiteralPath $css) -and ((Get-Content -LiteralPath $css -Raw -Encoding UTF8) -match '\.sidebar-entry')
-    Add-Check -Ctx $Ctx -Name 'compact-sidebar: names the Ampify entries (.sidebar-entry)' -Passed $named
+    Add-Check -Ctx $Ctx -Name 'sidebar-style: names the Ampify entries (.sidebar-entry)' -Passed $named
 }
 
-Register-Case -Id 'ui-current-lyrics' -Title 'UI: Lyrics spotlight styles the line being sung (:current)' -Requires 'kit:ui' -Action {
+Register-Case -Id 'ui-current-lyrics' -Title 'UI: Lyrics style styles the line being sung (:current)' -Requires 'kit:ui' -Action {
     param($Ctx)
 
     $cli = Join-Path $script:BenchKitRoot 'ui\ampify.exe'
-    $snippet = Join-Path $script:BenchKitRoot 'ui\themes\snippets\lyrics-spotlight'
+    $snippet = Join-Path $script:BenchKitRoot 'ui\themes\snippets\lyrics-style'
 
     $out = @(& $cli validate $snippet 2>&1)
     $code = $LASTEXITCODE
-    Add-Check -Ctx $Ctx -Name 'lyrics-spotlight: manifest valid' -Passed ($code -eq 0) -Detail "$($out -join ' | ')"
+    Add-Check -Ctx $Ctx -Name 'lyrics-style: manifest valid' -Passed ($code -eq 0) -Detail "$($out -join ' | ')"
     $css = Join-Path $snippet 'user.css'
     $current = (Test-Path -LiteralPath $css) -and ((Get-Content -LiteralPath $css -Raw -Encoding UTF8) -match '\.lyrics-line-content:current')
-    Add-Check -Ctx $Ctx -Name 'lyrics-spotlight: styles the line being sung with :current' -Passed $current
+    Add-Check -Ctx $Ctx -Name 'lyrics-style: styles the line being sung with :current' -Passed $current
 }

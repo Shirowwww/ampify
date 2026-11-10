@@ -1,4 +1,4 @@
-# Step 4 of the M3 test: after two launches without an answer, the launcher starts Apple Music without the kernel, then resets the counter.
+# After two launches without an answer, the launcher starts Apple Music without the kernel, then resets the counter.
 
 Register-Case -Id 'safe-mode' -Title 'Safe mode: after two failures, Apple Music starts without the kernel' -Requires 'apple-music', 'kit:bench' -Action {
     param($Ctx)

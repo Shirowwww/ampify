@@ -102,8 +102,6 @@ test("hello-extension declares exactly the permissions its code uses", () => {
   for (const permission of declared) assert.ok(needed.includes(permission), `permission inutile : ${permission}`);
 });
 
-// ---- Example of the audio API: the sound is read, never changed ---------------------------------------------------
-
 test("audio-meter logs the peak about once a second and reads loudness", () => {
   const { manifest, source } = load("audio-meter");
   const frames = [];
@@ -127,8 +125,6 @@ test("audio-meter declares exactly the permission its code uses", () => {
   assert.ok(/Ampify\.audio\./.test(source));
 });
 
-// ---- Examples of the kit services: Discord and Last.fm -----------------------------------------------------------
-
 // A fuller stand-in: player events, a clock, timers, config, POST, MD5, output files, a panel and the i18n texts.
 // Every service checks the permission the kernel checks.
 function serviceAmpify(manifest, { config = {}, storage = new Map(), state = null, language = "en" } = {}) {
@@ -141,6 +137,7 @@ function serviceAmpify(manifest, { config = {}, storage = new Map(), state = nul
     logs: [],
     posts: [],
     postStatus: 200,
+    postRejects: 0,  // the next posts Ampify refuses, as with too many requests in flight
     answers: {},
     opened: [],
     gets: [],
@@ -217,6 +214,10 @@ function serviceAmpify(manifest, { config = {}, storage = new Map(), state = nul
       post: (url, body) => {
         need(`network:${new URL(url).host}`);
         world.posts.push({ url, body });
+        if (world.postRejects > 0) {
+          world.postRejects--;
+          return Promise.reject(new RangeError("too many requests in flight (4 at most)"));
+        }
         // world.answers: the answers of a Last.fm method, given in turn, the last one kept.
         const queue = world.answers[new URLSearchParams(body).get("method")];
         const answer = queue ? (queue.length > 1 ? queue.shift() : queue[0]) : { status: world.postStatus, text: "{}" };
@@ -353,6 +354,7 @@ test("discord-presence does not take a longer title for the one playing", async 
   fake.world.getAnswer = () => ({ status: 200, text: JSON.stringify({ results: [other] }) });
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "Air", "Artist"), 200_000));
+  fake.runTimeouts();
   await settle();
   assert.ok(fake.world.activities.at(-1).buttons.every((button) => button.label !== "Other platforms"));
 });
@@ -362,6 +364,7 @@ test("discord-presence leaves out a button whose link is too long for Discord", 
   const fake = serviceAmpify(manifest, { config: { "button-1": "YouTube Music", "button-2": "Spotify" } });
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "é".repeat(120), "Artist"), 200_000));
+  fake.runTimeouts();
   assert.deepEqual(fake.world.activities.at(-1).buttons, []);
 });
 
@@ -391,19 +394,19 @@ test("discord-presence shows what is playing as Listening, with the catalog's co
   assert.equal(fake.world.cleared, 1);  // nothing playing at start
 
   fake.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000, 20_000));
-  const first = fake.world.activities.at(-1);
-  assert.equal(first.type, "listening");
-  assert.equal(first.statusDisplay, "state");
-  assert.equal(first.details, "Title");
-  assert.equal(first.state, "Artist");
-  assert.equal(first.largeText, "Album");
-  assert.equal(first.largeImage, "ampify");  // the cover comes once the catalog answers
-  assert.equal(first.startMs, fake.world.now - 20_000);
-  assert.equal(first.endMs - first.startMs, 200_000);
+  assert.equal(fake.world.activities.length, 0, "Discord waits a moment for the cover");
 
   await settle();
   assert.match(searches(fake.world)[0], /^https:\/\/itunes\.apple\.com\/search\?.*term=Artist%20Title/);
+  assert.equal(fake.world.activities.length, 1, "the first status already has the cover");
   const shown = fake.world.activities.at(-1);
+  assert.equal(shown.type, "listening");
+  assert.equal(shown.statusDisplay, "state");
+  assert.equal(shown.details, "Title");
+  assert.equal(shown.state, "Artist");
+  assert.equal(shown.largeText, "Album");
+  assert.equal(shown.startMs, fake.world.now - 20_000);
+  assert.equal(shown.endMs - shown.startMs, 200_000);
   assert.equal(shown.largeImage, "https://is1-ssl.mzstatic.com/image/thumb/a/600x600bb.jpg");
   assert.equal(shown.detailsUrl, "https://music.apple.com/us/album/album/1?i=42");
   assert.equal(shown.stateUrl, "https://music.apple.com/us/artist/artist/7");
@@ -417,6 +420,18 @@ test("discord-presence shows what is playing as Listening, with the catalog's co
   assert.equal(fake.world.cleared, 2);
   fake.world.stops.forEach((fn) => fn());
   assert.equal(fake.world.cleared, 3);
+});
+
+test("discord-presence shows the logo when the cover is slow to come, then the cover", async () => {
+  const { manifest, source } = load("discord-presence");
+  const fake = serviceAmpify(manifest);
+  fake.world.getAnswer = () => itunes();
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000));
+  fake.runTimeouts();  // the search has not answered yet
+  assert.equal(fake.world.activities.at(-1).largeImage, "ampify");
+  await settle();
+  assert.equal(fake.world.activities.at(-1).largeImage, "https://is1-ssl.mzstatic.com/image/thumb/a/600x600bb.jpg");
 });
 
 test("discord-presence asks the catalog once per track, even after a restart", async () => {
@@ -446,14 +461,14 @@ test("discord-presence shows a file of your own with its cover, shared for two m
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "Demo take", "My Band"), 200_000));
   await settle();
+  fake.runTimeouts();
   const before = fake.world.activities.at(-1);
-  assert.equal(before.largeImage, "ampify");  // until the cover is on the web
+  assert.equal(before.largeImage, "ampify");  // the wait is over, the cover not on the web yet
   assert.deepEqual(before.buttons, [
     { label: "Listen on Apple Music", url: "https://music.apple.com/search?term=My%20Band%20Demo%20take" },
     { label: "Find on YouTube Music", url: "https://music.youtube.com/search?q=My%20Band%20Demo%20take" },
   ]);
 
-  fake.runTimeouts();
   await settle();
   assert.equal(fake.world.forms.length, 1);
   assert.equal(fake.world.forms[0].url, "https://x0.at/");
@@ -620,7 +635,7 @@ test("discord-presence shows the album's motion artwork as a GIF made on this PC
   // The smallest H.264 variant of at least 200 pixels, its file read whole.
   assert.deepEqual(fake.world.gifs, [{
     url: "https://mvod.itunes.apple.com/itunes-assets/HLSMusic116/v4/7e/P1_video_sdr_360x360-.mp4",
-    options: { side: 200, fps: 10, seconds: 30 },
+    options: { side: 200, fps: 15, seconds: 20 },
   }]);
   assert.deepEqual(fake.world.forms[0].fields, {
     file: { filename: "cover.gif", type: "image/gif", base64: "R0lGODlh" }, id_length: "16",
@@ -646,7 +661,9 @@ test("discord-presence makes a lighter GIF when a busy video's would be too big,
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "FE!N", "Travis Scott", "UTOPIA"), 200_000));
   for (let i = 0; i < 10; i++) await settle();
-  assert.deepEqual(fake.world.gifs.map((gif) => gif.options), [{ side: 200, fps: 10, seconds: 30 }, { side: 160, fps: 8, seconds: 20 }]);
+  assert.deepEqual(fake.world.gifs.map((gif) => gif.options), [
+    { side: 200, fps: 15, seconds: 20 }, { side: 200, fps: 10, seconds: 20 }, { side: 160, fps: 8, seconds: 20 },
+  ]);
   assert.equal(fake.world.activities.at(-1).largeImage, "https://x0.at/gif0123456789abcd.gif");
 
   const broken = serviceAmpify(manifest, { config: { "animated-covers": true } });
@@ -829,6 +846,7 @@ test("discord-presence needs nothing set: it goes through Ampify's Discord appli
   const fake = serviceAmpify(manifest, { language: "en" });
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "Title", "Artist"), 200_000));
+  fake.runTimeouts();
   assert.equal(fake.world.activities.at(-1).clientId, "1566762712413904957");
 });
 
@@ -837,6 +855,7 @@ test("discord-presence speaks French on a French Windows", () => {
   const fake = serviceAmpify(manifest, { language: "fr" });
   runIn(source, fake.context);
   fake.emit("trackchange", playing(song("1", "", "Artiste"), 200_000));
+  fake.runTimeouts();
   assert.equal(fake.world.activities.at(-1).details, "Titre inconnu");
   assert.equal(fake.world.activities.at(-1).buttons[0].label, "Écouter sur Apple Music");
 });
@@ -885,6 +904,22 @@ test("scrobbler keeps a refused listen for later", async () => {
   await settle();
   assert.equal(fake.storage.get("pending").length, 1);
   assert.match(fake.world.logs.at(-1), /trying again/);
+});
+
+test("scrobbler sends again after Ampify refused a request", async () => {
+  const { manifest, source } = load("scrobbler");
+  const fake = serviceAmpify(manifest, { config: { apiKey: "k", apiSecret: "s", sessionKey: "x" } });
+  runIn(source, fake.context);
+  fake.emit("trackchange", playing(song("1", "Title", "Artist"), 600_000));
+  await settle();
+  fake.world.postRejects = 1;
+  fake.tick(240_000);
+  await settle();
+  assert.equal(fake.storage.get("pending").length, 1);
+  fake.emit("trackchange", playing(song("2", "Next", "Artist"), 600_000));
+  fake.tick(240_000);
+  await settle();
+  assert.deepEqual(fake.storage.get("pending"), []);
 });
 
 const lastfm = (value) => ({ status: 200, text: JSON.stringify(value) });
@@ -1219,6 +1254,59 @@ test("listening-stats says when Apple Music's library cannot be read, and reads 
   assert.ok(!shown.includes("Nothing yet: songs count after 30 seconds of listening."), "not the empty page of a new install");
 });
 
+test("listening-stats opens the page of the very song, never another one of the same name", async () => {
+  const { manifest, source } = load("listening-stats");
+  const granted = new Set(manifest.permissions ?? []);
+  const asked = [];
+  const hit = (artistName, id) => ({
+    trackName: "Capuche", artistName, collectionName: "Album " + id,
+    artworkUrl100: `https://is1-ssl.mzstatic.com/image/thumb/${id}/100x100bb.jpg`,
+    trackViewUrl: `https://music.apple.com/fr/album/a/${id}?i=1`, collectionViewUrl: `https://music.apple.com/fr/album/a/${id}`,
+    artistViewUrl: `https://music.apple.com/fr/artist/b/${id}`,
+  });
+  const Ampify = {
+    React: { h: (type, props, ...children) => ({ type, props: props ?? {}, children }), useState: (v) => [v, () => {}], useEffect: () => {} },
+    ReactDOM: { render: () => {} },
+    components: { Button: "Button", Card: "Card", Dropdown: "Dropdown", Text: "Text" },
+    i18n: fakeI18n("fr"),
+    storage: { get: (key, fallback) => fallback, set: () => {} },
+    http: {
+      get: (url) => {
+        if (!granted.has("network:" + new URL(url).host)) throw new Error("PermissionDenied");
+        asked.push(url);
+        return Promise.resolve({ status: 200, text: JSON.stringify({ results: [hit("Someone Else", 7), hit("Zola & Ninho", 8)] }) });
+      },
+    },
+    player: { state: () => null, on: () => {} },
+    ui: { sidebar: { addItem: () => {} }, navigate: () => {} },
+    onStop: () => {},
+  };
+  const context = { Ampify, setInterval: () => 0, clearInterval: () => {} };
+  runIn(source, context);
+
+  const found = await context.findOnAppleMusic({ kind: "song", name: "Capuche", artist: "Ninho" });
+  assert.match(asked[0], /limit=25/);
+  const plainCopy = (value) => JSON.parse(JSON.stringify(value));  // the script's objects come from another realm
+  assert.deepEqual(plainCopy(found), {
+    cover: "https://is1-ssl.mzstatic.com/image/thumb/8/600x600bb.jpg",
+    song: "https://music.apple.com/fr/album/a/8?i=1",
+    album: "https://music.apple.com/fr/album/a/8",
+    artist: "https://music.apple.com/fr/artist/b/8",
+  }, "the song by its artist, credited with another, and a sharp cover");
+  assert.equal(await context.findOnAppleMusic({ kind: "song", name: "Capuche", artist: "Nobody" }), null,
+    "no hit by that artist: no cover rather than another song's");
+  const songs = [{ title: "Perfect", artist: "Ed Sheeran", album: "÷" }, { title: "Shape", artist: "Ed Sheeran", album: "+" }];
+  assert.equal(context.songsOf({ kind: "album", name: "÷" }, songs).length, 1,
+    "an album named with a sign only keeps its songs, and only its own");
+
+  const day = new Date(2026, 10, 9).getTime();
+  assert.equal(context.dateOf(day), "09/11/2026");
+  assert.deepEqual(plainCopy(context.datesOf([{ first: day, last: day + 5 }], { last: day + 9, added: 1 })),
+    { first: day, added: 0, last: day + 9 });
+  assert.deepEqual(plainCopy(context.datesOf([{}], { last: 0, added: day })), { first: 0, added: day, last: 0 },
+    "counted before first listens were kept: the day it joined the library");
+});
+
 // ---- Sleep timer and keyboard shortcuts ---------------------------------------------------------------------------
 
 // Runs an example with a player that records its commands, the timers it sets and its notifications.
@@ -1321,8 +1409,6 @@ test("copy-link copies what plays now with its time, and nothing without a track
   assert.deepEqual(idle.copied, []);
 });
 
-// ---- The Marketplace page ----------------------------------------------------------------------------------------
-
 // A small stand-in for Ampify.React: function components render depth-first with their hooks kept by their place in
 // the tree, a state change renders the whole page again, and host elements come out as plain nodes. An effect's
 // cleanup runs when its component is no longer drawn.
@@ -1416,6 +1502,7 @@ function fakeMarketplace({ catalog = [], installed = [], theme = "", failures = 
     remove: ([id]) => { world.state.installed = world.state.installed.filter((item) => item.id !== id); },
     extension: ([action, id]) => { copyOf(id).enabled = action === "enable"; },
     snippet: ([action, id]) => { copyOf(id).enabled = action === "enable"; },
+    app: ([action, id]) => { copyOf(id).enabled = action === "enable"; },
     theme: ([action, id, , scheme]) => Object.assign(world.state, { theme: action === "set" ? id : "", scheme: scheme || "" }),
   };
   const h = react.React.h;
@@ -1538,32 +1625,31 @@ test("the Marketplace takes the installed copy's translation when the catalog ha
   assert.ok(textsOf(card).includes("Un test en français."));
 });
 
-test("the Marketplace installs an element with permissions off, then turns it on from its detail view", async () => {
+test("Install on a card of an element with permissions opens its detail view, whose Install also turns it on", async () => {
   const { world, page } = fakeMarketplace({ catalog: [marketEntry("demo", "extension", ["storage"])] });
   await settle();
   buttonIn(page.tree, "Extensions").onClick();
-  buttonIn(cardOf(page, "Demo"), "Install").onClick();
-  await settle();
-  assert.deepEqual(world.commands, ["install demo --yes"], "installed, not turned on");
+  buttonIn(cardOf(page, "Demo"), "Install…").onClick();
+  assert.deepEqual(world.commands, [], "nothing runs before the permissions are shown");
   assert.deepEqual(abilitiesOf(page), ["• keep its settings"], "the detail view lists the permissions");
-  assert.ok(textsOf(page.tree).includes("Demo installed. Read what it can do, then turn it on."));
 
-  buttonIn(page.tree, "Turn on").onClick();
+  buttonIn(page.tree, "Install").onClick();
   await settle();
   assert.deepEqual(world.commands, ["install demo --yes", "extension enable demo"]);
   assert.equal(world.state.installed[0].enabled, true);
+  assert.ok(textsOf(page.tree).includes("Demo installed and on"));
+  buttonIn(page.tree, "Turn off");
 });
 
-test("installing from a card opens the detail view even after that element's page was left", async () => {
+test("Install on a card opens the detail view even after that element's page was left", async () => {
   const { world, page, back } = fakeMarketplace({ catalog: [marketEntry("demo", "extension", ["storage"])] });
   await settle();
   buttonIn(page.tree, "Extensions").onClick();
   buttonIn(cardOf(page, "Demo"), "Details").onClick();
   back();
   await settle();
-  buttonIn(cardOf(page, "Demo"), "Install").onClick();
-  await settle();
-  assert.deepEqual(world.commands, ["install demo --yes"]);
+  buttonIn(cardOf(page, "Demo"), "Install…").onClick();
+  assert.deepEqual(world.commands, []);
   assert.deepEqual(abilitiesOf(page), ["• keep its settings"], "the detail view lists the permissions");
 });
 
@@ -1575,6 +1661,65 @@ test("the Marketplace installs and uses a theme without permissions in one click
   assert.deepEqual(world.commands, ["install night --yes", "theme set night"]);
   assert.ok(textsOf(page.tree).includes("Night installed and in use"));
   buttonIn(cardOf(page, "Night"), "Turn off");
+});
+
+test("Install puts a theme with permissions in use and turns an app on, from the detail view", async () => {
+  const { world, page, back } = fakeMarketplace({
+    catalog: [marketEntry("glow", "theme", ["player.read"]), marketEntry("stats", "app", ["library.read"])],
+  });
+  await settle();
+  buttonIn(cardOf(page, "Glow"), "Install…").onClick();
+  buttonIn(page.tree, "Install").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["install glow --yes", "theme set glow"]);
+  assert.equal(world.state.theme, "glow");
+  back();
+  await settle();
+
+  buttonIn(page.tree, "Apps").onClick();
+  buttonIn(cardOf(page, "Stats"), "Install…").onClick();
+  buttonIn(page.tree, "Install").onClick();
+  await settle();
+  assert.deepEqual(world.commands.slice(2), ["install stats --yes", "app enable stats"]);
+  assert.ok(textsOf(page.tree).includes("Stats installed and on"));
+});
+
+test("a failed install turns nothing on and says ampify's error", async () => {
+  const { world, page } = fakeMarketplace({
+    catalog: [marketEntry("compact", "snippet")],
+    failures: { "install compact --yes": "SHA-256 differs from the catalog's: archive refused" },
+  });
+  await settle();
+  buttonIn(page.tree, "Snippets").onClick();
+  buttonIn(cardOf(page, "Compact"), "Install").onClick();
+  await settle();
+  assert.deepEqual(world.commands, ["install compact --yes"], "no enable after a failed install");
+  assert.ok(textsOf(page.tree).includes("ampify: SHA-256 differs from the catalog's: archive refused"));
+});
+
+test("examples tagged developer live in the Developers tab, not in the list of their kind", async () => {
+  const example = { ...marketEntry("hello", "extension"), tags: ["example", "developer"] };
+  const { page } = fakeMarketplace({ catalog: [example, marketEntry("timer", "extension")],
+                                     installed: [marketCopy("hello", "extension", [], { tags: ["example", "developer"] })] });
+  await settle();
+  buttonIn(page.tree, "Extensions").onClick();
+  assert.ok(cardOf(page, "Timer"));
+  assert.ok(!cardOf(page, "Hello"), "the example has left the extensions");
+
+  buttonIn(page.tree, "Developers").onClick();
+  assert.ok(cardOf(page, "Hello"));
+  assert.ok(!cardOf(page, "Timer"), "only the examples");
+  assert.ok(textsOf(page.tree).some((text) => text.startsWith("Examples for people who make extensions")));
+
+  buttonIn(page.tree, "Installed").onClick();
+  assert.ok(cardOf(page, "Hello"), "an installed example is still listed with what is installed");
+});
+
+test("the Developers tab says so when the catalog has no example", async () => {
+  const { page } = fakeMarketplace({ catalog: [marketEntry("timer", "extension")] });
+  await settle();
+  buttonIn(page.tree, "Developers").onClick();
+  assert.ok(textsOf(page.tree).includes("No example for developers in the catalog yet."));
 });
 
 test("on a card, an action that grants permissions opens the detail view instead of acting", async () => {
@@ -1884,8 +2029,6 @@ test("Refresh shows the catalog's warning instead of clearing it", async () => {
   assert.ok(textsOf(page.tree).includes("ampify: catalog unreachable, cached copy used"));
 });
 
-// ---- The React panel example -------------------------------------------------------------------------------------
-
 function reactPanel(language) {
   const react = fakeReact();
   const h = react.React.h;
@@ -1933,7 +2076,9 @@ function uiPalette(language) {
                onClick: () => props.onChange(option.value) })));
   const Menu = (props) => h("menu", { label: props.label }, props.items.map((item) =>
     h("item", { label: item.label, disabled: item.disabled === true, onClick: item.onClick })));
-  const components = { Card: host("card"), Button: host("button"), Text: host("text"), Grid: host("grid"), Tabs, Menu };
+  const components = { Card: host("card"), Button: host("button"), Text: host("text"), Grid: host("grid"), Tabs, Menu,
+                       Checkbox: host("checkbox"), ProgressBar: host("progress"), Spinner: host("spinner"),
+                       Divider: host("divider") };
   const Ampify = {
     React: react.React,
     components,
@@ -1964,6 +2109,28 @@ test("ui-palette switches to its menu tab and resets the cells from the More fly
   allNodes(page.tree).find((node) => node.type === "item" && node.label === "Reset the cells").onClick();
   allNodes(page.tree).find((node) => node.type === "tab" && node.label === "Grid").onClick();
   assert.ok(buttonIn(page.tree, "Cell 1: 0"), "the reset put the count back to zero");
+});
+
+test("ui-palette shows a check box, a spinner, progress, a divider and a greyed button on its controls tab", () => {
+  const page = uiPalette("en");
+  const nodes = () => allNodes(page.tree);
+  const tab = (label) => nodes().find((node) => node.type === "tab" && node.label === label);
+  buttonIn(page.tree, "Cell 1: 0").onClick();
+  tab("Controls").onClick();
+  assert.ok(tab("Controls").selected, "the tab that is on is the selected one");
+  const busy = nodes().find((node) => node.type === "checkbox" && node.label === "Busy");
+  assert.equal(busy.checked, true, "the check box starts checked");
+  assert.ok(nodes().some((node) => node.type === "spinner"), "busy: a spinner turns");
+  assert.ok(nodes().some((node) => node.type === "progress" && node.value === undefined), "busy: the bar moves by itself");
+  assert.ok(nodes().some((node) => node.type === "divider"));
+  assert.equal(buttonIn(page.tree, "Reset the cells").disabled, false, "a cell was clicked, so the reset is on");
+  busy.onChange(false);
+  assert.ok(!nodes().some((node) => node.type === "spinner"));
+  const bar = nodes().find((node) => node.type === "progress");
+  assert.equal(bar.value, 1, "the bar counts the clicks");
+  assert.equal(bar.max, 10);
+  buttonIn(page.tree, "Reset the cells").onClick();
+  assert.equal(buttonIn(page.tree, "Reset the cells").disabled, true, "nothing to reset: the button is greyed");
 });
 
 // A player whose position the test moves, with a clock the test advances: setInterval and setTimeout both run on it.
@@ -2061,8 +2228,6 @@ test("playback-guard leaves a paused song, a loading song and a song it already 
   assert.equal(world.commands.filter((name) => name === "next").length, 2, "two repairs, then the song is left alone");
 });
 
-// ---- skip-list and new-releases ---------------------------------------------------------------------------------
-
 // One stand-in for the player, the playback bar, menus, the sidebar, the panel, http and timers. `used` collects each
 // permission the script really asked for, to compare with the manifest.
 function featureAmpify(name, { config = {}, storage = new Map(), language = "en", state = null, locale = "en-US" } = {}) {
@@ -2080,6 +2245,7 @@ function featureAmpify(name, { config = {}, storage = new Map(), language = "en"
     logs: [], commands: [], buttons: [], menus: [], labels: [], sidebar: [], navigated: [], opened: [], gets: [],
     intervals: [], stops: [], handlers: { trackchange: [], statechange: [] }, target: "", inFlight: 0, maxInFlight: 0,
     active: new Map(),
+    marks: new Map(),
     getAnswer: () => ({ status: 0, text: "" }),
     queue: { available: true, complete: true, items: [] },  // null: queue.list() throws
     state: state ?? { playing: false, positionMs: 0, durationMs: 0, track: null },
@@ -2112,7 +2278,10 @@ function featureAmpify(name, { config = {}, storage = new Map(), language = "en"
     },
     ui: {
       menu: { addItem: (kind, item) => (need("ui.menu"), world.menus.push({ kind, ...item })) },
-      playbar: { addButton: (button) => (need("ui.playbar"), world.buttons.push(button), world.buttons.length) },
+      playbar: {
+        addButton: (button) => (need("ui.playbar"), world.buttons.push(button), world.buttons.length),
+        mark: (id, from, to) => (need("ui.playbar"), world.marks.set(id, [from, to]), true),
+      },
       setLabel: (id, label) => (need("ui.playbar"), world.labels.push([id, label])),
       setActive: (id, on) => (need("ui.playbar"), world.active.set(id, on)),
       sidebar: { addItem: (item) => (need("ui.sidebar"), world.sidebar.push(item)) },
@@ -2475,7 +2644,7 @@ test("skip-list's panel stays under the interface's 300 nodes with a full list, 
   for (const text of textsOf(fake.react.page.tree)) assert.ok(text.length <= 500);
 });
 
-test("skip-list has every new string in all eight languages, and a new version", () => {
+test("skip-list has every new string in all ten languages, and a new version", () => {
   const fake = featureAmpify("skip-list");
   const { tables } = fake.context.Ampify.i18n;
   const english = Object.keys(tables.en).sort();
@@ -2483,11 +2652,9 @@ test("skip-list has every new string in all eight languages, and a new version",
     assert.deepEqual(Object.keys(tables[code]).sort(), english, code);
     for (const key of ["export", "import", "merge", "added", "invalid"]) assert.notEqual(tables[code][key], tables.en[key], `${code}.${key}`);
   }
-  assert.equal(fake.manifest.version, "1.1.0");
+  assert.equal(fake.manifest.version, "1.1.1");
   for (const code of languages) assert.ok(fake.manifest.translations[code].description.length > 20);
 });
-
-// ---- bookmarks ---------------------------------------------------------------------------------------------------
 
 const withoutDate = (list) => list.map(({ added, ...rest }) => (assert.equal(typeof added, "number"), rest));
 const rowWith = (tree, text) =>
@@ -2626,10 +2793,11 @@ test("bookmarks' panel stays under 300 nodes, speaks French, and declares exactl
   assert.deepEqual(fake.world.commands, ["seek 1000"]);
   assert.equal(fake.world.opened.length, 1);
   assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
-  assert.equal(fake.manifest.version, "1.0.0");
+  assert.equal(fake.world.menus.find((menu) => menu.kind === "app").icon, "", "the list has the bar's icon");
+  assert.equal(fake.manifest.version, "1.0.1");
 });
 
-test("bookmarks has every string in all eight languages", () => {
+test("bookmarks has every string in all ten languages", () => {
   const fake = featureAmpify("bookmarks");
   const { tables } = fake.context.Ampify.i18n;
   for (const code of languages) {
@@ -2816,8 +2984,6 @@ test("new-releases keeps a few requests in flight and declares exactly the permi
   assert.deepEqual([...single.used].sort(), declared(single.manifest));
 });
 
-// ---- ab-loop -----------------------------------------------------------------------------------------------------
-
 const at = (positionMs, track = song("1", "Riff", "Band"), isPlaying = true) =>
   ({ ...playing(track, 200_000, positionMs), playing: isPlaying });
 
@@ -2832,6 +2998,7 @@ test("ab-loop marks a start, then an end, and goes back to the start at the end"
   button.onClick();
   assert.deepEqual(fake.world.labels.at(-1), [1, "Loop from 0:30: mark the end"]);
   assert.equal(fake.world.active.get(1), true);
+  assert.deepEqual(fake.world.marks.get(1), [0.15, undefined], "A shows on the line");
   fake.emit("statechange", at(30_400));
   button.onClick();
   assert.equal(fake.world.intervals.length, 0, "under a second: the end is not taken");
@@ -2839,6 +3006,7 @@ test("ab-loop marks a start, then an end, and goes back to the start at the end"
   fake.emit("statechange", at(45_000));
   button.onClick();
   assert.deepEqual(fake.world.labels.at(-1), [1, "Looping 0:30 to 0:45: stop"]);
+  assert.deepEqual(fake.world.marks.get(1), [0.15, 0.225], "A, B and the passage show on the line");
   fake.emit("statechange", at(44_000));
   fake.tick();
   assert.deepEqual(fake.world.commands, []);
@@ -2852,6 +3020,7 @@ test("ab-loop marks a start, then an end, and goes back to the start at the end"
   button.onClick();
   assert.deepEqual(fake.world.labels.at(-1), [1, "Loop: mark the start"]);
   assert.equal(fake.world.active.get(1), false);
+  assert.deepEqual(fake.world.marks.get(1), [undefined, undefined], "the line is clear again");
   assert.equal(fake.world.intervals[0].cleared, true);
 });
 

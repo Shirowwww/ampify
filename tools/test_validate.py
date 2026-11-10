@@ -123,6 +123,29 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("required field missing: sha256", text)
 
+    def test_newer_versions_with_their_minimum_ampify_pass(self):
+        later = entry(version="1.1.0", minAmpify="1.3.0", url="https://example.com/demo-ext-1.1.0.zip")
+        code, text = self.write([entry(newer=[later])])
+        self.assertEqual(code, 0, text)
+
+    def test_newer_version_must_be_the_same_element_and_higher(self):
+        for later, field in ((entry(id="other", version="1.1.0", minAmpify="1.3.0"), "newer[0].id"),
+                             (entry(author="someone", version="1.1.0", minAmpify="1.3.0"), "newer[0].author"),
+                             (entry(version="1.0.0", minAmpify="1.3.0"), "newer[0].version"),
+                             (entry(version="1.1.0"), "newer[0].minAmpify"),
+                             (entry(version="1.1.0", minAmpify="1.3"), "newer[0].minAmpify"),
+                             (entry(version="1.1.0", minAmpify="1.3.0", newer=[]), "newer[0].newer")):
+            with self.subTest(field=field):
+                code, text = self.write([entry(newer=[later])])
+                self.assertEqual(code, 1, text)
+                self.assertIn(f"extensions[0].{field}", text)
+
+    def test_two_newer_items_cannot_share_a_version(self):
+        later = entry(version="1.1.0", minAmpify="1.3.0")
+        code, text = self.write([entry(newer=[later, dict(later)])])
+        self.assertEqual(code, 1)
+        self.assertIn("extensions[0].newer[1].version", text)
+
     def test_catalog_version_must_be_one(self):
         code, text = self.write([], catalogVersion=2)
         self.assertEqual(code, 1)
@@ -156,7 +179,7 @@ class CatalogTests(unittest.TestCase):
 
     def test_bad_translations_are_refused(self):
         cases = {
-            "unknown language": {"it": {"name": "Demo", "description": "Test."}},
+            "unknown language": {"sv": {"name": "Demo", "description": "Test."}},
             "missing description": {"fr": {"name": "Démo"}},
             "empty name": {"fr": {"name": "", "description": "Test."}},
             "name too long": {"fr": {"name": "a" * 61, "description": "Test."}},
@@ -302,7 +325,7 @@ class ManifestTests(unittest.TestCase):
 
     def test_bad_translations_are_refused(self):
         cases = {
-            "unknown language": {"it": {"name": "Demo", "description": "Test."}},
+            "unknown language": {"sv": {"name": "Demo", "description": "Test."}},
 
             "missing name": {"fr": {"description": "Test."}},
             "description too long": {"fr": {"name": "Démo", "description": "a" * 301}},
@@ -640,7 +663,7 @@ class SchemaSubsetTests(unittest.TestCase):
 
 
 class SnippetContentTests(unittest.TestCase):
-    """Every snippet of the repository: its texts in the eight languages and the element names it uses."""
+    """Every snippet of the repository: its texts in the ten languages and the element names it uses."""
 
     SNIPPETS = os.path.join(REPO, "themes", "snippets")
 
@@ -661,7 +684,7 @@ class SnippetContentTests(unittest.TestCase):
         return [os.path.join(self.SNIPPETS, name) for name in sorted(os.listdir(self.SNIPPETS))
                 if os.path.isfile(os.path.join(self.SNIPPETS, name, "manifest.json"))]
 
-    def test_every_snippet_has_all_eight_languages(self):
+    def test_every_snippet_has_all_ten_languages(self):
         for folder in self.snippet_folders():
             with open(os.path.join(folder, "manifest.json"), encoding="utf-8") as handle:
                 data = json.load(handle)

@@ -138,13 +138,31 @@ def catalog_entry(manifest, url, sha256, preview=None):
     return entry
 
 
-def update_catalog(catalog_path, entry):
-    """Adds or replaces the entry. The new catalog is checked beside the old one and replaces it only when valid."""
+def place_entry(entries, entry, min_ampify):
+    """Without min_ampify, the version replaces the entry (its newer list stays). With it, a first version becomes the
+    entry and a later one goes to the entry's newer list: Ampify 1.2.1 and older read only the entry, so it keeps the
+    version they take."""
+    if min_ampify:
+        entry = dict(entry, minAmpify=min_ampify)
+    current = next((item for item in entries if item["id"] == entry["id"]), None)
+    if current is None:
+        entries.append(entry)
+    elif min_ampify:
+        newer = [item for item in current.get("newer", []) if item["version"] != entry["version"]] + [entry]
+        current["newer"] = sorted(newer, key=lambda item: validate.version_key(item["version"]))
+    else:
+        if "newer" in current:
+            entry = dict(entry, newer=current["newer"])
+        entries[entries.index(current)] = entry
+    entries.sort(key=lambda item: item["id"])
+
+
+def update_catalog(catalog_path, entry, min_ampify=None):
+    """Adds the version to the catalog (see place_entry). The new catalog is checked beside the old one and replaces it
+    only when valid."""
     with open(catalog_path, encoding="utf-8") as handle:
         catalog = json.load(handle)
-    entries = catalog["extensions"]
-    entries[:] = [item for item in entries if item["id"] != entry["id"]] + [entry]
-    entries.sort(key=lambda item: item["id"])
+    place_entry(catalog["extensions"], entry, min_ampify)
     candidate = catalog_path + ".new"
     try:
         with open(candidate, "w", encoding="utf-8", newline="\n") as handle:
@@ -166,17 +184,19 @@ def check_same_name(archive, url):
         raise PackError(f"--out is named {local}.zip but --url ends with {remote}: use the same name for both")
 
 
-def pack(folder, archive, catalog=None, url=None):
+def pack(folder, archive, catalog=None, url=None, min_ampify=None):
     manifest = check_folder(folder)
     if catalog and not url:
         raise PackError("--catalog also needs --url, the https address where the archive will be published")
+    if min_ampify and not catalog:
+        raise PackError("--min-ampify needs --catalog, the catalog where the version is listed")
     if catalog:
         check_same_name(archive, url)
     sha256 = build_archive(folder, archive)
     if catalog:
         preview = preview_target(manifest, archive)
         entry = catalog_entry(manifest, url, sha256, preview and preview_address(preview, url))
-        update_catalog(catalog, entry)
+        update_catalog(catalog, entry, min_ampify)
         if preview:
             shutil.copyfile(os.path.join(folder, manifest["preview"]), preview)
         publish_readme(folder, archive)
@@ -189,10 +209,14 @@ def main(argv=None):
     parser.add_argument("--out", required=True, help="the .zip archive to create")
     parser.add_argument("--catalog", help="catalog to update (catalog.json of ampify-catalog)")
     parser.add_argument("--url", help="https:// address where the archive will be published")
+    parser.add_argument("--min-ampify", help="oldest Ampify release that takes this version (like 1.3.0): a later "
+                        "version of a listed element then goes to its newer list")
     args = parser.parse_args(argv)
+    if args.min_ampify and not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", args.min_ampify):
+        parser.error("--min-ampify expects three numbers, like 1.3.0")
 
     try:
-        result = pack(args.folder, args.out, args.catalog, args.url)
+        result = pack(args.folder, args.out, args.catalog, args.url, args.min_ampify)
     except (PackError, OSError, KeyError, ValueError) as error:
         print(f"pack: {error}", file=sys.stderr)
         return 1

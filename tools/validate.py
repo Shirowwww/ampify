@@ -219,6 +219,32 @@ def check_catalog(doc, path):
             errors.append(f"{where}.id: id already in the catalog: {entry['id']}")
         ids.add(entry["id"])
         errors += check_kit_api(entry["kitApi"], f"{where}.kitApi")
+        errors += check_newer(entry, where)
+    return errors
+
+
+def version_key(text):
+    return tuple(int(part) for part in text.split("."))
+
+
+def check_newer(entry, where):
+    """A later version of an entry is the same element by the same author, higher than every version before it in the
+    list, and says which Ampify it needs: without minAmpify it would reach the Ampify releases the entry is kept for."""
+    errors = []
+    seen = [entry["version"]]
+    for index, later in enumerate(entry.get("newer", [])):
+        at = f"{where}.newer[{index}]"
+        for key in ("id", "kind", "author"):
+            if later[key] != entry[key]:
+                errors.append(f"{at}.{key}: must be the entry's {key}, {entry[key]}")
+        if "newer" in later:
+            errors.append(f"{at}.newer: only the entry itself lists newer versions")
+        if "minAmpify" not in later:
+            errors.append(f"{at}.minAmpify: required field missing in a newer version")
+        if any(version_key(later["version"]) <= version_key(before) for before in seen):
+            errors.append(f"{at}.version: {later['version']} must be higher than the versions listed before it")
+        seen.append(later["version"])
+        errors += check_kit_api(later["kitApi"], f"{at}.kitApi")
     return errors
 
 

@@ -1,6 +1,6 @@
-# Step 3 of the UI test: the inspector writes the tree of Apple Music's window to logs\inspector.txt, then sets
+# The inspector writes the tree of Apple Music's window to logs\inspector.txt, then sets
 # theme.inspect back to 0, and `ampify theme names` checks the stable names against its inspector.json. This case opens
-# no page: the survey of the General page is still to be done on a real PC.
+# no page, so the General page is not surveyed.
 # Job: MSVC (msvc-build), AMPIFY_XAML=ON and AMPIFY_BENCH=ON build (otherwise the injection refuses the runner's version).
 # Needs $script:BenchKitRoot\ui\ with ampify_launcher.exe and ampify_kernel.dll side by side.
 

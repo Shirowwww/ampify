@@ -117,6 +117,58 @@ class PackTests(unittest.TestCase):
         self.assertEqual(entries[0]["url"], "https://example.com/demo-2.zip")
         self.assertRegex(entries[0]["sha256"], r"^[0-9a-f]{64}$")
 
+    def test_version_for_a_newer_ampify_goes_to_newer_and_leaves_the_entry(self):
+        catalog = os.path.join(self.tmp, "catalog.json")
+        with open(catalog, "w", encoding="utf-8") as handle:
+            json.dump({"catalogVersion": 1, "extensions": []}, handle)
+        old = self.make_element(name="demo", version="1.0.0")
+        pack.pack(old, os.path.join(self.tmp, "demo-1.0.0.zip"), catalog, "https://example.com/demo-1.0.0.zip")
+        shutil.rmtree(old)
+        for version in ("1.1.0", "1.2.0"):
+            folder = self.make_element(name="demo", version=version)
+            pack.pack(folder, os.path.join(self.tmp, f"demo-{version}.zip"), catalog,
+                      f"https://example.com/demo-{version}.zip", min_ampify="1.3.0")
+            shutil.rmtree(folder)
+
+        with open(catalog, encoding="utf-8") as handle:
+            entries = json.load(handle)["extensions"]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["version"], "1.0.0")
+        self.assertNotIn("minAmpify", entries[0])
+        self.assertEqual([(item["version"], item["minAmpify"]) for item in entries[0]["newer"]],
+                         [("1.1.0", "1.3.0"), ("1.2.0", "1.3.0")])
+
+    def test_minimum_ampify_needs_a_catalog(self):
+        folder = self.make_element()
+        with self.assertRaises(pack.PackError):
+            pack.pack(folder, os.path.join(self.tmp, "demo-1.zip"), min_ampify="1.3.0")
+
+    def test_first_version_with_a_minimum_ampify_becomes_the_entry(self):
+        catalog = os.path.join(self.tmp, "catalog.json")
+        with open(catalog, "w", encoding="utf-8") as handle:
+            json.dump({"catalogVersion": 1, "extensions": []}, handle)
+        folder = self.make_element()
+        pack.pack(folder, os.path.join(self.tmp, "demo-1.zip"), catalog, "https://example.com/demo-1.zip",
+                  min_ampify="1.3.0")
+        with open(catalog, encoding="utf-8") as handle:
+            entries = json.load(handle)["extensions"]
+        self.assertEqual(entries[0]["minAmpify"], "1.3.0")
+        self.assertNotIn("newer", entries[0])
+
+    def test_replacing_the_entry_keeps_its_newer_versions(self):
+        catalog = os.path.join(self.tmp, "catalog.json")
+        later = {"id": "demo", "name": "Demo", "version": "2.0.0", "kind": "extension", "author": "Shirowwww",
+                 "description": "Later.", "kitApi": "1.0", "minAmpify": "1.3.0",
+                 "url": "https://example.com/demo-2.0.0.zip", "sha256": "b" * 64, "permissions": []}
+        with open(catalog, "w", encoding="utf-8") as handle:
+            json.dump({"catalogVersion": 1, "extensions": [dict(later, version="0.9.0", newer=[later])]}, handle)
+        folder = self.make_element()
+        pack.pack(folder, os.path.join(self.tmp, "demo-1.zip"), catalog, "https://example.com/demo-1.zip")
+        with open(catalog, encoding="utf-8") as handle:
+            entry = json.load(handle)["extensions"][0]
+        self.assertEqual(entry["version"], "1.0.0")
+        self.assertEqual(entry["newer"], [later])
+
     def test_preview_is_published_next_to_the_archive(self):
         folder = self.make_element()
         with open(os.path.join(folder, "preview.jpg"), "wb") as handle:

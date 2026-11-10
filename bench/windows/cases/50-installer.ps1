@@ -1,7 +1,6 @@
-# M6: install and uninstall Ampify, without Apple Music (it installs anyway). The uninstaller deletes itself: that is
+# Install and uninstall Ampify, without Apple Music (it installs anyway). The uninstaller deletes itself: that is
 # the real path on Windows.
 
-# Runs an Ampify program and returns its exit code.
 # A program still running after the timeout is stopped and the code is -2, so a stuck installer cannot
 # hold the whole bench until the job's own time limit.
 function Invoke-KitProgram {

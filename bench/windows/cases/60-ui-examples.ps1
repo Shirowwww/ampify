@@ -1,4 +1,4 @@
-# Step 1 of the UI test, without Apple Music: the example themes load without a problem with `ampify theme check`.
+# Without Apple Music: the example themes load without a problem with `ampify theme check`.
 # Needs $script:BenchKitRoot\ui\ampify.exe and a copy of
 # themes/ in $script:BenchKitRoot\ui\themes.
 

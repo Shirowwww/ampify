@@ -1,4 +1,4 @@
-# Steps 1 and 2 of the M3 test, on the bench build (accepts any version): the kernel loads in both processes,
+# On the bench build (accepts any version): the kernel loads in both processes,
 # the app stays healthy, and the suspended launch is noted. The version verdict is the one of case 20.
 
 Register-Case -Id 'bench-injection' -Title 'Bench build: kernel in AppleMusic.exe and AMPLibraryAgent.exe' -Requires 'apple-music', 'kit:bench' -Action {

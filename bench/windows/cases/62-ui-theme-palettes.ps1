@@ -1,4 +1,4 @@
-# Steps 4 and 5 of the UI test: the palettes theme applies in Apple Music, then is removed without a restart when
+# The palettes theme applies in Apple Music, then is removed without a restart when
 # theme.active goes back to none. The setting changes in settings.txt, as the theme list of Ampify's settings page
 # does.
 # Job: MSVC (msvc-build), AMPIFY_XAML=ON and AMPIFY_BENCH=ON build (otherwise the injection refuses the runner's version).

@@ -75,6 +75,17 @@
           "maxItems": 32,
           "description": "Copy of the manifest's permissions, shown to the user before the item is turned on. Never kit.manage: only Ampify's own Marketplace holds it.",
           "items": {"$ref": "#/$defs/permission"}
+        },
+        "minAmpify": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Oldest Ampify release that takes this version. Read from Ampify 1.3.0 on; older releases ignore it."
+        },
+        "newer": {
+          "type": "array",
+          "maxItems": 64,
+          "description": "Later versions of the same element, each with its minAmpify. Ampify 1.3.0 and later take the newest version they reach; Ampify 1.2.1 and older read only the entry itself, so it keeps their version.",
+          "items": {"$ref": "#/$defs/entry"}
         }
       }
     },
@@ -82,7 +93,7 @@
     "translations": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Copy of the manifest's translations (fr, de, es, pt, ru, ja, zh), shown when Windows is in that language.",
+      "description": "Copy of the manifest's translations (fr, de, es, pt, ru, ja, zh, it, ko), shown when Windows is in that language.",
       "properties": {
         "fr": {"$ref": "#/$defs/translation"},
         "de": {"$ref": "#/$defs/translation"},
@@ -90,7 +101,9 @@
         "pt": {"$ref": "#/$defs/translation"},
         "ru": {"$ref": "#/$defs/translation"},
         "ja": {"$ref": "#/$defs/translation"},
-        "zh": {"$ref": "#/$defs/translation"}
+        "zh": {"$ref": "#/$defs/translation"},
+        "it": {"$ref": "#/$defs/translation"},
+        "ko": {"$ref": "#/$defs/translation"}
       }
     },
     "translation": {

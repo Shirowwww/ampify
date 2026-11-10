@@ -1,4 +1,4 @@
-# Steps 1 to 6 of the M7 test, on the bench build: the hello-extension extension from the user folder starts in
+# On the bench build: the hello-extension extension from the user folder starts in
 # AppleMusic.exe, not in AMPLibraryAgent.exe, and its launch counter is written to storage.
 
 Register-Case -Id 'extension-hello' -Title 'hello-extension started in AppleMusic.exe, not in AMPLibraryAgent.exe' -Requires 'apple-music', 'kit:bench' -Action {

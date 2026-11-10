@@ -130,8 +130,6 @@ if ($ScrubOnly) {
     return
 }
 
-# --- settings.txt ---------------------------------------------------------------------------------------------------
-
 $SettingsFile = Join-Path $Kit 'settings.txt'
 $InspectorFile = Join-Path $Kit 'logs\inspector.json'
 
@@ -158,8 +156,6 @@ function Set-Setting {
     if (-not $found -and $null -ne $Value) { $lines.Add("$Key = $Value") }
     [IO.File]::WriteAllLines($SettingsFile, $lines)
 }
-
-# --- UI Automation --------------------------------------------------------------------------------------------------
 
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
 if (-not ('CorpusWindows' -as [type])) {
@@ -300,8 +296,6 @@ function Open-MainMenuItem {
     Invoke-Ui $item
 }
 
-# --- Pages ----------------------------------------------------------------------------------------------------------
-
 $script:Undo = [Collections.Generic.List[scriptblock]]::new()  # what the page opened, closed after its dump
 
 function Show-Page {
@@ -391,8 +385,6 @@ function Get-Dump {
     }
     throw "no new inspector.json after $TimeoutSeconds s (is Ampify running in Apple Music?)"
 }
-
-# --- The run --------------------------------------------------------------------------------------------------------
 
 $script:Main = Get-MainWindow
 $saved = @{ 'theme.active' = (Get-Setting 'theme.active'); 'theme.inspect' = (Get-Setting 'theme.inspect') }
