@@ -18,6 +18,7 @@
 #include "../core/version_gate.hpp"
 #include "../core/version_list.hpp"
 #include "internal.hpp"
+#include "kit.hpp"
 #include "platform.hpp"
 #include "release_facts.hpp"
 #include "sha256.hpp"
@@ -318,18 +319,40 @@ void UseUserLanguage(const Settings& settings) {
 
 // Whether ampify update --auto may look for a release now: kit_update allows it, this is the installed copy (a build
 // folder or an extracted zip is never replaced behind the user's back), and no look was made today.
+bool IsInstalledCopy(const Context& ctx) {
+    return ctx.options.installDir || platform::IsInstallDirectory(platform::ExecutableDirectory());
+}
+
+bool DayPassed(const std::filesystem::path& cacheFile) {
+    UpdateCache cache = ReadUpdateCache(cacheFile);
+    std::int64_t now = NowSeconds();
+    return cache.checked < 0 || now < cache.checked || now - cache.checked >= kUpdateCheckPeriodSeconds;
+}
+
 bool MayLookForUpdate(Context& ctx, uirender::KitUpdate mode, const std::filesystem::path& cacheFile) {
     if (mode == uirender::KitUpdate::Off) {
         ctx.out << "kit_update = off: no update looked for.\n";
         return false;
     }
-    if (!ctx.options.installDir && !platform::IsInstallDirectory(platform::ExecutableDirectory())) {
+    if (!IsInstalledCopy(ctx)) {
         ctx.out << "Not the installed copy of Ampify: no update looked for.\n";
         return false;
     }
-    UpdateCache cache = ReadUpdateCache(cacheFile);
-    std::int64_t now = NowSeconds();
-    return cache.checked < 0 || now < cache.checked || now - cache.checked >= kUpdateCheckPeriodSeconds;
+    return DayPassed(cacheFile);
+}
+
+// The elements from the catalog follow their catalog on their own, whatever kit_update says, once a day. An
+// unreachable catalog leaves the day open, so the launcher's next run tries again.
+void UpdateElementsOfTheDay(Context& ctx) {
+    std::filesystem::path file = ctx.kit.Cache() / "elements-update.txt";
+    if (!IsInstalledCopy(ctx) || !DayPassed(file) || ListInstalled(ctx.kit).empty()) return;
+    std::optional<int> updated = UpdateInstalledElements(ctx);
+    if (!updated) return;
+    std::error_code ec;
+    std::filesystem::create_directories(ctx.kit.Cache(), ec);
+    std::string error;
+    WriteTextFile(file, "checked=" + std::to_string(NowSeconds()) + "\nupdated=" + std::to_string(*updated) + "\n", error);
+    ctx.out << *updated << " element(s) updated from the catalog.\n";
 }
 
 // Apple's library agent often stays open, with the kernel, long after Apple Music closed; Apple Music starts it again
@@ -416,6 +439,7 @@ bool OfferTaken(Context& ctx, const std::string& version) {
 int CmdAutoUpdate(Context& ctx) {
     Settings settings;
     settings.Load(ctx.kit.Settings().string());
+    UpdateElementsOfTheDay(ctx);
     uirender::KitUpdate mode = uirender::ReadKitUpdate(settings);
     std::filesystem::path file = ctx.kit.Cache() / "auto-update.txt";
     if (!MayLookForUpdate(ctx, mode, file)) return 0;

@@ -185,6 +185,11 @@ void NotifyKitUpdate(Context& ctx);
 // launcher's next run.
 int CmdAutoUpdate(Context& ctx);
 
+// Brings every installed element to its catalog version, keeping its settings and whether it is on. A version that
+// asks for a permission the installed one did not have is left for the Marketplace. Returns how many were updated,
+// or nullopt when the catalog could not be read.
+std::optional<int> UpdateInstalledElements(Context& ctx);
+
 // Commands in diagnose.cpp.
 int CmdDoctor(Context& ctx);
 

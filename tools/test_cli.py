@@ -779,6 +779,50 @@ class Marketplace(AmpifyTestCase):
         self.assertIn("It stays on", result.stdout)
         self.assertNotIn("It is off", result.stdout)
 
+    def auto_update(self, catalog):
+        install_dir = os.path.join(self.tmp, "install")
+        os.makedirs(install_dir, exist_ok=True)
+        return self.ampify("update", "--auto", "--install-dir", install_dir, *self.catalog_option(catalog))
+
+    def test_auto_update_brings_installed_elements_to_the_catalog_version_even_with_kit_update_off(self):
+        self.assertEqual(self.install("demo").returncode, 0)
+        self.ampify("config", "kit_update", "off")
+        newer_folder = self.write_element("demo", "extension", version="1.1.0", permissions=["storage"])
+        newer_entry, _ = self.entry_for(newer_folder)
+        catalog = self.write_catalog([newer_entry, self.night_entry, self.calm_entry])
+
+        result = self.auto_update(catalog)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('"version": "1.1.0"', self.read("extensions", "demo", "manifest.json"))
+        self.assertTrue(os.path.exists(os.path.join(self.kit, "cache", "elements-update.txt")))
+
+    def test_auto_update_leaves_an_element_that_asks_for_a_new_permission(self):
+        self.assertEqual(self.install("demo").returncode, 0)
+        self.ampify("config", "kit_update", "off")
+        newer_folder = self.write_element("demo", "extension", version="1.1.0", permissions=["storage", "notifications"])
+        newer_entry, _ = self.entry_for(newer_folder)
+        catalog = self.write_catalog([newer_entry, self.night_entry, self.calm_entry])
+
+        result = self.auto_update(catalog)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('"version": "1.0.0"', self.read("extensions", "demo", "manifest.json"))
+        self.assertIn("Marketplace", result.stdout)
+
+    def test_auto_update_of_elements_looks_once_a_day(self):
+        self.assertEqual(self.install("demo").returncode, 0)
+        self.ampify("config", "kit_update", "off")
+        self.assertEqual(self.auto_update(self.catalog).returncode, 0)
+        newer_folder = self.write_element("demo", "extension", version="1.1.0", permissions=["storage"])
+        newer_entry, _ = self.entry_for(newer_folder)
+        catalog = self.write_catalog([newer_entry, self.night_entry, self.calm_entry])
+
+        result = self.auto_update(catalog)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('"version": "1.0.0"', self.read("extensions", "demo", "manifest.json"))
+
     def test_broken_element_is_reported_and_not_loaded(self):
         self.assertEqual(self.install("demo").returncode, 0)
         self.ampify("extension", "enable", "demo")

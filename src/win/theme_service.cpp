@@ -22,6 +22,7 @@
 #include "apple_tweak.hpp"
 #include "artwork_passthrough.hpp"
 #include "sidebar_hover.hpp"
+#include "kit_command.hpp"
 #include "ui_thread.hpp"
 #include "win_common.hpp"
 #include "window_backdrop.hpp"
@@ -92,22 +93,34 @@ void UpdateThemeSettings(const std::filesystem::path& kit, Journal& journal,
     if (!written) journal.Write("Settings: theme keys not written, " + error);
 }
 
-// Once per start: settings.txt moves the keys of the elements Ampify retired or merged (theme/retired.hpp), and
+theme::InstalledCheck InstalledIn(const std::filesystem::path& kit) {
+    return [kit](const ElementRef& element) {
+        std::error_code error;
+        return std::filesystem::exists(kit / element.Folder() / element.id / "manifest.json", error);
+    };
+}
+
+// At each start: settings.txt moves the keys of the elements Ampify retired or merged (theme/retired.hpp), and
 // Ampify's own copies of those elements move to kit/retired, so that the settings page no longer offers them. A
-// folder someone else wrote under the same name stays.
-void MoveRetiredElements(const std::filesystem::path& kit, Journal& journal) {
+// folder someone else wrote under the same name stays. A merged element in use waits for its replacement, which the
+// catalog gives (InstallReplacements): returns those to install.
+std::vector<ElementRef> MoveRetiredElements(const std::filesystem::path& kit, Journal& journal) {
     const std::string path = (kit / "settings.txt").string();
     Settings settings;
     settings.Load(path);
-    if (theme::MoveRetiredSettings(settings)) {
+    const theme::InstalledCheck installed = InstalledIn(kit);
+    const std::vector<const theme::RetiredElement*> waiting = theme::AwaitingReplacement(settings, installed);
+    std::vector<ElementRef> wanted = theme::ReplacementsToInstall(settings, installed);
+    if (theme::MoveRetiredSettings(settings, waiting)) {
         std::string error;
-        bool written = Settings::UpdateFile(path, [](Settings& current) { theme::MoveRetiredSettings(current); }, error);
+        bool written = Settings::UpdateFile(
+            path, [&waiting](Settings& current) { theme::MoveRetiredSettings(current, waiting); }, error);
         journal.Write(written ? "Settings: keys of retired and merged elements moved"
                               : "Settings: keys of retired elements not moved, " + error);
         // The folders wait for the keys: a theme.active naming a removed folder would leave no theme at all.
-        if (!written) return;
+        if (!written) return wanted;
     }
-    for (std::string_view retired : theme::RetiredFolders()) {
+    for (std::string_view retired : theme::RetiredFolders(waiting)) {
         const std::filesystem::path folder = kit / std::filesystem::path(retired);
         std::optional<std::string> text = ReadWholeFile(folder / "manifest.json");
         if (!text) continue;
@@ -123,6 +136,32 @@ void MoveRetiredElements(const std::filesystem::path& kit, Journal& journal) {
         journal.Write("Themes: retired " + std::string(retired) +
                       (error ? ", not moved: " + error.message() : ", set aside in " + aside.generic_string()));
     }
+    for (const theme::RetiredElement* element : waiting) {
+        journal.Write("Themes: " + std::string(element->id) + " stays in use until " + std::string(element->into) +
+                      " is installed");
+    }
+    return wanted;
+}
+
+// Fetches the replacements from the catalog one after the other (they share its download), with ampify.exe as
+// `ampify install` would. Offline, the elements that wait keep the look, and the next start tries again. `done` runs
+// once every one was tried.
+void InstallReplacements(std::vector<ElementRef> wanted, std::filesystem::path kit, Journal& journal,
+                         std::function<void()> done) {
+    if (wanted.empty()) {
+        done();
+        return;
+    }
+    ElementRef next = wanted.front();
+    wanted.erase(wanted.begin());
+    journal.Write("Themes: installing " + next.id + " from the catalog, which replaces a retired element");
+    RunAmpifyInBackground({"install", next.id, "--yes", "--kit-dir", ToUtf8(kit.wstring())},
+                          [next, wanted = std::move(wanted), kit, &journal, done = std::move(done)](int code) mutable {
+                              journal.Write(code == 0 ? "Themes: " + next.id + " installed"
+                                                      : "Themes: " + next.id + " not installed (code " +
+                                                            std::to_string(code) + "), tried again at the next start");
+                              InstallReplacements(std::move(wanted), std::move(kit), journal, std::move(done));
+                          });
 }
 
 }  // namespace
@@ -195,7 +234,11 @@ void ThemeService::Run(HINSTANCE module) {
         settings.Load((m_kit / "settings.txt").string());
         if (ToggleOf(settings, kXamlWatcherKey)) StartXamlWatcher(m_journal, module);
     }
-    MoveRetiredElements(m_kit, m_journal);
+    // Once the replacements are in, the elements that waited for them move, in the same session.
+    auto replaced = std::make_shared<std::atomic<bool>>(false);
+    if (std::vector<ElementRef> wanted = MoveRetiredElements(m_kit, m_journal); !wanted.empty()) {
+        InstallReplacements(std::move(wanted), m_kit, m_journal, [replaced] { *replaced = true; });
+    }
 
     // Reads the settings, the theme, the snippets, sidebar.json and home.json, and reloads only what changed. The
     // Windows mode and the local time choose the scheme for theme.scheme = auto and theme.schedule.
@@ -206,6 +249,7 @@ void ThemeService::Run(HINSTANCE module) {
     int artworkReports = 0;
 
     while (m_running) {
+        if (replaced->exchange(false)) MoveRetiredElements(m_kit, m_journal);  // what failed is tried at the next start
         auto stamp = ChangeStamp(m_kit);
         Settings settings;
         settings.Load((m_kit / "settings.txt").string());

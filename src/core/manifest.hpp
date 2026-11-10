@@ -70,6 +70,8 @@ struct Manifest : ElementInfo {
     std::optional<std::string> defaultScheme;
     // A theme's place for the playback bar (top, bottom or centred) while apple.playbar leaves it to the theme.
     std::optional<std::string> playbar;
+    // The oldest Ampify release this version runs on: the catalog lists it for that release and later only.
+    std::optional<std::string> minAmpify;
     std::optional<std::string> resources;
     std::optional<std::string> icon;
     std::optional<std::string> preview;  // Marketplace image at the root of the folder, read when authoring

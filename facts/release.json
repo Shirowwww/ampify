@@ -19,6 +19,7 @@
     {"id": "now-playing", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
     {"id": "song-panel", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
     {"id": "playback-guard", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
+    {"id": "hover-time", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
     {"id": "atmos-leveler", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": true}
   ],
   "languages": [
@@ -37,7 +38,7 @@
     "repository": "Shirowwww/ampify",
     "catalogRepository": "Shirowwww/ampify-catalog",
     "releaseApi": "https://api.github.com/repos/Shirowwww/ampify/releases",
-    "catalogUrl": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog.json",
+    "catalogUrl": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog-1.3.json",
     "site": "https://shirowwww.github.io/ampify"
   }
 }

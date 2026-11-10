@@ -14,6 +14,7 @@
 #include "../src/core/json.hpp"
 #include "../src/core/manifest.hpp"
 #include "../src/core/text_util.hpp"
+#include "release_facts.hpp"
 #include "../src/cli/anonymize.hpp"
 #include "../src/cli/archive.hpp"
 #include "../src/cli/backup.hpp"
@@ -322,8 +323,12 @@ std::string CatalogWith(const std::string& entry) {
 }  // namespace
 
 // The public catalog lives in its own repository: checked when a clone of ampify-catalog sits next to this one.
+// It is the file the default address names (catalog-1.3.json: Ampify 1.2.1 keeps catalog.json).
 TEST_CASE(Catalog_PublicCatalogIsValid) {
-    std::string path = std::string(AMPIFY_SOURCE_DIR) + "/../ampify-catalog/catalog.json";
+    const std::string_view url = ampify::kDefaultCatalogUrl;
+    CHECK(url.starts_with("https://raw.githubusercontent.com/") && url.ends_with(".json"));
+    const std::string name(url.substr(url.rfind('/') + 1));
+    std::string path = std::string(AMPIFY_SOURCE_DIR) + "/../ampify-catalog/" + name;
     if (!std::filesystem::exists(path)) {
         std::cout << "Catalog: no ampify-catalog clone next to the repository, test skipped\n";
         return;

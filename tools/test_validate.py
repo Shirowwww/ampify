@@ -94,6 +94,17 @@ class CatalogTests(unittest.TestCase):
         code, text = run("catalog", os.path.join(CATALOG, "catalog.json"))
         self.assertEqual(code, 0, text)
 
+    @needs_catalog
+    def test_the_catalog_this_release_reads_is_valid(self):
+        # facts/release.json names it: Ampify 1.2.1 keeps catalog.json, 1.3.0 and later read their own file.
+        with open(os.path.join(REPO, "facts", "release.json"), encoding="utf-8") as handle:
+            name = json.load(handle)["project"]["catalogUrl"].rsplit("/", 1)[-1]
+        path = os.path.join(CATALOG, name)
+        if not os.path.exists(path):
+            self.skipTest(f"{name} not in the ampify-catalog clone yet")
+        code, text = run("catalog", path)
+        self.assertEqual(code, 0, text)
+
     def test_valid_entry_passes(self):
         code, text = self.write([entry()])
         self.assertEqual(code, 0, text)

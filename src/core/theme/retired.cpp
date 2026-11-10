@@ -5,6 +5,7 @@
 #include <map>
 #include <optional>
 
+#include "release_facts.hpp"
 #include "../settings_catalog.hpp"
 #include "../text_util.hpp"
 
@@ -72,12 +73,45 @@ constexpr CarriedSetting kSidebarIconsSettings[] = {
 constexpr CarriedSetting kCompactSidebarSettings[] = {
     {.from = "enabled", .to = "compact", .toValue = "true"},
 };
+// The second pass of 1.3.0. Each heir does more by default than the snippet it took in: those rows (whenNew) turn
+// that off for someone who did not use the heir, and leave someone who did as they were.
+constexpr CarriedSetting kCoverAmbienceSettings[] = {
+    {.from = "enabled", .to = "reach", .toValue = "Off", .whenNew = true},
+    {.from = "enabled", .to = "glow", .toValue = "Display"},
+    {.from = "reach", .to = "glow"},
+};
+constexpr CarriedSetting kAnimatedArtworkSettings[] = {
+    {.from = "enabled", .to = "reach", .toValue = "Off", .whenNew = true},
+    {.from = "enabled", .to = "moving-background", .toValue = "true"},
+    {.from = "strength", .to = "background-strength"},
+};
+constexpr CarriedSetting kHoverSearchSettings[] = {
+    {.from = "enabled", .to = "compact", .toValue = "false", .whenNew = true},
+    {.from = "enabled", .to = "search-on-hover", .toValue = "true"},
+};
+constexpr CarriedSetting kPlaybarTimesSettings[] = {
+    {.from = "enabled", .to = "custom-thickness", .toValue = "false", .whenNew = true},
+    {.from = "enabled", .to = "times", .toValue = "Under the pointer"},
+    {.from = "show", .to = "times"},
+};
+constexpr CarriedSetting kFocusedLyricsSettings[] = {
+    {.from = "enabled", .to = "align", .toValue = "Left", .whenNew = true},
+    {.from = "enabled", .to = "focus", .toValue = "Medium"},
+    {.from = "strength", .to = "focus"},
+};
 
 constexpr RetiredElement kRetired[] = {
     {.kind = ElementKind::Snippet, .id = "bottom-playbar"},  // 1.3.0: apple.playbar
     {.kind = ElementKind::Theme, .id = "ember", .into = "artwork", .settings = kEmberSettings},  // 1.3.0
     {.kind = ElementKind::Theme, .id = "high-contrast"},  // 1.3.0
     {.kind = ElementKind::Snippet, .id = "hover-row-actions"},  // 1.3.0: Apple shows the buttons on hover itself
+    // Before the other merges into the same heirs: their choices (Centred lyrics, a set thickness) win over the
+    // defaults these rows turn off.
+    {.kind = ElementKind::Snippet, .id = "cover-ambience", .into = "album-colors", .settings = kCoverAmbienceSettings},
+    {.kind = ElementKind::Snippet, .id = "animated-artwork", .into = "album-colors", .settings = kAnimatedArtworkSettings},
+    {.kind = ElementKind::Snippet, .id = "hover-search", .into = "sidebar-style", .settings = kHoverSearchSettings},
+    {.kind = ElementKind::Snippet, .id = "playbar-times", .into = "progress-line", .settings = kPlaybarTimesSettings},
+    {.kind = ElementKind::Snippet, .id = "focused-lyrics", .into = "lyrics-style", .settings = kFocusedLyricsSettings},
     {.kind = ElementKind::Snippet, .id = "hide-explicit", .into = "declutter", .settings = kHideExplicitSettings},
     {.kind = ElementKind::Snippet, .id = "square-corners", .into = "round-corners", .settings = kSquareCornersSettings},
     {.kind = ElementKind::Snippet, .id = "hide-buttons", .into = "declutter", .settings = kHideButtonsSettings},
@@ -115,6 +149,17 @@ constexpr MovedSwitch kMovedSwitches[] = {
     {"themes.greenroom.hide-badges", kBadgesHidden},
     {"themes.palettes.hide-badges", kBadgesHidden},
 };
+
+// 1.3.0: catalog.json stays as Ampify 1.2.1 reads it, and 1.3.0 reads its own file. The old default, saved as it was,
+// follows the new one; any other address was chosen and stays.
+constexpr std::string_view kCatalogUrlKey = "catalog.url";
+constexpr std::string_view kOldCatalogUrl =
+    "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog.json";
+
+void MoveCatalogUrl(Settings& settings) {
+    const std::string key(kCatalogUrlKey);
+    if (settings.GetString(key, "") == kOldCatalogUrl) settings.Set(key, std::string(kDefaultCatalogUrl));
+}
 
 void MoveSwitches(Settings& settings) {
     for (const MovedSwitch& moved : kMovedSwitches) {
@@ -184,16 +229,27 @@ void Carry(const RetiredElement& element, const CarriedSetting& carried, Setting
     settings.Set(Prefix(element.kind, element.into) + std::string(carried.to), written);
 }
 
-// The element in use goes to what took its place, with its settings: the active theme, or a snippet switched on.
-void MoveInUse(const RetiredElement& element, const std::string& active, Settings& settings) {
-    const std::string enabled = Prefix(element.kind, element.id) + std::string(kEnabledKey);
-    const bool inUse = element.kind == ElementKind::Theme ? active == element.id : settings.GetBool(enabled, false);
-    if (!inUse) return;
+// The active theme, or a snippet switched on.
+bool InUse(ElementKind kind, std::string_view id, const std::string& active, const Settings& settings) {
+    if (kind == ElementKind::Theme) return active == id;
+    return settings.GetBool(Prefix(kind, id) + std::string(kEnabledKey), false);
+}
+
+bool Waits(const RetiredElement& element, std::span<const RetiredElement* const> waiting) {
+    return std::find(waiting.begin(), waiting.end(), &element) != waiting.end();
+}
+
+// The element in use goes to what took its place, with its settings. `heirWasInUse`: the one that took its place was
+// already in use before the move, so the rows marked whenNew leave it as it was.
+void MoveInUse(const RetiredElement& element, const std::string& active, bool heirWasInUse, Settings& settings) {
+    if (!InUse(element.kind, element.id, active, settings)) return;
     if (element.into.empty()) {
         if (element.kind == ElementKind::Theme) settings.Set(kThemeActiveKey, "none");
         return;
     }
-    for (const CarriedSetting& carried : element.settings) Carry(element, carried, settings);
+    for (const CarriedSetting& carried : element.settings) {
+        if (!(carried.whenNew && heirWasInUse)) Carry(element, carried, settings);
+    }
     if (element.kind == ElementKind::Theme) {
         settings.Set(kThemeActiveKey, std::string(element.into));
     } else {
@@ -213,19 +269,50 @@ void RemoveWhere(Settings& settings, const auto& gone) {
 
 std::span<const RetiredElement> RetiredElements() { return kRetired; }
 
-bool MoveRetiredSettings(Settings& settings) {
+std::vector<const RetiredElement*> AwaitingReplacement(const Settings& settings, const InstalledCheck& installed) {
+    const std::string active = ActiveThemeId(settings);
+    std::vector<const RetiredElement*> waiting;
+    for (const RetiredElement& element : kRetired) {
+        if (element.into.empty() || !InUse(element.kind, element.id, active, settings)) continue;
+        if (!installed(ElementRef{element.kind, std::string(element.into)})) waiting.push_back(&element);
+    }
+    return waiting;
+}
+
+std::vector<ElementRef> ReplacementsToInstall(const Settings& settings, const InstalledCheck& installed) {
+    const std::string active = ActiveThemeId(settings);
+    std::vector<ElementRef> wanted;
+    for (const RetiredElement& element : kRetired) {
+        if (element.into.empty()) continue;
+        ElementRef replacement{element.kind, std::string(element.into)};
+        const bool needed = InUse(element.kind, element.id, active, settings) ||
+                            InUse(element.kind, element.into, active, settings);
+        if (!needed || installed(replacement)) continue;
+        if (std::find(wanted.begin(), wanted.end(), replacement) != wanted.end()) continue;
+        wanted.push_back(std::move(replacement));
+    }
+    return wanted;
+}
+
+bool MoveRetiredSettings(Settings& settings, std::span<const RetiredElement* const> waiting) {
     const std::map<std::string, std::string> before = settings.Values();
     const std::string active = ActiveThemeId(settings);
 
     if (!settings.Get(kPlaybarKey)) {
         if (std::optional<std::string> place = ChosenPlace(settings, active)) settings.Set(kPlaybarKey, *place);
     }
-    for (const RetiredElement& element : kRetired) MoveInUse(element, active, settings);
+    const Settings original = settings;
+    for (const RetiredElement& element : kRetired) {
+        if (Waits(element, waiting)) continue;
+        const bool heirWasInUse = !element.into.empty() && InUse(element.kind, element.into, active, original);
+        MoveInUse(element, active, heirWasInUse, settings);
+    }
     MoveSwitches(settings);
+    MoveCatalogUrl(settings);
 
-    RemoveWhere(settings, [](const std::string& key) {
+    RemoveWhere(settings, [waiting](const std::string& key) {
         for (const RetiredElement& element : kRetired) {
-            if (key.starts_with(Prefix(element.kind, element.id))) return true;
+            if (!Waits(element, waiting) && key.starts_with(Prefix(element.kind, element.id))) return true;
         }
         // Only Ampify's themes dropped bar-position: a theme of someone else's may still declare and read it.
         for (const OldPlace& old : kOldDefaults) {
@@ -241,9 +328,10 @@ bool IsRetired(ElementKind kind, std::string_view id) {
                        [&](const RetiredElement& element) { return element.kind == kind && element.id == id; });
 }
 
-std::vector<std::string> RetiredFolders() {
+std::vector<std::string> RetiredFolders(std::span<const RetiredElement* const> waiting) {
     std::vector<std::string> folders;
     for (const RetiredElement& element : kRetired) {
+        if (Waits(element, waiting)) continue;
         folders.push_back(std::string(TraitsOf(element.kind).folder) + "/" + std::string(element.id));
     }
     return folders;

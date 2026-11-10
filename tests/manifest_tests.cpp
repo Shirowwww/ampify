@@ -39,6 +39,19 @@ TEST_CASE(Manifest_AcceptsAValidExtension) {
     CHECK(result.manifest->NetworkHosts()[0] == "api.listenbrainz.org");
 }
 
+TEST_CASE(Manifest_ReadsTheOldestAmpifyAVersionRunsOn) {
+    std::string withMinimum = kHello;
+    withMinimum.replace(withMinimum.find("\"main\""), 0, "\"minAmpify\": \"1.3.0\", ");
+    ampify::ManifestResult result = Check(withMinimum, "hello-extension");
+    CHECK(result.errors.empty());
+    CHECK(result.manifest && result.manifest->minAmpify == std::optional<std::string>("1.3.0"));
+    CHECK(Check(kHello, "hello-extension").manifest->minAmpify == std::nullopt);
+
+    std::string malformed = kHello;
+    malformed.replace(malformed.find("\"main\""), 0, "\"minAmpify\": \"1.3\", ");
+    CHECK(!Check(malformed, "hello-extension").manifest);
+}
+
 TEST_CASE(Manifest_RejectsAnIdThatDiffersFromTheFolder) {
     CHECK(!Check(kHello, "other-folder").manifest);
 }

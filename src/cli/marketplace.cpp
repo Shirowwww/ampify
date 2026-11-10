@@ -284,7 +284,36 @@ int UpdateElement(Context& ctx, const std::string& id) {
     return InstallEntry(ctx, *entry, local, true);
 }
 
+bool AsksForNothingNew(const CatalogEntry& entry, const Manifest& installed) {
+    return std::ranges::all_of(entry.permissions, [&](const std::string& permission) {
+        return std::ranges::find(installed.permissions, permission) != installed.permissions.end();
+    });
+}
+
 }  // namespace
+
+std::optional<int> UpdateInstalledElements(Context& ctx) {
+    Catalog catalog;
+    bool local = false;
+    if (!LoadCatalog(ctx, catalog, local)) return std::nullopt;
+    Options quiet = ctx.options;
+    quiet.yes = true;
+    Context updating{quiet, ctx.kit, ctx.in, ctx.out, ctx.err};
+    int updated = 0;
+    for (const InstalledElement& element : ListInstalled(ctx.kit)) {
+        if (!element.Valid()) continue;
+        const CatalogEntry* entry = FindCatalogEntry(catalog, element.id);
+        if (entry == nullptr || ToString(entry->kind) != element.kind) continue;
+        if (CompareDottedVersions(entry->version, element.manifest->version) <= 0) continue;
+        if (!AsksForNothingNew(*entry, *element.manifest)) {
+            ctx.out << element.id << " " << entry->version
+                    << " asks for a new permission: left for the Marketplace, where it shows what it may do.\n";
+            continue;
+        }
+        if (InstallEntry(updating, *entry, local, true) == 0) updated++;
+    }
+    return updated;
+}
 
 std::string DefaultReleaseUrl(std::string_view version) {
     // A given release, by its tag: `ampify install-kit 0.1.0` reads .../releases/tags/v0.1.0.
