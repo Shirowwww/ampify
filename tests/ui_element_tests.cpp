@@ -1,9 +1,12 @@
+#include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "../src/core/i18n.hpp"
 #include "../src/core/journal.hpp"
@@ -267,6 +270,66 @@ TEST_CASE(Interface_APlaybarMarkClearsWhenCalledWithoutAStart) {
     if (controls.size() != 1) return;
     CHECK(controls[0].markFrom < 0 && controls[0].markTo < 0);
     element->Stop();
+}
+
+TEST_CASE(Interface_TheLastElementToAskForAReadoutIsTheOneShown) {
+    ampify::UiModel model;
+    std::uint64_t serial = model.PlaybarHover().serial;
+    model.SetPlaybarReadout("one", 180000);
+    model.SetPlaybarReadout("two", 240000);
+    CHECK_NEAR(model.PlaybarHover().totalMs, 240000, 1e-9);
+    CHECK(model.PlaybarHover().serial != serial);
+    model.SetPlaybarReadout("two", 0);  // takes its readout away: the first one shows again
+    CHECK_NEAR(model.PlaybarHover().totalMs, 180000, 1e-9);
+    model.SetPlaybarReadout("one", std::nan(""));
+    CHECK_NEAR(model.PlaybarHover().totalMs, 0, 1e-9);
+}
+
+TEST_CASE(Interface_AStoppedElementTakesItsReadoutAndItsListeningAway) {
+    ampify::UiModel model;
+    model.SetPlaybarReadout("one", 180000);
+    model.SetPlaybarHoverListener("one", true);
+    model.SetPlaybarHoverListener("one", true);  // once only
+    CHECK(model.PlaybarHover().listeners == std::vector<std::string>{"one"});
+    std::uint64_t serial = model.PlaybarHover().serial;
+    model.RemoveElement("one");
+    CHECK_NEAR(model.PlaybarHover().totalMs, 0, 1e-9);
+    CHECK(model.PlaybarHover().listeners.empty());
+    CHECK(model.PlaybarHover().serial != serial);
+}
+
+TEST_CASE(Interface_AReadoutAndOnHoverNeedThePlaybarPermission) {
+    Fixture f;
+    auto element = f.Make("noreadout", "extension", R"("player.read")", R"(
+        try { Ampify.ui.playbar.readout(1000); } catch (e) { Ampify.log("readout " + e.name); }
+        try { Ampify.ui.playbar.onHover(() => {}); } catch (e) { Ampify.log("hover " + e.name); })");
+    CHECK(element->Start());
+    CHECK(f.Logged("[noreadout] readout PermissionDenied"));
+    CHECK(f.Logged("[noreadout] hover PermissionDenied"));
+    element->Stop();
+}
+
+TEST_CASE(Interface_OnHoverHearsWherePointerIsAndNullWhenItLeaves) {
+    Fixture f;
+    auto element = f.Make("hover", "extension", R"("ui.playbar")", R"(
+        Ampify.ui.playbar.readout(200000);
+        try { Ampify.ui.playbar.readout("long"); } catch (e) { Ampify.log("text " + e.name); }
+        const stop = Ampify.ui.playbar.onHover((part) => Ampify.log("part " + part));
+        Ampify.ui.playbar.onHover((part) => { if (part === null) stop(); });)");
+    CHECK(element->Start());
+    CHECK(f.Logged("[hover] text TypeError"));
+    CHECK_NEAR(f.host.ui.PlaybarHover().totalMs, 200000, 1e-9);
+    CHECK(f.host.ui.PlaybarHover().listeners == std::vector<std::string>{"hover"});
+    element->DeliverEvent("playbarHover", R"({"part":0.25})");
+    element->DeliverEvent("playbarHover", R"({"part":1.5})");
+    element->DeliverEvent("playbarHover", R"({"part":null})");
+    element->Pump();
+    CHECK(f.Logged("[hover] part 0.25"));
+    CHECK(f.Logged("[hover] part 1"));  // kept on the line
+    CHECK(f.Logged("[hover] part null"));
+    CHECK(f.host.ui.PlaybarHover().listeners == std::vector<std::string>{"hover"});  // one listener is left
+    element->Stop();
+    CHECK(f.host.ui.PlaybarHover().listeners.empty());
 }
 
 TEST_CASE(Interface_ABadTreeIsRefusedWhenItIsRegistered) {

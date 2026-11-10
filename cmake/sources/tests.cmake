@@ -28,6 +28,7 @@ list(APPEND AMPIFY_TESTS_SOURCES
     tests/song_room_tests.cpp
     tests/playbar_place_tests.cpp
     tests/progress_mark_tests.cpp
+    tests/hover_readout_tests.cpp
     tests/merged_snippets_tests.cpp
     tests/lyrics_window_tests.cpp
     tests/caption_clearance_tests.cpp

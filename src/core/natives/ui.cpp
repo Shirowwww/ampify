@@ -107,6 +107,24 @@ struct UiNatives : ScriptBridge {
         return JS_NewBool(ctx, HostOf(ext).Ui().SetControlMark(ext->id(), id, from, to));
     }
 
+    // native.uiPlaybarReadout(totalMs): the time under the pointer on the progress line; 0 takes it away.
+    AMPIFY_NATIVE(UiPlaybarReadout) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.playbar", &failure)) return failure;
+        HostOf(ext).Ui().SetPlaybarReadout(ext->id(), Number(ctx, argc, argv, 0));
+        return JS_UNDEFINED;
+    }
+
+    // native.uiPlaybarHover(listening): whether the element hears where the pointer is on the progress line.
+    AMPIFY_NATIVE(UiPlaybarHover) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.playbar", &failure)) return failure;
+        HostOf(ext).Ui().SetPlaybarHoverListener(ext->id(), argc >= 1 && JS_ToBool(ctx, argv[0]) != 0);
+        return JS_UNDEFINED;
+    }
+
     AMPIFY_NATIVE(UiControlRemove) {
         ScriptExtension* ext = Owner(ctx);
         int id = static_cast<int>(Number(ctx, argc, argv, 0));
@@ -257,6 +275,8 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiControlActive", UiNatives::UiControlActive, 2);
     scope.Function("uiControlDisabled", UiNatives::UiControlDisabled, 2);
     scope.Function("uiControlMark", UiNatives::UiControlMark, 3);
+    scope.Function("uiPlaybarReadout", UiNatives::UiPlaybarReadout, 1);
+    scope.Function("uiPlaybarHover", UiNatives::UiPlaybarHover, 1);
     scope.Function("uiControlRemove", UiNatives::UiControlRemove, 1);
     scope.Function("uiControlKinds", UiNatives::UiControlKinds, 2);
     scope.Function("uiPanel", UiNatives::UiPanel, 2);

@@ -124,6 +124,35 @@ const char kUi[] = R"AMPIFYJS(
     return native.uiControlMark(Number(id), start, start < 0 ? -1 : part(to));
   };
 
+  // Under the pointer on the progress line: the kernel draws a marker and the time at that point of a span `totalMs`
+  // long, at the pointer's pace; nothing (or 0) takes it away. onHover hears where the pointer is, as a part of the
+  // line from 0 to 1, and null once it leaves; it returns the function that stops listening.
+  const readout = (totalMs) => {
+    if (totalMs === undefined || totalMs === null) return native.uiPlaybarReadout(0);
+    if (typeof totalMs !== "number" || !Number.isFinite(totalMs)) throw new TypeError("ui: readout expects a length in ms");
+    return native.uiPlaybarReadout(Math.max(0, totalMs));
+  };
+  const hoverListeners = new Set();
+  const onHover = (fn) => {
+    if (typeof fn !== "function") throw new TypeError("ui: onHover expects a function");
+    hoverListeners.add(fn);
+    native.uiPlaybarHover(true);
+    return () => {
+      if (hoverListeners.delete(fn) && hoverListeners.size === 0) native.uiPlaybarHover(false);
+    };
+  };
+  dispatch.playbarHover = (payload) => {
+    let part = null;
+    try {
+      const value = JSON.parse(payload).part;
+      if (typeof value === "number" && Number.isFinite(value)) part = Math.min(1, Math.max(0, value));
+    } catch (error) {
+      native.log("[error] playbarHover: " + describe(error));
+      return;
+    }
+    for (const fn of [...hoverListeners]) runGuarded("playbar onHover", fn, [part]);
+  };
+
   // The kernel checks each kind's name; an unknown one takes the new entry out again before throwing.
   const applyKinds = (id, kinds) => {
     if (!kinds) return;
@@ -239,6 +268,8 @@ const char kUi[] = R"AMPIFYJS(
       addButton: (options) => addControl("playbar", options),
       remove: (id) => removeControl(id),
       mark: (id, from, to) => markLine(id, from, to),
+      readout: (totalMs) => readout(totalMs),
+      onHover: (fn) => onHover(fn),
     }),
     sidebar: Object.freeze({ addItem: (options) => addControl("sidebar", options), remove: (id) => removeControl(id) }),
     menu: Object.freeze({

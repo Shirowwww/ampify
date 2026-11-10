@@ -35,6 +35,15 @@ struct UiControl {
     double markTo = -1;
 };
 
+// The readout under the pointer on the progress line of the playback bar (Ampify.ui.playbar.readout and onHover).
+// `totalMs` is the length the line stands for, set by the last element that asked for a readout (0: no readout);
+// `listeners` are the elements told where the pointer is. `serial` changes each time either changes.
+struct UiPlaybarHover {
+    double totalMs = 0;
+    std::vector<std::string> listeners;
+    std::uint64_t serial = 0;
+};
+
 struct UiSlot {
     std::string elementId;
     std::string id;  // panel or page path; for a popup, its name (SetPopup) or empty (OpenPopup)
@@ -64,6 +73,13 @@ public:
     // within 0 to 1 and in order; a negative `from` clears it, a negative `to` marks the start alone. False when the
     // element has no such play bar button.
     bool SetControlMark(const std::string& elementId, int controlId, double from, double to);
+
+    // Shows, under the pointer on the progress line, a marker and the time at that point of a span `totalMs` long; 0,
+    // a negative number or NaN takes the element's readout away. The last element to ask is the one shown.
+    void SetPlaybarReadout(const std::string& elementId, double totalMs);
+    // Whether the element is told where the pointer is on the progress line.
+    void SetPlaybarHoverListener(const std::string& elementId, bool listening);
+    UiPlaybarHover PlaybarHover() const;
 
     // The kinds of item a context menu entry is for (see UiControl::kinds). False when the element has no such control.
     bool SetControlKinds(const std::string& elementId, int controlId, std::vector<std::string> kinds);
@@ -141,6 +157,9 @@ private:
     std::optional<std::pair<std::string, std::string>> m_route;
     std::uint64_t m_routeSerial = 0;
     std::uint64_t m_applePlayerRequests = 0;
+    std::vector<std::pair<std::string, double>> m_readouts;  // element and length, the last asked at the end
+    std::vector<std::string> m_hoverListeners;
+    std::uint64_t m_hoverSerial = 0;
 };
 
 // Checks a tree sent by an element: only the primitives of ui_vocab.cpp, with the depth, size and text limits of

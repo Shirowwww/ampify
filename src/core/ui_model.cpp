@@ -389,6 +389,32 @@ bool UiModel::SetControlMark(const std::string& elementId, int controlId, double
     return false;
 }
 
+void UiModel::SetPlaybarReadout(const std::string& elementId, double totalMs) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    auto owned = [&](const auto& readout) { return readout.first == elementId; };
+    m_readouts.erase(std::remove_if(m_readouts.begin(), m_readouts.end(), owned), m_readouts.end());
+    if (totalMs > 0) m_readouts.emplace_back(elementId, totalMs);  // NaN fails the test too
+    m_hoverSerial++;
+}
+
+void UiModel::SetPlaybarHoverListener(const std::string& elementId, bool listening) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    auto at = std::find(m_hoverListeners.begin(), m_hoverListeners.end(), elementId);
+    if (listening == (at != m_hoverListeners.end())) return;
+    if (listening) m_hoverListeners.push_back(elementId);
+    else m_hoverListeners.erase(at);
+    m_hoverSerial++;
+}
+
+UiPlaybarHover UiModel::PlaybarHover() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    UiPlaybarHover hover;
+    hover.totalMs = m_readouts.empty() ? 0 : m_readouts.back().second;
+    hover.listeners = m_hoverListeners;
+    hover.serial = m_hoverSerial;
+    return hover;
+}
+
 bool UiModel::SetControlKinds(const std::string& elementId, int controlId, std::vector<std::string> kinds) {
     std::lock_guard<std::mutex> guard(m_mutex);
     return ChangeControl(m_controls, elementId, controlId,
@@ -432,6 +458,12 @@ void UiModel::RemoveElement(const std::string& elementId) {
         m_fullscreenSession = 0;
     }
     if (m_route && m_route->first == elementId) m_route.reset();
+    std::size_t hover = m_readouts.size() + m_hoverListeners.size();
+    auto readout = [&](const auto& pair) { return pair.first == elementId; };
+    m_readouts.erase(std::remove_if(m_readouts.begin(), m_readouts.end(), readout), m_readouts.end());
+    m_hoverListeners.erase(std::remove(m_hoverListeners.begin(), m_hoverListeners.end(), elementId),
+                           m_hoverListeners.end());
+    if (m_readouts.size() + m_hoverListeners.size() != hover) m_hoverSerial++;
 }
 
 std::optional<UiControl> UiModel::Find(int controlId) const {

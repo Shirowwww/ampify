@@ -66,6 +66,7 @@ TEST_CASE(KitLayout_TheMarketplaceAndNowPlayingShipWithTheKit) {
     CHECK(ampify::IsBundledElement("extensions", "now-playing"));
     CHECK(ampify::IsBundledElement("extensions", "playback-guard"));
     CHECK(ampify::IsBundledElement("extensions", "song-panel"));
+    CHECK(ampify::IsBundledElement("extensions", "hover-time"));
     // A community element, or a bundled id in another folder, is not one of them.
     CHECK(!ampify::IsBundledElement("apps", "lyrics"));
     CHECK(!ampify::IsBundledElement("extensions", "marketplace"));
@@ -85,7 +86,7 @@ TEST_CASE(KitLayout_TheAtmosLevelerIsBuiltInStartsOffAndShipsNoFolder) {
     CHECK(!ampify::IsBuiltInExtension("marketplace"));
     CHECK(!ampify::IsBundledElement("extensions", "atmos-leveler"));
     CHECK(!ampify::IsOnByDefault("extensions", "atmos-leveler"));
-    CHECK(ampify::BundledElements().size() == 4);
+    CHECK(ampify::BundledElements().size() == 5);
 }
 
 TEST_CASE(KitLayout_TheBundledElementsShipTurnedOn) {
@@ -93,6 +94,7 @@ TEST_CASE(KitLayout_TheBundledElementsShipTurnedOn) {
     CHECK(ampify::IsOnByDefault("extensions", "now-playing"));
     CHECK(ampify::IsOnByDefault("extensions", "playback-guard"));  // off until 1.3.0
     CHECK(ampify::IsOnByDefault("extensions", "song-panel"));
+    CHECK(ampify::IsOnByDefault("extensions", "hover-time"));
     CHECK(!ampify::IsOnByDefault("extensions", "community-thing"));
 }
 

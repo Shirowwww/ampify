@@ -23,10 +23,11 @@ inline constexpr char kFullscreenClose[] = "fullscreenClose";  // the full-scree
 inline constexpr char kTray[] = "tray";                // the notification-area icon or its menu
 inline constexpr char kMidi[] = "midi";                // a MIDI message an element subscribed to
 inline constexpr char kPageShow[] = "pageShow";        // the kernel opened one of the element's pages, by its path
+inline constexpr char kPlaybarHover[] = "playbarHover";  // the pointer moved over the progress line, or left it
 
 inline constexpr const char* kKernelEntries[] = {
-    kReady, kStop, kPlayer, kKey, kClick, kTimer, kHttp, kAudioFrame, kKitDone,
-    kLink,  kChange, kMenuClick, kPopupClose, kPanelClose, kFullscreenClose, kTray, kMidi, kPageShow,
+    kReady, kStop, kPlayer, kKey, kClick, kTimer, kHttp, kAudioFrame, kKitDone, kLink,
+    kChange, kMenuClick, kPopupClose, kPanelClose, kFullscreenClose, kTray, kMidi, kPageShow, kPlaybarHover,
 };
 
 }  // namespace ampify::dispatch

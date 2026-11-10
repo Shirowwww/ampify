@@ -38,8 +38,11 @@ struct SurfaceChanges {
     std::vector<Surface> removed;  // surfaces that are gone (only kind, element, id and key are meaningful)
     std::optional<std::pair<std::string, std::string>> route;  // a new Ampify.ui.navigate (element, path), once
     bool applePlayer = false;  // Ampify.ui.applePlayer.open was called since the last poll
+    std::optional<UiPlaybarHover> hover;  // the progress line's readout or its listeners changed
 
-    bool Empty() const { return added.empty() && changed.empty() && removed.empty() && !route && !applePlayer; }
+    bool Empty() const {
+        return added.empty() && changed.empty() && removed.empty() && !route && !applePlayer && !hover;
+    }
 };
 
 class SurfaceTracker {
@@ -56,6 +59,7 @@ private:
     std::optional<std::pair<std::string, std::string>> m_route;
     std::uint64_t m_routeSerial = 0;
     std::uint64_t m_applePlayerRequests = 0;
+    std::uint64_t m_hoverSerial = 0;
     std::uint64_t m_revision = 0;
 };
 

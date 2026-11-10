@@ -254,6 +254,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
         context.placed.clear();
         context.playbarMore = nullptr;
         ReleasePlaybarMark(context);
+        ReleasePlaybarHover(context);
         context.probe.clear();
         context.probeObjects.clear();
         context.dialogOpen = false;
@@ -668,6 +669,7 @@ void UiService::Run() {
                     m_shared->surfaces = tracker.Current();
                     if (changes.route) m_shared->pendingRoute = changes.route;
                     if (changes.applePlayer) m_shared->applePlayerPending = true;
+                    if (changes.hover) m_shared->playbarHover = *changes.hover;
                     windows = m_shared->windows;
                 }
                 for (const auto& context : windows) {

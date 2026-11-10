@@ -206,6 +206,20 @@ struct WindowContext : std::enable_shared_from_this<WindowContext> {
     winrt::weak_ref<controls::Grid> markTrack;
     double markFrom = -1;
     double markTo = -1;
+    // The readout under the pointer (Ampify.ui.playbar.readout and onHover, FollowPlaybarHover): Ampify's layer in the
+    // same track, the scrubber whose pointer events it follows (and its two handlers, to take them off), the length
+    // the line stands for (0: no readout), the elements told where the pointer is, and the timer that spaces out
+    // what they are told.
+    controls::Canvas hoverLayer{nullptr};
+    winrt::weak_ref<xaml::FrameworkElement> hoverScrubber;
+    IInspectable hoverMoved{nullptr};  // boxed PointerEventHandler: RemoveHandler takes back the same object
+    IInspectable hoverLeft{nullptr};
+    dispatching::DispatcherQueueTimer hoverTimer{nullptr};
+    double hoverTotal = 0;
+    std::vector<std::string> hoverListeners;
+    double hoverPart = -1;      // where the pointer is now, -1 when it is off the line
+    double hoverSentPart = -1;  // what the listeners were told last
+    std::uint64_t hoverSerial = 0;
 
     // Main window only.
     // Strong, like the Popup: the panels stay ours even when Apple Music rebuilds the children of its page (in the
@@ -379,6 +393,7 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     bool playerCheckPending = false;  // a window showed: the next refresh looks for Apple's own full-screen player
     uirender::PlayerMode playerMode = uirender::PlayerMode::Window;  // apple.fullscreen, read by the worker
     bool closeToTray = false;  // apple.close, read by the worker
+    UiPlaybarHover playbarHover;  // the progress line's readout and listeners, read by the worker
     std::atomic<bool> entryInHeader{false};  // ampify.entry, read on the interface thread (PlaceSidebarItem)
     std::string cardTheme;   // the theme the Ampify page shows
     bool cardStale = false;  // the theme changed elsewhere (Marketplace, ampify theme set): the card is built again
@@ -491,6 +506,8 @@ void FollowSongRoom(UiService::Shared& shared, const std::shared_ptr<WindowConte
 void FollowPlaybarMark(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
                        const std::vector<Surface>& surfaces);
 void ReleasePlaybarMark(WindowContext& context) noexcept;
+void FollowPlaybarHover(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context);
+void ReleasePlaybarHover(WindowContext& context) noexcept;
 
 }  // namespace ui_service_detail
 

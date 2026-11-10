@@ -3042,3 +3042,50 @@ test("ab-loop swaps points marked backwards and stops with another song", () => 
   fake.world.stops.forEach((stop) => stop());
   assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
 });
+
+// Time on hover ships with Ampify, in extensions/: it only tells the kernel how long the song playing is.
+function fakeHoverTime(state) {
+  const dir = join(examples, "..", "extensions", "hover-time");
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+  const granted = new Set(manifest.permissions ?? []);
+  const used = new Set();
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+    used.add(permission);
+  };
+  const world = { state, readouts: [], handlers: { trackchange: [], statechange: [] } };
+  const ampify = {
+    player: {
+      state: () => (need("player.read"), structuredClone(world.state)),
+      on: (event, fn) => (need("player.read"), world.handlers[event].push(fn)),
+    },
+    ui: { playbar: { readout: (totalMs) => (need("ui.playbar"), world.readouts.push(totalMs)) } },
+  };
+  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify: ampify });
+  const emit = (event, next) => {
+    world.state = next;
+    for (const fn of world.handlers[event]) fn(structuredClone(next));
+  };
+  return { world, emit, used, manifest };
+}
+
+test("hover-time reads out the length of the song playing and follows the next one", () => {
+  const fake = fakeHoverTime(playing(song("t1", "One", "Artist"), 187_000, 30_000));
+  assert.deepEqual(fake.world.readouts, [187_000], "the song playing when it starts");
+  fake.emit("statechange", playing(song("t1", "One", "Artist"), 187_000, 31_000));
+  assert.deepEqual(fake.world.readouts, [187_000], "the same length is not sent again");
+  fake.emit("trackchange", playing(song("t2", "Two", "Artist"), 3_729_000));
+  assert.deepEqual(fake.world.readouts, [187_000, 3_729_000]);
+  assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+});
+
+test("hover-time takes the readout away while no song is loaded, and waits for a length that comes late", () => {
+  const fake = fakeHoverTime({ playing: false, positionMs: 0, durationMs: 0, track: null });
+  assert.deepEqual(fake.world.readouts, [0], "nothing to read out");
+  fake.emit("trackchange", playing(song("t1", "One", "Artist"), 0));
+  assert.deepEqual(fake.world.readouts, [0], "a song whose length is not known yet");
+  fake.emit("statechange", playing(song("t1", "One", "Artist"), 200_000));
+  assert.deepEqual(fake.world.readouts, [0, 200_000]);
+  fake.emit("statechange", { playing: false, positionMs: 0, durationMs: 200_000, track: null });
+  assert.deepEqual(fake.world.readouts, [0, 200_000, 0], "the queue ended: no song, no readout");
+});

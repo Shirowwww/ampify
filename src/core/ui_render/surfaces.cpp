@@ -114,6 +114,9 @@ SurfaceChanges SurfaceTracker::Poll(const UiModel& model) {
     std::uint64_t requests = model.ApplePlayerRequests();
     changes.applePlayer = requests != m_applePlayerRequests;
     m_applePlayerRequests = requests;
+    UiPlaybarHover hover = model.PlaybarHover();
+    if (hover.serial != m_hoverSerial) changes.hover = hover;
+    m_hoverSerial = hover.serial;
 
     m_current = std::move(now);
     m_signatures = std::move(signatures);
