@@ -18,6 +18,8 @@
     "ko": {"name": "커버 필터", "description": "재생 중인 곡의 커버를 재생 바, 앨범 위쪽, 전체 화면에서 강조색 두 가지, 흑백, 세피아 또는 더 선명하게 보여 줍니다. 포인터를 올리면 재생 바의 커버가 원래 색으로 돌아옵니다.", "settings": {"look": "효과"}, "options": {"Duotone": "두 가지 색", "Grayscale": "흑백", "Sepia": "세피아", "Vivid": "더 선명하게"}}
   },
   "kitApi": "1.0",
+  "minAmpify": "1.3.0",
+  "preview": "preview.jpg",
   "tags": [
     "artwork",
     "colours"

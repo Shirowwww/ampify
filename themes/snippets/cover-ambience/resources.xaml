@@ -1,4 +1,0 @@
-<!-- A snippet's manifest asks for a resources.xaml. This one is empty: everything goes through user.css. -->
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-</ResourceDictionary>

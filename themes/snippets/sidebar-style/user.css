@@ -36,3 +36,18 @@
         corner-radius: 4px;
     }
 }
+
+/* Off unless chosen: the search box fades out until the pointer reaches it, like Spicetify's Dynamic Search Bar, in
+   the sidebar or where the "Search and back arrow" top bar of Settings > Ampify moves it. It stays where it is and
+   takes clicks while faded, and stays shown while it has the focus, the whole time one types. */
+@setting search-on-hover {
+    .search-box {
+        opacity: 0;
+        transition: opacity 150ms;
+    }
+
+    .search-box:hover,
+    .search-box:focus-within {
+        opacity: 1;
+    }
+}

@@ -19,6 +19,7 @@
   },
   "preview": "preview.jpg",
   "kitApi": "1.0",
+  "minAmpify": "1.3.0",
   "main": "main.js",
   "permissions": ["player.read", "player.control", "ui.playbar"],
   "tags": ["loop", "practice"]

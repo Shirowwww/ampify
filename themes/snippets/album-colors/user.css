@@ -1,9 +1,11 @@
-/* Album colours: an album or a playlist takes the colours of its own artwork, like Apple Music on Android. Ampify
-   reads the artwork of the page's header as --page-art-1 to --page-art-3 (art-3 is dark enough for white text), and
-   the page follows when you open another one. Works on top of any theme.
+/* Artwork colours, on top of any theme, in three places that go together or alone: the pages of albums and playlists
+   (reach), the song playing (glow), and the window's background (moving-background).
 
-   The reach setting picks a wash that fades out under the header, or the whole page in the artwork's colour. What
-   sits on the dark wash draws in dark mode (color-scheme), so its text stays light on a light theme too. */
+   Pages: an album or a playlist takes the colours of its own artwork, like Apple Music on Android. Ampify reads the
+   artwork of the page's header as --page-art-1 to --page-art-3 (art-3 is dark enough for white text), and the page
+   follows when you open another one. The reach setting picks a wash that fades out under the header, the whole page
+   in the artwork's colour, or nothing. What sits on the dark wash draws in dark mode (color-scheme), so its text stays
+   light on a light theme too. */
 
 @setting reach = Fade {
     .album-header {
@@ -38,5 +40,117 @@
     /* The other shelves under the songs keep a band of their own, in a lighter shade of the same colour. */
     .list-page-shelves {
         background: #26var(--page-art-2-hex, FFFFFF);
+    }
+}
+
+/* Glow: the song's display glows in the colours of its artwork, strongest behind the artwork and fading towards the
+   end of the display, like Spicetify's Cover Ambience. It follows each song within 3 seconds. Raise the two leading
+   digits of each colour (00 to FF) for a stronger glow. Bar spreads it over the whole playback bar, from one end to
+   the other, behind the buttons, at the top as at the bottom. */
+@setting glow = Display {
+    .lcd {
+        background: linear-gradient(to right, #A6var(--art-2-hex, 5A5A64) 0%, #4Dvar(--art-1-hex, 5A5A64) 40%, #1Avar(--art-3-hex, 5A5A64) 100%);
+        border-width: 1px;
+        border-color: #33var(--art-2-hex, FFFFFF);
+        corner-radius: var(--lcd-radius, 8px);
+    }
+}
+
+@setting glow = Bar {
+    /* The bar itself carries the glow, and its three columns let it through (Apple paints each with a brush of its
+       own: the glow showed behind the shuffle and previous buttons only). The artwork's two main colours only, to the
+       far end: its third one is an accent, often far from the cover's tone, and the bar drifted to it. */
+    .playbar {
+        background: linear-gradient(to right, #A6var(--art-2-hex, 5A5A64) 0%, #80var(--art-1-hex, 5A5A64) 55%, #6Bvar(--art-2-hex, 5A5A64) 100%);
+    }
+
+    .playbar-controls,
+    .now-playing,
+    .playbar-extras {
+        background: transparent;
+    }
+
+    /* The song's display takes a faint wash of the same colours, with no frame: the song reads as one block without
+       a box of another colour on the glow. */
+    .lcd {
+        background: linear-gradient(to right, #29var(--art-2-hex, FFFFFF) 0%, #0Fvar(--art-1-hex, FFFFFF) 100%);
+        border-width: 0;
+        corner-radius: var(--lcd-radius, 8px);
+    }
+
+    /* At the top, the glow is the whole band, edge to edge, under the window's buttons too: a box of colour inset in
+       the dark band looked cut out. The bar's content keeps its place, the room moving from the margin into the
+       padding, and the cell Apple keeps for the window's buttons goes (that room counted twice, and the bar's buttons
+       folded under "···" with room to spare). Under floating panels the column stands a gap from the window's
+       corner: the band reaches back under it (--bar-band-reach), or the bare window showed above and left of it. */
+    @setting bar-position = Top {
+        .playbar {
+            margin: 0 0 0 calc(var(--bar-band-reach, 0) * -1);
+            padding: var(--gap, 8) var(--bar-top-end, 150) 0 calc(var(--bar-band-reach, 0) + var(--gap, 8) * 2);
+            corner-radius: 0;
+        }
+
+        .caption-buttons-cover {
+            visibility: collapsed;
+        }
+    }
+
+    /* At the bottom, the bar keeps its place and size: edge to edge it read too wide. The glow fills it to its very
+       edge, without the capsule's rim (Glass), which left a few pixels without colour, and rises from its foot,
+       fading towards its top instead of starting on a hard line. */
+    @setting bar-position = Bottom {
+        .playbar {
+            background: linear-gradient(to top, #B3var(--art-2-hex, 5A5A64) 0%, #80var(--art-1-hex, 5A5A64) 55%, #26var(--art-1-hex, 5A5A64) 100%);
+            border-width: 0;
+        }
+    }
+}
+
+/* With the glow, the time keeps its contrast on a dark scheme. A light one (Paper light) keeps its own ink: white
+   times read as a wrong colour at the top left of its light bar. */
+@setting glow != Off {
+    @media (prefers-color-scheme: dark) {
+        .current-time,
+        .duration {
+            color: #E6FFFFFF;
+        }
+    }
+}
+
+/* Moving background: the window's background is Apple Music's own full-screen background (the song's artwork as a
+   slow, blurred, moving wash), faint behind the pages and the playback bar, which turn see-through for it. The window's
+   own colour (the theme's, or Apple Music's dark or light background) shows through it, so the text above stays
+   readable. It is the window's ::before, the one layer under everything: a ::after would lie over the whole window and
+   veil it. An Ampify without `content: immersion` keeps the line before: the song's artwork, still. */
+@setting moving-background {
+    .window {
+        background: var(--window-background, $SolidBackgroundFillColorBaseBrush);
+    }
+
+    .window::before {
+        content: artwork cover;
+        content: immersion;
+        opacity: var(--setting-background-strength, 0.4);
+    }
+
+    /* Apple's layers between the window and its pages, see-through as a theme's floating panels makes them; the
+       pages' panel too, so the background shows behind the lists. The sidebar keeps its own background. */
+    .navigation,
+    .main-column,
+    .content,
+    .page,
+    .content-background {
+        background: transparent;
+    }
+
+    /* The bar's glow, when it spreads over the bar, stays on top of the moving background. */
+    @setting glow != Bar {
+        .playbar {
+            background: transparent;
+        }
+    }
+
+    .frost {
+        visibility: collapsed;
     }
 }

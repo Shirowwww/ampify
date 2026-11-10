@@ -18,6 +18,7 @@
     "ko": {"name": "코지", "description": "부드럽고 평평한 저녁 분위기입니다. 사이드바와 페이지가 같은 색을 쓰고, 재생 바는 큼직한 둥근 커버와 함께 아래쪽을 따라 이어지며, 앨범은 자기 색의 은은한 빛 아래에서 시작합니다. 황혼, 밤, 이끼, 리넨 네 가지 변형이 있습니다.", "settings": {"artwork-size": "커버 크기", "artwork-radius": "커버 모서리", "panel-radius": "모서리", "flat": "플랫", "header-wash": "앨범 헤더 아래 색 번짐", "times": "재생 바 시간 표시"}, "options": {"One colour": "한 가지 색", "Two panels": "패널 두 개", "Deeper": "한 색, 더 어둡게", "Soft": "은은하게", "Strong": "진하게", "None": "없음", "Under the pointer": "포인터를 올릴 때", "Always": "항상", "Hidden": "숨김"}, "groups": {"Layout": "레이아웃", "Artwork": "커버", "Colours": "색상", "Details": "세부 사항"}, "settingDescriptions": {"artwork-size": "재생 바가 아래에 있을 때 적용되며, 바도 함께 커집니다.", "flat": "'패널 두 개'는 더 어두운 창 위에 패널이 도드라지고, '한 색, 더 어둡게'는 그 한 가지 색을 더 짙은 색조로 만듭니다.", "header-wash": "앨범과 플레이리스트에서, 커버 색으로 표시됩니다."}}
   },
   "kitApi": "1.0",
+  "minAmpify": "1.3.0",
   "colors": "colors.ini",
   "preview": "preview.jpg",
   "defaultScheme": "Dusk",

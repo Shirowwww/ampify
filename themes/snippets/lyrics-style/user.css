@@ -1,7 +1,7 @@
 /* Lyrics style: how Apple's lyrics read, in its side pane and in the full-screen player, on top of any theme. The lines
    centred or at the left, the line being sung on a soft tile of the song's colour, and the pane on a dark background,
-   like Spicetify's centred lyrics, lyrics highlight, Dark Lyrics and Pretty Lyrics. One snippet since Ampify 1.3, so
-   the three never fight: Focused lyrics, which blurs the lines away from the sung one, goes with any of them.
+   like Spicetify's centred lyrics, lyrics highlight, Dark Lyrics and Pretty Lyrics, and the lines blurred away from the
+   sung one. One snippet since Ampify 1.3, so these never fight.
 
    Apple sets a word-by-word line's text width when it builds the line, and Apple's own fading by state keeps the sung
    line the brightest: only alignments, colours and corners change here. A margin, padding or border on
@@ -49,5 +49,39 @@
     .lyrics-panel {
         color-scheme: dark;
         background: linear-gradient(to bottom, var(--art-3, #1C1C1E), #0B0B0D 85%);
+    }
+}
+
+/* The lines blur away towards the top and bottom of their column, as in Apple Music on the Mac and the iPhone. One
+   blurred copy of the whole column shows towards its edges: a single pass for the graphics card, however many lines
+   show. Apple keeps the sung line near the top of the side panel and a little above the middle of the full-screen
+   player, so the side panel blurs mostly its bottom. */
+@setting focus = Light {
+    .lyrics-panel .lyrics-synced {
+        filter: blur(6px) edges(6% 45%);
+    }
+
+    .fullscreen-lyrics .lyrics-synced {
+        filter: blur(6px) edges(24% 34%);
+    }
+}
+
+@setting focus = Medium {
+    .lyrics-panel .lyrics-synced {
+        filter: blur(9px) edges(8% 50%);
+    }
+
+    .fullscreen-lyrics .lyrics-synced {
+        filter: blur(9px) edges(28% 40%);
+    }
+}
+
+@setting focus = Strong {
+    .lyrics-panel .lyrics-synced {
+        filter: blur(13px) edges(10% 50%);
+    }
+
+    .fullscreen-lyrics .lyrics-synced {
+        filter: blur(13px) edges(32% 45%);
     }
 }

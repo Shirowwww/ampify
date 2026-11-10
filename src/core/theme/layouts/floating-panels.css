@@ -184,7 +184,7 @@ ContentControl#PaneHeaderContentBorder MenuButton#MoreButton > Grid#LayoutRoot {
 }
 
 /* The page column starts at the folded column's width, and the column floats a gap from the window's corner: a band
-   painted edge to edge at the top (cover-ambience) reaches back this far, under the column, so the window does not
+   painted edge to edge at the top (album-colors' glow) reaches back this far, under the column, so the window does not
    show above and left of it. The column lies over the band, folded or open, so nothing moves as it opens. */
 :root {
     --bar-band-reach: var(--compact-pane, 48);

@@ -47,6 +47,7 @@
   "tags": ["bookmark", "library"],
   "preview": "preview.jpg",
   "kitApi": "1.0",
+  "minAmpify": "1.3.0",
   "main": "main.js",
   "permissions": ["player.read", "player.control", "storage", "ui.menu", "ui.playbar", "ui.popup", "network:music.apple.com"]
 }

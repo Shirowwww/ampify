@@ -18,6 +18,8 @@
     "ko": {"name": "큰 앨범 커버", "description": "앨범과 플레이리스트 페이지 상단의 커버를 Apple 기본보다 크게, 120~360픽셀로 키우고 그 크기에 맞춰 선명하게 불러옵니다.", "settings": {"size": "커버 크기(픽셀)"}}
   },
   "kitApi": "1.0",
+  "minAmpify": "1.3.0",
+  "preview": "preview.jpg",
   "tags": [
     "artwork",
     "layout"

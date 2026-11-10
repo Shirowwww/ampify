@@ -8,7 +8,7 @@
     :root {
         --round: var(--setting-radius);
         --round-small: calc(var(--setting-radius) * 0.5);
-        /* What other parts draw around the display (cover-ambience's glow) follows its corners. */
+        /* What other parts draw around the display (album-colors' glow) follows its corners. */
         --lcd-radius: var(--round);
     }
 

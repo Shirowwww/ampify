@@ -91,6 +91,7 @@
   },
   "tags": ["skip", "filter"],
   "kitApi": "1.0",
+  "minAmpify": "1.3.0",
   "preview": "preview.jpg",
   "main": "main.js",
   "permissions": ["player.read", "player.control", "storage", "ui.menu", "ui.playbar", "ui.popup"],

@@ -1,6 +1,6 @@
 #pragma once
 // Apple decodes its images at the size it shows them: the play bar's cover is a thumbnail of about 54 pixels, which a
-// brush over the whole window blew up (the Artwork and Glass backgrounds, the animated-artwork snippet: soft, blocky).
+// brush over the whole window blew up (the Artwork and Glass backgrounds, the moving background of album-colors: soft, blocky).
 // LargeArtwork loads the cover FindLargerCover finds (larger_cover.hpp, as for the full-screen player) in a hidden image
 // beside Apple's, since WinUI decodes only what the window holds, and hands it over once it has opened. Interface
 // thread only.
