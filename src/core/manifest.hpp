@@ -70,6 +70,9 @@ struct Manifest : ElementInfo {
     std::optional<std::string> defaultScheme;
     // A theme's place for the playback bar (top, bottom or centred) while apple.playbar leaves it to the theme.
     std::optional<std::string> playbar;
+    // A theme's accent while theme.accent leaves it to the theme: "artwork" follows the song playing, as
+    // theme.accent = artwork does. Missing: the accent of its colors.ini.
+    std::optional<std::string> accent;
     // The oldest Ampify release this version runs on: the catalog lists it for that release and later only.
     std::optional<std::string> minAmpify;
     std::optional<std::string> resources;

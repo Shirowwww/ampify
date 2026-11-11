@@ -491,6 +491,11 @@ std::vector<std::string> ReadSchemes(FileSource& files) {
     return schemes;
 }
 
+bool ReadsArtworkAccent(FileSource& files) {
+    std::optional<std::string> text = files.Read("manifest.json");
+    return text && ParseManifest(*text, "", kKitApiMajor, nullptr).partial.accent.value_or("") == "artwork";
+}
+
 std::string ReadDefaultScheme(FileSource& files) {
     std::optional<std::string> text = files.Read("manifest.json");
     if (!text) return {};

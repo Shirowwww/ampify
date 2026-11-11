@@ -21,7 +21,7 @@ namespace {
 
 constexpr std::string_view kKnownFields[] = {
     "$schema", "id", "name", "version", "kind", "author", "description", "kitApi", "homepage", "license",
-    "main", "colors", "defaultScheme", "playbar", "resources", "icon", "permissions", "appVersions", "processes", "type",
+    "main", "colors", "defaultScheme", "playbar", "accent", "resources", "icon", "permissions", "appVersions", "processes", "type",
     "preview", "tags", "settings", "translations", "minAmpify",
 };
 
@@ -138,6 +138,8 @@ bool IsHttpsText(std::string_view text) { return IsHttpsAddress(text); }
 bool IsProcessText(std::string_view text) { return text == "ui" || text == "engine"; }
 bool IsPlaybarText(std::string_view text) { return text == "top" || text == "bottom" || text == "centred"; }
 
+bool IsAccentText(std::string_view text) { return text == "artwork"; }
+
 // A GitHub user name: letters, digits and inner hyphens.
 bool IsAuthorText(std::string_view text) {
     if (text.empty() || text.size() > kMaxAuthor || !IsAsciiAlnum(text.front()) || !IsAsciiAlnum(text.back())) {
@@ -193,6 +195,7 @@ struct Rules {
     TextRule type{IsTypeText, 0, 0, "script or module"};
     TextRule process{IsProcessText, 0, 0, "ui or engine"};
     TextRule playbar{IsPlaybarText, 0, 0, "top, bottom or centred"};
+    TextRule accent{IsAccentText, 0, 0, "artwork"};
     TextRule minAmpify{IsVersionText, 0, 0, "Ampify version, three numbers like 1.3.0"};
     TextRule appVersion{IsAppVersionText, 0, 0, "Apple Music version, for example 1.1540.23042.0"};
     TextRule tag{IsTagText, 0, 0, "lowercase letters, digits and hyphens, " + Between(1, kMaxTag)};
@@ -513,6 +516,7 @@ void ReadManifestOnly(Fields& fields, ManifestMode mode, Manifest& m) {
     m.colors = fields.Text("colors", rules.colors, false);
     m.defaultScheme = fields.Text("defaultScheme", rules.scheme, false);
     m.playbar = fields.Text("playbar", rules.playbar, false);
+    m.accent = fields.Text("accent", rules.accent, false);
     m.minAmpify = fields.Text("minAmpify", rules.minAmpify, false);
     m.resources = fields.Text("resources", rules.resources, false);
     m.icon = fields.Text("icon", rules.icon, false);

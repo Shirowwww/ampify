@@ -6,7 +6,10 @@
    playback bar floats too, as a third panel above the pages. */
 
 /* With the art-tint setting, the glass takes the artwork's dark vibrant colour (var(--art-3)), so the panels change
-   colour with each track. Before the first artwork, and with the setting off, they stay near black. */
+   colour with each track. Before the first artwork, and with the setting off, they stay near black.
+
+   The accent follows the artwork too ("accent": "artwork" in the manifest), so every accented control, shuffle and
+   repeat included, takes the cover's vibrant colour, until another accent is chosen in Ampify's settings. */
 :root {
     --tint: #0B0B10;
 }
@@ -130,31 +133,6 @@
 
 .lcd-artwork:hover .lcd-artwork-picture {
     transform: scale(1.1);
-}
-
-/* The volume and the progress line take the artwork's most vibrant colour, like the window: the theme's pink only
-   until the first artwork (older Ampify versions leave the progress line to Apple Music). */
-.volume-slider,
-.scrubber {
-    color: var(--art-2, #FFFF5C8A);
-}
-
-/* The art-accent setting (Ember's Artwork accent, merged here): the toggles that are on, the Play button of an album
-   and the song playing take the artwork's vibrant colour too, like the progress line and the volume. */
-@setting art-accent {
-    .shuffle-button,
-    .repeat-button {
-        checked-color: var(--art-2, #FFFF5C8A);
-    }
-
-    .album-play-button > Grid#Root,
-    .album-play-button {
-        background: var(--art-2, #FFFF5C8A);
-    }
-
-    .list-item:playing TextBlock {
-        color: var(--art-2, #FFFF5C8A);
-    }
 }
 
 .app-name {

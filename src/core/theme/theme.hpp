@@ -188,6 +188,9 @@ std::vector<std::string> ReadSchemes(FileSource& files);
 // The scheme manifest.json names as the theme's default (`defaultScheme`). Empty when the manifest has none.
 std::string ReadDefaultScheme(FileSource& files);
 
+// True when the theme's manifest asks for the artwork's accent ("accent": "artwork") while theme.accent is empty.
+bool ReadsArtworkAccent(FileSource& files);
+
 // True for a dictionary with no entry at all, such as `<ResourceDictionary/>`: merging it would change nothing.
 bool IsEmptyDictionary(std::string_view xaml);
 

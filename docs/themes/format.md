@@ -858,6 +858,9 @@ the theme keeps its own accent. The colour is kept between a lightness of 30% an
 or white on a dark or a light page: a very dark or very pale cover gives a grey-tinted accent of that lightness. Text
 on the accent is still chosen for it as above.
 
+A theme can start on that accent itself: `"accent": "artwork"` in its manifest (Ampify 1.3.3 and later) gives it the
+artwork's accent while `theme.accent` is empty, as Artwork does. Another accent chosen in the settings still wins.
+
 A theme's own "Artwork" accent setting (Fluent's) and `theme.accent` do not fight: the theme's other choice
 (Windows) is written as `$AccentFillColorDefaultBrush`, so it follows `theme.accent`; its Artwork choice uses
 `--art-2` where the theme names its accent, whatever `theme.accent` says, and Apple's own accented controls keep

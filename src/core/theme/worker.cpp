@@ -63,10 +63,12 @@ LoadInputs ThemeWorker::ReadInputs(const Settings& settings, const ThemeSettings
     const std::filesystem::path themeFolder = m_kit / "themes" / wanted.active;
     std::vector<std::string> schemes;
     std::string defaultScheme;
+    bool themeArtworkAccent = false;
     if (!wanted.active.empty()) {
         FolderFiles files(themeFolder);
         schemes = ReadSchemes(files);
         defaultScheme = ReadDefaultScheme(files);
+        themeArtworkAccent = ReadsArtworkAccent(files);
     }
     m_scheme = ChooseScheme(wanted.scheme, wanted.schedule, schemes, {m_systemDark, minute}, defaultScheme);
 
@@ -75,7 +77,9 @@ LoadInputs ThemeWorker::ReadInputs(const Settings& settings, const ThemeSettings
     inputs.scheme = m_scheme.scheme;
     inputs.parts = wanted.parts;
     // theme.accent = artwork: the colour follows the song; the theme reloads only when that colour changes.
-    inputs.accent = IsArtworkAccent(wanted.accent) ? ArtworkAccent(m_artwork) : ParseAccent(wanted.accent);
+    // A theme may start on the artwork's accent too ("accent": "artwork" in its manifest) until the user picks one.
+    const bool artworkAccent = IsArtworkAccent(wanted.accent) || (wanted.accent.empty() && themeArtworkAccent);
+    inputs.accent = artworkAccent ? ArtworkAccent(m_artwork) : ParseAccent(wanted.accent);
     inputs.glass = GlassLevelOf(wanted.glass);
     inputs.values = ReadThemeValues(settings, wanted.active);
     inputs.playbar = ChoiceOf(settings, kPlaybarKey);

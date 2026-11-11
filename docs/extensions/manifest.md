@@ -49,6 +49,7 @@ element's id. Schema: [schemas/manifest.schema.json](../../schemas/manifest.sche
 | `colors` | | | required, or `resources` | | An `.ini` file of color schemes |
 | `defaultScheme` | | | optional | | The scheme used by default |
 | `playbar` | | | optional | | `top` (default), `bottom` or `centred`: where the playback bar goes while `apple.playbar` leaves it to the theme ([format](../themes/format.md)) |
+| `accent` | | | optional | | `artwork`: the theme's accent follows the song playing while `theme.accent` is empty (Ampify 1.3.3 and later; [format](../themes/format.md#chosen-accent)) |
 | `resources` | | | required, or `colors` | required, or a `user.css` | A `.xaml` resource dictionary |
 | `settings` | optional | forbidden | optional | optional | Settings shown in Ampify's settings page (below) |
 
