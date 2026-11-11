@@ -501,6 +501,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | `--caption-room` | `40` | `bottom-bar`: the strip the panels leave at the top for the window's buttons |
 | `--sidebar-top` | `var(--caption-room)` | `bottom-bar`: where the sidebar starts. The back arrow and the folded menu button follow it |
 | `--song-width` | `560` | `bottom-bar`: width of the song (artwork, title, progress line), a clear space short of the buttons |
+| `--song-scale` | `1` | Set by Ampify from "Song on the playback bar" (`apple.songRoom`): 1.25 or 1.5. Both bar layouts multiply every song width above by it; a theme that lays its bar out itself can do the same |
 | `--song-width-medium`, `-folded`, `-narrow`, `-small` | `460`, `380`, `340`, `270` | The same in a window 1600, 1323, 1100 and 960 pixels wide (1323: the window's width, whether the sidebar is folded or not) or less |
 
 `@import url(ampify:bottom-bar);` works too, in a theme or in a snippet. Other `@import` targets (files, URLs) are ignored.
@@ -668,8 +669,8 @@ To blur the lyrics away from the sung line, blur their column towards its edges:
 top of the side panel and a little above the middle of the full-screen player, and one blur serves every line.
 
 ```css
-.lyrics-panel .lyrics-synced { filter: blur(9px) edges(8% 50%); }
-.fullscreen-lyrics .lyrics-synced { filter: blur(9px) edges(28% 40%); }
+.lyrics-panel .lyrics-lines { filter: blur(9px) edges(8% 50%); }
+.fullscreen-lyrics .lyrics-lines { filter: blur(9px) edges(28% 40%); }
 ```
 
 Examples: the Blur setting of the [`lyrics-style`](../../themes/snippets/lyrics-style/) snippet; colour filters in
@@ -788,7 +789,7 @@ A theme can create its own roles (`--font-lyrics`). Extensions read them with `A
   ```css
   .artwork { filter: duotone(#1B1035, var(--accent, #FA2D48)); transition: filter 400ms; }
   .card-artwork:hover { filter: saturate(1.4) brightness(1.05); }
-  .lyrics-panel .lyrics-synced { filter: blur(9px) edges(8% 50%) grayscale(0.6); }
+  .lyrics-panel .lyrics-lines { filter: blur(9px) edges(8% 50%) grayscale(0.6); }
   ```
 - With `transition: filter <duration>`, a blur eases from where it is, and a change of colours fades the new ones in
   over the old: both run on the compositor, so they stay smooth while Apple Music is busy. Without a transition the
@@ -923,15 +924,18 @@ These files, next to `settings.txt`, hide entries and change their order, with o
   "version": 1,
   "reorder": true,
   "items": [
-    {"name": "RadioItem", "hidden": false},
-    {"name": "BrowseItem", "hidden": true}
+    {"name": "Sidebar_Radio", "hidden": false},
+    {"name": "Sidebar_New", "hidden": true}
   ]
 }
 ```
 
-`name` is the element's `x:Name` (`NavigationViewItem#<name>` in the sidebar, `#<name>` on the home page). `hidden`
-gives `visibility: collapsed`. With `"reorder": true`, the list order becomes `order`, so list every entry. After an
-inspector pass, Ampify writes `sidebar.json` if it is missing, with the real entries, none hidden.
+`name` is the element's `x:Name` (`NavigationViewItem#<name>` in the sidebar, `#<name>` on the home page). A sidebar
+entry without one, as in Apple Music 1.1792, goes by its automation id (`Sidebar_Home`, `Sidebar_New`,
+`Sidebar_Radio`, `Sidebar_Header_Library`, `Sidebar_Header_Playlists`). `hidden` gives `visibility: collapsed`. With
+`"reorder": true`, the list order becomes `order`, so list every entry; it works whether the sidebar holds its
+entries itself or fills them from an items source. After an inspector pass, Ampify writes `sidebar.json` if it is
+missing, with the real entries, none hidden. The Order group of the settings page writes the same file.
 
 ## Check a theme and read the log
 
