@@ -57,31 +57,31 @@
    show. Apple keeps the sung line near the top of the side panel and about a third of the way down the full-screen
    player, so the side panel blurs mostly its bottom. */
 @setting focus = Light {
-    .lyrics-panel .lyrics-synced {
+    .lyrics-panel .lyrics-lines {
         filter: blur(6px) edges(6% 45%);
     }
 
-    .fullscreen-lyrics .lyrics-synced {
+    .fullscreen-lyrics .lyrics-lines {
         filter: blur(6px) edges(12% 34%);
     }
 }
 
 @setting focus = Medium {
-    .lyrics-panel .lyrics-synced {
+    .lyrics-panel .lyrics-lines {
         filter: blur(9px) edges(8% 50%);
     }
 
-    .fullscreen-lyrics .lyrics-synced {
+    .fullscreen-lyrics .lyrics-lines {
         filter: blur(9px) edges(14% 38%);
     }
 }
 
 @setting focus = Strong {
-    .lyrics-panel .lyrics-synced {
+    .lyrics-panel .lyrics-lines {
         filter: blur(13px) edges(10% 50%);
     }
 
-    .fullscreen-lyrics .lyrics-synced {
+    .fullscreen-lyrics .lyrics-lines {
         filter: blur(13px) edges(16% 42%);
     }
 }

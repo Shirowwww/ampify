@@ -159,6 +159,9 @@ bool ElementBlur::Write(theme::NodeId id, const xaml::UIElement& element, const 
         entry->text = text;
         Animate(id, *entry, *filter, ms);
         return true;
+    } catch (const winrt::hresult_error& error) {
+        NoteArtworkFilter(std::to_string(id % 100000) + " refused: " + winrt::to_string(error.message()));
+        return false;
     } catch (...) {
         return false;
     }
@@ -201,7 +204,8 @@ void ElementBlur::Retry(theme::NodeId id, const xaml::FrameworkElement& element,
             const double ms = found->second.ms;
             m_pending.erase(found);  // revokes this handler, which runs to its end
             NoteArtworkFilter(std::to_string(id % 100000) + " tried again");
-            Write(id, target, text, ms);
+            const bool written = Write(id, target, text, ms);
+            if (!written) NoteArtworkFilter(std::to_string(id % 100000) + " refused after waiting");
         } catch (...) {
             // Out of the tree for a moment: Sweep drops it.
         }
@@ -275,14 +279,20 @@ std::optional<ElementBlur::ClipAndContent> ElementBlur::ClipAndContentOf(const x
 ElementBlur::Entry* ElementBlur::Start(theme::NodeId id, const xaml::FrameworkElement& element, bool clip) {
     std::optional<ClipAndContent> pair = ClipAndContentOf(element);
     auto parent = media::VisualTreeHelper::GetParent(element).try_as<xaml::UIElement>();
-    if (!pair || !parent) return nullptr;
+    if (!pair || !parent) {
+        NoteArtworkFilter(std::string(pair ? "no parent" : "no single child with a visual"));
+        return nullptr;
+    }
     const xaml::UIElement content = pair->content;
     // Apple's own child visual (or another of Ampify's) would be replaced and lost: the copies go beside the element.
     xaml::UIElement host = parent;
     const bool ownHost = static_cast<bool>(xaml::Hosting::ElementCompositionPreview::GetElementChildVisual(parent));
     if (ownHost) {
         host = HostBeside(element, parent);
-        if (!host) return nullptr;
+        if (!host) {
+            NoteArtworkFilter("no room beside the element for the copies");
+            return nullptr;
+        }
     }
 
     comp::Visual own = pair->visual;
@@ -312,6 +322,13 @@ ElementBlur::Entry* ElementBlur::Start(theme::NodeId id, const xaml::FrameworkEl
         entry.xamlClipBefore = pair->clipped.Clip();
     } else {
         entry.clipBefore = own.Clip();
+        xaml::Hosting::ElementCompositionPreview::SetIsTranslationEnabled(pair->clipped, true);
+        entry.place = compositor.CreatePropertySet();
+        entry.place.InsertVector3(L"Offset", {0, 0, 0});
+        comp::ExpressionAnimation follow = compositor.CreateExpressionAnimation(L"place.Offset + clipped.Translation");
+        follow.SetReferenceParameter(L"place", entry.place);
+        follow.SetReferenceParameter(L"clipped", own);
+        entry.layer.StartAnimation(L"Offset", follow);
     }
     xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(host, entry.layer);
     Entry& kept = m_entries.insert_or_assign(id, std::move(entry)).first->second;
@@ -390,9 +407,23 @@ void ElementBlur::Place(Entry& entry) {
         }
     }
     winrt::Windows::Foundation::Point origin = content.TransformToVisual(host).TransformPoint({0, 0});
+    if (entry.place) {
+        // Without the clipped element's Translation, which the expression adds: TransformToVisual counts it once
+        // enabled, and the copies went twice as far as the element.
+        winrt::Windows::Foundation::Numerics::float3 moved{};
+        if (auto clipped = entry.clipped.get()) {
+            xaml::Hosting::ElementCompositionPreview::GetElementVisual(clipped).Properties().TryGetVector3(L"Translation", moved);
+        }
+        origin.X -= moved.x;
+        origin.Y -= moved.y;
+    }
     const winrt::Windows::Foundation::Numerics::float2 size{static_cast<float>(content.ActualWidth()),
                                                              static_cast<float>(content.ActualHeight())};
-    if (entry.layer.Offset().x != origin.X || entry.layer.Offset().y != origin.Y) entry.layer.Offset({origin.X, origin.Y, 0});
+    if (entry.place) {
+        entry.place.InsertVector3(L"Offset", {origin.X, origin.Y, 0});
+    } else if (entry.layer.Offset().x != origin.X || entry.layer.Offset().y != origin.Y) {
+        entry.layer.Offset({origin.X, origin.Y, 0});
+    }
     if (entry.surface.SourceSize() != size) entry.surface.SourceSize(size);
     for (Look& look : entry.looks) {
         if (look.sharp.Size() == size) continue;

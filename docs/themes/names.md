@@ -338,6 +338,7 @@ which writes `inspector.json`), and run `ampify theme names` on it; a class that
 | `.lyrics` | The lyrics view |
 | `.lyrics-menu-button` | Its menu button |
 | `.lyrics-synced` | The lyrics that follow the song |
+| `.lyrics-lines` | Their lines, in the scroller that shows them: without the menu button and the credits strip around it (a `filter` there leaves the button sharp) |
 | `.lyrics-static` | The lyrics without timing |
 | `.lyrics-message` | The text that stands in for lyrics: nothing playing, loading, not available |
 | `.lyrics-line` | One line of the synced lyrics, whole; `:current` while it is the line being sung |

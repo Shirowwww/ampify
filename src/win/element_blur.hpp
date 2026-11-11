@@ -92,6 +92,9 @@ private:
         winrt::Microsoft::UI::Composition::CompositionVisualSurface surface{nullptr};
         winrt::Microsoft::UI::Composition::CompositionSurfaceBrush copy{nullptr};   // the content, as it is
         winrt::Microsoft::UI::Composition::ContainerVisual layer{nullptr};          // the looks, the last on top
+        // The copies' place from layout ("Offset"), to which the clipped element's composition Translation is added
+        // by an expression: an element moved that way (the full-screen lyrics, win/lyrics_window.cpp) keeps them.
+        winrt::Microsoft::UI::Composition::CompositionPropertySet place{nullptr};
         std::vector<Look> looks;
         winrt::Microsoft::UI::Xaml::FrameworkElement::LayoutUpdated_revoker laidOut;
         ImageFilter filter;   // the last written

@@ -347,6 +347,7 @@ const std::vector<ClassEntry> kClasses{
     {"lyrics", {"LyricsHostView#LyricsView"}},
     {"lyrics-menu-button", {"Button#LyricsMenuButton"}},
     {"lyrics-synced", {"KaraokeLyricsView#RootControl"}},
+    {"lyrics-lines", {"KaraokeLyricsView ScrollViewer#TimeBasedLyrics"}},
     {"lyrics-static", {"ListView#StaticLyrics"}},
     {"lyrics-message", {"TextBlock#UnloadedTextBlock", "TextBlock#LoadingTextBlock", "TextBlock#NotAvailableTextBlock"}},
     {"lyrics-line", {"KaraokeLyricsLine"}},
