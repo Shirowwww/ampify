@@ -22,6 +22,7 @@
 
 #include "../core/theme/animation.hpp"
 #include "../core/theme/tree.hpp"
+#include "presence_watch.hpp"
 #include "xaml_chrome.hpp"
 
 namespace ampify::win {
@@ -106,7 +107,7 @@ private:
     bool m_wasPlaying = true;  // at the previous step of the loops
     std::map<theme::NodeId, Running> m_running;
     std::function<bool()> m_shown;
-    winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_loopTimer{nullptr};
+    SeenTimer m_loopTimer;  // the loops' steps, stopped while the main window is not seen
     std::shared_ptr<bool> m_alive = std::make_shared<bool>(true);
 };
 

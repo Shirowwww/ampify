@@ -31,5 +31,6 @@ list(APPEND AMPIFY_CORE_SOURCES
     src/core/text_util.cpp
     src/core/address_order.cpp
     src/core/ui_watchdog.cpp
+    src/core/presence.cpp
     src/core/orphan_agent.cpp
     src/core/reliability.cpp)

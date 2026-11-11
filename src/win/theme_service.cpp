@@ -19,6 +19,7 @@
 
 #include "element_picker.hpp"
 #include "mini_player_theme.hpp"
+#include "presence_watch.hpp"
 #include "apple_tweak.hpp"
 #include "artwork_passthrough.hpp"
 #include "sidebar_hover.hpp"
@@ -316,6 +317,7 @@ void ThemeService::Run(HINSTANCE module) {
                     ui->attached = ui->backend.Attach();
                 }
                 if (!ui->attached) return;
+                WatchPresence(journal);  // the work that only draws follows the windows
                 // New pages and rows get the theme within a fraction of a second instead of at the next tick.
                 std::weak_ptr<UiSide> weak = ui;
                 ui->backend.WatchChanges([weak, &journal] {
@@ -342,6 +344,7 @@ void ThemeService::Run(HINSTANCE module) {
                 });
             }
             if (ui->backend.WindowClosed()) return;
+            RefreshPresence();  // should a window event have been missed
             // Hidden in the notification area (music playing, window closed to the tray) or minimized: the periodic
             // pass waits, and the first tick once the window shows again applies what changed meanwhile. Not the very
             // first tick: a window that starts hidden still gets its theme before it first shows.

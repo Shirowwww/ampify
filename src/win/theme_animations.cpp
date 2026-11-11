@@ -250,7 +250,7 @@ bool ThemeAnimations::Write(theme::NodeId id, const xaml::UIElement& element, co
 
 ThemeAnimations::~ThemeAnimations() {
     m_alive.reset();
-    if (m_loopTimer) m_loopTimer.Stop();
+    m_loopTimer.Stop();
 }
 
 void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> loops) {
@@ -280,22 +280,10 @@ void ThemeAnimations::StartLoops(Running& running, std::vector<th::Animation> lo
         }
         running.stepCentre = true;
     }
-    if (!m_loopTimer) {
-        auto queue = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
-        if (!queue) return;
-        m_loopTimer = queue.CreateTimer();
-        m_loopTimer.IsRepeating(true);
-        std::weak_ptr<bool> alive = m_alive;
-        m_loopTimer.Tick([this, alive](auto const&, auto const&) noexcept {
-            try {  // a XAML call that throws would end the process from a noexcept handler
-                if (!alive.expired()) StepLoops();
-            } catch (...) {
-                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
-            }
-        });
-    }
-    m_loopTimer.Interval(Span(1000.0 / kLoopFps));
-    if (!m_loopTimer.IsRunning()) m_loopTimer.Start();
+    std::weak_ptr<bool> alive = m_alive;
+    m_loopTimer.Run(Span(1000.0 / kLoopFps), [this, alive] {
+        if (!alive.expired()) StepLoops();
+    });
 }
 
 void ThemeAnimations::StepLoops() {

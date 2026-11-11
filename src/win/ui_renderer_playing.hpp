@@ -19,6 +19,7 @@
 
 #include "../core/now_playing.hpp"
 #include "artwork_fade.hpp"
+#include "presence_watch.hpp"
 
 namespace ampify::win::playing_views {
 
@@ -74,7 +75,7 @@ struct LyricsView {
     controls::FontIcon backIcon{nullptr};
     double offset = 0;    // how far the lines are moved up
     bool manual = false;  // the user moved them
-    winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer timer{nullptr};
+    SeenTimer timer;  // a frame of the karaoke, while the view is loaded and the window seen
     std::shared_ptr<const Lyrics> shown;
     std::vector<std::vector<media::SolidColorBrush>> words;  // per line, per word (one per line without word times)
     int current = -2;                                        // the line drawn as current; -2 before the first frame
@@ -83,10 +84,6 @@ struct LyricsView {
     bool stale = true;  // the look changed: build the lines again
     std::weak_ptr<LyricsView> self;
     std::function<void(int64_t)> pick;  // a line clicked: its start, for the element's onChange
-
-    ~LyricsView() {
-        if (timer) timer.Stop();
-    }
 };
 
 // A queue entry's cover (AppleArtworkSource): Apple's loader draws it, then it is decoded large. It does not follow

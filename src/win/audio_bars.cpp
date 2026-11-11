@@ -95,22 +95,11 @@ controls::Grid AudioBars::Make(const theme::BarsContent& content, const wchar_t*
     }
     m_sets.push_back(std::move(set));
 
-    if (!m_timer) {
-        m_timer = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
-        m_timer.Interval(kFrame);
-        // An exception out of a timer's handler is a failed HRESULT for the dispatcher, which fails fast the whole
-        // process ("stowed exception" in CoreMessaging): nothing may leave it.
-        m_timer.Tick([this, alive = std::weak_ptr<int>(m_alive)](auto&&, auto&&) noexcept {
-            try {
-                if (alive.lock()) Tick();
-            } catch (...) {
-                // A handler runs inside Apple Music's XAML frame: nothing may escape it.
-            }
-        });
-    }
-    if (!m_timer.IsRunning()) {
+    if (!m_timer.Wanted()) {
         m_last = std::chrono::steady_clock::now();
-        m_timer.Start();
+        m_timer.Run(kFrame, [this, alive = std::weak_ptr<int>(m_alive)] {
+            if (alive.lock()) Tick();
+        });
     }
     return grid;
 }
@@ -126,7 +115,7 @@ void AudioBars::SetBrush(const controls::Grid& bars, const media::Brush& brush) 
 void AudioBars::Drop(const xaml::FrameworkElement& element) {
     if (!element) return;
     std::erase_if(m_sets, [&](const Set& set) { return set.grid == element; });
-    if (m_sets.empty() && m_timer) m_timer.Stop();
+    if (m_sets.empty()) m_timer.Stop();
 }
 
 void AudioBars::SetThick(const xaml::FrameworkElement& element, bool thick) {

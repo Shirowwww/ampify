@@ -22,6 +22,7 @@
 #include "../core/audio/bar_meter.hpp"
 #include "../core/audio/bar_shapes.hpp"
 #include "../core/theme/tree.hpp"
+#include "presence_watch.hpp"
 
 namespace ampify::win {
 
@@ -67,7 +68,7 @@ private:
     // The timer's handler holds a weak pointer to this: once the owner is destroyed (maybe off the interface thread,
     // when the timer cannot be stopped), a tick does nothing.
     std::shared_ptr<int> m_alive = std::make_shared<int>(0);
-    winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer m_timer{nullptr};
+    SeenTimer m_timer;  // a frame of the bars, while some show and the window is seen
     std::chrono::steady_clock::time_point m_last{};
     winrt::Windows::UI::ViewManagement::UISettings m_settings{nullptr};
 };

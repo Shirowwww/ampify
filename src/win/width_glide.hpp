@@ -14,13 +14,14 @@
 #include <winrt/Microsoft.UI.Xaml.Media.h>
 #include <winrt/Microsoft.UI.Xaml.h>
 
+#include "presence_watch.hpp"
 #include "../core/theme/tree.hpp"
 
 namespace ampify::win {
 
 class WidthGlides {
 public:
-    WidthGlides() = default;
+    WidthGlides();
     WidthGlides(const WidthGlides&) = delete;
     WidthGlides& operator=(const WidthGlides&) = delete;
     ~WidthGlides();
@@ -42,6 +43,7 @@ private:
         double from = 0;        // where the glide started
         double shown = 0;       // what Ampify last wrote
         double durationMs = 0;  // of the glide on its way
+        double step = 0.5;      // the least change worth a write: half a pixel of the screen, in XAML units
         Clock::time_point start{};
         Clock::time_point lastWrite{};  // Apple's last write
         bool known = false;     // a first width was seen
@@ -53,10 +55,12 @@ private:
     void Show(Glide& glide, double width) noexcept;
     void Release(Glide& glide) noexcept;
     void Listen() noexcept;
+    void Settle() noexcept;
 
     std::map<theme::NodeId, Glide> m_glides;
     bool m_writing = false;  // Ampify's own write, not Apple's
     winrt::Microsoft::UI::Xaml::Media::CompositionTarget::Rendering_revoker m_frames;
+    SeenListener m_presence;  // hidden, the lines stand at Apple's width: no frame is drawn for nobody
 };
 
 }  // namespace ampify::win

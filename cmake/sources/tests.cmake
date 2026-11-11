@@ -26,6 +26,7 @@ list(APPEND AMPIFY_TESTS_SOURCES
     tests/gain_board_tests.cpp
     tests/sidebar_hold_tests.cpp
     tests/song_room_tests.cpp
+    tests/presence_tests.cpp
     tests/playbar_place_tests.cpp
     tests/progress_mark_tests.cpp
     tests/hover_readout_tests.cpp

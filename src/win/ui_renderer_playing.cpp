@@ -423,8 +423,8 @@ void KeepLineInView(LyricsView& view, const controls::TextBlock& block) {
 }
 
 void PaintLyrics(LyricsView& view) {
-    // The window hidden (in the notification area, minimized): 30 frames a second for nobody. The next frame shown
-    // catches up with the song at once.
+    // The main window hidden, the timer stops (SeenTimer); a view in another window that hides waits here. The next
+    // frame shown catches up with the song at once.
     if (auto root = view.viewport ? view.viewport.XamlRoot() : nullptr; root && !root.IsHostVisible()) return;
     NowPlaying now = CurrentNowPlaying();
     if (view.stale || now.lyrics != view.shown) BuildLyricLines(view, now.lyrics);
@@ -451,22 +451,11 @@ void PaintLyrics(LyricsView& view) {
 }
 
 void RunLyrics(const std::shared_ptr<LyricsView>& view, bool run) {
-    if (!run) {
-        if (view->timer) view->timer.Stop();
-        return;
-    }
-    if (!view->timer) {
-        view->timer = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
-        view->timer.Interval(kLyricsFrame);
-        std::weak_ptr<LyricsView> weak = view;  // the timer must not keep the view alive
-        view->timer.Tick([weak](auto&&, auto&&) noexcept {
-            try {
-                if (std::shared_ptr<LyricsView> alive = weak.lock()) PaintLyrics(*alive);
-            } catch (...) {
-            }
-        });
-    }
-    view->timer.Start();
+    if (!run) return view->timer.Stop();
+    std::weak_ptr<LyricsView> weak = view;  // the timer must not keep the view alive
+    view->timer.Run(kLyricsFrame, [weak] {
+        if (std::shared_ptr<LyricsView> alive = weak.lock()) PaintLyrics(*alive);
+    });
 }
 
 // A small round button in the bottom right corner, hidden until the user reads elsewhere; it fades in and out.

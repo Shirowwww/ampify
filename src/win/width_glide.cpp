@@ -17,9 +17,18 @@ namespace {
 // width jumps there, as Apple shows it.
 constexpr double kJumpShare = 0.08;
 
+// A frame writes the width only once it moved this many pixels of the screen. Each write lays the line out again and
+// redraws what lies over it (a theme's glass blurs it again): a line growing a few pixels a second, written at every
+// frame, cost a whole core for changes no eye could see. Half a pixel still moves it smoothly, antialiased.
+constexpr double kLeastPixels = 0.5;
+
 bool Usable(double width) { return std::isfinite(width) && width >= 0; }
 
 }  // namespace
+
+WidthGlides::WidthGlides() : m_presence([this](bool seen) {
+                                 if (!seen) Settle();
+                             }) {}
 
 WidthGlides::~WidthGlides() {
     for (auto& [id, glide] : m_glides) Release(glide);
@@ -63,6 +72,9 @@ void WidthGlides::OnWidth(theme::NodeId id) noexcept {
     try {
         width = element.Width();
         if (auto parent = element.Parent().try_as<xaml::FrameworkElement>()) room = parent.ActualWidth();
+        if (auto root = element.XamlRoot(); root && root.RasterizationScale() > 0) {
+            glide.step = kLeastPixels / root.RasterizationScale();
+        }
     } catch (...) {
         return;  // an element on its way out: Apple's width stays as it is
     }
@@ -91,15 +103,21 @@ void WidthGlides::OnWidth(theme::NodeId id) noexcept {
 
 void WidthGlides::Listen() noexcept {
     if (m_frames) return;
+    if (!InterfacePresence().Seen()) return Settle();
     try {
         m_frames = xaml::Media::CompositionTarget::Rendering(winrt::auto_revoke,
                                                              [this](auto&&, auto&&) { Step(); });
     } catch (...) {
-        // No frame events: the widths jump as before.
-        for (auto& [id, glide] : m_glides) {
-            if (glide.moving) Show(glide, glide.target);
-            glide.moving = false;
-        }
+        Settle();  // no frame events: the widths jump as before
+    }
+}
+
+// Every line at Apple's last width at once, and no more frames until the next glide.
+void WidthGlides::Settle() noexcept {
+    m_frames.revoke();
+    for (auto& [id, glide] : m_glides) {
+        if (glide.moving) Show(glide, glide.target);
+        glide.moving = false;
     }
 }
 
@@ -116,7 +134,8 @@ void WidthGlides::Step() noexcept {
             continue;
         }
         any = true;
-        Show(glide, glide.from + (glide.target - glide.from) * t);
+        double width = glide.from + (glide.target - glide.from) * t;
+        if (std::abs(width - glide.shown) >= glide.step) Show(glide, width);
     }
     if (!any) m_frames.revoke();
 }

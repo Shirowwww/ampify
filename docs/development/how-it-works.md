@@ -111,6 +111,26 @@ with its fix; `ampify doctor` prints the same lines (`src/core/reliability.*`).
 The tree's shape is in [knowledge/apple-music-xaml-tree.md](../../knowledge/apple-music-xaml-tree.md). Pitfalls are in
 [xaml-lessons.md](xaml-lessons.md).
 
+### Drawing only what is seen
+
+One state says whether anyone can see the interface: `InterfacePresence()` (`src/core/presence.hpp`). It is seen while
+one of Apple Music's windows (the main one, the full-screen player, the mini player) is on screen, not minimized, not
+hidden in the notification area, not on another virtual desktop, and not covered by another app's window in front of
+it (a game or a full-screen video while the music plays). `src/win/presence_watch.cpp` keeps it with WinEvent hooks,
+and the theme's tick reads the windows again every 3 seconds in case an event was missed.
+
+Work whose only effect is on screen follows it instead of checking the window itself:
+
+- `SeenTimer` is a `DispatcherQueueTimer` that stops while nothing is seen and, seen again, ticks at once so what it
+  draws catches up with the song. The karaoke of the `lyrics` node, the visualiser bars and the loops of a theme's
+  `@keyframes` use it.
+- `SeenListener` hears each change on its own interface thread (the mini player has its own). The immersion
+  background holds its wash still (also while the music is paused), and the smooth progress line stops its frames and stands at Apple's width.
+
+Work that has an effect off screen does not follow it: the sound and the Atmos leveler, the JavaScript elements, the
+theme's passes (they wait for a shown window on their own). The audio analysis already runs only while something
+draws it (`DemandShared`).
+
 ## Panels, pages and the settings page
 
 Extensions describe interfaces as trees of nodes, drawn with real WinUI controls (`src/win/ui_renderer*.cpp`, the node
