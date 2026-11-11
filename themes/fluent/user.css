@@ -32,6 +32,10 @@
     --song-width-folded: 350;
     --song-width-narrow: 300;
     --song-width-small: 240;
+    /* Centred: the song gets more of a wide bar than centre-bar's 400, and the line under the buttons stays a
+       Windows player's short one rather than spanning most of the window. */
+    --song-width-centred: 540;
+    --song-width-centred-medium: 440;
     /* Windows' timings: a fade or a press settles in well under a fifth of a second. */
     --fade: 120ms;
     /* The play button, the progress and the volume: Windows' accent, or the artwork's colour (the setting). */
