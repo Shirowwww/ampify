@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.3.3 (2026-11-11)
+
+The play bar's place back in the settings, a progress line under the buttons that looks finished, a moving background
+for every theme, fewer duplicate settings, and an Ampify that rests while its window is out of sight.
+
+### Interface
+
+- The playback bar's place moved to the Look tab of Ampify's settings, right under the theme it overrides, and the
+  sidebar that opens under the pointer sits beside it. The bottom, centred choice is now called "At the bottom,
+  progress under the buttons", which is what it does.
+- The moving background (Artwork colours) is Ampify's own now: the song's artwork as soft fields of colour that drift
+  slowly behind the pages, under every theme. Apple's full-screen background, used before, drew an almost black layer
+  outside Apple's player. The pages stay glass over it, in the theme's own tint where it has one.
+- Glass's "Moving artwork in the background" setting went: the snippet's does the same under every theme. Someone who
+  had it on (it was on by default) gets the snippet's moving background instead.
+- Under the buttons, the progress line shows the elapsed time at its left end and the song's length at its right end,
+  as Spotify does. The song beside it is narrower, so the line is longer, and the buttons stand further from it.
+  With nothing playing, the times leave with the line instead of showing "0:00". Themes get the same state as `:idle`.
+- With nothing playing, the Apple logo shows in the middle of a bar at the bottom again. Declutter still hides it on
+  request, and no longer does by default.
+- In the full-screen player, with a number of lyrics lines above and below the sung one, the sung line now stands in
+  the middle of the lyrics area. Apple keeps it a third of the way down, so the few lines shown hung high.
+- Song panel is off until you turn it on, and its settings choose the sections it shows (lyrics, artist, credits, Up
+  Next) and whether its background takes the artwork's colours or the theme's.
+
+### Themes
+
+- A theme's manifest can say `"accent": "artwork"`: its accent then follows the song playing, as the "Follows the
+  artwork" accent does, until another accent is chosen in the settings.
+- Artwork uses it. Shuffle, repeat, the Play button and the progress line all take the cover's colour, where its old
+  "Accent in the artwork's colours" setting left some of them pink. The setting is gone.
+- Cinema puts its progress line under the buttons by default, in a wider capsule. Its page width setting says what it
+  sets: the width of the page column.
+- Fluent's buttons stand further from the progress line under them.
+- The artwork of a bar at the bottom stays square. In a taller display, Console's for one, Apple stretched its cell
+  and the cover was cut into a rectangle; Console's now grows to 64 pixels.
+- Lyrics style's blur in the full-screen player keeps clear of the sung line and blurs only the top and bottom lines.
+
+### Other
+
+- While Apple Music's windows are minimised, hidden in the notification area or on another desktop, Ampify's timers
+  stop: the karaoke, the audio bars, looping theme animations and the moving background no longer draw for nobody, and
+  catch up at once when a window shows again. The moving background also stands still while the music is paused.
+
 ## 1.3.2 (2026-11-11)
 
 A fix for the song panel, which 1.3.1 broke in narrow windows, two small fixes found while taking new screenshots, and

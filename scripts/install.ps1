@@ -9,7 +9,7 @@
 # In a console that shows colours, the steps appear in Ampify's colours with a live progress bar; through a pipe, in a
 # file or with NO_COLOR set, the output stays plain text.
 #
-# To install a given version instead of the latest: $env:AMPIFY_VERSION = '1.3.2' before the line above.
+# To install a given version instead of the latest: $env:AMPIFY_VERSION = '1.3.3' before the line above.
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'  # the progress bar of Invoke-WebRequest slows downloads a lot in 5.1
