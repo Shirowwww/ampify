@@ -91,6 +91,7 @@ Grid#NowPlayingBar {
 | `A:checked` | A toggle, check box, radio button or switch that is on (a settings switch, Apple's shuffle); also a button Apple shows on with a lit dot under it (repeat, `.repeat-button:checked`) |
 | `A:selected` | A selected list row (`.list-item:selected`) or sidebar entry: the row's presenter, as `.list-item` names it, is selected with its item. A row draws its selection over its background, so `background` on a selected row goes to its selection colours (`selected-background` and the two others) |
 | `A:disabled` | A control that takes no input |
+| `A:idle` | While nothing is in the player (before the first song): the same for every element. `.current-time:idle` |
 | `A:not(B)` | An `A` that does not match `B`, where `B` is one part: a type, a `#name` and the pseudo-classes above |
 | `A:has(B)`, `A:has(> B)` | An `A` with an element inside that matches the selector `B` (with `>`, a child of `A`), as in CSS: `StackPanel:has(TileControl)` |
 | `A::before`, `A::after` | A decorative image put into `A` (see [Decorative images](#decorative-images)) |
@@ -99,7 +100,7 @@ Grid#NowPlayingBar {
   state of that ancestor (see [A state on an ancestor](#a-state-on-an-ancestor)).
 - `:not()` takes no state, no `::before`/`::after`, no combinator and no class.
 - `:has()` takes no state and no `::before`/`::after`; it counts what its selector counts, and goes inside `:not()`.
-- `:playing`, `:checked`, `:selected` and `:disabled` go on any part and count as pseudo-classes. A toggle or a
+- `:playing`, `:checked`, `:selected`, `:disabled` and `:idle` go on any part and count as pseudo-classes. A toggle or a
   selection that changes restyles at once; a control that turns disabled is restyled at the next pass (a few seconds at
   most). Ampify reads these states only while the theme has a rule that uses one.
 - Not supported: attributes (`[x=y]`), `An+B` forms (`odd`, `2n+1`) and other pseudo-classes (`:visited`...). A rule
@@ -471,7 +472,7 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 |---|---|
 | `ampify:floating-panels` | The sidebar and the pages become two rounded panels on the window's background, with even gaps |
 | `ampify:bottom-bar` | The playback bar goes to the bottom across the window: the song left, buttons in the middle of the window, volume right. It hides the column Apple keeps for the window buttons, so a theme needs no rule of its own for it. Import it after `floating-panels` |
-| `ampify:centre-bar` | `bottom-bar` with the buttons centred and the progress line under them, the elapsed time at its left end (the length stays hidden, as `bottom-bar` keeps it). The line and the time move into the middle cell with `move-to`. Import it after `bottom-bar` |
+| `ampify:centre-bar` | `bottom-bar` with the buttons centred and the progress line under them, the elapsed time at its left end and the song's length at its right end. The song is narrower (`--song-width-centred`) so the line is longer. The line and the times move into the middle cell with `move-to`. Import it after `bottom-bar` |
 | `ampify:scrollbars` | Scroll bars inside their panel, clear of its rounded corners, without Windows' arrows, out of sight until the pointer reaches them. Part of `floating-panels` |
 
 | Variable | Default | Meaning |
@@ -494,6 +495,8 @@ For a whole layout whose edges line up, import a ready-made one, then add your o
 | `--bar-reach-end` | `0` | `bottom-bar`: how far right the bar reaches past the page column, for a sidebar on the right |
 | `--line-inset` | the song's width (`--song-width`... at each step), a gap and 16 | `centre-bar`: space from the cell's edges to the times; the line starts `--time-room` further in, on both sides, so it stays clear of the song and centred under the buttons |
 | `--time-room` | `44` | `centre-bar`: width kept for each time at the ends of the line |
+| `--song-width-centred`, `--song-width-centred-medium` | `400`, `340` | `centre-bar`: width of the song in a window wider than 1600 pixels, and up to 1600; narrower windows keep `bottom-bar`'s steps |
+| `--transport-lift` | `12` | `centre-bar`: room between the buttons and the line under them |
 | `--bar-reach-end-folded` | `0` | `bottom-bar`: the same with the sidebar folded |
 | `--caption-room` | `40` | `bottom-bar`: the strip the panels leave at the top for the window's buttons |
 | `--sidebar-top` | `var(--caption-room)` | `bottom-bar`: where the sidebar starts. The back arrow and the folded menu button follow it |
@@ -524,7 +527,7 @@ work with Ampify's own code: keep them in a copy, or the matching behaviour stop
 | `@media (max-width: 1324px)` and `(min-width: 1325px)` | The width where Apple Music folds its sidebar. With `apple.sidebar = hover`, Ampify keeps it folded and these bounds follow that, not the window |
 | `--caption-room` of `40` (`bottom-bar`) | The strip the top search bar and its veil are drawn in |
 | `Grid#ShadowCaster { visibility: collapsed; }` (`floating-panels`) | Without Apple's square shadow, Ampify draws a hairline round the sidebar opened over the pages, where nothing else draws an edge |
-| `.apple-logo { opacity: 0; }` (`bottom-bar`), never `visibility` | Apple Music sets the logo's visibility from what plays: the value Ampify restores when the theme goes would come back stale and show the logo over the title |
+| `.apple-logo { opacity: 0; }` (Declutter's `apple-logo` setting), never `visibility` | Apple Music sets the logo's visibility from what plays: the value Ampify restores when the theme goes would come back stale and show the logo over the title |
 
 #### The playback bar's place
 

@@ -477,6 +477,10 @@ void AddLookPane(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& 
     folds->host = controls::StackPanel();
     folds->host.Spacing(4);
     AddSettingsRow(*nav, rows, ThemeChoice(shared, nav, folds), TextOf("mods.theme", "mods.themeHelp"));
+    // Right under the theme they override: people looked for the bar's place and the sidebar that opens under the
+    // pointer among the look, not the window.
+    AddTweakRow(shared, *nav, rows, uirender::PlaybarChoice(shared.kit));
+    AddTweakRow(shared, *nav, rows, uirender::SidebarChoice(shared.kit));
     AddSettingsRow(*nav, rows, AccentChoice(shared), TextOf("accent.title", "accent.help"));
     // Like the accent, the glass level holds for every theme and snippet, and the engine follows it within a tick.
     AddTweakRow(shared, *nav, rows, uirender::GlassChoice(shared.kit));

@@ -18,4 +18,4 @@ Scroll bars that sit inside their panel: off its edge, clear of its rounded corn
 
 ## centre-bar
 
-The playback bar with the buttons centred and the progress line under them, the elapsed time at its left end. Pairs with bottom-bar (import it first). The line and the time move out of the song's display into the centre cell, which has no rows: the line stands at its foot and the buttons just above it, so both share the cell. The line's template repeats its margin inside: half the room goes on each side, and a top or bottom margin would take its 6 pixels (none drew).
+The playback bar with the buttons centred and the progress line under them, the elapsed time at its left end and the length at its right end. Pairs with bottom-bar (import it first). The line and the time move out of the song's display into the centre cell, which has no rows: the line stands at its foot and the buttons just above it, so both share the cell. The line's template repeats its margin inside: half the room goes on each side, and a top or bottom margin would take its 6 pixels (none drew).

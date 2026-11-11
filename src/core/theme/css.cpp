@@ -141,6 +141,8 @@ std::optional<std::string> ReadStructural(const std::string& pseudo, std::string
         compound.selected = true;
     } else if (pseudo == "disabled") {
         compound.disabled = true;
+    } else if (pseudo == "idle") {
+        compound.idle = true;
     } else if (pseudo == "nth-child" || pseudo == "nth-last-child") {
         int& target = pseudo == "nth-child" ? compound.nth : compound.nthLast;
         return ReadNthChild(s, i, target, pseudo, text).value_or("");
@@ -195,7 +197,7 @@ std::optional<std::string> ReadPseudo(std::string_view s, size_t& i, Compound& c
     }
     return "pseudo-class \":" + written + "\" is not supported in \"" + selector.text +
            "\" (" + StateList(", ") + ", :first-child, :last-child, :only-child, :nth-child(n), :nth-last-child(n), "
-           ":playing, :checked, :selected, :disabled, :not(...), :has(...), ::before and ::after are)";
+           ":playing, :checked, :selected, :disabled, :idle, :not(...), :has(...), ::before and ::after are)";
 }
 
 // One part of a selector from `i`: a type or `*`, a #name, then pseudo-classes. Moves `i` past what it read.

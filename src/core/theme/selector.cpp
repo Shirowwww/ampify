@@ -21,6 +21,7 @@ bool CompoundMatches(const Compound& compound, const std::vector<NodeInfo>& node
     if (compound.checked && !node.checked) return false;
     if (compound.selected && !node.selected) return false;
     if (compound.disabled && !node.disabled) return false;
+    if (compound.idle && !node.idle) return false;
     for (const Compound& negated : compound.negations) {
         if (CompoundMatches(negated, nodes, index)) return false;
     }
@@ -116,6 +117,7 @@ void AddSpecificity(const Compound& compound, Specificity& specificity) {
     if (compound.checked) specificity.classes++;
     if (compound.selected) specificity.classes++;
     if (compound.disabled) specificity.classes++;
+    if (compound.idle) specificity.classes++;
     if (!compound.type.empty()) specificity.types++;
     for (const Compound& negated : compound.negations) {
         if (negated.counted) AddSpecificity(negated, specificity);
@@ -197,7 +199,7 @@ void MarkCheckedByDot(std::vector<NodeInfo>& nodes, const std::vector<int>& dots
 
 bool UsesControlStates(const std::vector<Compound>& parts) {
     for (const Compound& part : parts) {
-        if (part.checked || part.selected || part.disabled) return true;
+        if (part.checked || part.selected || part.disabled || part.idle) return true;
         if (UsesControlStates(part.negations)) return true;
         for (const std::vector<Compound>& relative : part.has) {
             if (UsesControlStates(relative)) return true;

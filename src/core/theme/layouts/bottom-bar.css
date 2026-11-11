@@ -81,13 +81,6 @@ StackPanel#NowPlayingToggleButtons > StackPanel > ToggleButton {
     }
 }
 
-/* With nothing loaded, Apple Music centres its logo in the display, far from everything else on the bar. Its opacity,
-   not its visibility: Apple Music binds the visibility to what plays, so the value read before the theme would come
-   back stale when the theme goes, and show the logo over the title. */
-.apple-logo {
-    opacity: 0;
-}
-
 /* The song's title and artist start next to its artwork instead of in the middle of the display. */
 .track-lines {
     grid-column: 0;
@@ -150,6 +143,15 @@ StackPanel#NowPlayingToggleButtons > StackPanel > ToggleButton {
    here is 12 on screen. */
 .scrubber {
     margin: 0 6 0 0;
+}
+
+/* The artwork stays square: in a display taller than Apple's (a taller bar), Apple's cell stretched it upwards and the
+   cover was cut into a rectangle. A theme that sizes it sets --artwork-size, or its own width and height. */
+.lcd-artwork-image,
+.lcd-placeholder {
+    width: var(--artwork-size, 54);
+    height: var(--artwork-size, 54);
+    vertical-alignment: center;
 }
 
 /* Apple draws a hairline between the artwork and the title: on a bar without the display's box it hangs alone. */

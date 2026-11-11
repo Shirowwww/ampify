@@ -42,7 +42,7 @@ void MarkSelectedPresenters(std::vector<NodeInfo>& nodes);
 // elements named "<button>Dot", without "Dot", when it holds that dot; `:checked` then reaches it as it does a toggle.
 void MarkCheckedByDot(std::vector<NodeInfo>& nodes, const std::vector<int>& dots);
 
-// True when a rule of `parts` waits on :checked, :selected or :disabled (TreeBackend::WatchStates).
+// True when a rule of `parts` waits on :checked, :selected, :disabled or :idle (TreeBackend::WatchStates).
 bool UsesControlStates(const std::vector<Compound>& parts);
 
 }  // namespace ampify::theme

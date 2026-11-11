@@ -76,8 +76,9 @@ of its own with an entry in the sidebar, and a **snippet** is a few lines of sty
 **Developers** tab holds the examples for people who make extensions.
 **Scheme** is the light or dark version a theme may offer.
 
-The playback bar's place is one choice for every theme, in Settings > Ampify > Window > Playback bar. "As the theme plans"
-keeps each theme's own place; Top, Bottom and Bottom, centred hold under every theme.
+The playback bar's place is one choice for every theme, in Settings > Ampify > Look > Playback bar, under the theme.
+"As the theme plans" keeps each theme's own place; At the top, At the bottom and "At the bottom, progress under the
+buttons" (the line runs under the buttons, between the elapsed time and the song's length) hold under every theme.
 
 ## Extensions
 

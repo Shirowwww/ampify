@@ -2,7 +2,7 @@
    reach over them, which is fine). --transport-lift is the room between the cell's foot and the buttons. */
 .transport {
     vertical-alignment: bottom;
-    margin: 0 0 var(--transport-lift, 6) 0;
+    margin: 0 0 var(--transport-lift, 12) 0;
 }
 
 /* The line and the times stand 10 above the bar's edge. */
@@ -27,43 +27,77 @@
     visibility: visible;
 }
 
-/* The elapsed time only, at the line's left end: the length stays hidden, as bottom-bar keeps it. Always visible:
-   out of the song, Apple's pointer states no longer hide it. The opacity is written after floating-panels, so it
-   shows on narrow windows too. Centred on the track: 6 under the cell's foot. */
-.current-time {
+/* The elapsed time at the line's left end and the song's length at its right end, as Spotify shows them. Always
+   visible: out of the song, Apple's pointer states no longer hide them. The opacity is written after floating-panels,
+   so they show on narrow windows too. Centred on the track: 6 under the cell's foot. */
+.current-time,
+.duration {
     move-to: "Grid#TransportBar > Grid:nth-child(1)";
     grid-row: 0;
     grid-column: 0;
     grid-column-span: 4;
     vertical-alignment: bottom;
-    horizontal-alignment: left;
     opacity: 1;
     visibility: visible;
 }
 
+.current-time {
+    horizontal-alignment: left;
+}
+
+.duration {
+    horizontal-alignment: right;
+}
+
+/* Nothing in the player: Apple hides the line but leaves the times at "0:00", now out of the hidden song. */
+.current-time:idle,
+.duration:idle {
+    opacity: 0;
+}
+
+/* The song stops short of the line: with the line under the buttons, a song as wide as bottom-bar's left the line
+   a third of the bar. --song-width-centred sets that width on a wide window; narrower ones keep bottom-bar's steps. */
+.now-playing {
+    width: var(--song-width-centred, 400);
+}
+
 /* The line keeps clear of the song on the left, and as far from the right edge: centred under the buttons at every
-   width. Each step follows the song's width in bottom-bar; --line-inset sets one inset for all of them. */
+   width. Each step follows the song's width; --line-inset sets one inset for all of them. */
 .scrubber {
-    margin: 0 calc((var(--line-inset, calc(var(--song-width, 560) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width, 560) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+    margin: 0 calc((var(--line-inset, calc(var(--song-width-centred, 400) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-centred, 400) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
 }
 
 .current-time {
-    margin: 0 0 -6 var(--line-inset, calc(var(--song-width, 560) + var(--gap, 8) + 16));
+    margin: 0 0 -6 var(--line-inset, calc(var(--song-width-centred, 400) + var(--gap, 8) + 16));
 }
 
+.duration {
+    margin: 0 var(--line-inset, calc(var(--song-width-centred, 400) + var(--gap, 8) + 16)) -6 0;
+}
 
 @media (max-width: 1600px) {
+    .now-playing {
+        width: var(--song-width-centred-medium, 340);
+    }
+
     .scrubber {
-        margin: 0 calc((var(--line-inset, calc(var(--song-width-medium, 460) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-medium, 460) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
+        margin: 0 calc((var(--line-inset, calc(var(--song-width-centred-medium, 340) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-centred-medium, 340) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
     }
 
     .current-time {
-        margin: 0 0 -6 var(--line-inset, calc(var(--song-width-medium, 460) + var(--gap, 8) + 16));
+        margin: 0 0 -6 var(--line-inset, calc(var(--song-width-centred-medium, 340) + var(--gap, 8) + 16));
     }
 
+    .duration {
+        margin: 0 var(--line-inset, calc(var(--song-width-centred-medium, 340) + var(--gap, 8) + 16)) -6 0;
+    }
 }
 
 @media (max-width: 1323px) {
+    .now-playing {
+        width: var(--song-width-folded, 380);
+    }
+
     .scrubber {
         margin: 0 calc((var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
     }
@@ -72,9 +106,16 @@
         margin: 0 0 -6 var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16));
     }
 
+    .duration {
+        margin: 0 var(--line-inset, calc(var(--song-width-folded, 380) + var(--gap, 8) + 16)) -6 0;
+    }
 }
 
 @media (max-width: 1100px) {
+    .now-playing {
+        width: var(--song-width-narrow, 340);
+    }
+
     .scrubber {
         margin: 0 calc((var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
     }
@@ -83,9 +124,16 @@
         margin: 0 0 -6 var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16));
     }
 
+    .duration {
+        margin: 0 var(--line-inset, calc(var(--song-width-narrow, 340) + var(--gap, 8) + 16)) -6 0;
+    }
 }
 
 @media (max-width: 960px) {
+    .now-playing {
+        width: var(--song-width-small, 270);
+    }
+
     .scrubber {
         margin: 0 calc((var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2) 0 calc((var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16)) + var(--time-room, 44)) / 2);
     }
@@ -94,4 +142,7 @@
         margin: 0 0 -6 var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16));
     }
 
+    .duration {
+        margin: 0 var(--line-inset, calc(var(--song-width-small, 270) + var(--gap, 8) + 16)) -6 0;
+    }
 }

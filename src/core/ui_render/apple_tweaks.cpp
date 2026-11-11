@@ -12,8 +12,9 @@ namespace fs = std::filesystem;
 namespace {
 
 // The rows of each section of the page, in the order it shows them.
-constexpr const char* kWindowKeys[] = {kSidebarKey, kPlaybarKey, kTopbarKey,       kEntryKey,
-                                       kMarqueeKey, kCloseKey,   kNotificationsKey};
+// The playback bar's place and the sidebar's opening sit on the Look tab instead, under the theme they change
+// (PlaybarChoice, SidebarChoice).
+constexpr const char* kWindowKeys[] = {kTopbarKey, kEntryKey, kMarqueeKey, kCloseKey, kNotificationsKey};
 constexpr const char* kPlayerKeys[] = {kPlayerModeKey, kPlayerControlsKey, kLyricsBeforeKey, kLyricsAfterKey,
                                        kArtworkKey};
 constexpr const char* kReliabilityKeys[] = {kNetworkKey, kProxyKey, kOrphanAgentKey, kFreezeLogKey};
@@ -94,6 +95,10 @@ bool ReadEntryInHeader(const Settings& settings) { return ChoiceOf(settings, kEn
 TweakChoice EntryChoice(const fs::path& kit) { return ChoiceIn(kit, kEntryKey); }
 
 TweakChoice GlassChoice(const fs::path& kit) { return ChoiceIn(kit, kGlassChoiceKey); }
+
+TweakChoice PlaybarChoice(const fs::path& kit) { return ChoiceIn(kit, kPlaybarKey); }
+
+TweakChoice SidebarChoice(const fs::path& kit) { return ChoiceIn(kit, kSidebarKey); }
 
 bool IsAppleTweakValue(const std::string& key, const std::string& value) { return IsOfferedValue(key, value); }
 

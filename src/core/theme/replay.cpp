@@ -373,6 +373,7 @@ std::unique_ptr<ReplayBackend> ReplayBackend::Load(std::string_view text, std::s
         node.checked = FlagOf(item, "checked", flags);
         node.selected = FlagOf(item, "selected", flags);
         node.disabled = FlagOf(item, "disabled", flags);
+        node.idle = FlagOf(item, "idle", flags);
         node.box = BoxOf(item);
         backend->m_hasBoxes = backend->m_hasBoxes || node.box.has_value();
         if (const Json* properties = item.Find("properties"); properties && properties->AsObject()) {
@@ -495,6 +496,7 @@ std::vector<NodeInfo> ReplayBackend::Snapshot() {
         info.checked = node.checked;
         info.selected = node.selected;
         info.disabled = node.disabled;
+        info.idle = node.idle;
         const int at = static_cast<int>(infos.size());
         infos.push_back(std::move(info));
         const int count = static_cast<int>(node.children.size());

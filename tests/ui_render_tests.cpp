@@ -926,6 +926,13 @@ TEST_CASE(UiRender_TheGlassLevelIsChosenFromThreeValues) {
 
     WriteFile(kit / "settings.txt", "theme.active = night\n");
     CHECK(GlassChoice(kit).value == "full");
+
+    // The playback bar's place, shown on the Look tab: as the theme plans by default, four places, and it saves.
+    TweakChoice playbar = PlaybarChoice(kit);
+    CHECK(playbar.key == "apple.playbar" && playbar.value == "theme" && playbar.options.size() == 4);
+    CHECK(SetAppleTweak(kit, "apple.playbar", "centred", error));
+    CHECK(PlaybarChoice(kit).value == "centred");
+    CHECK(SidebarChoice(kit).key == "apple.sidebar" && SidebarChoice(kit).options.size() == 2);
 }
 
 TEST_CASE(UiRender_AmpifysEntryGoesInTheHeaderOnlyWhenChosen) {
@@ -1023,7 +1030,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "apple.notifications", "loud", error));
     CHECK(!SetAppleTweak(kit, "theme.active", "screen", error));
 
-    // Three sections: the window (sidebar, top bar, Ampify's entry, long texts, closing, then the notifications, where
+    // Three sections: the window (top bar, Ampify's entry, long texts, closing, then the notifications, where
     // "never" only shows for someone who chose it before: Apple's own switch does it), the full-screen player, and the
     // network and reliability fixes.
     auto keysOf = [&kit](TweakGroup group) {
@@ -1031,7 +1038,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
         for (const TweakChoice& choice : AppleTweakChoices(kit, group)) keys.push_back(choice.key);
         return keys;
     };
-    CHECK((keysOf(TweakGroup::Window) == std::vector<std::string>{"apple.sidebar", "apple.playbar", "apple.topbar",
+    CHECK((keysOf(TweakGroup::Window) == std::vector<std::string>{"apple.topbar",
                                                                   "ampify.entry",
                                                                   "apple.marquee", "apple.close",
                                                                   "apple.notifications"}));
@@ -1063,7 +1070,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(card("apple.lyricsAfter").value == "all" && card("apple.lyricsAfter").options.size() == 7);
     CHECK(card("apple.artwork").value == "sharp");
     CHECK(card("apple.marquee").value == "hover");
-    CHECK(card("apple.sidebar").value == "open");
+    CHECK(SidebarChoice(kit).value == "open");  // on the Look tab, beside the playback bar
     CHECK(card("apple.topbar").value == "off" && card("apple.topbar").options.size() == 2);  // off by default
     CHECK(card("apple.close").value == "tray" && card("apple.close").options.size() == 2);
     CHECK(card("apple.notifications").value == "never" && card("apple.notifications").options.size() == 3);
@@ -1091,7 +1098,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(card("apple.notifications").options.size() == 2 && card("apple.notifications").value == "background");
     CHECK(card("apple.network").value == "system");
     CHECK(card("apple.artwork").value == "apple" && card("apple.marquee").value == "off");
-    CHECK(card("apple.sidebar").value == "hover");
+    CHECK(SidebarChoice(kit).value == "hover");
     CHECK(card("apple.topbar").value == "search");
 }
 

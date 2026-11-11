@@ -52,7 +52,7 @@ versione chiara o scura che un tema può offrire.
 
 La barra di riproduzione si sceglie una volta per tutti i temi, nelle impostazioni di Ampify, alla voce
 «Barra di riproduzione». «Come previsto dal tema»
-mantiene la posizione di ciascun tema; In alto, In basso e In basso, centrata valgono per tutti.
+mantiene la posizione di ciascun tema; In alto, In basso e «In basso, avanzamento sotto i pulsanti» valgono per tutti.
 
 ## Tornare ad Apple Music
 

@@ -90,6 +90,8 @@ struct NodeInfo {
     bool checked = false;
     bool selected = false;
     bool disabled = false;
+    // Nothing in the player (before the first song): the same for every element of a pass, read with the states above.
+    bool idle = false;
 };
 
 inline constexpr std::string_view kOrderProperty = "Order";

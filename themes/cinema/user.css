@@ -26,6 +26,10 @@
     @import "ampify:bottom-bar";
 }
 @setting bar-position = Centred {
+    :root {
+        --capsule-width: 1200;  /* the line under the buttons needs the room: at 960 it was a fifth of the capsule */
+    }
+
     @import "ampify:bottom-bar";
     @import "ampify:centre-bar";
 }
@@ -122,6 +126,8 @@
         --sidebar-top: var(--gap);
         --song-width: 330;
         --song-width-medium: 330;
+        --song-width-centred: 300;
+        --song-width-centred-medium: 300;
         --song-width-folded: 330;
         --song-width-narrow: 330;
         --song-width-small: 210;

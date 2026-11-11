@@ -1072,6 +1072,19 @@ TEST_CASE(Selector_CheckedSelectedAndDisabledMatchTheControlsState) {
     CHECK(!th::UsesControlStates(Sel("ListViewItemPresenter:playing:hover").parts));
 }
 
+TEST_CASE(Selector_IdleMatchesOnlyWhileNothingIsInThePlayer) {
+    std::vector<th::NodeInfo> nodes(2);
+    nodes[0] = {1, "Grid", "", "TransportBar", -1, 0};
+    nodes[1] = {2, "TextBlock", "", "CurrentTime", 0, 1};
+    CHECK(!th::Matches(Sel("TextBlock#CurrentTime:idle"), nodes, 1));
+
+    for (th::NodeInfo& node : nodes) node.idle = true;
+    CHECK(th::Matches(Sel("TextBlock#CurrentTime:idle"), nodes, 1));
+    CHECK(th::Matches(Sel("Grid:idle > TextBlock"), nodes, 1));
+    CHECK(th::UsesControlStates(Sel("TextBlock:idle").parts));
+    CHECK(th::SpecificityOf(Sel("TextBlock:idle")) > th::SpecificityOf(Sel("TextBlock")));
+}
+
 TEST_CASE(Selector_HasMatchesAnElementInsideAndNothingAboveOrBeside) {
     // A section holding a card, a section holding a header, and a card outside both.
     std::vector<th::NodeInfo> nodes(6);
@@ -3908,7 +3921,7 @@ TEST_CASE(Builtins_CentreBarMovesTheProgressLineIntoTheControls) {
         moved.push_back(assignment.selector.text);
         CHECK(assignment.value.text == "Grid#TransportBar > Grid:nth-child(1)");
     }
-    CHECK(moved.size() == 2);  // the progress line and the elapsed time
+    CHECK(moved.size() == 3);  // the progress line, the elapsed time and the length
 }
 
 namespace {
@@ -3982,14 +3995,19 @@ TEST_CASE(Builtins_CentreBarFollowsTheSongWidthOfTheTheme) {
     CHECK(Sides(ValueAtWidth(theme, ".current-time", "Margin", 1200))[0] == 330 + 8 + 16);
 }
 
-// Apple Music shows the times only while the pointer is over the song; under the buttons the elapsed time always shows,
-// and the length stays where bottom-bar keeps it (hidden).
-TEST_CASE(Builtins_CentreBarShowsTheElapsedTimeAlways) {
+// Apple Music shows the times only while the pointer is over the song; under the buttons both always show, the
+// elapsed time at the line's left end and the length at its right end, as far from the bar's edges.
+TEST_CASE(Builtins_CentreBarShowsBothTimesAlways) {
     th::Theme theme = CentreBar();
     CHECK(theme.problems.empty());
-    CHECK(ValueAtWidth(theme, ".current-time", "Visibility", 1500) == "Visible");
-    CHECK(ValueAtWidth(theme, ".current-time", "Opacity", 1500) == "1");
-    CHECK(ValueAtWidth(theme, ".duration", "Visibility", 1500) != "Visible");
+    for (const char* time : {".current-time", ".duration"}) {
+        CHECK(ValueAtWidth(theme, time, "Visibility", 1500) == "Visible");
+        CHECK(ValueAtWidth(theme, time, "Opacity", 1500) == "1");
+    }
+    for (double width : kBarWidths) {
+        CHECK(Sides(ValueAtWidth(theme, ".duration", "Margin", width))[2] ==
+              Sides(ValueAtWidth(theme, ".current-time", "Margin", width))[0]);
+    }
 }
 
 TEST_CASE(Variables_RootBlockAndVar) {

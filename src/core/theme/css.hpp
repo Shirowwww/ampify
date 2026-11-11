@@ -90,6 +90,7 @@ struct Compound {
     bool checked = false;   // :checked, a toggle, check box or switch that is on (NodeInfo::checked)
     bool selected = false;  // :selected, a list row or sidebar entry that is selected (NodeInfo::selected)
     bool disabled = false;  // :disabled, a control that takes no input (NodeInfo::disabled)
+    bool idle = false;      // :idle, nothing in the player (NodeInfo::idle)
     std::vector<Compound> negations;  // :not(...): parts the element must not match
     // :has(...): the parts of each relative selector, one of whose elements inside this one must match. The combinator
     // of the first part is how that part stands to this element: Child for `:has(> X)`, else Descendant.

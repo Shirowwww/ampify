@@ -26,6 +26,11 @@
 /* The rack unit stands along the bottom unless Ampify's playback bar setting puts it at the top. Centred keeps the
    rack's own layout: the display already takes the middle of the bar. */
 @setting bar-position != Top {
+    /* The rack's display is taller than Apple's: the artwork grows with it, square, a little short of its edges. */
+    :root {
+        --artwork-size: 64;
+    }
+
     @import "ampify:bottom-bar";
 }
 

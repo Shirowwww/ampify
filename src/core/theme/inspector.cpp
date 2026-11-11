@@ -152,6 +152,7 @@ std::string NodeJson(const Inspection& inspection, int index, const InspectOptio
     if (node.checked) entry.emplace_back("checked", Json(true));
     if (node.selected) entry.emplace_back("selected", Json(true));
     if (node.disabled) entry.emplace_back("disabled", Json(true));
+    if (node.idle) entry.emplace_back("idle", Json(true));
     if (const std::optional<NodeBox>& box = read.box) {
         entry.emplace_back("box", Json(Json::Array{Json(box->x), Json(box->y), Json(box->width), Json(box->height)}));
     }
@@ -234,6 +235,7 @@ std::optional<std::vector<NodeInfo>> ReadInspectorTree(std::string_view text, st
         node.checked = flag("checked");
         node.selected = flag("selected");
         node.disabled = flag("disabled");
+        node.idle = flag("idle");
         if (node.parent < -1 || node.parent >= static_cast<int>(nodes.size())) {
             return fail("node " + std::to_string(nodes.size()) + " comes before its parent");
         }

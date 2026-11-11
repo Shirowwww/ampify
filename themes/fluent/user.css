@@ -170,9 +170,13 @@
     }
 }
 
-/* The card is tall enough for the buttons at full size and the line under them, a clear 11 apart: centre-bar's
-   smaller buttons, for bars where the line crowds them, are not needed here. */
+/* The card is tall enough for the buttons at full size and the line under them, with room between the two:
+   centre-bar's smaller buttons, for bars where the line crowds them, are not needed here. */
 @setting bar-position = Centred {
+    :root {
+        --transport-lift: 16;  /* centre-bar's 6 is for its smaller buttons: full size, they sat on the line */
+    }
+
     .transport {
         transform: none;
     }

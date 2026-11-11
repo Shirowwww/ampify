@@ -35,6 +35,7 @@
 #include <winrt/Windows.Foundation.Numerics.h>
 
 #include "../core/color_extract.hpp"
+#include "../core/now_playing.hpp"
 #include "../core/theme/colour_keys.hpp"
 #include "../core/theme/properties.hpp"
 #include "../core/theme/selector.hpp"
@@ -356,6 +357,8 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     media::ImageSource artwork{nullptr};
     controls::Image artworkImage{nullptr};
     controls::Image pageImage{nullptr};
+    // :idle. A first song changes the play bar, and that change asks for a pass, so the times come back with it.
+    m_idle = CurrentNowPlaying().trackKey.empty();
     while (!stack.empty()) {
         Pending item = stack.back();
         stack.pop_back();
@@ -517,6 +520,7 @@ void XamlTreeBackend::TakeStates(const xaml::DependencyObject& object, theme::No
         watched = controls::NavigationViewItemBase::IsSelectedProperty();
     }
     if (auto control = object.try_as<controls::Control>()) node.disabled = !control.IsEnabled();
+    node.idle = m_idle;
     if (!watched) return;
     if (auto known = m_stateWatched.find(node.id); known != m_stateWatched.end() && known->second.get() == object) return;
     std::weak_ptr<bool> alive = m_alive;

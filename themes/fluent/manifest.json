@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "fluent",
   "name": "Fluent",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Apple Music built like a Windows 11 app: the navigation and the controls on the window's Mica, the pages on one content layer with Windows' corner and hairline edge, Segoe UI Variable, and the accent on what acts. Light and dark.",

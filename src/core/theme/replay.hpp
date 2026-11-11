@@ -42,6 +42,7 @@ public:
         bool checked = false;   // the states the inspector saw (NodeInfo::checked, selected, disabled)
         bool selected = false;
         bool disabled = false;
+        bool idle = false;
         bool reachable = true;
         std::optional<NodeBox> box;
         std::map<std::string, Value, std::less<>> properties;  // as recorded, then as written

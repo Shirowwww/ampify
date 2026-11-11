@@ -73,7 +73,7 @@
     }
 }
 
-/* On unless turned off. Apple Music shows and hides its logo itself, following what plays: an opacity leaves that
+/* Off unless chosen: Apple Music shows and hides its logo itself, following what plays: an opacity leaves that
    to it. */
 @setting apple-logo {
     .apple-logo {

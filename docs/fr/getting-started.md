@@ -52,8 +52,9 @@ plus d'un thème. L'onglet **Développeurs** réunit les exemples pour qui crée
 version claire ou sombre qu'un thème peut proposer.
 
 La barre de lecture se place une fois pour tous les thèmes, dans les réglages d'Ampify, onglet
-Fenêtre, à « Barre de lecture ». « Selon le thème »
-garde la place de chaque thème ; En haut, En bas et En bas, centrée valent pour tous.
+Apparence, à « Barre de lecture », sous le thème. « Selon le thème » garde la place de chaque thème ; En haut, En bas
+et « En bas, progression sous les boutons » (la ligne passe sous les boutons, entre le temps écoulé et la durée) valent
+pour tous.
 
 ## Revenir à Apple Music
 

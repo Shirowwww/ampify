@@ -374,6 +374,7 @@ private:
     std::vector<bool> m_mediaAnswers;               // whether each matched at the last pass
     bool m_watchOverPages = false;                  // WatchSidebarOverPages: the theme dims the sidebar's pane
     bool m_watchStates = false;                     // WatchStates: the theme has :checked, :selected or :disabled
+    bool m_idle = false;                            // :idle on this pass: nothing in the player
     // The controls whose IsChecked, IsOn or IsSelected asks for a pass when it changes (TakeStates).
     std::map<theme::NodeId, winrt::weak_ref<winrt::Microsoft::UI::Xaml::DependencyObject>> m_stateWatched;
     void TakeStates(const winrt::Microsoft::UI::Xaml::DependencyObject& object, theme::NodeInfo& node);

@@ -90,6 +90,12 @@ TweakChoice EntryChoice(const std::filesystem::path& kit);
 // cannot include): full, balanced or eco.
 TweakChoice GlassChoice(const std::filesystem::path& kit);
 
+// Where the playback bar goes (apple.playbar): as the theme plans, or one place that wins over every theme.
+TweakChoice PlaybarChoice(const std::filesystem::path& kit);
+
+// Whether the sidebar stays open or opens under the pointer (apple.sidebar), for every theme.
+TweakChoice SidebarChoice(const std::filesystem::path& kit);
+
 // True when the card offers `value` for `key` (stored values, such as "auto" for kit_update).
 bool IsAppleTweakValue(const std::string& key, const std::string& value);
 
