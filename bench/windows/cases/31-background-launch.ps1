@@ -40,7 +40,9 @@ Register-Case -Id 'background-launch' -Title 'Launcher started by Windows: Apple
     Add-Check -Ctx $Ctx -Name 'kernel loaded in AppleMusic.exe opened from its icon' -Passed $loaded
     $hostReady = Wait-Journal -FileName 'AppleMusic.log' -Text $script:LogPhrase.ExtensionHostReady -TimeoutSeconds 60
     Add-Check -Ctx $Ctx -Name 'AppleMusic.log: extension host ready' -Passed $hostReady
-    $agent = Wait-Until -TimeoutSeconds 90 -Condition {
+    # The runner's Windows Server never hands the engine over (below): 15 s there instead of 90, the slowest wait of the bench.
+    $agentWait = if ($env:GITHUB_ACTIONS -eq 'true') { 15 } else { 90 }
+    $agent = Wait-Until -TimeoutSeconds $agentWait -Condition {
         $null -ne (Find-JournalMatch -FileName 'attach.log' -Pattern 'AMPLibraryAgent\.exe \(\d+\): kernel loaded')
     }
     # Windows 11 hands the engine over too (seen on 05/11/2026); the runner's Windows Server starts it outside the

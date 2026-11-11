@@ -6,14 +6,15 @@ needs the Windows bench, which runs unattended in CI, and a pass on a real PC fo
 ## CI
 
 `.github/workflows/ci.yml` runs on each push to `dev` that touches code, schemas, knowledge, docs, scripts or the
-bench (not `bench/windows/live/`), and by hand from the Actions tab. A new push cancels the run in progress.
+bench (not `bench/windows/live/`), and by hand from the Actions tab. A new push cancels the run in progress; the compiler caches are saved anyway, so the next run starts from them.
 
 | Job | What it does |
 |---|---|
+| What changed | Compares the push with the previous `dev`. Only `docs/`, `knowledge/`, `tools/` or top-level `.md` files: the Windows jobs and the bench are skipped, the Linux job still runs |
 | Unit tests (Linux) | `ampify_tests`, then the Python and Node tests and the linter against the Linux `ampify` |
 | Unit tests (Windows, MSVC) | `ampify_tests` |
 | Build the release kit, Build the bench kit | The two MSVC kits with XAML, in parallel |
-| Split the bench cases, Bench (group 1 to 4) | `bench/windows/shards.sh` reads the case ids from the case files and deals them over four runners, each with its own Apple Music. A new case needs no edit in `ci.yml` |
+| Split the bench cases, Bench (group 1 to 6) | `bench/windows/shards.sh` reads the case ids from the case files and deals them over six runners, each with its own Apple Music. A new case needs no edit in `ci.yml` |
 
 The release build injects only on tested versions. The bench build (`AMPIFY_BENCH=ON`) accepts the version installed on
 the runner. Results are in the job summary and an artifact: `report.md`, `results.json`, `winget.log`,

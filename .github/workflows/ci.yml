@@ -42,6 +42,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A push that only touches the docs, the knowledge notes or the Python/JS tools needs no Windows build and no bench:
+  # the Linux job covers those. Started by hand, everything runs.
+  changes:
+    name: What changed
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      windows: ${{ steps.diff.outputs.windows }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: diff
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          windows=true
+          if [[ "$GITHUB_EVENT_NAME" == push && -n "$BEFORE" && "$BEFORE" != 0000000000000000000000000000000000000000 ]] \
+             && git fetch --quiet --depth=1 origin "$BEFORE"; then
+            files="$(git diff --name-only "$BEFORE" "$GITHUB_SHA")"
+            printf '%s\n' "$files"
+            if [[ -n "$files" ]] && ! grep -qvE '^(docs/|knowledge/|tools/|[^/]+\.md$)' <<<"$files"; then windows=false; fi
+          fi
+          echo "windows=$windows" | tee -a "$GITHUB_OUTPUT"
+
   linux-tests:
     name: Unit tests (Linux)
     runs-on: ubuntu-24.04
@@ -50,7 +73,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: Install Ninja, ccache and jsonschema (the validator tests compare against it)
         run: sudo apt-get install -y --no-install-recommends ninja-build ccache python3-jsonschema || (sudo apt-get update && sudo apt-get install -y --no-install-recommends ninja-build ccache python3-jsonschema)
-      - uses: actions/cache@v4
+      # Restored and saved apart, so a cancelled or failed run still keeps what it compiled for the next one.
+      - uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ccache
           key: ccache-linux-${{ github.sha }}
@@ -62,6 +86,12 @@ jobs:
           cmake --build build-linux --target ampify_tests ampify
           ./build-linux/ampify_tests
           ccache --show-stats
+      - uses: actions/cache/save@v4
+        if: always()
+        continue-on-error: true
+        with:
+          path: ~/.cache/ccache
+          key: ccache-linux-${{ github.sha }}-${{ github.run_attempt }}
       # The command line, the catalog tools and the JavaScript elements, against the binary just built.
       - name: Tool and element tests
         env:
@@ -74,6 +104,8 @@ jobs:
   # The MSVC unit tests build their own targets beside the kits, so the bench never waits for them.
   windows-tests:
     name: Unit tests (Windows, MSVC)
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -91,11 +123,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'build failed' }
           & (Join-Path build 'ampify_tests.exe')
           if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
+      - uses: ./.github/actions/msvc-cache-save
+        if: always()
+        continue-on-error: true
+        with:
+          cache-name: msvc-tests
 
   # Two kits side by side: release (tested Apple Music versions only, what ships) and bench (any version, plus the
   # files of the interface cases). Never ship the bench kit.
   windows-build:
     name: Build the ${{ matrix.variant }} kit (MSVC)
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     strategy:
@@ -121,6 +160,11 @@ jobs:
           cmake --build build --parallel --target ${{ matrix.targets }}
           if ($LASTEXITCODE -ne 0) { throw 'build failed' }
           ccache --show-stats
+      - uses: ./.github/actions/msvc-cache-save
+        if: always()
+        continue-on-error: true
+        with:
+          cache-name: msvc-${{ matrix.variant }}
       # The layout lives in scripts/bench-kit.ps1 (also used on a PC); BUILD_INFO.txt comes with the release part.
       - name: Lay out the kit
         shell: pwsh
@@ -135,6 +179,8 @@ jobs:
   # The case ids are read from the case files (bench/windows/shards.sh), so a new case needs no edit here.
   bench-plan:
     name: Split the bench cases
+    needs: changes
+    if: needs.changes.outputs.windows == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
@@ -142,7 +188,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - id: plan
-        run: echo "shards=$(bash bench/windows/shards.sh 4)" >> "$GITHUB_OUTPUT"
+        run: echo "shards=$(bash bench/windows/shards.sh 6)" >> "$GITHUB_OUTPUT"
 
   # The cases on parallel runners, each with its own Apple Music, dealt out in turn so the groups weigh about the same.
   bench:

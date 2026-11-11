@@ -24,8 +24,9 @@ runs:
         "WASDK_INCLUDE=$gen" | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8
 
     # Only the files a commit touches are compiled again. Ninja instead of the Visual Studio generator, so ccache can
-    # sit in front of cl.exe (/Z7 in CMakeLists.txt keeps the debug information cacheable).
-    - uses: actions/cache@v4
+    # sit in front of cl.exe (/Z7 in CMakeLists.txt keeps the debug information cacheable). Saved by msvc-cache-save,
+    # even when the job fails or is cancelled.
+    - uses: actions/cache/restore@v4
       with:
         path: ${{ runner.temp }}/ccache
         key: ccache-${{ inputs.cache-name }}-${{ github.sha }}
@@ -41,6 +42,8 @@ runs:
         Join-Path $env:RUNNER_TEMP "ccache-$version-windows-x86_64" | Out-File -LiteralPath $env:GITHUB_PATH -Append -Encoding utf8
         "CCACHE_DIR=$(Join-Path $env:RUNNER_TEMP 'ccache')" | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8
         'CCACHE_MAXSIZE=2G' | Out-File -LiteralPath $env:GITHUB_ENV -Append -Encoding utf8
+        # The statistics of this build only (the restored cache carries those of every earlier run).
+        & (Join-Path $env:RUNNER_TEMP "ccache-$version-windows-x86_64\ccache.exe") -z -d (Join-Path $env:RUNNER_TEMP 'ccache') | Out-Null
         $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -property installationPath
         $vars = cmd /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" >nul && set"
         foreach ($line in $vars) {

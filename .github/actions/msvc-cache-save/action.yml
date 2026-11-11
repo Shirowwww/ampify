@@ -1,0 +1,17 @@
+name: MSVC cache save
+description: >
+  Saves the ccache folder that msvc-setup restored. Called with `if: always()`, so a failed or cancelled build still
+  hands what it compiled to the next run.
+
+inputs:
+  cache-name:
+    description: The same cache-name as given to msvc-setup
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache/save@v4
+      with:
+        path: ${{ runner.temp }}/ccache
+        key: ccache-${{ inputs.cache-name }}-${{ github.sha }}-${{ github.run_attempt }}
