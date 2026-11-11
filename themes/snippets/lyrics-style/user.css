@@ -54,7 +54,7 @@
 
 /* The lines blur away towards the top and bottom of their column, as in Apple Music on the Mac and the iPhone. One
    blurred copy of the whole column shows towards its edges: a single pass for the graphics card, however many lines
-   show. Apple keeps the sung line near the top of the side panel and a little above the middle of the full-screen
+   show. Apple keeps the sung line near the top of the side panel and about a third of the way down the full-screen
    player, so the side panel blurs mostly its bottom. */
 @setting focus = Light {
     .lyrics-panel .lyrics-synced {
@@ -62,7 +62,7 @@
     }
 
     .fullscreen-lyrics .lyrics-synced {
-        filter: blur(6px) edges(24% 34%);
+        filter: blur(6px) edges(12% 34%);
     }
 }
 
@@ -72,7 +72,7 @@
     }
 
     .fullscreen-lyrics .lyrics-synced {
-        filter: blur(9px) edges(28% 40%);
+        filter: blur(9px) edges(14% 38%);
     }
 }
 
@@ -82,6 +82,6 @@
     }
 
     .fullscreen-lyrics .lyrics-synced {
-        filter: blur(13px) edges(32% 45%);
+        filter: blur(13px) edges(16% 42%);
     }
 }

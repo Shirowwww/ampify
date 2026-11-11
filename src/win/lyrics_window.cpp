@@ -27,6 +27,7 @@ constexpr wchar_t kListName[] = L"TimeBasedLyricsItemsControl";  // Apple's list
 constexpr int kSearchEvery = 4;                                   // ticks of a quarter second between two searches
 constexpr std::size_t kSearchLimit = 3000;                        // elements walked in the player to find the list
 constexpr std::size_t kLineSearchLimit = 40;                      // elements walked in a line to find its states
+constexpr int kAreaSearchDepth = 12;                              // parents walked up from the lines to their scroller
 constexpr auto kFade = std::chrono::milliseconds(250);            // a line fading in or out
 constexpr auto kGlide = std::chrono::milliseconds(300);           // the block moving, as Apple's own scroll does
 
@@ -36,6 +37,7 @@ std::atomic<int> g_after{kAllLines};
 // Interface thread only; never destroyed: it holds XAML references, released with the process (xaml-lessons.md).
 struct Window {
     winrt::weak_ref<controls::Panel> lines;  // the list's items panel, one container per line
+    winrt::weak_ref<xaml::FrameworkElement> area;  // what shows the lines: the scroller around them, its height
     std::vector<xaml::VisualStateGroup> groups;  // each line's group with Apple's "Current" state, by index
     std::vector<xaml::VisualStateGroup::CurrentStateChanged_revoker> watches;
     int ticks = 0;
@@ -69,13 +71,11 @@ xaml::VisualStateGroup CurrentGroupOf(const xaml::DependencyObject& line) {
     return nullptr;
 }
 
-controls::Panel FindLines(const xaml::UIElement& root) {
+controls::ItemsControl FindList(const xaml::UIElement& root) {
     ampify::ActivityScope activity("full-screen lyrics search");
     std::vector<xaml::DependencyObject> queue{root};
     for (std::size_t i = 0; i < queue.size() && queue.size() < kSearchLimit; i++) {
-        if (auto list = queue[i].try_as<controls::ItemsControl>(); list && list.Name() == kListName) {
-            return list.ItemsPanelRoot();
-        }
+        if (auto list = queue[i].try_as<controls::ItemsControl>(); list && list.Name() == kListName) return list;
         int count = media::VisualTreeHelper::GetChildrenCount(queue[i]);
         for (int child = 0; child < count; child++) queue.push_back(media::VisualTreeHelper::GetChild(queue[i], child));
     }
@@ -124,6 +124,35 @@ void Move(const controls::Panel& lines, double shift) {
     lines.Translation({now.x, static_cast<float>(shift), now.z});
 }
 
+// Where the sung lines stand in the list's area, without the shift Ampify gave the lines (their Translation counts in
+// TransformToVisual), and the shift that brings them to its middle. Read on every tick: Apple's own scroll to a new
+// line takes a moment, and the shift follows it until it settles.
+double CentringShift(const Window& state, const controls::Panel& lines, SungLines sung, int before, int after) {
+    xaml::FrameworkElement list = state.area.get();
+    auto children = lines.Children();
+    const bool singing = list && sung.first >= 0 && static_cast<uint32_t>(sung.last) < children.Size();
+    if (!singing) return LyricsCentringShift({}, 0, before, after, false);
+    const float moved = lines.Translation().y;
+    auto edge = [&](uint32_t index, bool bottom) {
+        xaml::UIElement line = children.GetAt(index);
+        const float y = bottom ? line.ActualSize().y : 0.0f;
+        return line.TransformToVisual(list).TransformPoint({0, y}).Y - moved;
+    };
+    SungSpan span{edge(static_cast<uint32_t>(sung.first), false), edge(static_cast<uint32_t>(sung.last), true)};
+    return LyricsCentringShift(span, list.ActualHeight(), before, after, true);
+}
+
+// The lyrics area: the first scroller above the lines (Apple scrolls them in it; the list itself is as tall as all
+// its lines), else the list.
+xaml::FrameworkElement AreaOf(const controls::Panel& lines, const controls::ItemsControl& list) {
+    xaml::DependencyObject at = lines;
+    for (int depth = 0; at && depth < kAreaSearchDepth; depth++) {
+        if (auto scroller = at.try_as<controls::ScrollViewer>()) return scroller;
+        at = media::VisualTreeHelper::GetParent(at);
+    }
+    return list;
+}
+
 void Apply(Window& state) {
     controls::Panel lines = state.lines.get();
     if (!lines) return;
@@ -139,15 +168,10 @@ void Apply(Window& state) {
         if (sung.first < 0) sung.first = static_cast<int>(index);
         sung.last = static_cast<int>(index);
     }
-    std::vector<double> heights;
-    heights.reserve(children.Size());
     for (uint32_t index = 0; index < children.Size(); index++) {
-        xaml::UIElement line = children.GetAt(index);
-        Fade(line, LyricLineShown(static_cast<int>(index), sung, before, after));
-        heights.push_back(line.ActualSize().y);
+        Fade(children.GetAt(index), LyricLineShown(static_cast<int>(index), sung, before, after));
     }
-    auto stack = lines.try_as<controls::StackPanel>();
-    Move(lines, LyricsCentringShift(heights, stack ? stack.Spacing() : 0, sung, before, after));
+    Move(lines, CentringShift(state, lines, sung, before, after));
     state.touched = !all;
 }
 
@@ -161,8 +185,10 @@ void FollowLyricsWindow(const xaml::UIElement& root) noexcept {
         if (!attached) {
             const bool wanted = g_before.load() != kAllLines || g_after.load() != kAllLines;
             if (!wanted || !root || state.ticks++ % kSearchEvery != 0) return;
-            lines = FindLines(root);
+            controls::ItemsControl list = FindList(root);
+            lines = list ? list.ItemsPanelRoot() : nullptr;
             if (!lines) return;
+            state.area = winrt::make_weak(AreaOf(lines, list));
             state.lines = winrt::make_weak(lines);
             state.groups.clear();
             state.watches.clear();
@@ -183,6 +209,7 @@ void ReleaseLyricsWindow() noexcept {
         state.watches.clear();
         state.groups.clear();
         state.lines = nullptr;
+        state.area = nullptr;
         state.touched = false;
         state.ticks = 0;
     } catch (...) {

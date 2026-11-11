@@ -6,9 +6,7 @@
 // first one, "after" from the last. kAllLines leaves that side as Apple shows it. Pure arithmetic, for
 // src/win/lyrics_window.cpp and its tests.
 
-#include <algorithm>
 #include <string_view>
-#include <vector>
 
 namespace ampify {
 
@@ -28,22 +26,19 @@ inline bool LyricLineShown(int index, SungLines sung, int before, int after) {
     return true;
 }
 
-// How far to move the lines down (positive) or up so that the block shown stands centred on the sung ones, which Apple
-// keeps near the middle of the player: half of what the block has more above them than below. Nothing while a side
-// shows all its lines (the block then reaches the edge anyway) or no line is sung.
-inline double LyricsCentringShift(const std::vector<double>& heights, double spacing, SungLines sung, int before,
-                                  int after) {
-    if (before == kAllLines || after == kAllLines) return 0;
-    const int count = static_cast<int>(heights.size());
-    if (sung.first < 0 || sung.last < sung.first || sung.last >= count) return 0;
-    auto span = [&](int from, int to) {  // the lines from..to inclusive, each with the gap that follows it
-        double total = 0;
-        for (int index = std::max(0, from); index <= std::min(to, count - 1); ++index) total += heights[index] + spacing;
-        return total;
-    };
-    double above = span(sung.first - before, sung.first - 1);
-    double below = span(sung.last + 1, sung.last + after);
-    return (above - below) / 2;
+// The sung lines as they stand in the lyrics area, before Ampify moves them: their top and bottom edges, from the
+// area's top edge.
+struct SungSpan {
+    double top = 0;
+    double bottom = 0;
+};
+
+// How far to move the lines down (positive) or up so that the sung ones stand in the middle of the lyrics area, whose
+// height is `area`: Apple keeps them about a third of the way down, and the few lines shown then hung high, with
+// room left under them. Nothing while a side shows all its lines (Apple's own place then) or no line is sung.
+inline double LyricsCentringShift(SungSpan sung, double area, int before, int after, bool singing) {
+    if (before == kAllLines || after == kAllLines || !singing || area <= 0 || sung.bottom < sung.top) return 0;
+    return area / 2 - (sung.top + sung.bottom) / 2;
 }
 
 // A setting's text: "all" (or nothing) for every line, else 0 to kMostLines; anything else counts as all.

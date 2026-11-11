@@ -1,5 +1,3 @@
-#include <vector>
-
 #include "../src/core/lyrics_window.hpp"
 #include "test.hpp"
 
@@ -7,6 +5,7 @@ using ampify::kAllLines;
 using ampify::LyricLineShown;
 using ampify::LyricLinesOf;
 using ampify::LyricsCentringShift;
+using ampify::SungSpan;
 using ampify::SungLines;
 
 namespace {
@@ -45,22 +44,21 @@ TEST_CASE(LyricsWindow_BeforeTheFirstLineOnlyTheComingOnesShow) {
     CHECK(!LyricLineShown(2, SungLines{}, 0, 2));
 }
 
-TEST_CASE(LyricsWindow_TheBlockMovesSoTheSungLineStandsInItsMiddle) {
-    const std::vector<double> heights{40, 40, 80, 40, 40, 40};
-    // Three above (40 + 80 + 40 with their gaps of 10), one below (40 + 10): the block moves down by half the rest.
-    CHECK_NEAR(LyricsCentringShift(heights, 10, One(4), 3, 1), (190.0 - 50.0) / 2, 1e-9);
-    // As many lines on both sides of the same height: nothing moves.
-    CHECK_NEAR(LyricsCentringShift(heights, 10, One(4), 1, 1), 0, 1e-9);
-    // Near the start, a side holds fewer lines than asked.
-    CHECK_NEAR(LyricsCentringShift(heights, 10, One(0), 2, 1), -25, 1e-9);
-    // A duet: the lines around are counted from either end of the two sung ones.
-    CHECK_NEAR(LyricsCentringShift(heights, 10, SungLines{3, 4}, 1, 1), (90.0 - 50.0) / 2, 1e-9);
+TEST_CASE(LyricsWindow_TheSungLineMovesToTheMiddleOfTheLyricsArea) {
+    // Apple keeps the sung line about a third of the way down an area 900 high: it moves down to the middle.
+    CHECK_NEAR(LyricsCentringShift(SungSpan{300, 360}, 900, 2, 2, true), 450 - 330, 1e-9);
+    // Already in the middle: nothing moves.
+    CHECK_NEAR(LyricsCentringShift(SungSpan{420, 480}, 900, 1, 1, true), 0, 1e-9);
+    // Below it (the first lines of a song): up.
+    CHECK_NEAR(LyricsCentringShift(SungSpan{600, 660}, 900, 0, 3, true), 450 - 630, 1e-9);
+    // A duet: the middle of both sung lines.
+    CHECK_NEAR(LyricsCentringShift(SungSpan{300, 420}, 900, 2, 2, true), 90, 1e-9);
 }
 
 TEST_CASE(LyricsWindow_NothingMovesWhileASideShowsAllOrNothingIsSung) {
-    const std::vector<double> heights{40, 40, 40};
-    CHECK_NEAR(LyricsCentringShift(heights, 10, One(1), kAllLines, 1), 0, 1e-9);
-    CHECK_NEAR(LyricsCentringShift(heights, 10, SungLines{}, 1, 1), 0, 1e-9);
+    CHECK_NEAR(LyricsCentringShift(SungSpan{300, 360}, 900, kAllLines, 1, true), 0, 1e-9);
+    CHECK_NEAR(LyricsCentringShift(SungSpan{300, 360}, 900, 1, 1, false), 0, 1e-9);
+    CHECK_NEAR(LyricsCentringShift(SungSpan{300, 360}, 0, 1, 1, true), 0, 1e-9);
 }
 
 TEST_CASE(LyricsWindow_ASettingReadsAllOrZeroToFive) {
