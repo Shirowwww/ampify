@@ -34,7 +34,8 @@ std::string Signature(const Surface& surface) {
         return surface.control.placement + "\n" + surface.control.label + "\n" + surface.control.icon + "\n" +
                (surface.control.clickable ? "click " : "show ") + std::to_string(surface.control.parent) + "\n" +
                (surface.control.active ? "on" : "off") + (surface.control.disabled ? " disabled\n" : "\n") + kinds +
-               "\n" + std::to_string(surface.control.markFrom) + " " + std::to_string(surface.control.markTo);
+               "\n" + std::to_string(surface.control.markFrom) + " " + std::to_string(surface.control.markTo) + "\n" +
+               surface.control.beside;
     }
     return surface.title + "\n" + surface.tree.Dump();
 }

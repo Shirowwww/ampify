@@ -20,6 +20,7 @@
 @setting badges {
     .lossless-badge,
     .digital-master-badge,
+    .audio-formats,
     .audio-badge {
         visibility: collapsed;
     }

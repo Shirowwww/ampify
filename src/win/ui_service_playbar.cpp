@@ -104,7 +104,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         }
 
         std::optional<uirender::Insertion> insertion = control.placement == "playbar"
-                                                           ? uirender::ChoosePlaybarInsertion(context->probe)
+                                                           ? uirender::ChoosePlaybarInsertion(context->probe, control.beside)
                                                            : uirender::ChooseTopbarInsertion(context->probe);
         controls::StackPanel parent{nullptr};
         if (insertion) parent = context->probeObjects[insertion->parent].get().try_as<controls::StackPanel>();
@@ -172,7 +172,10 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
         std::optional<std::uint32_t> anchor;
         auto after = insertion->after >= 0 ? context->probeObjects[insertion->after].get().try_as<xaml::UIElement>() : nullptr;
         if (after && parent.Children().IndexOf(after, index)) anchor = index;
-        parent.Children().InsertAt(StableIndex(context->placed, parent, anchor, control.elementId, control.id), button);
+        // Beside one of Apple's buttons (the volume), right after it; the others keep their order at the end.
+        bool beside = !control.beside.empty() && anchor;
+        parent.Children().InsertAt(beside ? *anchor + 1 : StableIndex(context->placed, parent, anchor, control.elementId, control.id),
+                                   button);
         placed.button = button;
         placed.label = control.label;
         placed.hasIcon = static_cast<bool>(icon);

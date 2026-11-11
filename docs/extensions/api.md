@@ -355,6 +355,9 @@ Ampify.ui.navigate(path)
   Spicetify's `shouldAdd`: Apple's menu opens on the interface thread before an element could answer, so the choice is
   given beforehand. `disabled: true` (or `setDisabled`) shows an entry or a button greyed. `remove` takes out an entry
   or a button with its click handler, and a submenu with its entries.
+- `playbar.addButton({ label, beside: "volume" })` puts the button, or the text, right after Apple Music's volume
+  button instead of at the end of the bar, as Volume percentage does. `"volume"` is the only name for now; another
+  throws. Ampify before 1.3.2 leaves `beside` out and puts the button at the end.
 - `playbar.mark(id, from, to)` draws two ticks on the progress line of the playback bar and shades the stretch between
   them, as the A-B loop does with its passage. `from` and `to` are parts of the song, from 0 to 1 (a position divided by
   `state().durationMs`), in either order; without `to` only the first tick shows, and without `from` the line is clear

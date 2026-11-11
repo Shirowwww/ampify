@@ -98,7 +98,12 @@ struct Insertion {
     int after = -1;      // the sibling to insert after (its index in `nodes`), -1 for the end
     int styleFrom = -1;  // the native control whose style is copied, -1 for none
 };
-std::optional<Insertion> ChoosePlaybarInsertion(const std::vector<ProbeNode>& nodes);
+// `beside` names one of Apple Music's buttons among the toggles (kPlaybarNeighbours, "volume"): the button goes
+// right after it rather than at the end. An unknown name, or a bar without that button, places it at the end.
+std::optional<Insertion> ChoosePlaybarInsertion(const std::vector<ProbeNode>& nodes, std::string_view beside = {});
+
+// The names `beside` takes (Ampify.ui.playbar.addButton): the element of Apple Music's toggles each one stands for.
+bool IsPlaybarNeighbour(std::string_view beside);
 
 // Where a button of the top bar goes: the horizontal StackPanel or Grid that holds the search box (an AutoSuggestBox),
 // at its end. Provisional: the real tree may put the search box elsewhere.

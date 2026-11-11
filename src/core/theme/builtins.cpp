@@ -235,6 +235,9 @@ const std::vector<ClassEntry> kClasses{
     {"share-button", {"Button#ShareButton"}},
     {"lossless-badge", {"Canvas#LosslessImage"}},
     {"digital-master-badge", {"Canvas#DigitalMasterImage"}},
+    // The end of the line under an album's title: its dot and the run of formats after it (Lossless, Hi-Res Lossless,
+    // Dolby Atmos, Apple Digital Master), each an icon and its word, whatever the album has.
+    {"audio-formats", {"TextBlock#AudioBadgeDot", "StackPanel:has(> TextBlock#AudioBadgeDot) > ContentPresenter"}},
     {"motion-artwork", {"MediaPlayerElement#MotionArtworkPlayer"}},
     {"artist-picture", {"PersonPicture#ArtworkPicture"}},
     {"radio-play-button", {"Button#RadioPlayButton"}},

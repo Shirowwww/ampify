@@ -108,6 +108,14 @@ const char kUi[] = R"AMPIFYJS(
     if (clickable) uiCallbacks.set(id, note.onClick);
     if (note.active) native.uiControlActive(id, true);
     if (note.disabled) native.uiControlDisabled(id, true);
+    if (placement === "playbar" && note.beside !== undefined) {
+      try {
+        native.uiControlBeside(id, String(note.beside));
+      } catch (error) {
+        native.uiControlRemove(id);
+        throw error;
+      }
+    }
     applyKinds(id, kinds);
     return id;
   };

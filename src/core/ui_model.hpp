@@ -27,6 +27,9 @@ struct UiControl {
     int parent = 0;         // the submenu (a menu control that is not clickable) this menu entry sits in; 0: the menu itself
     bool active = false;    // a top bar or play bar button that is on: it takes the accent colour
     bool disabled = false;  // drawn greyed and ignores clicks (top bar, play bar, menu entry)
+    // A play bar control placed right after this button of Apple Music's (uirender::IsPlaybarNeighbour, "volume");
+    // empty: after the others, at the end.
+    std::string beside;
     // A context menu entry shows only in the menus of these kinds of item (IsMenuItemKind); empty: in every one.
     std::vector<std::string> kinds;
     // A play bar button's stretch of the progress line, as parts of the song from 0 to 1 (the A-B loop's passage);
@@ -68,6 +71,10 @@ public:
 
     // Greys a control the element added, or brings it back. False when the element has no such control.
     bool SetControlDisabled(const std::string& elementId, int controlId, bool disabled);
+
+    // Places a play bar control the element added right after one of Apple Music's buttons (UiControl::beside).
+    // False when the element has no such play bar control.
+    bool SetControlBeside(const std::string& elementId, int controlId, const std::string& beside);
 
     // Marks a stretch of the progress line for a play bar button the element added (see UiControl::markFrom), kept
     // within 0 to 1 and in order; a negative `from` clears it, a negative `to` marks the start alone. False when the

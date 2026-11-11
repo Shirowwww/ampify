@@ -175,6 +175,7 @@ that takes no input). `.list-item:selected` and `.next-button:disabled` work as 
 | `.add-description-button` | The button that adds a description to a playlist |
 | `.share-button` | The share button |
 | `.lossless-badge`, `.digital-master-badge` | The Lossless and Apple Digital Master badges |
+| `.audio-formats` | The formats at the end of the line under an album's title, icons and words (Lossless, Hi-Res Lossless, Dolby Atmos, Apple Digital Master), with the dot before them |
 | `.motion-artwork` | The moving artwork of some albums |
 | `.artist-picture` | The picture of an artist |
 | `.radio-play-button` | The play button of a station |

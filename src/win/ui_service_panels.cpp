@@ -271,8 +271,12 @@ bool DockPanelPopup(WindowContext& context, const winrt::Windows::Foundation::Si
         room = std::min(padding, static_cast<double>(size.Width) - (parentRight - padding));
         start = parentRight - padding;
     }
-    if (room < kPanelWidth + 8) return false;
-    double gap = ours ? room - kPanelWidth : (room - kPanelWidth) / 2;  // ours: the gap on the pages' side only
+    // Ours is exactly a panel and a gap wide: at 125 % the measures round, and a room a hair short of it sent the
+    // column floating over the squeezed pages, on their left (Victor, 2026-11-10, 1.3.1 in a narrow window). It docks
+    // as long as a panel fits, the gap shrinking first.
+    const double least = ours ? kPanelWidth : kPanelWidth + 8;
+    if (room + 0.5 < least) return false;
+    double gap = ours ? std::max(0.0, room - kPanelWidth) : (room - kPanelWidth) / 2;  // ours: on the pages' side only
     double width = kPanelWidth;
     if (context.panelHost.Width() != width) context.panelHost.Width(width);
     if (context.panelHost.Height() != bounds.Height) context.panelHost.Height(bounds.Height);
@@ -349,11 +353,23 @@ namespace {
 constexpr double kPagesMinWidth = 720;  // narrower, a playlist's header cut its buttons: the panels float instead
 constexpr double kDockMargin = 8;       // room past that before the pages make room again: no back and forth
 
+// The pages take their width back before the floating panels measure them: measured on the pushed layout, the panels
+// floated a column's width left of the window's edge, over the pages, with the room on their right left empty.
+void ReleasePagesNow(WindowContext& context) {
+    if (!context.pushedPages) return;
+    controls::Grid parent = context.pushedPages;
+    ReleasePages(context);
+    parent.UpdateLayout();
+}
+
 // Whether the pages keep kPagesMinWidth beside a column of panels, measured on the pages as they are, pushed or not.
-bool PagesKeepRoom(const WindowContext& context) {
+// Only what the window shows counts: in a narrow window Apple keeps its pages at their least width and the window cuts
+// them, so their ActualWidth stayed wide while the column had no room left.
+bool PagesKeepRoom(const WindowContext& context, double windowWidth) {
     controls::Grid pages = PagesGrid(context);
     if (!pages || pages.ActualWidth() <= 0) return true;
-    double width = pages.ActualWidth();
+    double left = pages.TransformToVisual(nullptr).TransformPoint({0, 0}).X;
+    double width = std::min(pages.ActualWidth(), windowWidth - left);
     if (context.pushedPages) return width >= kPagesMinWidth;
     return width - (kPanelWidth + kPushGap) >= kPagesMinWidth + kDockMargin;
 }
@@ -365,16 +381,18 @@ bool PagesKeepRoom(const WindowContext& context) {
 void PlacePanelPopup(WindowContext& context, const xaml::XamlRoot& root) {
     auto size = root.Size();
     if (AnyPanelShown(context)) {
-        if (PagesKeepRoom(context)) {
+        if (PagesKeepRoom(context, size.Width)) {
             PushPages(context);
         } else {
-            ReleasePages(context);  // a narrow window: the panels float over the pages rather than squeeze them
+            ReleasePagesNow(context);  // a narrow window: the panels float over the pages rather than squeeze them
         }
     }
     if (DockPanelPopup(context, size)) {
         OpenOverlay(context, context.panelPopup);
         return;
     }
+    // Floating, the panels sit over the pages: pages still pushed would leave the room empty and the panels over them.
+    ReleasePagesNow(context);
     if (context.panelDocked) {
         context.panelDocked = false;
         context.panelHost.Width(kPanelWidth);

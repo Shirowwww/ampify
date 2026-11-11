@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.3.2 (2026-11-11)
+
+A fix for the song panel, which 1.3.1 broke in narrow windows, two small fixes found while taking new screenshots, and
+new pictures in the README, on the site and in the Marketplace.
+
+### Interface
+
+- In a narrow window the song panel, and any other panel, could land over the left of the pages, with an empty column
+  on their right. The column that 1.3.1 set against the window's edge left no spare pixel, and at 125 % scaling the
+  measures fell a hair short. The panels now dock as long as one fits, and float on the right of the window otherwise,
+  with the pages back at their full width.
+
+### Extensions
+
+- `Ampify.ui.playbar.addButton` takes `beside: "volume"`: the button goes right after Apple Music's volume button
+  instead of at the end of the bar.
+- Volume percentage uses it, and now shows the volume next to the volume button, as its description says. It sat after
+  the other buttons.
+
+### Themes
+
+- New stable name `.audio-formats`: the formats at the end of the line under an album's title, icons and words.
+- Declutter's quality badges setting hides that whole run now. Only the Lossless icon went; the words "Lossless",
+  "Dolby Atmos" and "Apple Digital Master" stayed.
+
 ## 1.3.1 (2026-11-10)
 
 A few fixes to how Ampify 1.3 looks, found in the first hours of use.

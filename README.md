@@ -20,6 +20,37 @@ lyrics, your library and its sync all keep working.
 
 </div>
 
+## What people install it for
+
+<table>
+<tr>
+<td width="50%" valign="top"><img src="docs/assets/screens/marketplace.png" alt="The Marketplace inside Apple Music, on its Themes tab"><br>
+<b>Themes and a Marketplace.</b> Ten themes, from Apple's own Liquid Glass to a Windows 11 look, and 28 colour
+schemes. Pick one in the Marketplace inside Apple Music and it is on at once, no restart.</td>
+<td width="50%" valign="top"><img src="examples/discord-presence/preview.jpg" alt="Discord showing the song playing in Apple Music"><br>
+<b>Discord and Last.fm.</b> Your Discord status shows the song, its artwork, the album and a progress bar. A
+scrobbler sends what you play to Last.fm. Both are one click away in the Marketplace.</td>
+</tr>
+<tr>
+<td valign="top"><img src="extensions/song-panel/preview.jpg" alt="The Song panel beside an album, with a large artwork"><br>
+<b>Lyrics word by word.</b> The Song panel slides over the window with a large artwork, lyrics that light up word by
+word, the credits and what plays next. The Now Playing button opens Apple's full-screen player, karaoke lyrics
+included.</td>
+<td valign="top"><img src="examples/listening-stats/preview.jpg" alt="Listening stats: time listened, plays, top artists and songs (names blurred here)"><br>
+<b>Your listening stats.</b> Hours listened, plays, your top artists, songs and albums, over all time or a
+period. A second page lists the new releases of the artists you play.</td>
+</tr>
+<tr>
+<td valign="top"><img src="themes/snippets/progress-line/preview.jpg" alt="The playback bar with and without Progress line"><br>
+<b>A playback bar of your own.</b> At the top, the bottom or centred under any theme. Snippets add a thicker
+progress line with the time under the pointer, an equalizer that moves with the music, a spinning record.</td>
+<td valign="top"><img src="docs/assets/screens/settings-card.png" alt="Ampify's settings page in Apple Music, Sound and extensions tab"><br>
+<b>Everything in Apple Music's settings.</b> Five tabs and a search box that finds any setting. Extensions add an
+A-B loop, a sleep timer, global shortcuts, bookmarks, a skip list, and an Atmos leveler that plays Dolby Atmos
+songs as loud as stereo ones.</td>
+</tr>
+</table>
+
 ## What you get
 
 | Change the look | Add what is missing | Keep it safe |
@@ -32,20 +63,12 @@ lyrics, your library and its sync all keep working.
 Ampify speaks English, French, German, Spanish, Portuguese, Russian, Japanese, Simplified Chinese, Italian and Korean.
 Spicetify `color.ini` palettes work as they are.
 
-<div align="center">
-<table>
-<tr>
-<td align="center"><img src="docs/assets/screens/marketplace.png" height="240" alt="The Marketplace inside Apple Music"><br><sub>The Marketplace</sub></td>
-<td align="center"><img src="docs/assets/screens/settings-card.png" height="240" alt="Ampify's settings in Apple Music"><br><sub>Ampify in Apple Music's settings</sub></td>
-</tr>
-</table>
-</div>
-
 ### New in 1.3
 
 A new installer and uninstaller with a window of their own. A settings page in five tabs, with a search box that finds
 any setting. Fewer snippets with more settings each, and your choices carry over. One place for the playback bar under
-every theme. Liquid glass for Glass, and colour filters for the artwork. The full list is in the
+every theme. Liquid glass for Glass, and colour filters for the artwork. 1.3.1 and 1.3.2 fix the sidebar that opens
+under the pointer, theme colours in the playback bar and the song panel in narrow windows. The full list is in the
 [changelog](CHANGELOG.md).
 
 ## Install

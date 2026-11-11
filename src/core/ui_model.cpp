@@ -370,6 +370,17 @@ bool UiModel::SetControlDisabled(const std::string& elementId, int controlId, bo
     return ChangeControl(m_controls, elementId, controlId, [&](UiControl& control) { control.disabled = disabled; });
 }
 
+bool UiModel::SetControlBeside(const std::string& elementId, int controlId, const std::string& beside) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    for (UiControl& control : m_controls) {
+        if (control.id != controlId || control.elementId != elementId) continue;
+        if (control.placement != "playbar") return false;
+        control.beside = beside;
+        return true;
+    }
+    return false;
+}
+
 bool UiModel::SetControlMark(const std::string& elementId, int controlId, double from, double to) {
     std::lock_guard<std::mutex> guard(m_mutex);
     for (UiControl& control : m_controls) {

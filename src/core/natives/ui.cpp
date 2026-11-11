@@ -12,6 +12,7 @@
 #include "../i18n.hpp"
 #include "../json.hpp"
 #include "../text_util.hpp"
+#include "../ui_render/probe.hpp"
 #include "../ui_model.hpp"
 #include "../ui_vocab.hpp"
 
@@ -88,6 +89,16 @@ struct UiNatives : ScriptBridge {
         int id = static_cast<int>(Number(ctx, argc, argv, 0));
         bool active = argc >= 2 && JS_ToBool(ctx, argv[1]) != 0;
         return JS_NewBool(ctx, HostOf(ext).Ui().SetControlActive(ext->id(), id, active));
+    }
+
+    // Where a play bar button goes: right after one of Apple Music's buttons ("volume"). An unknown name is refused, so
+    // a typo shows at once rather than as a button at the end of the bar.
+    AMPIFY_NATIVE(UiControlBeside) {
+        ScriptExtension* ext = Owner(ctx);
+        int id = static_cast<int>(Number(ctx, argc, argv, 0));
+        std::string beside = String(ctx, argc, argv, 1).value_or("");
+        if (!uirender::IsPlaybarNeighbour(beside)) return Throw(ctx, "TypeError", "ui: beside expects \"volume\"");
+        return JS_NewBool(ctx, HostOf(ext).Ui().SetControlBeside(ext->id(), id, beside));
     }
 
     // Same rule again: the element can only grey or take out what it added.
@@ -274,6 +285,7 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiControlLabel", UiNatives::UiControlLabel, 2);
     scope.Function("uiControlActive", UiNatives::UiControlActive, 2);
     scope.Function("uiControlDisabled", UiNatives::UiControlDisabled, 2);
+    scope.Function("uiControlBeside", UiNatives::UiControlBeside, 2);
     scope.Function("uiControlMark", UiNatives::UiControlMark, 3);
     scope.Function("uiPlaybarReadout", UiNatives::UiPlaybarReadout, 1);
     scope.Function("uiPlaybarHover", UiNatives::UiPlaybarHover, 1);

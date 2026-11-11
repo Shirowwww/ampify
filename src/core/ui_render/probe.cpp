@@ -179,8 +179,38 @@ std::optional<Insertion> AfterToggleButtons(const std::vector<ProbeNode>& nodes)
     return insertion;
 }
 
-std::optional<Insertion> ChoosePlaybarInsertion(const std::vector<ProbeNode>& nodes) {
-    if (std::optional<Insertion> toggles = AfterToggleButtons(nodes)) return toggles;
+namespace {
+
+// The play bar buttons a control can stand beside, and the element of Apple's toggles each one is.
+constexpr std::pair<std::string_view, std::string_view> kPlaybarNeighbours[] = {
+    {"volume", "VolumeControl"},
+};
+
+std::string_view NeighbourName(std::string_view beside) {
+    for (const auto& [name, element] : kPlaybarNeighbours) {
+        if (name == beside) return element;
+    }
+    return {};
+}
+
+}  // namespace
+
+bool IsPlaybarNeighbour(std::string_view beside) {
+    return !NeighbourName(beside).empty();
+}
+
+std::optional<Insertion> ChoosePlaybarInsertion(const std::vector<ProbeNode>& nodes, std::string_view beside) {
+    if (std::optional<Insertion> toggles = AfterToggleButtons(nodes)) {
+        if (std::string_view element = NeighbourName(beside); !element.empty()) {
+            for (int index = 0; index < static_cast<int>(nodes.size()); index++) {
+                if (nodes[index].parent == toggles->parent && nodes[index].name == element) {
+                    toggles->after = index;
+                    break;
+                }
+            }
+        }
+        return toggles;
+    }
     // Older versions: after the transport buttons.
     std::optional<int> anchor = FindByName(nodes, "TransportControl_SkipForward");
     if (!anchor) anchor = FindByName(nodes, "TransportControl_PlayPauseStop");

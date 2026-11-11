@@ -448,6 +448,24 @@ TEST_CASE(UiRender_PlaybarButtonJoinsTheToggleButtonsOn1792) {
     CHECK(insertion && insertion->styleFrom == lyrics);
 }
 
+TEST_CASE(UiRender_PlaybarButtonGoesBesideTheVolume) {
+    FakeTree tree;
+    int root = tree.Add(-1, "Grid", kProbePanel | kProbeGrid, "TransportBar");
+    int toggles = tree.Add(root, "StackPanel", kStack | kProbeHorizontal, "NowPlayingToggleButtons");
+    int volume = tree.Add(toggles, "VolumeControl", 0, "VolumeControl");
+    tree.Add(volume, "Button", kProbeButtonBase, "VolumeButton");
+    tree.Add(toggles, "ToggleButton", kProbeButtonBase, "LyricsToggleButton");
+    std::optional<Insertion> insertion = ChoosePlaybarInsertion(tree.nodes, "volume");
+    CHECK(insertion && insertion->parent == toggles);
+    CHECK(insertion && insertion->after == volume);
+    // Unknown, or no volume in the bar: at the end, as without `beside`.
+    std::optional<Insertion> unknown = ChoosePlaybarInsertion(tree.nodes, "airplay");
+    CHECK(unknown && unknown->after == -1);
+    CHECK(IsPlaybarNeighbour("volume"));
+    CHECK(!IsPlaybarNeighbour("airplay"));
+    CHECK(!IsPlaybarNeighbour(""));
+}
+
 TEST_CASE(UiRender_TopbarButtonGoesAfterAppleMusicsToggleButtons) {
     FakeTree tree;
     int root = tree.Add(-1, "Grid", kProbePanel | kProbeGrid, "TransportBar");

@@ -24,11 +24,11 @@ function refresh() {
   Ampify.ui.setLabel(button, text);
 }
 
-// No onClick: a text of the bar, which the pointer goes through. Ampify before 1.3 wants an onClick: a click then
-// reads the volume again.
+// No onClick: a text of the bar, which the pointer goes through, right after the volume button (Ampify before 1.3.2
+// puts it at the end of the bar). Ampify before 1.3 wants an onClick: a click then reads the volume again.
 function addText() {
   try {
-    return Ampify.ui.playbar.addButton({ label: label() });
+    return Ampify.ui.playbar.addButton({ label: label(), beside: "volume" });
   } catch {
     return Ampify.ui.playbar.addButton({ label: label(), onClick: refresh });
   }

@@ -60,6 +60,20 @@ TEST_CASE(Interface_APlaybarTextWithoutOnClickIsNotClickable) {
     element->Stop();
 }
 
+TEST_CASE(Interface_APlaybarTextGoesBesideTheVolume) {
+    Fixture f;
+    auto element = f.Make("beside", "extension", R"("ui.playbar")",
+                          R"(Ampify.ui.playbar.addButton({ label: "50 %", beside: "volume" });
+                             try { Ampify.ui.playbar.addButton({ label: "x", beside: "airplay" }); }
+                             catch (e) { Ampify.log("refused " + e.message); })");
+    CHECK(element->Start());
+    auto controls = f.host.ui.Controls();
+    CHECK(controls.size() == 1);  // the refused one is taken out again
+    CHECK(controls.size() == 1 && controls[0].beside == "volume");
+    CHECK(f.Logged("refused ui: beside expects"));
+    element->Stop();
+}
+
 TEST_CASE(Interface_AButtonNeedsItsPermission) {
     Fixture f;
     auto element = f.Make("nobar", "extension", "", R"(Ampify.ui.playbar.addButton({ onClick: () => {} });)");

@@ -269,9 +269,9 @@ declare const Ampify: {
     // mark: a stretch of the progress line for a button it added, as parts of the song (0 to 1); no `to` marks the
     // start alone, no `from` clears it. readout: the time under the pointer on the line, for a span `totalMs` long
     // (0 or nothing takes it away). onHover: where the pointer is on the line (0 to 1), null once it leaves; it returns
-    // the function that stops listening.
+    // the function that stops listening. beside: "volume" puts the button right after Apple Music's volume button.
     playbar: {
-      addButton(button: UiButton): number; remove(id: number): boolean; mark(id: number, from?: number, to?: number): boolean;
+      addButton(button: UiButton & { beside?: "volume" }): number; remove(id: number): boolean; mark(id: number, from?: number, to?: number): boolean;
       readout(totalMs?: number): void; onHover(fn: (part: number | null) => void): () => void;
     };
     sidebar: { addItem(item: UiButton): number; remove(id: number): boolean };  // on while its own page is open, or after setActive
