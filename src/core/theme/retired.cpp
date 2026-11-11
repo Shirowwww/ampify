@@ -136,7 +136,20 @@ struct SettingValue {
 struct MovedSwitch {
     std::string_view key;
     std::span<const SettingValue> becomes;
+    // A switch on by default: unset, it counts as on while this theme is the active one and `doneWhenSet` is unset
+    // too. Once moved, that key is written (on or off), so a later start does not move it again.
+    std::string_view onByDefaultFor = {};
+    std::string_view doneWhenSet = {};
+    // Written first when the snippet these values switch on was off: what it does by default and the old switch did
+    // not stays off, and someone who already used it keeps their choices.
+    std::string_view heirSwitch = {};
+    std::span<const SettingValue> whenNew = {};
 };
+
+bool OnByDefault(const MovedSwitch& moved, const Settings& settings, const std::string& active) {
+    return !moved.onByDefaultFor.empty() && active == moved.onByDefaultFor &&
+           !settings.Get(std::string(moved.doneWhenSet));
+}
 
 // 1.3.0: Greenroom's and Palettes' "Hide the Explicit and Lossless badges".
 constexpr SettingValue kBadgesHidden[] = {
@@ -145,9 +158,21 @@ constexpr SettingValue kBadgesHidden[] = {
     {"snippets.declutter.explicit", "true"},
 };
 
+// 1.3.3: Glass's "Moving artwork in the background", which Artwork colours does under every theme.
+constexpr SettingValue kMovingBackground[] = {
+    {"snippets.album-colors.enabled", "1"},
+    {"snippets.album-colors.moving-background", "true"},
+};
+constexpr SettingValue kAlbumColoursOff[] = {
+    {"snippets.album-colors.reach", "Off"},
+    {"snippets.album-colors.glow", "Off"},
+};
+
 constexpr MovedSwitch kMovedSwitches[] = {
     {"themes.greenroom.hide-badges", kBadgesHidden},
     {"themes.palettes.hide-badges", kBadgesHidden},
+    {"themes.glass.moving-artwork", kMovingBackground, "glass", "snippets.album-colors.moving-background",
+     "snippets.album-colors.enabled", kAlbumColoursOff},
 };
 
 // 1.3.0: catalog.json stays as Ampify 1.2.1 reads it, and 1.3.0 reads its own file. The old default, saved as it was,
@@ -162,9 +187,13 @@ void MoveCatalogUrl(Settings& settings) {
 }
 
 void MoveSwitches(Settings& settings) {
+    const std::string active = ActiveThemeId(settings);
     for (const MovedSwitch& moved : kMovedSwitches) {
         const std::string key(moved.key);
-        if (settings.GetBool(key, false)) {
+        if (settings.GetBool(key, OnByDefault(moved, settings, active))) {
+            if (!moved.heirSwitch.empty() && !settings.GetBool(std::string(moved.heirSwitch), false)) {
+                for (const SettingValue& target : moved.whenNew) settings.Set(std::string(target.key), std::string(target.value));
+            }
             for (const SettingValue& target : moved.becomes) settings.Set(std::string(target.key), std::string(target.value));
         }
         settings.Remove(key);

@@ -250,6 +250,37 @@ TEST_CASE(RetiredSettings_EveryRetiredElementHasItsFolder) {
 }
 
 TEST_CASE(RetiredSettings_NothingToMoveChangesNothing) {
-    ampify::Settings settings = SettingsOf({{"theme.active", "glass"}, {"themes.glass.tint", "Artwork"}});
+    ampify::Settings settings = SettingsOf({{"theme.active", "glass"}, {"themes.glass.tint", "Artwork"},
+                                            {"snippets.album-colors.moving-background", "false"}});
     CHECK(!th::MoveRetiredSettings(settings));
+}
+
+// 1.3.3: Glass's moving artwork, on by default, is Artwork colours' moving background under every theme.
+TEST_CASE(RetiredSettings_GlassMovingArtworkBecomesTheSnippetsMovingBackground) {
+    ampify::Settings unset = SettingsOf({{"theme.active", "glass"}});
+    CHECK(th::MoveRetiredSettings(unset));
+    CHECK(unset.GetString("snippets.album-colors.enabled", "") == "1");
+    CHECK(unset.GetString("snippets.album-colors.moving-background", "") == "true");
+    // The snippet was off: its pages and glow stay as they were, off.
+    CHECK(unset.GetString("snippets.album-colors.reach", "") == "Off");
+    CHECK(unset.GetString("snippets.album-colors.glow", "") == "Off");
+    // Turned off afterwards, it stays off at the next start.
+    unset.Set("snippets.album-colors.moving-background", "false");
+    CHECK(!th::MoveRetiredSettings(unset));
+
+    // Already in use: its choices stay.
+    ampify::Settings used = SettingsOf({{"theme.active", "artwork"}, {"themes.glass.moving-artwork", "true"},
+                                        {"snippets.album-colors.enabled", "1"},
+                                        {"snippets.album-colors.glow", "Display"}});
+    CHECK(th::MoveRetiredSettings(used));
+    CHECK(used.GetString("snippets.album-colors.glow", "") == "Display");
+    CHECK(used.GetString("snippets.album-colors.moving-background", "") == "true");
+    CHECK(!used.Get("themes.glass.moving-artwork"));
+
+    // Turned off in Glass, or not the active theme and never set: nothing moves to the snippet.
+    ampify::Settings off = SettingsOf({{"theme.active", "glass"}, {"themes.glass.moving-artwork", "false"}});
+    CHECK(th::MoveRetiredSettings(off));
+    CHECK(!off.Get("snippets.album-colors.enabled"));
+    ampify::Settings other = SettingsOf({{"theme.active", "cinema"}});
+    CHECK(!th::MoveRetiredSettings(other));
 }

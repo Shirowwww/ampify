@@ -133,14 +133,19 @@
         opacity: var(--setting-background-strength, 0.4);
     }
 
-    /* Apple's layers between the window and its pages, see-through as a theme's floating panels makes them; the
-       pages' panel too, so the background shows behind the lists. The sidebar keeps its own background. */
+    /* Apple's layers between the window and its pages, see-through as a theme's floating panels makes them. The
+       sidebar keeps its own background. */
     .navigation,
     .main-column,
-    .content,
     .page,
     .content-background {
         background: transparent;
+    }
+
+    /* The pages are glass over it: the moving artwork shows behind the lists, blurred, and the text keeps its
+       contrast. A theme's own glass keeps its tint (--glass-light, then --glass, as Artwork and Glass name it). */
+    .content {
+        backdrop: var(--glass-light, var(--glass, acrylic(#FF101014, 0.55)));
     }
 
     /* The bar's glow, when it spreads over the bar, stays on top of the moving background. */

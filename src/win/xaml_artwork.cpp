@@ -79,7 +79,7 @@ bool XamlTreeBackend::DecorHolds(const xaml::FrameworkElement& owner) const {
 // thumbnail), and lets go of those nothing holds any more (the theme was removed, the decor replaced). Strong
 // references: weak ones to what Ampify made never resolve in Apple Music.
 void XamlTreeBackend::FollowArtwork(const controls::Image& image, const media::ImageSource& artwork) {
-    // Apple's own background takes the play bar's cover, as Apple gives its full-screen one the library's file.
+    // The moving washes (content: immersion) take the play bar's cover too.
     m_immersion.Sweep([this](const xaml::FrameworkElement& lockup) { return DecorHolds(lockup); });
     if (auto bitmap = artwork ? artwork.try_as<media::Imaging::BitmapImage>() : nullptr) {
         if (auto uri = bitmap.UriSource()) m_immersion.Follow(Utf8(uri.AbsoluteUri()));

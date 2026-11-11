@@ -286,7 +286,10 @@ panels, it gives the blurred background of Spicetify's Hazy or Comfy themes. Exa
 }
 ```
 
-Example: the Moving artwork setting of [`themes/glass/`](../../themes/glass/).
+`content: immersion` puts the song's artwork there as a moving wash, as behind Apple's full-screen player: decoded
+tiny and stretched, so it reads as soft fields of colour, two copies turning slowly the opposite way. It follows the
+song and stands still while Windows' animation effects are off. Example: the moving background of
+[`themes/snippets/album-colors/`](../../themes/snippets/album-colors/).
 
 On a new song, a `content: artwork` layer cross-fades: the previous cover fades out over the new one in 500 ms. In eco
 glass (`theme.glass = eco`) or with Windows' animation effects off, it changes at once. A `background: artwork` changes

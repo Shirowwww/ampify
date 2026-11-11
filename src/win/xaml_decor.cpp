@@ -154,7 +154,7 @@ theme::DecorChange XamlTreeBackend::PlaceDecor(theme::NodeId id, theme::PseudoEl
         if (DecorTurns(decor)) KeepSquareOnDiagonal(image);
     } else if (decor.image.starts_with(theme::kImmersionContent)) {
         image = m_immersion.Make(name);
-        if (!image) return theme::DecorChange::Refused;  // an Apple Music without ImmersionLockup
+        if (!image) return theme::DecorChange::Refused;  // no compositor to draw it with
     } else {
         image = DecorImageFrom(decor.image, slot);
     }

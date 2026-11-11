@@ -80,7 +80,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Colours from the artwork (Dribbblish Dynamic) | `--art-1`, `--art-2`, `--art-3`, `--art-text`; `--page-art-*` for the album or playlist on screen | Done |
 | Windows 11 look (Fluent, Bloom's Mica) | `--window-material: mica \| mica-alt \| acrylic` on the window; theme `fluent` | Done |
 | Liquid glass with refraction | `backdrop: liquid-glass(...)`: a light blur of what lies behind in more vivid colours, a tint and a sheen along the top edge (theme `glass`, setting "Liquid glass"); no shader bends what lies behind | Partial: no refraction; checked by tests only, not on screen |
-| An artwork background that moves (Lucid, Kawarp) | `content: artwork cover` with `@keyframes` turns the artwork behind the panes (Glass, setting `moving-artwork`); no shader warp like Kawarp's | Partial |
+| An artwork background that moves (Lucid, Kawarp) | `content: immersion` draws the artwork as a slow moving wash behind the panes, for every theme (snippet Album colours, setting `moving-background`); no shader warp like Kawarp's | Partial |
 | `theme.js` | The theme's `main.js` | Done |
 | Theme settings menu (each theme codes its own) | `settings` in the manifest, shown in Ampify's settings page, read as `var(--setting-*)` | Done |
 | Fonts and images of the theme | `font-family: url(...)`, `url(...)` backgrounds | Done |

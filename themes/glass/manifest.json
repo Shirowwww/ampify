@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "glass",
   "name": "Glass",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "Apple's Liquid Glass: the song's artwork fills the window, and the sidebar, the pages and a floating capsule for the playback bar are clear panes over it, tinted by the music, with a bright rim of light.",
@@ -15,7 +15,6 @@
         "panel-radius": "Arrondi des vitres",
         "frost": "Opacité du verre (0,2 à 0,9)",
         "hover-grow": "Boutons et cartes qui se soulèvent au survol",
-        "moving-artwork": "Pochette animée en fond, comme en plein écran",
         "gap": "Espace autour des panneaux",
         "liquid": "Verre liquide : plus clair, couleurs plus vives"
       },
@@ -28,9 +27,6 @@
         "Details": "Détails",
         "Layout": "Disposition",
         "Shapes": "Formes"
-      },
-      "settingDescriptions": {
-        "moving-artwork": "Coupée, elle demande moins à la carte graphique."
       }
     },
     "de": {
@@ -41,7 +37,6 @@
         "panel-radius": "Ecken der Scheiben",
         "frost": "Deckkraft des Glases (0,2 bis 0,9)",
         "hover-grow": "Tasten und Karten heben sich beim Darüberfahren",
-        "moving-artwork": "Bewegtes Cover im Hintergrund, wie im Vollbild",
         "gap": "Abstand um die Panels",
         "liquid": "Flüssiges Glas: klarer, kräftigere Farben"
       },
@@ -54,9 +49,6 @@
         "Details": "Details",
         "Layout": "Layout",
         "Shapes": "Formen"
-      },
-      "settingDescriptions": {
-        "moving-artwork": "Aus entlastet es die Grafikkarte."
       }
     },
     "es": {
@@ -67,7 +59,6 @@
         "panel-radius": "Esquinas de los cristales",
         "frost": "Opacidad del cristal (0,2 a 0,9)",
         "hover-grow": "Botones y tarjetas que se elevan al pasar el puntero",
-        "moving-artwork": "Portada animada al fondo, como en pantalla completa",
         "gap": "Espacio alrededor de los paneles",
         "liquid": "Cristal líquido: más claro, colores más vivos"
       },
@@ -80,9 +71,6 @@
         "Details": "Detalles",
         "Layout": "Disposición",
         "Shapes": "Formas"
-      },
-      "settingDescriptions": {
-        "moving-artwork": "Desactivada, exige menos a la tarjeta gráfica."
       }
     },
     "pt": {
@@ -93,7 +81,6 @@
         "panel-radius": "Cantos dos vidros",
         "frost": "Opacidade do vidro (0,2 a 0,9)",
         "hover-grow": "Botões e cartões que se erguem ao passar o ponteiro",
-        "moving-artwork": "Capa animada ao fundo, como em tela cheia",
         "gap": "Espaço ao redor dos painéis",
         "liquid": "Vidro líquido: mais claro, cores mais vivas"
       },
@@ -106,9 +93,6 @@
         "Details": "Detalhes",
         "Layout": "Layout",
         "Shapes": "Formas"
-      },
-      "settingDescriptions": {
-        "moving-artwork": "Desligada, exige menos da placa de vídeo."
       }
     },
     "ru": {
@@ -119,7 +103,6 @@
         "panel-radius": "Скругление стёкол",
         "frost": "Непрозрачность стекла (от 0,2 до 0,9)",
         "hover-grow": "Кнопки и карточки приподнимаются при наведении",
-        "moving-artwork": "Живая обложка на фоне, как в полноэкранном режиме",
         "gap": "Отступы вокруг панелей",
         "liquid": "Жидкое стекло: прозрачнее, цвета ярче"
       },
@@ -132,9 +115,6 @@
         "Details": "Детали",
         "Layout": "Раскладка",
         "Shapes": "Формы"
-      },
-      "settingDescriptions": {
-        "moving-artwork": "Если выключить, видеокарта нагружается меньше."
       }
     },
     "ja": {
@@ -145,7 +125,6 @@
         "panel-radius": "ガラスの角丸",
         "frost": "ガラスの不透明度（0.2〜0.9）",
         "hover-grow": "ポインターを合わせたボタンとカードが浮き上がる",
-        "moving-artwork": "フルスクリーンのように背景でアートワークが動く",
         "gap": "パネルの周りの余白",
         "liquid": "リキッドグラス：より透明で鮮やかな色"
       },
@@ -158,9 +137,6 @@
         "Details": "細部",
         "Layout": "レイアウト",
         "Shapes": "形"
-      },
-      "settingDescriptions": {
-        "moving-artwork": "オフにするとグラフィックスカードの負荷が減ります。"
       }
     },
     "zh": {
@@ -171,7 +147,6 @@
         "panel-radius": "玻璃圆角",
         "frost": "玻璃不透明度（0.2 至 0.9）",
         "hover-grow": "鼠标悬停时按钮和卡片浮起",
-        "moving-artwork": "像全屏播放器一样的动态封面背景",
         "gap": "面板周围的间距",
         "liquid": "液态玻璃：更通透，色彩更鲜艳"
       },
@@ -184,9 +159,6 @@
         "Details": "细节",
         "Layout": "布局",
         "Shapes": "形状"
-      },
-      "settingDescriptions": {
-        "moving-artwork": "关闭后可减轻显卡负担。"
       }
     },
     "it": {
@@ -197,7 +169,6 @@
         "panel-radius": "Angoli dei vetri",
         "frost": "Opacità del vetro (da 0,2 a 0,9)",
         "hover-grow": "Pulsanti e schede che si sollevano al passaggio",
-        "moving-artwork": "Copertina animata sullo sfondo, come a schermo intero",
         "gap": "Spazio attorno ai pannelli",
         "liquid": "Vetro liquido: più chiaro, colori più vivi"
       },
@@ -209,9 +180,6 @@
         "Colours": "Colori",
         "Details": "Dettagli",
         "Shapes": "Forme"
-      },
-      "settingDescriptions": {
-        "moving-artwork": "Se disattivata, chiede meno alla scheda grafica."
       }
     },
     "ko": {
@@ -222,7 +190,6 @@
         "panel-radius": "유리판 모서리",
         "frost": "유리 불투명도(0.2~0.9)",
         "hover-grow": "포인터를 올리면 버튼과 카드가 떠오름",
-        "moving-artwork": "배경에서 움직이는 커버, 전체 화면처럼",
         "gap": "패널 사이 간격",
         "liquid": "리퀴드 글래스: 더 투명하고 색이 더 선명하게"
       },
@@ -234,9 +201,6 @@
         "Colours": "색상",
         "Details": "세부 사항",
         "Shapes": "모양"
-      },
-      "settingDescriptions": {
-        "moving-artwork": "끄면 그래픽 카드 부담이 줄어듭니다."
       }
     }
   },
@@ -289,14 +253,6 @@
       "type": "toggle",
       "default": true,
       "group": "Details"
-    },
-    {
-      "key": "moving-artwork",
-      "label": "Moving artwork in the background, as in full screen",
-      "type": "toggle",
-      "default": true,
-      "group": "Details",
-      "description": "Off, it asks less of the graphics card."
     },
     {
       "key": "gap",

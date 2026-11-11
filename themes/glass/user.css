@@ -46,18 +46,10 @@
 
 /* ---- The window: the artwork, behind everything --------------------------------------------------------------------- */
 
+/* The artwork moving behind the glass, as in full screen, is the Artwork colours snippet's moving background: it works
+   under every theme, and Glass's panes blur it further. */
 .window {
     background: artwork;
-}
-
-/* The moving-artwork setting: Apple Music's own full-screen background behind the glass, the song's artwork as a slow,
-   blurred, moving wash; the panes blur it further. An Ampify without content: immersion keeps the still artwork. */
-@setting moving-artwork {
-    .window::before {
-        content: artwork cover;
-        content: immersion;
-        opacity: 0.85;
-    }
 }
 
 /* A dark frost over the whole window, under the panes: the artwork reads as colour, not as a picture, and the

@@ -141,8 +141,8 @@ struct BarsContent {
 std::string WriteBarsContent(const BarsContent& bars);
 std::optional<BarsContent> ReadBarsContent(std::string_view image);
 
-// The text of `content: immersion`: Apple Music's own full-screen background (the song's artwork as a slow, blurred,
-// moving wash), drawn by Apple's ImmersionLockup and following the song.
+// The text of `content: immersion`: the song's artwork as a slow, soft, moving wash, as behind Apple's full-screen
+// player, drawn by Ampify (src/win/moving_artwork.*) and following the song.
 inline constexpr std::string_view kImmersionContent = "immersion:";
 
 // A decorative image a theme puts into a panel with ::before or ::after and `content: url(...)`, or bars that move

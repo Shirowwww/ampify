@@ -40,7 +40,7 @@
 #include "../core/theme/tree.hpp"
 #include "artwork_fade.hpp"
 #include "artwork_large.hpp"
-#include "immersion.hpp"
+#include "moving_artwork.hpp"
 #include "audio_bars.hpp"
 #include "element_blur.hpp"
 #include "gradient_fit.hpp"
@@ -410,7 +410,7 @@ private:
     winrt::Microsoft::UI::Xaml::Media::ImageSource m_artwork{nullptr};
     std::vector<ArtworkLayer> m_artworkLayers;
     LargeArtwork m_largeArtwork;  // what those brushes paint: the cover decoded large, not Apple's thumbnail
-    ImmersionBackgrounds m_immersion;  // the decors of content: immersion, Apple's own background, on the same song
+    MovingArtworks m_immersion;  // the decors of content: immersion, the song's artwork as a moving wash
     std::shared_ptr<ArtworkColours> m_artworkColours = std::make_shared<ArtworkColours>();
     // That image is followed between passes: a new song's artwork is read as soon as it opens, not at the next tick. A
     // reading asked while another runs is tried again shortly (m_artworkRetry).

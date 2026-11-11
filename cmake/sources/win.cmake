@@ -16,7 +16,7 @@ list(APPEND AMPIFY_XAML_SOURCES src/win/xaml_backend.cpp src/win/xaml_artwork.cp
     src/win/apple_player.cpp src/win/apple_tweak.cpp src/win/player_controls.cpp src/win/notifications.cpp src/win/close_to_tray.cpp src/win/audio_bars.cpp
     src/win/xaml_watcher.cpp src/win/element_picker.cpp src/win/lcd_links.cpp src/win/window_backdrop.cpp
     src/win/sharp_artwork.cpp src/win/text_marquee.cpp src/win/sidebar_hover.cpp src/win/sidebar_pane_dress.cpp src/win/dialog_fonts.cpp
-    src/win/artwork_fade.cpp src/win/artwork_large.cpp src/win/larger_cover.cpp src/win/immersion.cpp src/win/artwork_cap.cpp src/win/artwork_passthrough.cpp src/win/apple_properties.cpp src/win/hosted_text_align.cpp
+    src/win/artwork_fade.cpp src/win/artwork_large.cpp src/win/larger_cover.cpp src/win/moving_artwork.cpp src/win/artwork_cap.cpp src/win/artwork_passthrough.cpp src/win/apple_properties.cpp src/win/hosted_text_align.cpp
     src/win/topbar_search.cpp src/win/pane_corners.cpp src/win/gradient_fit.cpp
     src/win/element_blur.cpp src/win/image_effects.cpp src/win/glass_brush.cpp src/win/width_glide.cpp src/win/presence_watch.cpp)
 

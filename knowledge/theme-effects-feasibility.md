@@ -23,7 +23,7 @@ attempt starts from the facts.
   sheen gradient composited over. A brush, not a visual, because the panes it targets hold many children. It eases its
   blur and tint in when connected. No refraction: Composition has no displacement effect.
 - Still to measure on screen: the cost of a filter on a card artwork recycled by Apple's lists, and liquid glass over
-  the moving-artwork background of Glass.
+  the moving background of Album colours (`content: immersion`).
 
 ## Clips: why `UIElement.Clip` and not the composition visual
 
