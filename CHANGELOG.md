@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.3.4 (2026-11-11)
+
+Lyrics that glide from line to line, a full-screen button in the player, more room for the song on the playback bar,
+and your own order for the sidebar and the playback bar's buttons.
+
+### Interface
+
+- In the full-screen player, with a number of lyrics lines kept around the sung one, a new line now arrives with
+  Apple's own smooth scroll. The block used to jump up and come back down at each line, and could vanish for a few
+  frames while the lines were blurred.
+- The writers' credits after the last line no longer show over the lines above it: they come with the last lines.
+- The lyrics' menu button (translation and pronunciation) stays sharp when Lyrics style blurs the lines around the
+  sung one. The blur now covers the lines only, through the new `.lyrics-lines` name.
+- The full-screen player that Ampify lays over or in place of Apple Music's window has a full-screen button next to
+  its close button. It fills the screen without making it exclusive, then turns into a button that gives the window
+  back, where it was. Escape does the same before it closes the player.
+- "Full screen, taskbar shown" left the full-screen player's choices: the new button does it better. A setting still
+  on it opens the player over Apple Music.
+- New "Song on the playback bar" setting on the Look tab: wider or widest gives the song a quarter or a half more of
+  the bar, under every theme, and the progress line gets shorter.
+- Fluent's progress line under the buttons is shorter on a wide window, and the song beside it has more room.
+- New Order group on the Look tab: drag the sidebar's entries or the buttons at the right of the playback bar, or
+  select one and use the arrows. It holds for every theme, Ampify's and the extensions' buttons included, and
+  "Apple's order" gives the first one back at once.
+- A theme's sidebar layout (`sidebar.json`) works again with Apple Music 1.1792, whose sidebar entries have no
+  x:Name: an entry is named by its automation id (`Sidebar_Home`, `Sidebar_Radio`...), and `order` moves entries of
+  a sidebar filled from an items source.
+
+### Themes
+
+- `var(--song-scale, 1)` holds the "Song on the playback bar" factor; the bar layouts multiply the song's width by it.
+- A blurred element moved through its composition `Translation` keeps its blurred copy in place.
+
 ## 1.3.3 (2026-11-11)
 
 The play bar's place back in the settings, a progress line under the buttons that looks finished, a moving background
