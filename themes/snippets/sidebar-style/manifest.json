@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "sidebar-style",
   "name": "Sidebar style",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Tighter rows in the sidebar, so more of your playlists fit on screen, and one shape for every pinned item and playlist, round or square with softened corners, and a search box that shows under the pointer, on top of any theme, like Comfy's compact sidebar.",

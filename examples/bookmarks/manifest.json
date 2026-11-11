@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "bookmarks",
   "name": "Bookmarks",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Save songs, albums, artists and playlists from the context menu, or the exact moment of the song playing from the playback bar, like Spicetify's bookmark.js. Come back to them from the main menu.",

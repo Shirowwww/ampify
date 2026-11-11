@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "ab-loop",
   "name": "A-B loop",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Loops a passage of the song playing, like Spicetify's Loopy Loop: the playback bar button marks its start, then its end, and the song goes back to the start each time it reaches the end.",

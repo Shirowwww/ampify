@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "listening-stats",
   "name": "Listening stats",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "app",
   "author": "Shirowwww",
   "description": "Your top artists and songs and your listening time, like Spicetify's Stats. By default from Apple Music's own play counts, all your devices included; the last 7 days, the last 4 weeks and since the start count what plays on this PC.",

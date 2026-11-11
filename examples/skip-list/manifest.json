@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "skip-list",
   "name": "Skip list",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Never hear a song, album or artist again, like Spicetify's Trash Bin and Auto Skip. Add from the context menu or the playback bar, manage the list from the main menu, optionally skip live versions, remixes and intros, and export or import the list as JSON.",

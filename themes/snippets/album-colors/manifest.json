@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "album-colors",
   "name": "Artwork colours",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "The colours of the artwork, on top of any theme: albums and playlists take those of their cover, under the header or on the whole page; the song playing glows in its own, on the display or the whole playback bar; and its artwork moves, blurred, behind the window.",

@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "large-album-artwork",
   "name": "Large album artwork",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "Makes the cover at the top of album and playlist pages bigger than Apple's, from 120 to 360 pixels, and loads it sharp at that size.",

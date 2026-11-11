@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "display-equalizer",
   "name": "Animated equalizer",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "An equalizer that moves with the music: bars, a line, a ring or mirrored bars. Its settings choose where it goes (the song's display, the artwork, the whole playback bar or the page background), its shape, how many bars, how high and how strong it shows, its colour, and thin or thick bars.",

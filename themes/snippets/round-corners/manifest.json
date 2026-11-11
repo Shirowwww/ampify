@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "round-corners",
   "name": "Corners",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "One radius for the covers, tiles, rows, the display and the menus, or square corners everywhere, the panels and Ampify's own included, on top of any theme, like Spicetify's Rounded Images and Be Square.",

@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "cosy",
   "name": "Cosy",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "kind": "theme",
   "author": "Shirowwww",
   "description": "A soft, flat evening look: the sidebar and the pages share one colour, the playback bar runs along the bottom with a large rounded artwork, and albums start under a wash of their own colours. Four schemes: Dusk, Night, Moss and Linen.",

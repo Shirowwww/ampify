@@ -2652,7 +2652,7 @@ test("skip-list has every new string in all ten languages, and a new version", (
     assert.deepEqual(Object.keys(tables[code]).sort(), english, code);
     for (const key of ["export", "import", "merge", "added", "invalid"]) assert.notEqual(tables[code][key], tables.en[key], `${code}.${key}`);
   }
-  assert.equal(fake.manifest.version, "1.1.1");
+  assert.equal(fake.manifest.version, "1.1.2");
   for (const code of languages) assert.ok(fake.manifest.translations[code].description.length > 20);
 });
 
@@ -2794,7 +2794,7 @@ test("bookmarks' panel stays under 300 nodes, speaks French, and declares exactl
   assert.equal(fake.world.opened.length, 1);
   assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
   assert.equal(fake.world.menus.find((menu) => menu.kind === "app").icon, "", "the list has the bar's icon");
-  assert.equal(fake.manifest.version, "1.0.1");
+  assert.equal(fake.manifest.version, "1.0.2");
 });
 
 test("bookmarks has every string in all ten languages", () => {

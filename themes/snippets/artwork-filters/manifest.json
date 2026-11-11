@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "artwork-filters",
   "name": "Artwork filters",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "The artwork of the song playing, in the playback bar, at the top of its album and in full screen, in two inks of the accent, in black and white, in sepia or more vivid. Under the pointer, the playback bar's artwork takes its colours back.",

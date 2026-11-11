@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "lyrics-style",
   "name": "Lyrics style",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "How the lyrics read, in their pane and in full screen: lines centred or at the left, the sung line on a tile of the song's colour, a dark pane, plain or from the artwork, and the other lines blurred, like Spicetify's Dark Lyrics and Pretty Lyrics.",

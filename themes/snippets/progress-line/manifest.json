@@ -2,7 +2,7 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "progress-line",
   "name": "Progress line",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "kind": "snippet",
   "author": "Shirowwww",
   "description": "The progress line of the display thinner or thicker, with round ends, and a little animated mascot that rides it at the song's position: a comet, a bobbing note, a beating heart or a running cat, with a rainbow trail if you like, like Spicetify's thin, thick and Nyan Cat bars.",
