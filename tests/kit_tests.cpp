@@ -93,7 +93,7 @@ TEST_CASE(KitLayout_TheBundledElementsShipTurnedOn) {
     CHECK(ampify::IsOnByDefault("apps", "marketplace"));
     CHECK(ampify::IsOnByDefault("extensions", "now-playing"));
     CHECK(ampify::IsOnByDefault("extensions", "playback-guard"));  // off until 1.3.0
-    CHECK(ampify::IsOnByDefault("extensions", "song-panel"));
+    CHECK(!ampify::IsOnByDefault("extensions", "song-panel"));  // off from 1.3.3: one button too many by default
     CHECK(ampify::IsOnByDefault("extensions", "hover-time"));
     CHECK(!ampify::IsOnByDefault("extensions", "community-thing"));
 }

@@ -221,6 +221,10 @@ function QueueCard({ items }) {
   return h(Card, { title: t("next") }, rows);
 }
 
+// The sections the settings keep (a change in the settings restarts the extension, so it reads them again).
+const shows = (key) => Ampify.config.get(key) !== false;
+const THEME_CARD = "#1FFFFFFF";  // with the theme's background, a light veil sets the cards apart
+
 function SongPanel() {
   const player = Ampify.hooks.usePlayer();
   const track = player && player.track;
@@ -235,19 +239,21 @@ function SongPanel() {
                                colors ? colors.VIBRANT_NON_ALARMING : null);
   const base = "linear-gradient(" + tint(readableShade(songColor, GRADIENT_TOP), 1) + ", " +
                tint(readableShade(songColor, GRADIENT_BOTTOM), 1) + ")";
-  const lyricsTint = tint(colors ? colors.VIBRANT_NON_ALARMING : track.artworkColor, 0.5);
-  return h("stack", { background: base, cornerRadius: 12, padding: 12, gap: 12 },
+  // "Background: the theme's" leaves the column to the theme (its glass or its page colour), the cards on a veil.
+  const themeBackground = Ampify.config.get("colour") === "Theme";
+  const lyricsTint = themeBackground ? THEME_CARD : tint(colors ? colors.VIBRANT_NON_ALARMING : track.artworkColor, 0.5);
+  return h("stack", { background: themeBackground ? undefined : base, cornerRadius: 12, padding: 12, gap: 12 },
     h("image", { src: "artwork", fit: "cover", cornerRadius: 8, width: SIDE - 24, height: SIDE - 24,
                  label: track.album || track.title }),
     h(Header, { track, song }),
-    h("stack", { background: lyricsTint, cornerRadius: 12, padding: 16, gap: 8, height: LYRICS_HEIGHT },
+    shows("lyrics") ? h("stack", { background: lyricsTint, cornerRadius: 12, padding: 16, gap: 8, height: LYRICS_HEIGHT },
       h("text", { text: t("lyrics"), size: 15, weight: 700, color: TEXT }),
       // A line clicked: the song goes there.
       h("lyrics", { grow: true, size: 22, color: TEXT, placeholder: t("noLyrics"),
-                    onChange: (event) => Ampify.player.seek(Number(event.value)) })),
-    h(ArtistCard, { track, artistSongs }),
-    h(CreditsCard, { track, song }),
-    h(QueueCard, { items: queue }));
+                    onChange: (event) => Ampify.player.seek(Number(event.value)) })) : null,
+    shows("artist") ? h(ArtistCard, { track, artistSongs }) : null,
+    shows("credits") ? h(CreditsCard, { track, song }) : null,
+    shows("queue") ? h(QueueCard, { items: queue }) : null);
 }
 
 // The button opens and closes the panel; the panel slides in from the right and back out.

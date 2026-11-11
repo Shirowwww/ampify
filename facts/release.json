@@ -17,7 +17,7 @@
   "elements": [
     {"id": "marketplace", "kind": "app", "folder": "apps", "startsOn": true, "firstParty": true, "builtIn": false},
     {"id": "now-playing", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
-    {"id": "song-panel", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
+    {"id": "song-panel", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false},
     {"id": "playback-guard", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
     {"id": "hover-time", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
     {"id": "atmos-leveler", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": true}
