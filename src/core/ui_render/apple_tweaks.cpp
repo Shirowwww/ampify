@@ -4,6 +4,7 @@
 #include <span>
 
 #include "../lyrics_window.hpp"
+#include "../user_order.hpp"
 
 namespace ampify::uirender {
 
@@ -13,7 +14,7 @@ namespace {
 
 // The rows of each section of the page, in the order it shows them.
 // The playback bar's place and the sidebar's opening sit on the Look tab instead, under the theme they change
-// (PlaybarChoice, SidebarChoice).
+// (PlaybarChoice, SongRoomChoice, SidebarChoice).
 constexpr const char* kWindowKeys[] = {kTopbarKey, kEntryKey, kMarqueeKey, kCloseKey, kNotificationsKey};
 constexpr const char* kPlayerKeys[] = {kPlayerModeKey, kPlayerControlsKey, kLyricsBeforeKey, kLyricsAfterKey,
                                        kArtworkKey};
@@ -52,7 +53,6 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
                                                          : NotificationRule::Apple;
     std::string player = ChoiceOf(settings, kPlayerModeKey);
     tweaks.player = player == "replace"     ? PlayerMode::Replace
-                    : player == "work-area" ? PlayerMode::WorkArea
                     : player == "screen"    ? PlayerMode::Screen
                                             : PlayerMode::Window;
     tweaks.closeToTray = ChoiceOf(settings, kCloseKey) == "tray";
@@ -66,6 +66,7 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.topbarSearch = ChoiceOf(settings, kTopbarKey) == "search";
     tweaks.lyricsBefore = LyricLinesOf(ChoiceOf(settings, kLyricsBeforeKey));
     tweaks.lyricsAfter = LyricLinesOf(ChoiceOf(settings, kLyricsAfterKey));
+    tweaks.playbarOrder = ParseOrder(settings.Get(kPlaybarOrderKey).value_or(""));
     return tweaks;
 }
 
@@ -97,6 +98,8 @@ TweakChoice EntryChoice(const fs::path& kit) { return ChoiceIn(kit, kEntryKey); 
 TweakChoice GlassChoice(const fs::path& kit) { return ChoiceIn(kit, kGlassChoiceKey); }
 
 TweakChoice PlaybarChoice(const fs::path& kit) { return ChoiceIn(kit, kPlaybarKey); }
+
+TweakChoice SongRoomChoice(const fs::path& kit) { return ChoiceIn(kit, kSongRoomKey); }
 
 TweakChoice SidebarChoice(const fs::path& kit) { return ChoiceIn(kit, kSidebarKey); }
 

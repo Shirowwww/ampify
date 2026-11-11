@@ -40,6 +40,7 @@
 #include "../core/ui_watchdog.hpp"
 #include "lyrics_window.hpp"
 #include "player_controls.hpp"
+#include "player_fill.hpp"
 #include "sharp_artwork.hpp"
 #include "winrt_abi.hpp"
 #include "win_common.hpp"
@@ -77,6 +78,9 @@ struct Placement {
     RECT lastRect{};             // where the player was last seen, for the main window it replaced
     RECT laidRect{};             // where the player settled once laid out: still there if the person moved nothing
     bool playerZoomed = false;   // the player was last seen maximized
+    bool filled = false;         // Ampify's button filled the screen with it (SetFilled)
+    RECT windowRect{};           // where it was as a window, for the way back
+    bool windowZoomed = false;   // that window was maximized
     HWND settleMain = nullptr;   // the main window put back where the player was, while it settles (Settle)
     int settleTicks = 0;
     HWND main = nullptr;
@@ -104,6 +108,8 @@ Placement& State() {
     static Placement* state = new Placement();
     return *state;
 }
+
+void SetFilled(bool filled);  // Ampify's button: the player fills its screen, or is a window again
 
 // The main window hidden while the player takes its place; any thread may show it again (ShowMainWindowAgain).
 std::atomic<HWND>& HiddenMain() {
@@ -399,6 +405,18 @@ void HookInput(const xaml::Window& player, HWND window) {
             // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     };
+    // Escape steps back, from the full screen to the window, then closes. Before Apple's own handling, which closes.
+    auto onPreviewKey = [](auto const&, xaml::Input::KeyRoutedEventArgs const& args) noexcept {
+        try {
+            if (args.Key() != winrt::Windows::System::VirtualKey::Escape || args.KeyStatus().WasKeyDown) return;
+            if (!State().filled) return;
+            SetFilled(false);
+            args.Handled(true);
+        } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
+        }
+    };
+    root.PreviewKeyDown(onPreviewKey);
     root.AddHandler(xaml::UIElement::PointerPressedEvent(), winrt::box_value(xaml::Input::PointerEventHandler(onPress)), true);
     root.AddHandler(xaml::UIElement::PointerMovedEvent(), winrt::box_value(xaml::Input::PointerEventHandler(onMove)), true);
     // Not PointerCaptureLost: taking the capture from Apple's element raises it, and would end the drag at once.
@@ -433,14 +451,13 @@ RECT TargetRect(HWND main) {
 const char* ModeName(uirender::PlayerMode mode) {
     switch (mode) {
         case uirender::PlayerMode::Screen: return "whole screen";
-        case uirender::PlayerMode::WorkArea: return "screen above the taskbar";
         case uirender::PlayerMode::Window: return "over the main window";
         case uirender::PlayerMode::Replace: return "in place of the main window";
     }
     return "?";
 }
 
-// Above the taskbar the player reads as a full screen: no frame, square corners. The overlapped presenter leaves the
+// Filling its screen, the player reads as a full screen: no frame, square corners. The overlapped presenter leaves the
 // dialog frame Apple's window was made with, a 3 px light line around the screen, and puts it back on any
 // style change: the client area fills `target` and a window region cuts the frame off.
 void FillWithClient(HWND window, const RECT& target) {
@@ -518,33 +535,61 @@ void WidenScrubberRow(Placement& state, const xaml::UIElement& root) {
     row.Margin({apple.Left - reach, margin.Top, apple.Right - reach, margin.Bottom});
 }
 
+
+// The player as a window with a border that resizes and moves, or filling its whole screen, with neither: a full
+// screen of its own that Windows does not make exclusive, so other windows still come over it. Its button follows.
+void Frame(const xaml::Window& player, Placement& state, const RECT& target) {
+    HWND hwnd = WindowHandle(player);
+    auto presenter = player.AppWindow().Presenter().try_as<windowing::OverlappedPresenter>();
+    if (presenter) {
+        if (presenter.State() == windowing::OverlappedPresenterState::Maximized) presenter.Restore();
+        presenter.SetBorderAndTitleBar(!state.filled, false);
+        presenter.IsResizable(!state.filled);
+    }
+    SetScreenFrame(hwnd, state.filled);
+    if (state.filled) {
+        FillWithClient(hwnd, target);
+        ClearCaption(player, state);
+    } else {
+        PlaceVisible(hwnd, target);
+        SetCaption(player, state);
+    }
+    ShowFillButton(player.Content().try_as<xaml::UIElement>(), state.filled, [] { SetFilled(!State().filled); });
+}
+
+// Ampify's button, or Escape on the way back: the screen it is on, then where it was as a window.
+void SetFilled(bool filled) {
+    Placement& state = State();
+    xaml::Window player = AppWindowOf(WindowRole::Player);
+    if (!state.laid || !player || state.filled == filled) return;
+    HWND hwnd = WindowHandle(player);
+    if (filled) {
+        state.windowZoomed = IsZoomed(hwnd) != FALSE;
+        if (!state.windowZoomed) state.windowRect = VisibleRect(hwnd);
+    }
+    state.filled = filled;
+    const RECT target = filled ? MonitorRect(hwnd, false) : state.windowRect;
+    Frame(player, state, target);
+    auto presenter = player.AppWindow().Presenter().try_as<windowing::OverlappedPresenter>();
+    if (!filled && state.windowZoomed && presenter) presenter.Maximize();
+    state.journal->Write(filled ? "Apple player: fills its screen, " + RectText(VisibleRect(hwnd))
+                                : "Apple player: a window again, " + RectText(VisibleRect(hwnd)));
+}
+
 // Apple shows its player with the FullScreen presenter, which puts its own style back on every change: an overlapped
-// presenter is what keeps the window where Ampify puts it. Over or in place of the main window it keeps a border and
-// resizes; above the taskbar it has neither, as a full screen that leaves the taskbar.
+// presenter is what keeps the window where Ampify puts it, over or in place of the main window, with a border.
 void Lay(const xaml::Window& player, const windowing::AppWindow& window, Placement& state) {
     std::string before = PresenterName(window.Presenter().Kind());
-    bool screenLike = state.mode == uirender::PlayerMode::WorkArea;
-    auto presenter = windowing::OverlappedPresenter::Create();
-    presenter.SetBorderAndTitleBar(!screenLike, false);
-    presenter.IsResizable(!screenLike);
-    window.SetPresenter(presenter);
+    window.SetPresenter(windowing::OverlappedPresenter::Create());
     HWND hwnd = WindowHandle(player);
-    SetScreenFrame(hwnd, screenLike);
-    if (screenLike) {
-        FillWithClient(hwnd, MonitorRect(state.main, true));
-    } else {
-        PlaceVisible(hwnd, TargetRect(state.main));
-    }
+    state.filled = false;
+    Frame(player, state, TargetRect(state.main));
     state.laidRect = VisibleRect(hwnd);  // taken again once it settles (Step)
+    state.windowRect = state.laidRect;
     HookInput(player, hwnd);
     ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), false);
     HugArtwork(player.Content().try_as<xaml::UIElement>());
     SharpenPlayerArtwork(player.Content().try_as<xaml::UIElement>(), *state.journal);
-    if (screenLike) {
-        ClearCaption(player, state);
-    } else {
-        SetCaption(player, state);
-    }
     if (uirender::PlayerReplacesMain(state.mode, IsWindowVisible(state.main) != FALSE, IsIconic(state.main) != FALSE)) {
         state.mainWasZoomed = IsZoomed(state.main) != FALSE;
         ShowWindow(state.main, SW_HIDE);
@@ -626,23 +671,22 @@ void Step(Placement& state) {
     if (state.laid) {
         if (!visible) return OnClosed(state);
         HWND hwnd = WindowHandle(player);
-        state.lastRect = VisibleRect(hwnd);
-        state.playerZoomed = IsZoomed(hwnd) != FALSE;
+        state.lastRect = state.filled ? state.windowRect : VisibleRect(hwnd);  // the main window comes back as a window
+        state.playerZoomed = state.filled ? state.windowZoomed : IsZoomed(hwnd) != FALSE;
         WidenScrubberRow(state, player.Content().try_as<xaml::UIElement>());
         FollowLyricsWindow(player.Content().try_as<xaml::UIElement>());
         if (++state.artworkTicks % kArtworkEvery == 0) {
             SharpenPlayerArtwork(player.Content().try_as<xaml::UIElement>(), *state.journal);  // built once a song plays
         }
-        bool caption = state.mode != uirender::PlayerMode::WorkArea && !state.captionRefused;
+        bool caption = !state.filled && !state.captionRefused;
         if (caption && ++state.captionTicks % kCaptionEvery == 0) SetCaption(player, state);  // follows the layout
         if (state.reportPending && std::chrono::steady_clock::now() >= state.reportAt) {
             state.reportPending = false;
             HookInput(player, hwnd);  // a second chance when the content came late
             AddPlayerControls(player.Content(), state.mainRoot.get(), *state.journal);
             ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), false);
+            ShowFillButton(player.Content().try_as<xaml::UIElement>(), state.filled, [] { SetFilled(!State().filled); });
             HugArtwork(player.Content().try_as<xaml::UIElement>());
-            // The presenter may still have resized the window while it settled.
-            if (state.mode == uirender::PlayerMode::WorkArea) FillWithClient(hwnd, MonitorRect(state.main, true));
             state.laidRect = VisibleRect(hwnd);  // settled: a later change is the person's
             Report(*state.journal);
             // Which engine themes it: the main window's walks it on this thread only (mini_player_theme.cpp otherwise).
@@ -702,6 +746,7 @@ void Step(Placement& state) {
             window.SetPresenter(windowing::AppWindowPresenterKind::FullScreen);  // Ampify's from an earlier opening
             SetScreenFrame(WindowHandle(player), false);
             ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), true);
+            RemoveFillButton(player.Content().try_as<xaml::UIElement>());
         }
         state.journal->Write("Apple player: left on the whole screen, as Apple shows it (setting)");
         return;

@@ -20,8 +20,9 @@ namespace ampify::uirender {
 enum class NotificationRule { Apple, Background, Never };
 
 // Where Apple's full-screen player goes, from Ampify's Now Playing button or Apple's own: the whole screen (Apple's
-// way), the screen above the taskbar, over the Apple Music window, or in place of that window (one window, not two).
-enum class PlayerMode { Screen, WorkArea, Window, Replace };
+// way), over the Apple Music window, or in place of that window (one window, not two). Laid out by Ampify, a button
+// beside its close button fills the screen with it and gives the window back.
+enum class PlayerMode { Screen, Window, Replace };
 
 // Whether the player hides the main window until it closes: in place of it, and only a main window on screen. From the
 // mini player, Apple keeps the main window minimized and brings the mini player back on close: it stays Apple's.
@@ -56,6 +57,8 @@ struct AppleTweaks {
     // The full-screen player's lyrics lines above and below the sung one, kAllLines for all (win/lyrics_window.cpp).
     int lyricsBefore = -1;
     int lyricsAfter = -1;
+    // The buttons at the right of the playback bar, in the order chosen on the settings page (win/user_order.cpp).
+    std::vector<std::string> playbarOrder;
 };
 
 // An unknown value reads as the default.
@@ -92,6 +95,9 @@ TweakChoice GlassChoice(const std::filesystem::path& kit);
 
 // Where the playback bar goes (apple.playbar): as the theme plans, or one place that wins over every theme.
 TweakChoice PlaybarChoice(const std::filesystem::path& kit);
+
+// How much of the bar the song takes (apple.songRoom), for every theme: the layouts read the variable song-scale.
+TweakChoice SongRoomChoice(const std::filesystem::path& kit);
 
 // Whether the sidebar stays open or opens under the pointer (apple.sidebar), for every theme.
 TweakChoice SidebarChoice(const std::filesystem::path& kit);

@@ -52,12 +52,12 @@ StackPanel#NowPlayingToggleButtons > StackPanel > ToggleButton {
 .now-playing {
     grid-column-span: 2;
     horizontal-alignment: left;
-    width: var(--song-width, 560);
+    width: calc(var(--song-width, 560) * var(--song-scale, 1));
 }
 
 @media (max-width: 1600px) {
     .now-playing {
-        width: var(--song-width-medium, 460);
+        width: calc(var(--song-width-medium, 460) * var(--song-scale, 1));
     }
 }
 
@@ -65,19 +65,19 @@ StackPanel#NowPlayingToggleButtons > StackPanel > ToggleButton {
    keeps it folded, and the song then stayed at 380 in a wide window, its artist cut. The room follows the window. */
 @media (max-width: 1323px) {
     .now-playing {
-        width: var(--song-width-folded, 380);
+        width: calc(var(--song-width-folded, 380) * var(--song-scale, 1));
     }
 }
 
 @media (max-width: 1100px) {
     .now-playing {
-        width: var(--song-width-narrow, 340);
+        width: calc(var(--song-width-narrow, 340) * var(--song-scale, 1));
     }
 }
 
 @media (max-width: 960px) {
     .now-playing {
-        width: var(--song-width-small, 270);
+        width: calc(var(--song-width-small, 270) * var(--song-scale, 1));
     }
 }
 

@@ -371,6 +371,11 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         node.fullType = Utf8(winrt::get_class_name(item.object));
         node.type = ShortName(node.fullType);
         if (auto element = item.object.try_as<xaml::FrameworkElement>()) node.name = Utf8(element.Name());
+        // Apple Music 1.1792 gives its sidebar entries no x:Name but a stable AutomationId (Sidebar_Home...): that
+        // stands for the name, so NavigationViewItem#Sidebar_Home and sidebar.json reach them in every language.
+        if (node.name.empty() && item.object.try_as<controls::NavigationViewItemBase>()) {
+            node.name = Utf8(xaml::Automation::AutomationProperties::GetAutomationId(item.object));
+        }
         // Ampify's app pages sit beside Apple's frame but stay out of themes, as when they lived in a popup: the kit
         // renderer owns their values.
         if (node.name == "AMPIFY_PageHost" || node.name == kLargeArtworkLoaderName || node.name == kEffectHostName) {

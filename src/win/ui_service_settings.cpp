@@ -480,10 +480,12 @@ void AddLookPane(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& 
     // Right under the theme they override: people looked for the bar's place and the sidebar that opens under the
     // pointer among the look, not the window.
     AddTweakRow(shared, *nav, rows, uirender::PlaybarChoice(shared.kit));
+    AddTweakRow(shared, *nav, rows, uirender::SongRoomChoice(shared.kit));
     AddTweakRow(shared, *nav, rows, uirender::SidebarChoice(shared.kit));
     AddSettingsRow(*nav, rows, AccentChoice(shared), TextOf("accent.title", "accent.help"));
     // Like the accent, the glass level holds for every theme and snippet, and the engine follows it within a tick.
     AddTweakRow(shared, *nav, rows, uirender::GlassChoice(shared.kit));
+    AddOrderRows(shared, *nav, AddSettingsGroup(shared, *nav, "Order", "order.title", ""));
     controls::StackPanel elements = AddSettingsGroup(shared, *nav, "Elements", "section.elementSettings", "");
     folds->row = AddSettingsRow(*nav, elements, folds->host, {});
     FillThemeFolds(shared, nav, *folds);
@@ -503,6 +505,11 @@ xaml::FrameworkElement FolderRow(UiService::Shared& shared) {
 }
 
 }  // namespace
+
+controls::Grid SettingsLabelledRow(UiService::Shared& shared, const std::string& label, const std::string& help,
+                                   const xaml::FrameworkElement& control) {
+    return LabelledRow(shared, label, help, control);
+}
 
 // Ampify's settings page: a line on what Ampify is and the way to the Marketplace, then one section per subject.
 controls::StackPanel BuildAmpifyPage(UiService::Shared& shared) {

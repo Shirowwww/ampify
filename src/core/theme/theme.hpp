@@ -96,6 +96,8 @@ struct LoadOptions {
     GlassLevel glass = GlassLevel::Full;
     // apple.playbar: top, bottom or centred for every theme; theme (or empty) leaves the place to the theme's manifest.
     std::string playbar;
+    // apple.songRoom: wider or widest gives the song more of the bar (variable song-scale); theme leaves the theme's.
+    std::string songRoom;
 };
 
 // The id of the theme LoadAccentOnly makes: no theme folder can have it.

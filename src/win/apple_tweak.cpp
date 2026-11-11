@@ -11,6 +11,7 @@
 #include "sidebar_hover.hpp"
 #include "text_marquee.hpp"
 #include "topbar_search.hpp"
+#include "user_order.hpp"
 #include "../core/journal.hpp"
 
 namespace ampify::win {
@@ -37,6 +38,8 @@ constexpr AppleTweak kTweaks[] = {
     {[](const uirender::AppleTweaks& t, Journal&) { SetPlayerControlsShown(t.playerControls); }, nullptr},
     {[](const uirender::AppleTweaks& t, Journal&) { SetSharpArtwork(t.sharpArtwork); }, nullptr},
     {[](const uirender::AppleTweaks& t, Journal&) { SetLyricsWindow(t.lyricsBefore, t.lyricsAfter); }, nullptr},
+    {[](const uirender::AppleTweaks& t, Journal&) { SetPlaybarOrder(t.playbarOrder); },
+     [](Journal&) noexcept { KeepPlaybarOrder(); }},
 };
 
 }  // namespace

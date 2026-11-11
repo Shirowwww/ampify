@@ -12,7 +12,7 @@ list(APPEND AMPIFY_XAML_SOURCES src/win/xaml_backend.cpp src/win/xaml_artwork.cp
     src/win/xaml_resources.cpp src/win/xaml_properties.cpp src/win/xaml_read.cpp src/win/xaml_motion.cpp src/win/xaml_states.cpp src/win/mini_player_theme.cpp
     src/win/xaml_values.cpp src/win/theme_animations.cpp src/win/theme_service.cpp src/win/xaml_host.cpp src/win/xaml_chrome.cpp src/win/ui_renderer.cpp src/win/ui_renderer_build.cpp src/win/ui_renderer_attributes.cpp src/win/ui_renderer_style.cpp src/win/ui_renderer_playing.cpp src/win/ui_service.cpp
     src/win/ui_service_settings.cpp src/win/ui_service_settings_nav.cpp src/win/ui_motion.cpp src/win/ui_service_mods.cpp src/win/ui_service_settings_io.cpp src/win/ui_service_panels.cpp src/win/ui_service_pages.cpp
-    src/win/ui_service_sidebar.cpp src/win/ui_service_menus.cpp src/win/ui_service_playbar.cpp src/win/ui_service_mark.cpp src/win/lyrics_window.cpp
+    src/win/ui_service_sidebar.cpp src/win/ui_service_menus.cpp src/win/ui_service_playbar.cpp src/win/ui_service_mark.cpp src/win/lyrics_window.cpp src/win/player_fill.cpp src/win/user_order.cpp src/win/ui_service_order.cpp
     src/win/apple_player.cpp src/win/apple_tweak.cpp src/win/player_controls.cpp src/win/notifications.cpp src/win/close_to_tray.cpp src/win/audio_bars.cpp
     src/win/xaml_watcher.cpp src/win/element_picker.cpp src/win/lcd_links.cpp src/win/window_backdrop.cpp
     src/win/sharp_artwork.cpp src/win/text_marquee.cpp src/win/sidebar_hover.cpp src/win/sidebar_pane_dress.cpp src/win/dialog_fonts.cpp

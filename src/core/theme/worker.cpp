@@ -83,6 +83,7 @@ LoadInputs ThemeWorker::ReadInputs(const Settings& settings, const ThemeSettings
     inputs.glass = GlassLevelOf(wanted.glass);
     inputs.values = ReadThemeValues(settings, wanted.active);
     inputs.playbar = ChoiceOf(settings, kPlaybarKey);
+    inputs.songRoom = ChoiceOf(settings, kSongRoomKey);
     const std::filesystem::path snippetRoot = m_kit / "snippets";
     bool usesArtwork = !wanted.active.empty() && NamesArtwork(themeFolder);
     for (const std::string& id : EnabledSnippets(settings, ListSnippetFolders(snippetRoot))) {
@@ -118,6 +119,7 @@ SessionRequest ThemeWorker::Load(const LoadInputs& inputs) const {
     options.accent = inputs.accent;
     options.glass = inputs.glass;
     options.playbar = inputs.playbar;
+    options.songRoom = inputs.songRoom;
 
     if (!inputs.active.empty()) {
         const std::filesystem::path folder = m_kit / "themes" / inputs.active;

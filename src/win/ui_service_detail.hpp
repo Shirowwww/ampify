@@ -460,6 +460,12 @@ controls::Expander AddSettingsFold(UiService::Shared& shared, const std::shared_
                                    const uirender::ModEntry& mod, bool named);
 xaml::FrameworkElement SettingsNavBar(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& nav);
 xaml::FrameworkElement SettingsPanes(UiService::Shared& shared, const std::shared_ptr<SettingsNav>& nav);
+
+// ui_service_settings.cpp: a row of the Ampify page, label and help on the left, the control on the right.
+controls::Grid SettingsLabelledRow(UiService::Shared& shared, const std::string& label, const std::string& help,
+                                   const xaml::FrameworkElement& control);
+// ui_service_order.cpp: the order of the sidebar's entries and of the playback bar's right buttons (user_order.cpp).
+void AddOrderRows(UiService::Shared& shared, SettingsNav& nav, const controls::StackPanel& rows);
 void ShowSettingsState(UiService::Shared& shared, SettingsNav& nav, bool animate);
 
 // ui_service_panels.cpp

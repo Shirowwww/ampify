@@ -46,6 +46,7 @@ struct LoadInputs {
     GlassLevel glass = GlassLevel::Full;
     std::map<std::string, std::string> values;  // themes.<active>.<key>
     std::string playbar;                        // apple.playbar
+    std::string songRoom;                       // apple.songRoom
     std::vector<Snippet> snippets;              // the enabled ones, in id order
     std::map<std::string, std::string> artwork;  // the artwork's colours, only when a user.css names them
     std::optional<std::string> sidebar;          // sidebar.json and home.json, as text

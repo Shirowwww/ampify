@@ -846,7 +846,6 @@ TEST_CASE(UiRender_PlayerReplacesOnlyAMainWindowOnScreen) {
     CHECK(!PlayerReplacesMain(PlayerMode::Replace, true, true));
     CHECK(!PlayerReplacesMain(PlayerMode::Replace, false, false));
     CHECK(!PlayerReplacesMain(PlayerMode::Window, true, false));
-    CHECK(!PlayerReplacesMain(PlayerMode::WorkArea, true, false));
     CHECK(!PlayerReplacesMain(PlayerMode::Screen, true, false));
 }
 
@@ -885,7 +884,7 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     settings.Set("apple.close", "away");
     AppleTweaks odd = ReadAppleTweaks(settings);
     CHECK(odd.notifications == NotificationRule::Apple);
-    CHECK(odd.player == PlayerMode::WorkArea);
+    CHECK(odd.player == PlayerMode::Window);  // 1.3.3's "above the taskbar", now a button in the player
     CHECK(!odd.closeToTray);
 }
 
@@ -1063,7 +1062,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(card("apple.proxy").value == "system" && card("apple.proxy").options.size() == 2);  // off by default
     CHECK(card("apple.orphanAgent").value == "on");
     CHECK(card("apple.watchdog").value == "on" && card("apple.watchdog").options.size() == 2);
-    CHECK(card("apple.fullscreen").value == "screen" && card("apple.fullscreen").options.size() == 4);
+    CHECK(card("apple.fullscreen").value == "screen" && card("apple.fullscreen").options.size() == 3);
     CHECK(card("apple.playerControls").value == "shown");
     // Every lyrics line by default, as Apple shows them, or 0 to 5 of them on each side of the sung one.
     CHECK(card("apple.lyricsBefore").value == "all" && card("apple.lyricsBefore").options.size() == 7);

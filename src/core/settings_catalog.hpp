@@ -68,6 +68,11 @@ inline constexpr char kFreezeLogKey[] = "apple.watchdog";
 inline constexpr char kOrphanAgentKey[] = "apple.orphanAgent";
 inline constexpr char kTopbarKey[] = "apple.topbar";
 inline constexpr char kPlaybarKey[] = "apple.playbar";
+// The song's room on the playback bar, for every theme: theme (as it plans), wider or widest (theme.cpp, song-scale).
+inline constexpr char kSongRoomKey[] = "apple.songRoom";
+// The order of the buttons at the right of the playback bar, keys joined by '|' (the sidebar's is sidebar.json)
+// (core/user_order.hpp, win/user_order.cpp); empty for Apple's.
+inline constexpr char kPlaybarOrderKey[] = "apple.order.playbar";
 // The full-screen player's lyrics lines kept above and below the sung one: "all", or 0 to 5 (win/lyrics_window.cpp).
 inline constexpr char kLyricsBeforeKey[] = "apple.lyricsBefore";
 inline constexpr char kLyricsAfterKey[] = "apple.lyricsAfter";

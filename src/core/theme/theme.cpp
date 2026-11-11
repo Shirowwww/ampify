@@ -111,6 +111,14 @@ void SetPlaybarPlace(const LoadOptions& options, const std::optional<std::string
     theme.variables[std::string("setting-") + kPlaybarSetting] = place;
 }
 
+// song-scale, which the bar layouts (layouts/bottom-bar.css, centre-bar.css) and any stylesheet can multiply the song's
+// width by: the rest of the bar, the progress line in particular, gives up that room.
+void SetSongRoom(const LoadOptions& options, Theme& theme) {
+    const std::string room = ToLowerAscii(options.songRoom);
+    if (room == "wider") theme.variables["song-scale"] = "1.25";
+    if (room == "widest") theme.variables["song-scale"] = "1.5";
+}
+
 // The settings manifest.json declares, with their value now: variables setting-<key>, and the @setting conditions.
 void LoadSettings(FileSource& files, const LoadOptions& options, Theme& theme) {
     std::optional<std::string> text = files.Read("manifest.json");
@@ -128,6 +136,7 @@ void LoadSettings(FileSource& files, const LoadOptions& options, Theme& theme) {
         theirs = ParseManifest(*text, "", kKitApiMajor, nullptr).partial.playbar;
     }
     SetPlaybarPlace(options, theirs, theme);
+    SetSongRoom(options, theme);
 }
 
 // The declarations of the :root blocks, in file order. A variable can use the ones defined before it.

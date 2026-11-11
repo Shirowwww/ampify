@@ -41,6 +41,7 @@
 #include "apple_properties.hpp"
 #include "glass_brush.hpp"
 #include "hosted_text_align.hpp"
+#include "user_order.hpp"
 #include "xaml_host.hpp"
 #include "xaml_backend_detail.hpp"
 
@@ -470,24 +471,59 @@ std::string ShortName(const std::string& fullType) {
     return dot == std::string::npos ? fullType : fullType.substr(dot + 1);
 }
 
-// The position of `object` in the list that holds it (theme::kOrderProperty): the MenuItems of the nearest
-// NavigationView for a NavigationViewItem, else the Children of its direct parent Panel (not an ItemsRepeater, which
-// manages its own). With `target`, it moves there first. Nothing for MenuItemsSource or footer items. Moving the
-// selected entry may change the selection (to check on the PC).
+namespace {
+
+using Inspectables = winrt::Windows::Foundation::Collections::IVector<winrt::Windows::Foundation::IInspectable>;
+
+// Reads where `item` sits in `items`, or moves it to `target` first. The selection is put back when it was the
+// moved entry, so moving it does not leave the sidebar without a selected page.
+std::optional<std::uint32_t> MoveMenuItem(const controls::NavigationView& navigation, const Inspectables& items,
+                                          const winrt::Windows::Foundation::IInspectable& item,
+                                          std::optional<std::uint32_t> target) {
+    std::uint32_t index = 0;
+    if (!items || !item || !items.IndexOf(item, index)) return std::nullopt;
+    if (!target || *target == index) return index;
+    if (*target >= items.Size()) return std::nullopt;
+    std::vector<std::string> keys;  // Apple's order, for "Apple's order" on the settings page
+    for (const auto& entry : items) {
+        auto shown = entry.try_as<controls::NavigationViewItemBase>();
+        if (!shown) shown = navigation.ContainerFromMenuItem(entry).try_as<controls::NavigationViewItemBase>();
+        std::string key = shown ? winrt::to_string(shown.Name()) : std::string();
+        if (key.empty() && shown) key = winrt::to_string(xaml::Automation::AutomationProperties::GetAutomationId(shown));
+        if (!key.empty()) keys.push_back(key);
+    }
+    NoteSidebarOrder(keys);
+    const bool selected = winrt::get_abi(navigation.SelectedItem()) == winrt::get_abi(item);
+    items.RemoveAt(index);
+    items.InsertAt(*target, item);
+    // A source that does not tell the list it changed is given again, so the sidebar shows the new order.
+    using Observed = winrt::Windows::Foundation::Collections::IObservableVector<winrt::Windows::Foundation::IInspectable>;
+    if (winrt::get_abi(items) == winrt::get_abi(navigation.MenuItemsSource().try_as<Inspectables>()) &&
+        !items.try_as<Observed>()) {
+        auto source = navigation.MenuItemsSource();
+        navigation.MenuItemsSource(nullptr);
+        navigation.MenuItemsSource(source);
+    }
+    if (selected) navigation.SelectedItem(item);
+    return *target;
+}
+
+}  // namespace
+
+// The position of `object` in the list that holds it (theme::kOrderProperty): for a NavigationViewItem, the MenuItems
+// of the nearest NavigationView, or its MenuItemsSource when the sidebar is filled from one (Apple Music's is); else
+// the Children of its direct parent Panel (not an ItemsRepeater, which manages its own). With `target`, it moves there
+// first. Nothing for footer items or a source that is not a list of objects.
 std::optional<std::uint32_t> ItemPosition(const xaml::DependencyObject& object, std::optional<std::uint32_t> target) {
     if (object.try_as<controls::NavigationViewItemBase>()) {
         for (xaml::DependencyObject parent = media::VisualTreeHelper::GetParent(object); parent;
              parent = media::VisualTreeHelper::GetParent(parent)) {
             auto navigation = parent.try_as<controls::NavigationView>();
             if (!navigation) continue;
-            auto items = navigation.MenuItems();
-            std::uint32_t index = 0;
-            if (!items.IndexOf(object, index)) return std::nullopt;
-            if (!target) return index;
-            if (*target >= items.Size()) return std::nullopt;
-            items.RemoveAt(index);
-            items.InsertAt(*target, object);
-            return *target;
+            if (auto shown = MoveMenuItem(navigation, navigation.MenuItems(), object, target)) return shown;
+            auto source = navigation.MenuItemsSource().try_as<Inspectables>();
+            return MoveMenuItem(navigation, source, navigation.MenuItemFromContainer(object.as<xaml::UIElement>()),
+                                target);
         }
         return std::nullopt;
     }

@@ -284,3 +284,30 @@ TEST_CASE(RetiredSettings_GlassMovingArtworkBecomesTheSnippetsMovingBackground) 
     ampify::Settings other = SettingsOf({{"theme.active", "cinema"}});
     CHECK(!th::MoveRetiredSettings(other));
 }
+
+namespace {
+
+std::string SongWidth(const std::string& room) {
+    th::LoadOptions options;
+    options.playbar = "centred";
+    options.songRoom = room;
+    std::optional<th::Theme> layout = th::LoadPlaybarLayout(nullptr, options);
+    std::string width = "MISSING";
+    if (!layout) return width;
+    for (const th::Assignment& assignment : layout->assignments) {
+        if (!assignment.media && assignment.selector.text == ".now-playing" && assignment.property == "Width") {
+            width = assignment.value.text;
+        }
+    }
+    return width;
+}
+
+}  // namespace
+
+// apple.songRoom: the bar layouts multiply the song's width by song-scale, and the progress line gives up that room.
+TEST_CASE(PlaybarPlace_AWiderSongRoomWidensTheSongOnEveryLayout) {
+    CHECK(SongWidth("") == "400");
+    CHECK(SongWidth("theme") == "400");
+    CHECK(SongWidth("wider") == "500");
+    CHECK(SongWidth("widest") == "600");
+}
