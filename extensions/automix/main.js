@@ -1,8 +1,9 @@
-// AutoMix: each song flows into the next, as in a DJ set. Apple's own analysis of both songs (beats, bars, loudness,
-// fades, vocals, the analysis Apple's AutoMix uses) picks where the next song comes in, at which bar of it, and how long
-// the two play together; the kernel keeps them in step to the millisecond with a second player and crosses their
-// volumes (Ampify.automix). Songs of one album that follow each other and classical music keep Apple's gapless
-// playback; songs that cannot be put in step get a smooth crossfade instead.
+// AutoMix: each song flows into the next, as in a DJ set. Apple's own analysis of both songs (beats, bars, phrases,
+// key, loudness, fades, vocals: the analysis Apple's AutoMix uses) picks where the next song comes in, at which bar of
+// it, and how long the two play together. The kernel (Ampify.automix) brings the current song to the next one's tempo
+// at its own pitch, keeps the two in step with a second player, crosses their volumes and hands the bass from one to
+// the other. Songs of one album that follow each other and classical music keep Apple's gapless playback; songs that
+// cannot share a tempo get a smooth crossfade instead.
 
 const CHECK_EVERY_MS = 1000;
 const PLAN_AHEAD_S = 45;          // a plan is handed to the kernel once its mix is this close
@@ -10,8 +11,17 @@ const LATEST_S = 14;              // closer than this, the next song cannot be p
 const MAX_TRIES = 3;               // a plan cancelled by a pause or a seek is sent again this many times at most
 const RETRY_MS = 15000;            // Apple's catalog failed: asked again this much later...
 const MAX_FETCH_FAILURES = 3;      // ...this many times, then the songs are planned without its analysis
-const END_DRIFT_S = 0.04;         // songs a little apart in tempo drift this much at each end of a mix, no more
-const MAX_TEMPO_GAP = 0.03;       // past 3 % apart in tempo, no beat mix
+const MAX_STRETCH = 0.08;         // the current song plays this much faster or slower at most to share a tempo
+const NO_STRETCH = 0.002;         // tempos this close are left alone: the bars drift 20 ms at most over a long mix
+const SHORT_ABOVE = 0.05;         // past this much stretch, or when the keys clash, a short mix
+const SHORT_BARS = 4;
+const RAMP_S = 8;                 // the current song reaches its new speed over this long, before the mix
+const MIN_RAMP_S = 4;
+const END_ROOM_S = 3.1;           // the kernel wants 3 s of the current song after a mix...
+const STRETCH_ROOM_S = 0.3;       // ...and this much more after a stretched one
+const BASS_SWAP = [0.45, 0.55];   // where in a mix the bass goes from the current song to the next
+const PHRASE_SCORE = 600;         // Apple's structure scores every beat: a phrase starts where it gives this or more
+const NO_MELODY = 0.25;           // two songs under this melodicness have no keys to clash
 const CROSSFADE_S = 6;
 const MIN_CROSSFADE_S = 3;
 const MAX_CROSSFADE_S = 12;
@@ -98,6 +108,62 @@ function danceable(song, part) {
   return Number.isFinite(value) && value >= MIN_DANCEABILITY;
 }
 
+// One bar of the current song against the next song's: over how many of them it runs (70 against 140 bpm is one
+// pulse: a half, one or two), and the speed at which the current song's bars last exactly that.
+function tempoMatch(barA, barB) {
+  const fits = [0.5, 1, 2].map((span) => ({ span, rate: barA / (barB * span) }));
+  return fits.reduce((x, y) => (Math.abs(Math.log(y.rate)) < Math.abs(Math.log(x.rate)) ? y : x));
+}
+
+// A key's place on the circle of fifths (the DJ's Camelot wheel: 1 to 12, minor or major), null when unknown.
+function camelot(key) {
+  const tonic = /^([A-G])([#b♯♭]?)$/.exec(key?.tonic ?? "");
+  if (!tonic || (key.mode !== "major" && key.mode !== "minor")) return null;
+  const shift = { "": 0, "#": 1, "♯": 1, b: -1, "♭": -1 }[tonic[2]];
+  const major = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[tonic[1]] + shift + (key.mode === "minor" ? 3 : 0);
+  return { number: (((7 + major * 7) % 12) + 12) % 12 + 1, minor: key.mode === "minor" };
+}
+
+// Keys agree when they are the same, relative (A minor and C major) or a fifth apart in the same mode. Unknown keys
+// and two songs with little melody never clash.
+function keysClash(a, b) {
+  const part = (song, name, which) => song.analysis?.[name]?.[which] ?? song.analysis?.[name]?.main;
+  const x = camelot(part(a, "key", "ending"));
+  const y = camelot(part(b, "key", "beginning"));
+  if (!x || !y) return false;
+  if ((part(a, "melodicness", "ending") ?? 1) < NO_MELODY && (part(b, "melodicness", "beginning") ?? 1) < NO_MELODY) {
+    return false;
+  }
+  const steps = Math.min((x.number - y.number + 12) % 12, (y.number - x.number + 12) % 12);
+  return !(steps === 0 || (steps === 1 && x.minor === y.minor));
+}
+
+// The bars on which a phrase of the song starts, from Apple's structure; empty without it.
+function phraseBars(song, bars) {
+  const events = song.structure?.videoEvents;
+  if (!Array.isArray(events?.score) || !Array.isArray(events?.timeInSeconds)) return [];
+  const found = [];
+  events.score.forEach((score, i) => {
+    if (!(score >= PHRASE_SCORE)) return;
+    const bar = bars.findIndex((time) => Math.abs(time - events.timeInSeconds[i]) < 0.1);
+    if (bar >= 0 && !found.includes(bar)) found.push(bar);
+  });
+  return found.sort((x, y) => x - y);
+}
+
+// The volumes and the lows of a mix on the beat, as [time, A, B, A's lows, B's lows]: the next song comes in without
+// its bass, takes it over around the middle, and the current song leaves once the next one is in full.
+function blendKeys(aStart, aEnd) {
+  const at = (x) => aStart + (aEnd - aStart) * x;
+  return [
+    [aStart, 1, 0, 1, 0],
+    [at(BASS_SWAP[0]), 1, 0.7, 1, 0],
+    [at(BASS_SWAP[1]), 1, 0.9, 0, 1],
+    [at(0.8), 0.5, 1, 0, 1],
+    [aEnd, 0, 1, 0, 1],
+  ];
+}
+
 function sameAlbumInOrder(a, b) {
   const x = a.attributes ?? {};
   const y = b.attributes ?? {};
@@ -109,6 +175,13 @@ function noMixGenre(song) {
   return (song.attributes?.genreNames ?? []).some((genre) => NO_MIX_GENRES.includes(genre));
 }
 
+// Seconds of the current song a mix must leave after it: the kernel's second player runs ahead of what is heard, more
+// so under a slowed song, and stops once it is through the song. `ramp` and `mix` are seconds of the song at most.
+function endRoom(rate = 1, ramp = 0, mix = 0) {
+  const carried = 2 * ramp / (1 + rate) + mix / rate;
+  return END_ROOM_S + (rate === 1 ? 0 : STRETCH_ROOM_S) + Math.max(0, 1 - rate) * carried;
+}
+
 // Bars a beat mix lasts, by style, from the longest to the shortest tried.
 function barChoices(style) {
   if (style === "Long blends") return [16, 8, 4];
@@ -116,46 +189,51 @@ function barChoices(style) {
   return [8, 4, 2];
 }
 
-// A mix on the beat: the next song comes in on a bar, its own bars on the current song's, under the current song's
-// last bars; the two cross three quarters in. Null when the songs cannot share a beat.
+// A mix on the beat: the current song, brought to the next one's tempo, ends on a phrase; the next song comes in on
+// one of its own phrases, bar on bar, under the current song's last bars. Null when the songs cannot share a tempo.
 function beatMix(a, b, spanA, spanB, options) {
   const barsA = barsOf(a);
   const barsB = barsOf(b);
   if (barsA.length < 8 || barsB.length < 8 || !danceable(a, "ending") || !danceable(b, "beginning")) return null;
-  const barA = barLength(barsA, spanA.end);
-  const barB = barLength(barsB, spanB.start);
-  const gap = Math.abs(1 - barA / barB);
-  if (!(gap <= MAX_TEMPO_GAP)) return null;
-  // Lined up on the middle bar, the beats drift apart by gap * time on each side: the most at the ends, where one
-  // song is nearly silent, half that where both are loud.
-  const longest = Math.min(options.maxSeconds, gap > 0 ? END_DRIFT_S / (0.5 * gap) : Infinity);
+  const match = tempoMatch(barLength(barsA, spanA.end), barLength(barsB, spanB.start));
+  if (!(Math.abs(match.rate - 1) <= MAX_STRETCH)) return null;
+  const stretched = Math.abs(match.rate - 1) > NO_STRETCH;
+  const rate = stretched ? match.rate : 1;
+  const latest = Math.min(spanA.end, a.duration - endRoom(rate, RAMP_S, options.maxSeconds * rate));
   let last = barsA.length - 1;
-  while (last > 0 && barsA[last] > spanA.end) last--;
-  let first = barsB.findIndex((t) => t >= spanB.start - 0.05);
+  while (last > 0 && barsA[last] > latest) last--;
+  const phraseEnd = phraseBars(a, barsA).filter((bar) => bar <= last).at(-1);
+  if (phraseEnd !== undefined && last - phraseEnd < 4) last = phraseEnd;
+  const first = barsB.findIndex((t) => t >= spanB.start - 0.05);
   if (first < 0) return null;
-  first = Math.ceil(first / 4) * 4;  // a phrase starts on a fourth bar
-  for (const count of barChoices(options.style)) {
+  const phrases = phraseBars(b, barsB).filter((bar) => bar >= first);
+  const fourth = Math.ceil(first / 4) * 4;  // without Apple's structure, a phrase starts on a fourth bar
+  const entries = phrases.length ? phrases.slice(0, 2) : [fourth, fourth + 4];
+  const choices = barChoices(options.style);
+  const short = Math.abs(rate - 1) > SHORT_ABOVE || keysClash(a, b);
+  const counts = short && choices.some((count) => count <= SHORT_BARS)
+    ? choices.filter((count) => count <= SHORT_BARS) : choices;
+  for (const count of counts) {
     const from = last - count;
+    if (from < 0) continue;
     const aStart = barsA[from];
     const aEnd = barsA[last];
-    const length = aEnd - aStart;
-    if (from < 0 || length > longest || aStart < options.earliest) continue;
+    const length = (aEnd - aStart) / rate;
+    const ramp = stretched ? Math.min(RAMP_S, aStart - options.earliest) : 0;
+    if (length > options.maxSeconds || aStart < options.earliest || (stretched && ramp < MIN_RAMP_S)) continue;
+    // Lined up on the middle bar: what is left of a tempo gap shows half as much at each end.
     const middle = count / 2;
-    // Lined up on the middle bar, a slightly faster next song would start before its first bar: then a phrase later.
-    const entry = [first, first + 4].find((bar) => bar + count < barsB.length &&
-      barsB[bar + middle] - (barsA[from + middle] - aStart) >= 0);
+    const across = middle * match.span;
+    if (!Number.isInteger(across)) continue;
+    const startFor = (bar) => barsB[bar + across] - (barsA[from + middle] - aStart) / rate;
+    const entry = entries.find((bar) => bar + count * match.span < barsB.length && startFor(bar) >= 0);
     if (entry === undefined) continue;
-    const bStart = barsB[entry + middle] - (barsA[from + middle] - aStart);
+    const bStart = startFor(entry);
     // Two singers at once for long sounds like a clash: then only the shortest mix.
     const clash = vocalShare(a, aStart, aEnd) > 0.4 && vocalShare(b, bStart, bStart + length) > 0.4;
-    if (clash && count > 2 && barChoices(options.style).includes(2)) continue;
-    const keys = [
-      [aStart, 1, 0],
-      [aStart + length * 0.5, 1, 0.5],
-      [aStart + length * 0.75, 0.5, 1],
-      [aEnd, 0, 1],
-    ];
-    return { kind: "beat", bars: count, plan: { bStart, keys } };
+    if (clash && count > 2 && counts.includes(2)) continue;
+    const plan = { bStart, keys: blendKeys(aStart, aEnd), ...(stretched ? { rate, rateFrom: aStart - ramp } : {}) };
+    return { kind: "beat", bars: count, plan };
   }
   return null;
 }
@@ -164,7 +242,7 @@ function beatMix(a, b, spanA, spanB, options) {
 // last seconds and is at full once the current one has faded to nothing. When the current song fades out by itself,
 // the next one is nearly full when that fade begins, so no hole opens between them.
 function crossfade(a, b, spanA, spanB, options) {
-  const aEnd = Math.min(a.duration - 0.25, spanA.silent);
+  const aEnd = Math.min(a.duration - endRoom(), spanA.silent);
   const fade = aEnd - spanA.end;
   const wanted = fade > 0.5 ? fade + 1 : CROSSFADE_S;
   const length = Math.min(options.maxSeconds, MAX_CROSSFADE_S, Math.max(MIN_CROSSFADE_S, wanted));
@@ -176,10 +254,20 @@ function crossfade(a, b, spanA, spanB, options) {
   return { kind: "crossfade", bars: 0, plan: { bStart: spanB.sound, keys } };
 }
 
-// The mix from song `a` into song `b`, or why there is none. A song: { duration, analysis, attributes }, where the
-// analysis and the attributes may be missing. options: { style, maxSeconds, albums, earliest (A's earliest start) }.
+// The mix from song `a` into song `b`, or why there is none. A song: { duration, analysis, structure, attributes },
+// where all but the duration may be missing. options: { style, maxSeconds, albums, earliest (A's earliest start) }.
+// Dolby Atmos goes out as spatial objects, which no mix can take. Apple's player says what a song plays in only once
+// it has started (`atmos`); before that the catalog says whether it has an Atmos version, and `atmosPlays` whether
+// such songs were seen to play in it here (unknown counts as yes: a mix into Atmos comes in late and at full volume).
+function inAtmos(song, atmosPlays) {
+  if (typeof song.atmos === "boolean") return song.atmos;
+  return atmosPlays !== false && (song.attributes?.audioTraits ?? []).includes("atmos");
+}
+
 function planMix(a, b, options) {
   if (options.style === "Off") return { kind: "none", why: "off" };
+  if (inAtmos(a, options.atmosPlays)) return { kind: "none", why: "this song plays in Dolby Atmos" };
+  if (inAtmos(b, options.atmosPlays)) return { kind: "none", why: "it plays in Dolby Atmos" };
   if (options.albums && sameAlbumInOrder(a, b)) return { kind: "none", why: "the next song of the same album" };
   if (noMixGenre(a) || noMixGenre(b)) return { kind: "none", why: "classical music or speech" };
   const spanA = musicalSpan(a);
@@ -225,14 +313,14 @@ function storefronts(song) {
   return [...new Set([STORES[song.storefront], local, "us"].filter(Boolean))];
 }
 
-const songs = new Map();  // catalog id -> Promise<{ attributes, analysis } | null>
+const songs = new Map();  // catalog id -> Promise<{ attributes, analysis, structure } | null>
 
 // The song in the first store that has it, or null when none does. Any other answer (no network, a refused token,
 // a busy server) throws, so that the song is asked again later instead of staying without its analysis.
 async function fetchSong(id, places) {
   for (const place of places) {
     const url = `https://amp-api.music.apple.com/v1/catalog/${place}/songs/${id}` +
-      "?include=audio-analysis&extend[audio-analysis]=fades,loudnessCurve";
+      "?include=audio-analysis,flexml-analysis&extend[audio-analysis]=fades,loudnessCurve";
     const headers = { authorization: `Bearer ${await token()}`, origin: "https://music.apple.com" };
     const reply = await Ampify.http.get(url, { headers });
     if (reply.status === 404) continue;
@@ -242,8 +330,8 @@ async function fetchSong(id, places) {
     }
     const item = JSON.parse(reply.text).data?.[0];
     if (!item) continue;
-    const analysis = item.relationships?.["audio-analysis"]?.data?.[0]?.attributes ?? null;
-    return { attributes: item.attributes ?? {}, analysis };
+    const part = (name) => item.relationships?.[name]?.data?.[0]?.attributes ?? null;
+    return { attributes: item.attributes ?? {}, analysis: part("audio-analysis"), structure: part("flexml-analysis") };
   }
   return null;
 }
@@ -275,12 +363,36 @@ function minutes(time) {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 }
 
+function speedNote(rate) {
+  if (!rate || rate === 1) return "";
+  return `, this song ${Math.abs((rate - 1) * 100).toFixed(1)} % ${rate > 1 ? "faster" : "slower"}`;
+}
+
+// Whether the songs that have a Dolby Atmos version play in it on this PC: learnt from each one Apple's player plays,
+// and kept, since the answer only changes with a setting of Apple Music or of Windows.
+const atmosVersions = new Map();  // song name -> its catalog entry has a Dolby Atmos version
+let atmosPlays;                   // true, false, or null while no such song was seen; undefined until read
+
+function knownAtmosPlays() {
+  if (atmosPlays === undefined) atmosPlays = Ampify.storage.get("atmosPlays", null);
+  return atmosPlays;
+}
+
+// True when the song taught something new.
+function learnAtmos(song) {
+  if (typeof song.atmos !== "boolean" || !atmosVersions.get(song.name) || song.atmos === knownAtmosPlays()) return false;
+  atmosPlays = song.atmos;
+  Ampify.storage.set("atmosPlays", atmosPlays);
+  return true;
+}
+
 function options(state) {
   return {
     style: Ampify.config.get("style"),
     maxSeconds: Ampify.config.get("longest"),
     albums: Ampify.config.get("albums"),
     earliest: state.current.time + LATEST_S + 1,
+    atmosPlays: knownAtmosPlays(),
   };
 }
 
@@ -308,8 +420,15 @@ async function decide(state, key) {
   if (key !== decidedFor) return;  // the queue moved on meanwhile
   const now = Ampify.automix.state();  // the time and lengths as they are after the wait
   if (!now.current || !now.next || keyOf(now) !== key) return;
-  const a = { duration: now.current.duration, analysis: infoA?.analysis, attributes: infoA?.attributes };
-  const b = { duration: now.next.duration, analysis: infoB?.analysis, attributes: infoB?.attributes };
+  const song = (played, info) => ({ duration: played.duration, analysis: info?.analysis, structure: info?.structure,
+                                    attributes: info?.attributes, atmos: played.atmos });
+  const a = song(now.current, infoA);
+  const b = song(now.next, infoB);
+  if (atmosVersions.size > 8) atmosVersions.clear();
+  for (const [played, info] of [[now.current, infoA], [now.next, infoB]]) {
+    atmosVersions.set(played.name, (info?.attributes?.audioTraits ?? []).includes("atmos"));
+  }
+  learnAtmos(now.current);
   if (!(a.duration > 0) || !(b.duration > 0)) {
     decidedFor = "";  // a length Apple's player does not know yet: decided again at the next look
     return;
@@ -327,6 +446,7 @@ async function decide(state, key) {
 function check() {
   const state = Ampify.automix.state();
   if (!state.available || !state.current || !state.next || !state.playing) return;
+  if (learnAtmos(state.current)) decidedFor = "";  // what was decided for the next song may no longer hold
   if (ACTIVE.includes(state.mix.phase)) return;
   const key = keyOf(state);
   if (key !== decidedFor) {
@@ -341,7 +461,8 @@ function check() {
     return;
   }
   if (!decision?.plan) return;
-  const lead = decision.plan.keys[0][0] - state.current.time;
+  // The kernel takes the song over where its speed starts to move, before the mix itself.
+  const lead = (decision.plan.rateFrom ?? decision.plan.keys[0][0]) - state.current.time;
   if (lead > PLAN_AHEAD_S || lead < LATEST_S) return;
   // A pause, a seek or a skip cancels a plan, and the kernel may refuse one for a passing reason: sent again once the
   // song is back before its mix, a few times at most.
@@ -349,7 +470,7 @@ function check() {
   decision.tries++;
   const result = Ampify.automix.schedule(decision.plan);
   decision.sent = result.ok;
-  const what = decision.kind === "beat" ? `${decision.bars} bars on the beat` : "a crossfade";
+  const what = decision.kind === "beat" ? `${decision.bars} bars on the beat${speedNote(decision.plan.rate)}` : "a crossfade";
   Ampify.log(result.ok
     ? `Mix into "${decision.title}" at ${minutes(decision.plan.keys[0][0])}: ${what}, from its ${minutes(decision.plan.bStart)}`
     : `Mix into "${decision.title}" refused: ${result.reason}`);

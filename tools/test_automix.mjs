@@ -23,23 +23,34 @@ const { planMix } = load();
 const OPTIONS = { style: "Auto", maxSeconds: 20, albums: true, earliest: 30 };
 
 // A song of `duration` seconds at `bpm`, four beats a bar from `firstBeat`, loud from `loudFrom` to `loudTo`, or
-// with `level(t)` as its loudness curve (dB, one value every half second).
+// with `level(t)` as its loudness curve (dB, one value every half second). `phraseEvery` and `phraseFrom` give it
+// Apple's structure: a phrase starts on every `phraseEvery`-th bar from bar `phraseFrom`.
 function song({ duration = 200, bpm = 124, firstBeat = 0, loudFrom = 0, loudTo = duration, vocals = [],
-                attributes = {}, danceability = 0.8, fadeIn = null, fadeOut = null, level = null } = {}) {
+                attributes = {}, danceability = 0.8, fadeIn = null, fadeOut = null, level = null, key = null,
+                melodicness = 0.7, phraseEvery = 0, phraseFrom = 0 } = {}) {
   const beat = 60 / bpm;
   const beats = [];
   for (let t = firstBeat; t < duration; t += beat) beats.push(Math.round(t * 1000));
   const bars = beats.filter((_, i) => i % 4 === 0);
   const curve = [];
   for (let t = 0; t < duration; t += 0.5) curve.push(level ? level(t) : t >= loudFrom && t < loudTo ? -8 : -60);
+  const score = (i) => {
+    if (i % 4 !== 0) return 200;
+    return phraseEvery && (i / 4 - phraseFrom) % phraseEvery === 0 ? 700 : 400;
+  };
   return {
     duration,
+    structure: phraseEvery
+      ? { videoEvents: { score: beats.map((_, i) => score(i)), timeInSeconds: beats.map((ms) => ms / 1000 + 0.002) } }
+      : null,
     attributes: { name: "Song", albumName: "Album", artistName: "Artist", trackNumber: 1, discNumber: 1,
                   genreNames: ["Electronic"], ...attributes },
     analysis: {
       beats: { beatsInMilliseconds: beats, barsInMilliseconds: bars },
       bpm: { main: bpm, beginning: bpm, ending: bpm },
       danceability: { main: danceability, beginning: danceability, ending: danceability },
+      melodicness: { main: melodicness, beginning: melodicness, ending: melodicness },
+      ...(key ? { key: { main: key, beginning: key, ending: key } } : {}),
       loudness: { main: { value: -8 } },
       loudnessCurve: { value: curve },
       fades: { ...(fadeIn ? { fadeIn } : {}), ...(fadeOut ? { fadeOut } : {}) },
@@ -84,12 +95,32 @@ function assertPlayable(plan, a, b) {
   const keys = plan.keys;
   assert.ok(keys.length >= 2);
   for (let i = 1; i < keys.length; i++) assert.ok(keys[i][0] >= keys[i - 1][0], "keys in time order");
-  for (const [, x, y] of keys) assert.ok(x >= 0 && x <= 1 && y >= 0 && y <= 1, "volumes within 0..1");
-  assert.deepEqual(Array.from(keys[0].slice(1)), [1, 0], "B comes in from silence under A at full");
-  assert.deepEqual(Array.from(keys.at(-1).slice(1)), [0, 1], "A gone, B full at the end");
+  for (const key of keys) {
+    assert.ok(key.length === 3 || key.length === 5, "a time and two volumes, or the lows of both songs as well");
+    for (const value of key.slice(1)) assert.ok(value >= 0 && value <= 1, "volumes and lows within 0..1");
+  }
+  assert.deepEqual(Array.from(keys[0].slice(1, 3)), [1, 0], "B comes in from silence under A at full");
+  assert.deepEqual(Array.from(keys.at(-1).slice(1, 3)), [0, 1], "A gone, B full at the end");
+  assert.equal(keys.at(-1)[4] ?? 1, 1, "B has its lows at the end");
+  const rate = plan.rate ?? 1;
   const span = keys.at(-1)[0] - keys[0][0];
-  assert.ok(span > 0 && span <= 60 && keys.at(-1)[0] < a.duration);
-  assert.ok(plan.bStart >= 0 && plan.bStart + span < b.duration);
+  assert.ok(span > 0 && span <= 60);
+  const stretchRoom = rate === 1 ? 0 : 0.3 + Math.max(0, 1 - rate) * (2 * (keys[0][0] - plan.rateFrom) / (1 + rate) + span / rate);
+  assert.ok(a.duration - keys.at(-1)[0] >= 3 + stretchRoom, "the song goes on after the mix: the kernel's second player runs ahead");
+  assert.ok(plan.bStart >= 0 && plan.bStart + span / rate < b.duration);
+  assert.ok(Math.abs(rate - 1) <= 0.1, "a rate the kernel takes");
+  if (rate !== 1) {
+    assert.ok(plan.rateFrom < keys[0][0] && keys[0][0] - plan.rateFrom <= 30, "the speed moves before the mix");
+  } else {
+    assert.equal(plan.rateFrom, undefined);
+  }
+}
+
+// How far B's nearest bar is from where B is while A is at `t`, in seconds.
+function barsApart(a, b, plan, t) {
+  const barsB = b.analysis.beats.barsInMilliseconds.map((ms) => ms / 1000);
+  const inB = plan.bStart + (t - plan.keys[0][0]) / (plan.rate ?? 1);
+  return Math.min(...barsB.map((bar) => Math.abs(bar - inB)));
 }
 
 test("two songs at one tempo mix for eight bars, bar on bar, ending on the current song's last loud bar", () => {
@@ -117,29 +148,115 @@ test("a silent start of the next song is skipped, up to its first phrase", () =>
 
 test("songs too far apart in tempo get a crossfade instead of a beat mix", () => {
   const a = song({ bpm: 124 });
-  const b = song({ bpm: 128, attributes: { albumName: "Other" } });
+  const b = song({ bpm: 138, attributes: { albumName: "Other" } });
   const result = planMix(a, b, OPTIONS);
   assert.equal(result.kind, "crossfade");
   assertPlayable(result.plan, a, b);
 });
 
-test("a small tempo gap only allows a short mix, so the beats never drift apart audibly", () => {
+test("the current song is brought to the next one's tempo, and their bars stay together for the whole mix", () => {
   const a = song({ bpm: 124 });
-  const b = song({ bpm: 126, attributes: { albumName: "Other" } });
+  const b = song({ bpm: 128, attributes: { albumName: "Other" } });
   const result = planMix(a, b, OPTIONS);
   assert.equal(result.kind, "beat");
-  assert.equal(result.bars, 2);
+  assert.equal(result.bars, 8);
   assertPlayable(result.plan, a, b);
-  // Bar on bar in the middle of the mix, the bars at its ends no more than 40 ms apart.
+  assert.ok(Math.abs(result.plan.rate - 128 / 124) < 1e-3, `rate ${result.plan.rate}`);
+  assert.ok(Math.abs(result.plan.keys[0][0] - result.plan.rateFrom - 8) < 1e-9, "eight seconds to reach that speed");
   const barsA = a.analysis.beats.barsInMilliseconds.map((ms) => ms / 1000);
-  const barsB = b.analysis.beats.barsInMilliseconds.map((ms) => ms / 1000);
   const [start, end] = [result.plan.keys[0][0], result.plan.keys.at(-1)[0]];
   for (const t of [start, (start + end) / 2, end]) {
-    const inB = result.plan.bStart + t - start;
-    const nearest = barsB.reduce((x, y) => (Math.abs(y - inB) < Math.abs(x - inB) ? y : x));
     assert.ok(barsA.some((bar) => Math.abs(bar - t) < 0.002), `a bar of the current song at ${t}`);
-    assert.ok(Math.abs(nearest - inB) <= 0.04 + 1e-9, `bars ${((nearest - inB) * 1000).toFixed(1)} ms apart at ${t}`);
+    const apart = barsApart(a, b, result.plan, t);
+    assert.ok(apart <= 0.003, `bars ${(apart * 1000).toFixed(1)} ms apart at ${t}`);
   }
+});
+
+test("a slower next song slows the current one down", () => {
+  const a = song({ bpm: 128 });
+  const b = song({ bpm: 122, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.equal(result.kind, "beat");
+  assertPlayable(result.plan, a, b);
+  assert.ok(Math.abs(result.plan.rate - 122 / 128) < 1e-3, `rate ${result.plan.rate}`);
+});
+
+test("tempos a hair apart are left alone: the bars drift 20 ms at most", () => {
+  const a = song({ bpm: 124 });
+  const b = song({ bpm: 124.1, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.equal(result.kind, "beat");
+  assertPlayable(result.plan, a, b);
+  assert.equal(result.plan.rate, undefined);
+  const [start, end] = [result.plan.keys[0][0], result.plan.keys.at(-1)[0]];
+  for (const t of [start, (start + end) / 2, end]) assert.ok(barsApart(a, b, result.plan, t) <= 0.02 + 1e-9);
+});
+
+test("more than five percent of stretch keeps the mix to four bars", () => {
+  const a = song({ bpm: 120 });
+  const b = song({ bpm: 128, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.equal(result.kind, "beat");
+  assert.equal(result.bars, 4);
+  assertPlayable(result.plan, a, b);
+});
+
+test("a song at half the tempo of the next shares its pulse: one bar on two", () => {
+  const a = song({ bpm: 70 });
+  const b = song({ bpm: 141, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.equal(result.kind, "beat");
+  assertPlayable(result.plan, a, b);
+  assert.ok(Math.abs(result.plan.rate - 141 / 140) < 1e-3, `rate ${result.plan.rate}`);
+  const [start, end] = [result.plan.keys[0][0], result.plan.keys.at(-1)[0]];
+  for (const t of [start, end]) assert.ok(barsApart(a, b, result.plan, t) <= 0.003);
+});
+
+test("no room to reach the next song's tempo before the mix: a crossfade", () => {
+  const a = song({ bpm: 124 });
+  const b = song({ bpm: 128, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, { ...OPTIONS, earliest: 196 });
+  assert.notEqual(result.kind, "beat");
+});
+
+test("the basses of the two songs change hands in the middle of a mix on the beat", () => {
+  const a = song();
+  const b = song({ attributes: { albumName: "Other" } });
+  const keys = planMix(a, b, OPTIONS).plan.keys;
+  assert.deepEqual(Array.from(keys[0].slice(3)), [1, 0], "the next song comes in without its lows");
+  assert.deepEqual(Array.from(keys.at(-1).slice(3)), [0, 1], "and ends with them, the current song without");
+  const [start, end] = [keys[0][0], keys.at(-1)[0]];
+  for (const key of keys) {
+    const x = (key[0] - start) / (end - start);
+    assert.ok(key[3] + key[4] <= 1 + 1e-9, "never both basses in full");
+    if (x < 0.4) assert.deepEqual(Array.from(key.slice(3)), [1, 0]);
+    if (x > 0.6) assert.deepEqual(Array.from(key.slice(3)), [0, 1]);
+  }
+});
+
+test("keys that clash keep the mix short, keys that agree do not", () => {
+  const b = (key) => song({ key, attributes: { albumName: "Other" } });
+  const a = song({ key: { tonic: "C", mode: "major" } });
+  assert.equal(planMix(a, b({ tonic: "G", mode: "major" }), OPTIONS).bars, 8, "a fifth apart");
+  assert.equal(planMix(a, b({ tonic: "A", mode: "minor" }), OPTIONS).bars, 8, "relative keys");
+  assert.equal(planMix(a, b({ tonic: "F#", mode: "major" }), OPTIONS).bars, 4, "a tritone apart");
+  assert.equal(planMix(a, b({ tonic: "C", mode: "minor" }), OPTIONS).bars, 4, "major against minor");
+  const drums = song({ key: { tonic: "C", mode: "major" }, melodicness: 0.1 });
+  const drumsToo = song({ key: { tonic: "F#", mode: "major" }, melodicness: 0.1, attributes: { albumName: "Other" } });
+  assert.equal(planMix(drums, drumsToo, OPTIONS).bars, 8, "two songs with no melody to clash");
+});
+
+test("with Apple's structure the mix ends on a phrase of the current song and starts on one of the next", () => {
+  const a = song({ loudTo: 190, phraseEvery: 4, phraseFrom: 1 });
+  const b = song({ phraseEvery: 4, phraseFrom: 2, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.equal(result.kind, "beat");
+  assertPlayable(result.plan, a, b);
+  const bar = 4 * 60 / 124;
+  const lastBar = Math.round(result.plan.keys.at(-1)[0] / bar);
+  assert.equal((lastBar - 1) % 4, 0, `the mix ends on bar ${lastBar}, a phrase of the current song`);
+  assert.ok(result.plan.keys.at(-1)[0] <= 190);
+  assert.ok(Math.abs(result.plan.bStart - 2 * bar) < 0.003, `the next song comes in at ${result.plan.bStart}`);
 });
 
 test("two singers at once keep the mix to its shortest", () => {
@@ -163,7 +280,7 @@ test("classical music is left alone", () => {
   assert.equal(planMix(a, b, OPTIONS).kind, "none");
 });
 
-test("songs without Apple's analysis get a six-second crossfade at the very end", () => {
+test("songs without Apple's analysis get a six-second crossfade over the song's last seconds", () => {
   const a = { duration: 180 };
   const b = { duration: 200 };
   const result = planMix(a, b, OPTIONS);
@@ -179,7 +296,8 @@ test("a crossfade follows the current song's own fade-out, the next song nearly 
   const result = planMix(a, b, OPTIONS);
   assert.equal(result.kind, "crossfade");
   assertPlayable(result.plan, a, b);
-  assert.deepEqual(Array.from(result.plan.keys, (key) => Array.from(key)), [[189, 1, 0], [190, 1, 0.7], [198, 0, 1]]);
+  // the song lasts 200 s: the mix is over 3.1 s before its end, a second into the last of its fade-out
+  assert.deepEqual(Array.from(result.plan.keys, (key) => Array.from(key)), [[189, 1, 0], [190, 1, 0.7], [196.9, 0, 1]]);
 });
 
 // Measured on 12/11/2026: a rap song that dies out within a second of its fade-out's start, then a song that fades
@@ -216,12 +334,17 @@ test("a mix that would start before the song can prepare it is not planned", () 
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-function follower({ state, schedule, http, clock }) {
+function follower({ state, schedule, http, clock, stored = {} }) {
+  const kept = { token: { value: "token", at: clock?.() ?? Date.now() }, ...stored };
   const context = {
     Ampify: {
       process: "test", locale: "en-US", log() {},
       config: { get: (key) => ({ style: "Auto", longest: 20, albums: true })[key] },
-      storage: { get: () => ({ value: "token", at: clock?.() ?? Date.now() }), set() {}, remove() {} },
+      storage: {
+        get: (key, fallback) => (key in kept ? kept[key] : fallback),
+        set: (key, value) => { kept[key] = stored[key] = value; },
+        remove: (key) => { delete kept[key]; },
+      },
       http: { get: http ?? (async () => ({ status: 404, text: "" })) },
       automix: { state, schedule, cancel() {} },
     },
@@ -259,7 +382,7 @@ test("a next song whose length is not known yet gets its mix once it is", async 
   await looks(context, 3);
   assert.equal(sent.length, 1);
   assert.equal(sent[0].next, "B");
-  assert.ok(Math.abs(sent[0].keys[0][0] - 193.75) < 1e-9);
+  assert.ok(Math.abs(sent[0].keys[0][0] - 190.9) < 1e-9);  // six seconds, over 3.1 s before the end of 200 s
 });
 
 test("a plan the kernel refuses for a passing reason is sent again", async () => {
@@ -306,6 +429,43 @@ test("a catalog that fails is asked again later, then the songs mix without its 
     await looks(context, 2);
   }
   assert.equal(sent.length, 1, "planned without the analysis after the last try");
+});
+
+// ---- Dolby Atmos: it goes out as spatial objects, which no mix can take
+
+test("a song that plays in Dolby Atmos is not mixed out of", () => {
+  const a = { ...song(), atmos: true };
+  const b = song({ attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.equal(result.kind, "none");
+  assert.match(result.why, /Dolby Atmos/);
+});
+
+test("a next song with a Dolby Atmos version is mixed into only where such songs play in stereo", () => {
+  const a = { ...song(), atmos: false };
+  const b = song({ attributes: { albumName: "Other", audioTraits: ["atmos", "lossless"] } });
+  assert.equal(planMix(a, b, OPTIONS).kind, "none", "not known yet: it may well play in Dolby Atmos");
+  assert.match(planMix(a, b, OPTIONS).why, /Dolby Atmos/);
+  assert.equal(planMix(a, b, { ...OPTIONS, atmosPlays: true }).kind, "none");
+  assert.notEqual(planMix(a, b, { ...OPTIONS, atmosPlays: false }).kind, "none");
+});
+
+test("what a song with a Dolby Atmos version plays in is remembered for the next ones", async () => {
+  const stored = {};
+  const sent = [];
+  let atmos = null;  // Apple's player has not loaded the song yet
+  const catalog = async () => ({ status: 200, text: JSON.stringify({ data: [{ attributes: { audioTraits: ["atmos"] } }] }) });
+  const state = () => ({ ...queue(160), current: { ...queue(160).current, atmos } });
+  const context = follower({ state, schedule: (plan) => (sent.push(plan), { ok: true }), http: catalog, stored });
+  await looks(context, 3);
+  assert.equal(sent.length, 0, "both songs may play in Dolby Atmos");
+  atmos = false;  // it plays in stereo: Dolby Atmos is off here
+  await looks(context, 4);
+  assert.equal(stored.atmosPlays, false);
+  assert.equal(sent.length, 1, "decided again with what was learnt");
+  const later = follower({ state, schedule: (plan) => (sent.push(plan), { ok: true }), http: catalog, stored });
+  await looks(later, 3);
+  assert.equal(sent.length, 2, "known from the start the next time");
 });
 
 test("crossfade only and off are honoured", () => {
