@@ -9,6 +9,7 @@
   "translations": {"fr": {"name": "Temps au survol", "description": "Affiche le temps du morceau sous le pointeur sur la ligne de progression, avec un fin repère à cet endroit, comme Spotify."}, "de": {"name": "Zeit beim Überfahren", "description": "Zeigt die Zeit des Titels unter dem Mauszeiger auf der Fortschrittslinie, mit einer feinen Markierung an dieser Stelle, wie Spotify."}, "es": {"name": "Tiempo al pasar", "description": "Muestra el tiempo de la canción bajo el puntero en la línea de progreso, con una marca fina en ese punto, como Spotify."}, "pt": {"name": "Tempo ao passar", "description": "Mostra o tempo da música sob o ponteiro na linha de progresso, com uma marca fina nesse ponto, como o Spotify."}, "ru": {"name": "Время под указателем", "description": "Показывает время трека под указателем на линии прогресса и тонкую отметку в этом месте, как Spotify."}, "ja": {"name": "ホバーで時間表示", "description": "Spotify のように、進行状況バー上のポインターの位置にある曲の時間を、細いマーカーと一緒に表示します。"}, "zh": {"name": "悬停显示时间", "description": "像 Spotify 一样，在进度条上显示指针所在位置的歌曲时间，并在该处显示一条细标记。"}, "it": {"name": "Tempo al passaggio", "description": "Mostra il tempo del brano sotto il puntatore sulla linea di avanzamento, con un sottile segno in quel punto, come Spotify."}, "ko": {"name": "마우스 올리면 시간 표시", "description": "Spotify처럼 진행 막대에서 포인터가 있는 지점의 곡 시간을 가는 표시와 함께 보여 줍니다."}},
   "kitApi": "1.0",
   "minAmpify": "1.3.0",
+  "preview": "preview.jpg",
   "main": "main.js",
   "permissions": ["player.read", "ui.playbar"]
 }
