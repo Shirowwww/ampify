@@ -36,6 +36,7 @@ constexpr std::size_t kLineSearchLimit = 40;                      // elements wa
 constexpr int kAreaSearchDepth = 12;                              // parents walked up from the lines to their scroller
 constexpr auto kFade = std::chrono::milliseconds(250);            // a line fading in or out
 constexpr auto kGlide = std::chrono::milliseconds(300);           // the block moving, as Apple's own scroll does
+constexpr auto kLineAfterScroll = std::chrono::milliseconds(150);  // Apple lights a line 15 to 30 ms after its scroll
 
 std::atomic<int> g_before{kAllLines};
 std::atomic<int> g_after{kAllLines};
@@ -51,6 +52,8 @@ struct Window {
     controls::ScrollViewer::ViewChanged_revoker scrolled;
     std::optional<double> scrollEnd;  // where Apple's scroll in flight ends, while one is
     SungLines sung;
+    std::chrono::steady_clock::time_point sungAt;  // when the sung lines last changed
+    std::chrono::steady_clock::time_point waitsForLine;  // until then the block stays put: a scroll's line is to light
     int ticks = 0;
     bool touched = false;  // Ampify faded lines or moved the block: they go back when the setting does
 };
@@ -194,7 +197,7 @@ double CentringShift(const Window& state, const controls::ScrollViewer& scroller
 void Recentre(Window& state) {
     controls::Panel lines = state.lines.get();
     controls::ScrollViewer scroller = state.scroller.get();
-    if (!lines || !scroller) return;
+    if (!lines || !scroller || std::chrono::steady_clock::now() < state.waitsForLine) return;
     Move(scroller, CentringShift(state, scroller, lines, g_before.load(), g_after.load()));
 }
 
@@ -205,6 +208,12 @@ void WatchScroll(Window& state, const controls::ScrollViewer& scroller) {
         try {
             Window& state = State();
             state.scrollEnd = args.FinalView().VerticalOffset();
+            // Apple scrolls to a line a few frames before it lights it (1.1792). Centred at once on the sung line,
+            // which is then the one ending, the block went a whole line down and came back as the new line lit:
+            // only a scroll that comes after its line is followed at once, the others once their line lights.
+            const auto now = std::chrono::steady_clock::now();
+            const double ms = std::chrono::duration<double, std::milli>(now - state.sungAt).count();
+            state.waitsForLine = ScrollFollowsSungLine(ms) ? now : now + kLineAfterScroll;
             if (state.touched) Recentre(state);
         } catch (...) {
         }
@@ -245,6 +254,10 @@ void Apply(Window& state) {
     // The credits come with the last line, not over the lines above it.
     if (auto footer = state.footer.get(); footer && children.Size() > 0) {
         Fade(footer, LyricLineShown(static_cast<int>(children.Size()) - 1, sung, before, after));
+    }
+    if (sung.first != state.sung.first || sung.last != state.sung.last) {
+        state.sungAt = std::chrono::steady_clock::now();
+        state.waitsForLine = {};
     }
     state.sung = sung;
     state.touched = !all;

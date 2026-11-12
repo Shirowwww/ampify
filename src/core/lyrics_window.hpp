@@ -41,6 +41,12 @@ inline double LyricsCentringShift(SungSpan sung, double area, int before, int af
     return area / 2 - (sung.top + sung.bottom) / 2;
 }
 
+// Whether a scroll that starts `sinceLineMs` after the sung lines changed is the one that brings them in place.
+// Apple scrolls to a line 15 to 30 ms before it lights it (1.1792, measured): such a scroll finds the line that is
+// ending still sung, and is not followed; one that comes just after its line is.
+inline constexpr double kScrollAfterLineMs = 150;
+inline bool ScrollFollowsSungLine(double sinceLineMs) { return sinceLineMs >= 0 && sinceLineMs < kScrollAfterLineMs; }
+
 // A setting's text: "all" (or nothing) for every line, else 0 to kMostLines; anything else counts as all.
 inline int LyricLinesOf(std::string_view text) {
     if (text.size() == 1 && text[0] >= '0' && text[0] - '0' <= kMostLines) return text[0] - '0';

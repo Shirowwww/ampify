@@ -482,44 +482,14 @@ Lyrics ParseTtml(std::string_view ttml) {
     return Scanner().Run(ttml);
 }
 
-namespace {
-
-// Apple times many lines only as a whole: their words then share the line's span by length, so they still light up
-// one after the other. Kept out of the parsed lyrics, which say only what Apple gave.
-std::vector<KaraokeWord> SpreadOverLine(const LyricLine& line) {
-    std::vector<KaraokeWord> words;
-    size_t letters = 0;
-    for (size_t at = 0; at < line.text.size();) {
-        size_t end = line.text.find(' ', at);
-        if (end == std::string::npos) end = line.text.size();
-        if (end > at) {
-            words.push_back({line.text.substr(at, end - at), 0, 0});
-            letters += end - at;
-        }
-        at = end + 1;
-    }
-    const double span = static_cast<double>(line.endMs - line.startMs);
-    size_t before = 0;
-    for (KaraokeWord& word : words) {
-        word.startMs = line.startMs + static_cast<int64_t>(span * before / letters);
-        before += word.piece.size();
-        word.endMs = line.startMs + static_cast<int64_t>(span * before / letters);
-    }
-    return words;
-}
-
-}  // namespace
-
 std::vector<KaraokeWord> KaraokeWords(const LyricLine& line) {
     std::vector<KaraokeWord> words;
     if (line.timing == LyricTiming::ByWord) {
         for (const LyricWord& word : line.words) words.push_back({word.text, word.startMs, word.endMs});
-    } else if (line.timing == LyricTiming::ByLine && line.endMs > line.startMs) {
-        words = SpreadOverLine(line);
     }
     if (words.empty()) return {{line.text, line.startMs, line.endMs}};
     for (size_t i = 0; i + 1 < words.size(); ++i) {
-        if (line.timing != LyricTiming::ByWord || line.words[i].spaceAfter) words[i].piece += ' ';
+        if (line.words[i].spaceAfter) words[i].piece += ' ';
     }
     return words;
 }
@@ -534,6 +504,11 @@ KaraokeFrame KaraokeAt(const Lyrics& lyrics, int64_t positionMs) {
     const LyricLine& line = *(after - 1);
     frame.line = static_cast<int>(after - lyrics.lines.begin()) - 1;
     frame.between = line.endMs > line.startMs && positionMs >= line.endMs;
+    // Timed only as a whole, a line lights at once when it starts, as in Apple's own view (no word timing on Windows).
+    if (line.timing != LyricTiming::ByWord) {
+        frame.words = {1.0};
+        return frame;
+    }
     const std::vector<KaraokeWord> words = KaraokeWords(line);
     frame.words.reserve(words.size());
     for (const KaraokeWord& word : words) {

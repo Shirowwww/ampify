@@ -469,21 +469,21 @@ TEST_CASE(NowPlaying_MovesOnWhileHeardAndKeepsTheLyricsOfItsTrack) {
     CHECK(!ampify::CurrentNowPlaying().lyrics);
 }
 
-TEST_CASE(Karaoke_SpreadsALineTimedAsAWholeOverItsWordsByLength) {
+TEST_CASE(Karaoke_LightsALineTimedAsAWholeAtOnce) {
     ampify::Lyrics lyrics;
     lyrics.synced = true;
-    lyrics.lines.push_back({0, 3000, "ab  cdef", {}, ampify::LyricTiming::ByLine});
-    ampify::KaraokeFrame early = ampify::KaraokeAt(lyrics, 500);
-    CHECK(early.words.size() == 2);
-    if (early.words.size() == 2) CHECK(early.words[0] == 0.5 && early.words[1] == 0.0);
-    ampify::KaraokeFrame late = ampify::KaraokeAt(lyrics, 2000);
-    if (late.words.size() == 2) CHECK(late.words[0] == 1.0 && late.words[1] == 0.5);
+    lyrics.lines.push_back({1000, 4000, "ab  cdef", {}, ampify::LyricTiming::ByLine});
+    CHECK(ampify::KaraokeAt(lyrics, 500).line == -1);
+    ampify::KaraokeFrame early = ampify::KaraokeAt(lyrics, 1001);  // just started: the whole line, as Apple's view
+    CHECK(early.line == 0);
+    CHECK(early.words.size() == 1);
+    if (early.words.size() == 1) CHECK(early.words[0] == 1.0);
 
     std::vector<ampify::KaraokeWord> words = ampify::KaraokeWords(lyrics.lines[0]);
-    CHECK(words.size() == 2);
-    if (words.size() == 2) CHECK(words[0].piece == "ab " && words[1].piece == "cdef");
+    CHECK(words.size() == 1);
+    if (words.size() == 1) CHECK(words[0].piece == "ab  cdef");
 
-    ampify::LyricLine instant{4000, 4000, "no span", {}, ampify::LyricTiming::ByLine};  // no duration: nothing to spread over
+    ampify::LyricLine instant{4000, 4000, "no span", {}, ampify::LyricTiming::ByLine};
     words = ampify::KaraokeWords(instant);
     CHECK(words.size() == 1);
     if (words.size() == 1) CHECK(words[0].piece == "no span");

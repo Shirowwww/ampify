@@ -88,8 +88,17 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   and of a freeze at a song change with the side pane open. It is now left to Apple's panes; Ampify asks only
   `GetLyricsAsync(descriptor, StoreSyllable)` (slot 50, three times at most, `src/win/amp_player.cpp`). That call
   completes, but on 1.1792 it gave `timing="Line"` TTML for every library song tried (05/11/2026): Apple Music on
-  Windows had no word timing for them. The karaoke then spreads a line's span over its words by length
-  (`KaraokeWords`, `src/core/lyrics.cpp`), the parsed lyrics keep only what Apple gave.
+  Windows had no word timing for them. The karaoke then lights such a line at once when it starts, as Apple's
+  own pane does (`KaraokeAt`, `src/core/lyrics.cpp`; until 12/11/2026 it spread the line's span over its words by
+  length), the parsed lyrics keep only what Apple gave.
+  Checked again on 2026-11-12: Apple's own lyrics pane lights whole lines on a song that has word timing on iPhone,
+  and `lyrics()` gave no word times for six songs. Word-timed lyrics would have to come from Apple's web API.
+- **The full-screen lyrics scroll before the line lights (1.1792, traced 2026-11-12).** At each new line Apple calls
+  `ChangeView` without animation (`ViewChanging`, then `ViewChanged` not intermediate within 16 ms; the glide seen
+  is Apple's own animation), then puts the line in its `Current` state 0 to 31 ms later. Code that follows both
+  events must not act on the scroll alone: the sung line is then still the one ending. `apple.lyricsBefore` centred
+  that ending line at the scroll's end, a whole line down, and came back as the new line lit
+  (`src/win/lyrics_window.cpp`, `ScrollFollowsSungLine`).
 - **A large cover.** The play bar's `Image#StaticArtwork` is a thumbnail. Apple's own loader is a static of
   `AMP.UI.Views.UIBroker` (`IUIBrokerStatics` AC46998B-…, slot 34 `GetImageSource(Artwork, Double scale, Double width,
   Double height) -> ImageSource`), given the item's `IArtwork`. Library covers sit on disk in

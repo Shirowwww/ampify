@@ -61,6 +61,15 @@ TEST_CASE(LyricsWindow_NothingMovesWhileASideShowsAllOrNothingIsSung) {
     CHECK_NEAR(LyricsCentringShift(SungSpan{300, 360}, 0, 1, 1, true), 0, 1e-9);
 }
 
+TEST_CASE(LyricsWindow_AScrollBeforeItsLineLightsIsNotFollowed) {
+    // Apple scrolls, then lights the line: the scroll comes seconds after the line before it.
+    CHECK(!ampify::ScrollFollowsSungLine(2400));
+    CHECK(!ampify::ScrollFollowsSungLine(ampify::kScrollAfterLineMs));
+    // A scroll right after its line is the one that brings it in place.
+    CHECK(ampify::ScrollFollowsSungLine(0));
+    CHECK(ampify::ScrollFollowsSungLine(40));
+}
+
 TEST_CASE(LyricsWindow_ASettingReadsAllOrZeroToFive) {
     CHECK(LyricLinesOf("all") == kAllLines);
     CHECK(LyricLinesOf("") == kAllLines);

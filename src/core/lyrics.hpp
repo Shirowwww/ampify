@@ -71,7 +71,7 @@ Json LyricsJson(const Lyrics* lyrics);
 
 // One word of a line as the karaoke shows it: its text with the space that follows it, if any, and when it is sung.
 // Apple times syllables apart ("beau" "ti" "ful"), so a piece is not always a whole word. A line timed only as a
-// whole shares its span among its words by length; an untimed or instant line is one piece.
+// whole, or not timed, is one piece: it lights at once when it starts.
 struct KaraokeWord {
     std::string piece;
     int64_t startMs = 0;
