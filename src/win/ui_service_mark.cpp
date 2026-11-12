@@ -49,7 +49,19 @@ xaml::FrameworkElement FindBelow(const xaml::DependencyObject& root, std::wstrin
     return nullptr;
 }
 
-// The playback bar's scrubber: Apple's slider in the song's display.
+// The nearest element above `element` named `name`, within a few levels.
+xaml::FrameworkElement AncestorNamed(const xaml::FrameworkElement& element, std::wstring_view name) {
+    constexpr int kMaxLevels = 8;
+    xaml::DependencyObject current = element;
+    for (int level = 0; current && level < kMaxLevels; level++) {
+        current = media::VisualTreeHelper::GetParent(current);
+        if (auto found = current.try_as<xaml::FrameworkElement>(); found && found.Name() == name) return found;
+    }
+    return nullptr;
+}
+
+// The playback bar's scrubber: Apple's slider in the song's display, or elsewhere in the bar when a bar layout moved
+// it out of the display (layouts/centre-bar.css puts it under the buttons).
 xaml::FrameworkElement FindScrubber(const WindowContext& context) {
     xaml::FrameworkElement display = context.songDisplay.get();
     if (!display) {
@@ -57,7 +69,10 @@ xaml::FrameworkElement FindScrubber(const WindowContext& context) {
             display = context.probeObjects[*lcd].get().try_as<xaml::FrameworkElement>();
         }
     }
-    return display ? FindBelow(display, L"LCDScrubber") : nullptr;
+    if (!display) return nullptr;
+    if (xaml::FrameworkElement scrubber = FindBelow(display, L"LCDScrubber")) return scrubber;
+    xaml::FrameworkElement bar = AncestorNamed(display, L"TransportBar");
+    return bar ? FindBelow(bar, L"LCDScrubber") : nullptr;
 }
 
 // The track of the progress line: the Grid of the scrubber's template that holds its rectangles.
@@ -164,7 +179,8 @@ controls::Border MakeLabel() {
     }
 }
 
-// A Canvas, which clips nothing: the label stands above the line, outside the track's own box.
+// The marker's layer, in the track. The label is not in it: a bar layout can leave the scrubber a few pixels high, and
+// the scrubber clips what stands outside it (the centred bar, 7 high, cut the label off whole).
 controls::Canvas MakeHoverLayer() {
     controls::Canvas layer;
     Name(layer, "ampify-progress-readout");
@@ -172,13 +188,33 @@ controls::Canvas MakeHoverLayer() {
     controls::Border marker = MakePart(1);
     marker.RenderTransform(media::TranslateTransform());
     layer.Children().Append(marker);
-    if (controls::Border label = MakeLabel()) {
-        label.RenderTransform(media::TranslateTransform());
-        layer.Children().Append(label);
-    }
     layer.Opacity(0);
     FadeWith(layer, kHoverFadeMs);
     return layer;
+}
+
+// The label, in a Popup of the window, which nothing clips; open from the start, shown by its opacity.
+primitives::Popup MakeHoverLabel(const xaml::XamlRoot& root) {
+    controls::Border label = MakeLabel();
+    if (!label || !root) return nullptr;
+    label.IsHitTestVisible(false);
+    label.Opacity(0);
+    FadeWith(label, kHoverFadeMs);
+    primitives::Popup popup;
+    popup.XamlRoot(root);
+    popup.IsHitTestVisible(false);
+    popup.Child(label);
+    popup.IsOpen(true);
+    return popup;
+}
+
+controls::Border HoverLabel(const WindowContext& context) {
+    return context.hoverLabel ? context.hoverLabel.Child().try_as<controls::Border>() : nullptr;
+}
+
+void ShowHover(WindowContext& context, bool shown) {
+    if (context.hoverLayer) context.hoverLayer.Opacity(shown ? 1 : 0);
+    if (controls::Border label = HoverLabel(context)) label.Opacity(shown ? 1 : 0);
 }
 
 // The marker and the label at `x` (in the layer), the label naming the time there; above the line, or below it when
@@ -188,7 +224,8 @@ void PlaceHover(WindowContext& context, double x) {
     auto children = layer.Children();
     if (children.Size() == 0) return;
     auto marker = children.GetAt(0).as<controls::Border>();
-    controls::Border label = children.Size() > 1 ? children.GetAt(1).as<controls::Border>() : nullptr;
+    if (!context.hoverLabel) context.hoverLabel = MakeHoverLabel(layer.XamlRoot());
+    controls::Border label = HoverLabel(context);
     controls::TextBlock text = label ? label.Child().try_as<controls::TextBlock>() : nullptr;
     double width = layer.ActualWidth();
     if (text) {
@@ -201,7 +238,7 @@ void PlaceHover(WindowContext& context, double x) {
     HoverReadout readout = LayOutHoverReadout(width, x, kTick, labelWidth);
     context.hoverPart = readout.shown ? readout.part : -1;
     if (!readout.shown) {
-        layer.Opacity(0);
+        ShowHover(context, false);
         return;
     }
     auto [lineTop, lineHeight] = LineIn(layer);
@@ -213,12 +250,14 @@ void PlaceHover(WindowContext& context, double x) {
     if (label) {
         double labelHeight = label.DesiredSize().Height;
         double above = tickTop - kLabelGap - labelHeight;
-        double inWindow = layer.TransformToVisual(nullptr).TransformPoint({0, static_cast<float>(above)}).Y;
+        media::GeneralTransform toWindow = layer.TransformToVisual(nullptr);
+        double inWindow = toWindow.TransformPoint({0, static_cast<float>(above)}).Y;
         double top = inWindow >= 0 ? above : lineTop + lineHeight + kTickOverhang + kLabelGap;
-        controls::Canvas::SetTop(label, top);
-        label.RenderTransform().as<media::TranslateTransform>().X(readout.labelLeft);
+        auto at = toWindow.TransformPoint({static_cast<float>(readout.labelLeft), static_cast<float>(top)});
+        context.hoverLabel.HorizontalOffset(at.X);
+        context.hoverLabel.VerticalOffset(at.Y);
     }
-    layer.Opacity(context.hoverTotal > 0 ? 1 : 0);
+    ShowHover(context, context.hoverTotal > 0);
 }
 
 // Tells the listening elements where the pointer is (`part`, or -1 for "left the line"), once per change.
@@ -257,7 +296,7 @@ void FollowPointer(const UiEventSink& sink, const std::shared_ptr<WindowContext>
             auto live = weakContext.lock();
             if (!live || !live->hoverLayer) return;
             live->hoverPart = -1;
-            live->hoverLayer.Opacity(0);
+            ShowHover(*live, false);
             if (live->hoverTimer) live->hoverTimer.Stop();
             Report(sink, *live, -1);
         } catch (...) {
@@ -366,7 +405,7 @@ void FollowPlaybarHover(UiService::Shared& shared, const std::shared_ptr<WindowC
     }
     context->hoverTotal = hover.totalMs;
     context->hoverListeners = hover.listeners;
-    if (hover.totalMs <= 0 && context->hoverLayer) context->hoverLayer.Opacity(0);
+    if (hover.totalMs <= 0) ShowHover(*context, false);
     xaml::FrameworkElement scrubber = context->hoverScrubber.get();
     if (context->hoverLayer && scrubber && scrubber.IsLoaded() && context->hoverLayer.Parent()) return;
     scrubber = FindScrubber(*context);
@@ -388,9 +427,11 @@ void ReleasePlaybarHover(WindowContext& context) noexcept {
     try {
         StopFollowingPointer(context);
         RemoveFromParent(context.hoverLayer);
+        if (context.hoverLabel) context.hoverLabel.IsOpen(false);
     } catch (...) {
     }
     context.hoverLayer = nullptr;
+    context.hoverLabel = nullptr;
     context.hoverTimer = nullptr;
     context.hoverPart = context.hoverSentPart = -1;
 }

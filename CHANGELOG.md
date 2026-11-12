@@ -53,6 +53,8 @@ and your own order for the sidebar and the playback bar's buttons.
 - A theme's sidebar layout (`sidebar.json`) works again with Apple Music 1.1792, whose sidebar entries have no
   x:Name: an entry is named by its automation id (`Sidebar_Home`, `Sidebar_Radio`...), and `order` moves entries of
   a sidebar filled from an items source.
+- Time on hover works with the centred playback bar: it drew nothing there, and the time over the pointer was cut
+  off.
 - AutoMix and Time on hover have a preview picture in the Marketplace.
 
 ### Themes

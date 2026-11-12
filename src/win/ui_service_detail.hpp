@@ -211,6 +211,7 @@ struct WindowContext : std::enable_shared_from_this<WindowContext> {
     // the line stands for (0: no readout), the elements told where the pointer is, and the timer that spaces out
     // what they are told.
     controls::Canvas hoverLayer{nullptr};
+    primitives::Popup hoverLabel{nullptr};  // the time, in a Popup of the window: the scrubber clips its own layer
     winrt::weak_ref<xaml::FrameworkElement> hoverScrubber;
     IInspectable hoverMoved{nullptr};  // boxed PointerEventHandler: RemoveHandler takes back the same object
     IInspectable hoverLeft{nullptr};

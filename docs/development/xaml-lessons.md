@@ -76,6 +76,7 @@ A setter read from a template's visual state rarely gives its element: `TargetPr
 | Problem | Cause and fix |
 |---|---|
 | Glass: playback bar and buttons gone; a margin on `Grid#ContentRoot` pushed the bar down | That name exists in the NavigationView, in every playback button and in the page area. Select it under `SplitView#ContentSplitView`, without z-index |
+| Time on hover drew nothing with the centred play bar | `layouts/centre-bar.css` moves `ScrubberControl#LCDScrubber` out of `NowPlayingControl#LCD` into `Grid#TransportBar`, so a search under the display alone finds no scrubber: look in the display first, then in the bar (`FindScrubber`). The scrubber is also only 7 high there and clips whatever stands outside it, so the readout's label lives in a `Popup` of the window, placed from the track's coordinates |
 | Top bar button not found | Apple Music has no separate top bar. Ampify's buttons go in `StackPanel#NowPlayingToggleButtons` |
 | A text size on every `TextBlock` overwrote page titles | Too broad. Target under a named parent, or use a relative size (`font-size: 120%`) |
 | Large text: playback bar and search icons cut or gone | `Button { padding: 8 16 }` reached fixed-size icon buttons. Pad buttons only under a named parent |
