@@ -109,6 +109,19 @@ type AudioAnalysis = {
   frequencies: number[];
 };
 type EqBand = { frequency: number; gainDb: number; q: number; type: "peaking" | "lowshelf" | "highshelf" };
+// name: the song's stream address without its query, what a plan's `next` gives
+type AutoMixSong = { name: string; id: string | null; storefront: string | null; time: number; duration: number };
+type AutoMixPhase = "idle" | "waiting" | "preparing" | "aligning" | "ready" | "taking over" | "mixing" | "recovering" |
+  "done" | "failed";
+type AutoMixState = {
+  available: boolean;
+  playing: boolean;
+  current: AutoMixSong | null;
+  next: AutoMixSong | null;
+  mix: { phase: AutoMixPhase; next: string | null; reason: string | null; stepErrorMs: number | null; seeks: number };
+};
+// keys: [time in the current song, its volume, the next song's volume], from [t, 1, 0] to [t2, 0, 1]
+type AutoMixPlan = { next: string; bStart: number; keys: [number, number, number][] };
 type ExtractedColors = {
   PROMINENT: string;
   VIBRANT: string;
@@ -261,6 +274,13 @@ declare const Ampify: {
       bands(): EqBand[];
       presets(): string[];
     };
+  };
+
+  // 5.4 AutoMix [preview], permission audio.mix, audio process only
+  automix: {
+    state(): AutoMixState;
+    schedule(plan: AutoMixPlan): { ok: true } | { ok: false; reason: string };
+    cancel(reason?: string): void;
   };
 
   // 5.5 Interface [preview]

@@ -65,9 +65,9 @@ bool Resolve(const char* name, void* out) {
 }
 
 // Observes the volume Apple Music sets on its player. The volume itself is passed through unchanged, so
-// the slider does not move.
+// the slider does not move; only during an AutoMix mix is it scaled by the mix's share of the current song.
 void __cdecl SetVolume_Hook(void* player, float volume) {
-    g_setVolumeOriginal(player, volume);
+    g_setVolumeOriginal(player, volume * detail::AutoMixMainGain(player));
 
     g_playerVolume = volume;
     g_playerVolumeSeen = true;
@@ -127,6 +127,15 @@ bool HookPlayerVolume() {
 }
 
 float LastPlayerVolume() { return g_playerVolume.load(); }
+
+bool PlayerVolumeSeen() { return g_playerVolumeSeen.load(); }
+
+void SetPlayerVolumeDirect(void* player, float volume) {
+    static const SetVolume_t direct = detail::FromAddress<SetVolume_t>(reinterpret_cast<void*>(
+        GetProcAddress(GetModuleHandleW(L"AVFoundationCF.dll"), "AVCFPlayerSetVolume")));
+    SetVolume_t setVolume = g_setVolumeOriginal ? g_setVolumeOriginal : direct;
+    if (setVolume) setVolume(player, volume);
+}
 
 void PublishStoredVolume() {
     static bool resolved = ResolveStoredVolume();

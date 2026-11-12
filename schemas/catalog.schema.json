@@ -124,7 +124,7 @@
     "https": {"type": "string", "pattern": "^https://[^\\s]+$", "maxLength": 512},
     "permission": {
       "type": "string",
-      "pattern": "^(player\\.read|player\\.control|audio\\.analyze|audio\\.gain|audio\\.eq|storage|notifications|ipc\\.discord|midi\\.input|library\\.read|library\\.write|services\\.read|ui\\.keyboard|ui\\.topbar|ui\\.playbar|ui\\.sidebar|ui\\.menu|ui\\.popup|ui\\.fullscreen|ui\\.panel|ui\\.page|ui\\.window|ui\\.tray|fs\\.output|clipboard\\.read|clipboard\\.write|network:[a-z0-9.-]{1,253})$"
+      "pattern": "^(player\\.read|player\\.control|audio\\.analyze|audio\\.gain|audio\\.eq|audio\\.mix|storage|notifications|ipc\\.discord|midi\\.input|library\\.read|library\\.write|services\\.read|ui\\.keyboard|ui\\.topbar|ui\\.playbar|ui\\.sidebar|ui\\.menu|ui\\.popup|ui\\.fullscreen|ui\\.panel|ui\\.page|ui\\.window|ui\\.tray|fs\\.output|clipboard\\.read|clipboard\\.write|network:[a-z0-9.-]{1,253})$"
     }
   }
 }

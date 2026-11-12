@@ -2,7 +2,20 @@
 
 ## Unreleased
 
-An Ampify that does less while nothing changes.
+Songs that flow into each other, and an Ampify that does less while nothing changes.
+
+### Extensions
+
+- New AutoMix extension, off by default (Settings > Ampify): each song flows into the next. It reads Apple's own
+  analysis of both songs (beats, bars, fades, loudness, vocals) to choose where the next song comes in. Two songs
+  close in tempo mix on the beat, bar on bar; the others get a crossfade that ends where the current song falls
+  silent, so the sound does not dip between them. Songs of one album in order, classical music and "repeat one" keep
+  Apple's gapless playback. Its settings: the style (Auto, long or short blends, crossfade only), the longest mix and
+  the album rule.
+- A second player carries the end of the current song while Apple's player moves on, within a millisecond of it. A
+  pause, a seek or a skip during a mix gives the sound back to Apple's player without a jump, and a mix cancelled
+  before it began is planned again once the song plays on.
+- `Ampify.automix` (permission `audio.mix`, audio process only) lets an extension plan its own mixes.
 
 ### Performance
 

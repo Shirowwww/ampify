@@ -3,7 +3,7 @@
 list(APPEND AMPIFY_WIN_SOURCES src/win/win_common.cpp src/win/package.cpp src/win/win_host.cpp src/win/hook.cpp
     src/win/ui_thread.cpp src/win/kit_command.cpp src/win/wic_image.cpp src/win/video_gif.cpp src/win/background.cpp
     src/win/toast_hold.cpp src/win/package_debug.cpp src/win/network_fix.cpp src/win/audio/audio_sharing.cpp
-    src/win/audio/audio_hooks.cpp src/win/audio/player_volume.cpp
+    src/win/audio/audio_hooks.cpp src/win/audio/player_volume.cpp src/win/audio/output_record.cpp
     src/win/ui_watchdog.cpp src/win/reliability_watch.cpp src/win/kit_watch.cpp)
 
 list(APPEND AMPIFY_KERNEL_SOURCES src/kernel/kernel.cpp)

@@ -36,6 +36,16 @@ Fn FromAddress(void* address) {
 bool ResolvePlayerApi();     // CFRetain and CFRelease, which following the player needs
 bool HookPlayerVolume();     // AVCFPlayerSetVolume in every module that imports it
 float LastPlayerVolume();    // what Apple Music set on its player last, 1 until then
+bool PlayerVolumeSeen();     // Apple Music set a volume on its player since Ampify came in
 void PublishStoredVolume();  // the slider's value from Apple's preferences, until the player has one. Poll thread
+
+// AutoMix (automix.cpp): Apple's queue player followed, and what ends a mix (pause, seek, skip) watched.
+void StartAutoMixWatch();
+float AutoMixMainGain(void* player);  // what a mix leaves of Apple's volume on `player`, 1 outside a mix
+void SetPlayerVolumeDirect(void* player, float volume);  // past the hook: the slider's value stays
+
+// Diagnostic (output_record.cpp): while record.on exists in the kit, what the stereo stream sends goes to a WAV file.
+void RecordOutput(const float* samples, unsigned frames, int rate);  // audio thread, after Ampify's steps
+void PollRecording();                                                // poll thread
 
 }  // namespace ampify::win::audio_hooks::detail

@@ -67,6 +67,7 @@ TEST_CASE(KitLayout_TheMarketplaceAndNowPlayingShipWithTheKit) {
     CHECK(ampify::IsBundledElement("extensions", "playback-guard"));
     CHECK(ampify::IsBundledElement("extensions", "song-panel"));
     CHECK(ampify::IsBundledElement("extensions", "hover-time"));
+    CHECK(ampify::IsBundledElement("extensions", "automix"));
     // A community element, or a bundled id in another folder, is not one of them.
     CHECK(!ampify::IsBundledElement("apps", "lyrics"));
     CHECK(!ampify::IsBundledElement("extensions", "marketplace"));
@@ -86,7 +87,7 @@ TEST_CASE(KitLayout_TheAtmosLevelerIsBuiltInStartsOffAndShipsNoFolder) {
     CHECK(!ampify::IsBuiltInExtension("marketplace"));
     CHECK(!ampify::IsBundledElement("extensions", "atmos-leveler"));
     CHECK(!ampify::IsOnByDefault("extensions", "atmos-leveler"));
-    CHECK(ampify::BundledElements().size() == 5);
+    CHECK(ampify::BundledElements().size() == 6);
 }
 
 TEST_CASE(KitLayout_TheBundledElementsShipTurnedOn) {
@@ -95,6 +96,7 @@ TEST_CASE(KitLayout_TheBundledElementsShipTurnedOn) {
     CHECK(ampify::IsOnByDefault("extensions", "playback-guard"));  // off until 1.3.0
     CHECK(!ampify::IsOnByDefault("extensions", "song-panel"));  // off from 1.3.3: one button too many by default
     CHECK(ampify::IsOnByDefault("extensions", "hover-time"));
+    CHECK(!ampify::IsOnByDefault("extensions", "automix"));  // it changes how every song ends: the user turns it on
     CHECK(!ampify::IsOnByDefault("extensions", "community-thing"));
 }
 

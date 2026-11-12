@@ -79,6 +79,8 @@ namespace prelude { extern const char kFonts[]; }
 namespace natives { void DefineFonts(api::NativeScope& scope); }
 namespace prelude { extern const char kLibrary[]; }
 namespace natives { void DefineLibrary(api::NativeScope& scope); }
+namespace prelude { extern const char kAutoMix[]; }
+namespace natives { void DefineAutoMix(api::NativeScope& scope); void StopAutoMix(ScriptExtension& extension); }
 namespace prelude { extern const char kClipboard[]; }
 namespace natives { void DefineClipboard(api::NativeScope& scope); }
 
@@ -117,6 +119,7 @@ const ApiModule kModules[] = {
     {"library", prelude::kLibrary, natives::DefineLibrary, nullptr, nullptr},
     {"clipboard", prelude::kClipboard, natives::DefineClipboard, nullptr, nullptr},
     {"kit", prelude::kKit, natives::DefineKit, nullptr, natives::StopKit},
+    {"automix", prelude::kAutoMix, natives::DefineAutoMix, nullptr, natives::StopAutoMix},
 };
 
 }  // namespace

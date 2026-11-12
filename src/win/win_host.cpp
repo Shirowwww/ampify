@@ -29,6 +29,7 @@
 #include "../core/text_util.hpp"
 #include "../core/ui_watchdog.hpp"
 #include "audio/audio_sharing.hpp"
+#include "audio/automix.hpp"
 #include "clipboard.hpp"
 #include "kit_command.hpp"
 #include "player_bridge.hpp"
@@ -247,6 +248,8 @@ void* WinHost::QueryCapability(std::string_view name) {
         return static_cast<AudioHost*>(&engine);
     }
     if (m_process == "ui" && name == AudioHost::kCapabilityName) return static_cast<AudioHost*>(&win::InterfaceAudio());
+    // Ampify.automix: Apple's queue player and Ampify's second player live in the audio process only.
+    if (m_process == "engine" && name == AutoMixHost::kCapabilityName) return &win::audio_hooks::AutoMix();
     return Host::QueryCapability(name);
 }
 

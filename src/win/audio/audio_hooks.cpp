@@ -32,6 +32,7 @@
 #include "../../core/audio/sample_path.hpp"
 #include "../../core/gain_board.hpp"
 #include "../hook.hpp"
+#include "../win_common.hpp"
 #include "hooks_detail.hpp"
 #include "spatial_metadata.hpp"
 
@@ -225,6 +226,7 @@ void PollLoop() {
         std::this_thread::sleep_for(kPollPeriod);
         try {
             detail::PublishStoredVolume();
+            detail::PollRecording();
             if (GainPolicy* policy = g_policy.load()) g_policyGain = policy->Poll();
         } catch (...) {
             Note("error in the follow loop: the leveler carries on without this pass");
@@ -333,6 +335,7 @@ void ProcessStream(IAudioRenderClient* self, float* samples, UINT32 count) {
     bool unity = g_streamRamp.Curve(count, AppliedGain(), g_streamCurve);
     audio::ApplyCurve(samples, count, 2, g_streamCurve, unity, g_samplePath.StreamStage(rate), self);
     g_samplePath.AfterStream(samples, count, 2, rate, volume);
+    detail::RecordOutput(samples, count, rate);
 }
 
 HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 frames, DWORD flags) {
@@ -661,6 +664,7 @@ StartResult PlaceHooks(const char* why) {
     // The policy is ready before the hooks can feed it.
     if (GainPolicy* policy = g_policy.load(); policy && !policy->Prepare()) g_policy = nullptr;
     if (!detail::HookPlayerVolume()) return StartResult::Failed;
+    detail::StartAutoMixWatch();
 
     int installed = InstallAudioHooks();
     if (installed == 0) return StartResult::Failed;

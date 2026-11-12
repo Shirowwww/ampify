@@ -78,6 +78,7 @@ A function whose permission is not declared throws `PermissionDenied` and does n
 | `audio.analyze` | Spectrum, levels, tempo and loudness of the sound | [preview] |
 | `audio.gain` | `Ampify.audio.setGainDb`, a gain on the samples | [preview] |
 | `audio.eq` | A 10-band equalizer | [preview] |
+| `audio.mix` | `Ampify.automix`: the current song mixed into the next one, in the audio process | [preview] |
 | `ui.topbar`, `ui.playbar`, `ui.sidebar`, `ui.menu`, `ui.popup` | Buttons, sidebar entries, menu entries, dialogs | [stable] |
 | `ui.panel`, `ui.window` | A side panel, a secondary window | [preview] |
 | `ui.fullscreen` | A view over the whole window, and Apple's own full-screen player | [stable] |
@@ -256,6 +257,33 @@ Ampify.audio.eq.presets()           // -> preset names
 - Order: gain, then equalizer, then a soft limiter. A flat equalizer leaves the samples untouched. There is one
   equalizer per process; the last element that sets it wins.
 - Scripts only receive these numbers, never the samples, and nothing is written to disk.
+
+#### AutoMix [preview]
+
+`Ampify.automix` (permission `audio.mix`, audio process only) plays the end of the current song into the next one.
+Ampify starts a second player on the current song, puts it in step with Apple's (within a millisecond), moves Apple's
+player to the next song at the plan's start, then crosses the two volumes along the plan. The `automix` extension
+plans each mix from Apple's analysis of the two songs (beats, bars, fades, loudness).
+
+```js
+Ampify.automix.state()            // -> { available, playing, current, next, mix }
+Ampify.automix.schedule(plan)     // -> { ok: true } or { ok: false, reason }
+Ampify.automix.cancel(reason)
+```
+
+- `current` and `next`: `{ name, id, storefront, time, duration }` or `null`. `name` is the song's stream address
+  without its query, the name a plan gives; `id` is its catalog id and `storefront` its store's number (143442 for
+  France), `null` when Apple's player does not say; `time` and `duration` in seconds, 0 while unknown.
+- `mix`: `{ phase, next, reason, stepErrorMs, seeks }`. `phase` is `idle`, `waiting`, `preparing`, `aligning`,
+  `ready`, `taking over`, `mixing`, `recovering`, `done` or `failed` (then `reason` says why); `stepErrorMs` is how
+  far the second player was from Apple's at its last check.
+- A plan is `{ next, bStart, keys }`: `next` is the next song's `name`, `bStart` where that song starts (seconds into
+  it), `keys` 2 to 64 points `[time in the current song, its volume, the next song's volume]` in time order, from
+  `[t, 1, 0]` to `[t2, 0, 1]`, at most 60 s apart and before the end of both songs. Apple's player moves to the next
+  song at the first key; between two keys the squared volumes follow a smoothstep, so a crossfade keeps its power.
+- The second player starts 12 s before the first key and takes a few seconds to be in step: hand a plan over at
+  least 14 s ahead. A plan whose mix has not begun is replaced by the next one. Pausing, seeking, skipping or changing
+  the queue cancels the mix: Apple's player plays on alone, without a jump. Stopping the element cancels its plan.
 
 ### 5.5 Interface [stable]
 

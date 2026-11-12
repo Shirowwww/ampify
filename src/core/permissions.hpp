@@ -18,7 +18,8 @@ struct PermissionInfo {
 // In the order of their names.
 inline constexpr PermissionInfo kPermissions[] = {
     {"audio.analyze", "", false, false},  {"audio.eq", "", false, false},
-    {"audio.gain", "", false, false},     {"clipboard.read", "", false, false},
+    {"audio.gain", "", false, false},     {"audio.mix", "", false, false},
+    {"clipboard.read", "", false, false},
     {"clipboard.write", "", false, false}, {"fs.output", "", false, false},
     {"ipc.discord", "discord.enabled", false, false},
     {"kit.manage", "", false, true},      {"library.read", "", false, false},

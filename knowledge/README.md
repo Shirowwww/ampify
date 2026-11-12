@@ -10,6 +10,7 @@ What was learned about Apple Music for Windows while building Ampify, and the ra
 | [apple-music-xaml-tree.md](apple-music-xaml-tree.md) | The XAML tree of the main window, with selectors and the duplicate-name traps |
 | [apple-music-native-views.md](apple-music-native-views.md) | Apple's mini player, full-screen player and karaoke lyrics, and what Ampify reaches of them |
 | [apple-music-queue.md](apple-music-queue.md) | The play queue: reading and removing work, adding a song does not yet |
+| [apple-music-playback.md](apple-music-playback.md) | Apple's player engine for a mix: what works, what does not, the 50 ms switch delay, Apple's song analysis |
 | [apple-music-library-file.md](apple-music-library-file.md) | `Library.musicdb`: encryption, records, play counts, local-time dates |
 | [player-buttons.md](player-buttons.md) | Shuffle and repeat buttons: how their state reads and what presses them |
 | [atmos-loudness.md](atmos-loudness.md) | Why Atmos plays quieter than stereo, Apple's own leveling, and the gain that works |
