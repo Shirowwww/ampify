@@ -455,8 +455,9 @@ Ampify.library.tracks() -> Promise<track[]>         // permission library.read
 ```
 
 - `http` calls go over https to declared hosts only. A string body is sent as a form, an object as JSON. Allowed
-  headers, on `get`, `post`, `put`, `patch` and `del`: `content-type`, `authorization`, `accept`, `origin`. Bodies up to 64 KB (8 MB for `postForm`), replies up to 1 MB,
-  4 requests in flight per element. An error resolves with status 0.
+  headers, on `get`, `post`, `put`, `patch` and `del`: `content-type`, `authorization`, `accept`, `origin`. Bodies up
+  to 64 KB (8 MB for `postForm`), replies up to 8 MB (cut there), 4 requests in flight per element. An error resolves
+  with status 0.
 - `postForm` fields are texts or files `{ filename, type, base64 }`.
 - `gifFromVideo` downloads a short video (MP4, fragmented or not, up to 8 MB) from a declared host and makes it a GIF
   that loops, on the PC: `side` pixels at most (200, up to 480), `fps` frames a second (10, up to 25), its first
