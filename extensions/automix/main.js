@@ -3,7 +3,7 @@
 // it, and how long the two play together. The kernel (Ampify.automix) brings the current song to the next one's tempo
 // at its own pitch, keeps the two in step with a second player, crosses their volumes and hands the bass from one to
 // the other. Songs of one album that follow each other and classical music keep Apple's gapless playback; songs that
-// cannot share a tempo get a smooth crossfade instead.
+// cannot share a tempo swap on a bar when both have a beat, and get a smooth crossfade otherwise.
 
 const CHECK_EVERY_MS = 1000;
 const PLAN_AHEAD_S = 45;          // a plan is handed to the kernel once its mix is this close
@@ -25,9 +25,12 @@ const NO_MELODY = 0.25;           // two songs under this melodicness have no ke
 const CROSSFADE_S = 6;
 const MIN_CROSSFADE_S = 3;
 const MAX_CROSSFADE_S = 12;
+const OWN_FADE_S = 4;             // a song quiet for this long at its end fades out by itself; less is a last note dying
+const SWAP_IN_S = 0.06;          // in a swap on a bar, the next song goes from silence to full in this long...
+const SWAP_AHEAD_S = 0.02;        // ...and is in full this long before the bar, so its first beat is heard whole
 const OVER_FADE_GAIN = 0.7;       // the next song's volume once the current one starts fading out by itself
 const QUIET_BELOW_DB = 18;        // this far below the song's loudness: silence or a fade, not the music
-const MIN_DANCEABILITY = 0.45;
+const MIN_DANCEABILITY = 0.15;    // Apple scores most rap 0.1 to 0.4: higher, hardly any pair mixes on the beat
 const TOKEN_MAX_AGE_MS = 5 * 24 * 3600 * 1000;
 const NO_MIX_GENRES = ["Classical", "Opera", "Spoken Word", "Audiobooks", "Comedy"];
 const ACTIVE = ["waiting", "preparing", "aligning", "ready", "taking over", "mixing", "recovering"];
@@ -182,6 +185,14 @@ function endRoom(rate = 1, ramp = 0, mix = 0) {
   return END_ROOM_S + (rate === 1 ? 0 : STRETCH_ROOM_S) + Math.max(0, 1 - rate) * carried;
 }
 
+// Why two songs cannot be put together on their beats, or "" when they can: both need bars and a beat to hear.
+function beatless(a, b, barsA, barsB) {
+  if (barsA.length < 8 || barsB.length < 8) return "Apple gives one of them no bars";
+  if (!danceable(a, "ending")) return "this song ends with little beat";
+  if (!danceable(b, "beginning")) return "it starts with little beat";
+  return "";
+}
+
 // Bars a beat mix lasts, by style, from the longest to the shortest tried.
 function barChoices(style) {
   if (style === "Long blends") return [16, 8, 4];
@@ -194,7 +205,7 @@ function barChoices(style) {
 function beatMix(a, b, spanA, spanB, options) {
   const barsA = barsOf(a);
   const barsB = barsOf(b);
-  if (barsA.length < 8 || barsB.length < 8 || !danceable(a, "ending") || !danceable(b, "beginning")) return null;
+  if (beatless(a, b, barsA, barsB)) return null;
   const match = tempoMatch(barLength(barsA, spanA.end), barLength(barsB, spanB.start));
   if (!(Math.abs(match.rate - 1) <= MAX_STRETCH)) return null;
   const stretched = Math.abs(match.rate - 1) > NO_STRETCH;
@@ -254,6 +265,32 @@ function crossfade(a, b, spanA, spanB, options) {
   return { kind: "crossfade", bars: 0, plan: { bStart: spanB.sound, keys } };
 }
 
+// A swap on a bar, for songs with a beat that cannot share a tempo: the current song loses its bass over its last
+// bar, the next one comes in at full with its first bar on that bar's end, and the current song is gone a beat later.
+// Two beats that do not agree are heard together for that one beat only. Null when the current song fades out by
+// itself (a crossfade follows that fade) or the next song has nothing before its first bar to come in from.
+function barSwap(a, b, spanA, spanB, options) {
+  const barsA = barsOf(a);
+  const barsB = barsOf(b);
+  if (beatless(a, b, barsA, barsB) || spanA.silent - spanA.end >= OWN_FADE_S) return null;
+  const bar = barLength(barsA, spanA.end);
+  const tail = bar / 4;
+  const latest = Math.min(spanA.end, a.duration - endRoom()) - tail;
+  const swapAt = barsA.findLast((time) => time <= latest);
+  const entry = barsB.find((time) => time >= spanB.start - 0.05);
+  if (swapAt === undefined || entry === undefined) return null;
+  const lead = Math.min(bar, entry);
+  const aStart = swapAt - lead;
+  if (lead < SWAP_IN_S + 2 * SWAP_AHEAD_S || !(aStart > options.earliest) || !(entry + tail < b.duration)) return null;
+  const keys = [
+    [aStart, 1, 0, 1, 1],
+    [swapAt - SWAP_AHEAD_S - SWAP_IN_S, 1, 0, 0, 1],
+    [swapAt - SWAP_AHEAD_S, 1, 1, 0, 1],
+    [swapAt + tail, 0, 1, 0, 1],
+  ];
+  return { kind: "swap", bars: 0, plan: { bStart: entry - lead, keys } };
+}
+
 // The mix from song `a` into song `b`, or why there is none. A song: { duration, analysis, structure, attributes },
 // where all but the duration may be missing. options: { style, maxSeconds, albums, earliest (A's earliest start) }.
 // Dolby Atmos goes out as spatial objects, which no mix can take. Apple's player says what a song plays in only once
@@ -272,8 +309,16 @@ function planMix(a, b, options) {
   if (noMixGenre(a) || noMixGenre(b)) return { kind: "none", why: "classical music or speech" };
   const spanA = musicalSpan(a);
   const spanB = musicalSpan(b);
-  const beat = options.style === "Crossfade only" ? null : beatMix(a, b, spanA, spanB, options);
-  return beat ?? crossfade(a, b, spanA, spanB, options) ?? { kind: "none", why: "no room for a mix" };
+  const onTheBeat = options.style === "Crossfade only"
+    ? null : beatMix(a, b, spanA, spanB, options) ?? barSwap(a, b, spanA, spanB, options);
+  if (onTheBeat) return onTheBeat;
+  const fade = crossfade(a, b, spanA, spanB, options);
+  if (!fade) return { kind: "none", why: "no room for a mix" };
+  // Why not on the beat, for the log: the first thing in the way.
+  const ownFade = spanA.silent - spanA.end >= OWN_FADE_S ? "this song fades out by itself" : "";
+  const why = options.style === "Crossfade only"
+    ? "" : beatless(a, b, barsOf(a), barsOf(b)) || ownFade || "no room for a swap on a bar";
+  return { ...fade, why };
 }
 
 // ---- Apple's catalog: who the songs are and their analysis
@@ -470,7 +515,8 @@ function check() {
   decision.tries++;
   const result = Ampify.automix.schedule(decision.plan);
   decision.sent = result.ok;
-  const what = decision.kind === "beat" ? `${decision.bars} bars on the beat${speedNote(decision.plan.rate)}` : "a crossfade";
+  const kinds = { beat: `${decision.bars} bars on the beat${speedNote(decision.plan.rate)}`, swap: "a swap on a bar" };
+  const what = kinds[decision.kind] ?? (decision.why ? `a crossfade (${decision.why})` : "a crossfade");
   Ampify.log(result.ok
     ? `Mix into "${decision.title}" at ${minutes(decision.plan.keys[0][0])}: ${what}, from its ${minutes(decision.plan.bStart)}`
     : `Mix into "${decision.title}" refused: ${result.reason}`);

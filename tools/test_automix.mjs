@@ -146,12 +146,52 @@ test("a silent start of the next song is skipped, up to its first phrase", () =>
   assert.ok(result.plan.bStart >= 5 - 0.05, `B starts at ${result.plan.bStart}`);
 });
 
-test("songs too far apart in tempo get a crossfade instead of a beat mix", () => {
+// Where the next song is first heard in a plan, and the time of the next song that plays then.
+function entryOf(plan) {
+  const heard = plan.keys.findIndex((key) => key[2] > 0);
+  const from = plan.keys[heard - 1];
+  return { key: heard, from, bTime: plan.bStart + (plan.keys[heard][0] - plan.keys[0][0]) };
+}
+
+test("songs too far apart in tempo swap on a bar: the next song's first bar lands on a bar of the current one", () => {
   const a = song({ bpm: 124 });
-  const b = song({ bpm: 138, attributes: { albumName: "Other" } });
+  const b = song({ bpm: 138, firstBeat: 2.5, attributes: { albumName: "Other" } });
   const result = planMix(a, b, OPTIONS);
-  assert.equal(result.kind, "crossfade");
+  assert.equal(result.kind, "swap");
   assertPlayable(result.plan, a, b);
+  const { key, from, bTime } = entryOf(result.plan);
+  const swapAt = result.plan.keys[key][0];
+  const bars = a.analysis.beats.barsInMilliseconds.map((ms) => ms / 1000);
+  // the next song is in full a few hundredths before the bar, so that its first beat is heard whole
+  assert.ok(bars.some((t) => t >= swapAt && t - swapAt < 0.05), `the swap is at ${swapAt}`);
+  assert.ok(Math.abs(bTime - 2.5) < 0.05, `the next song is at ${bTime} then, its first bar is at 2.5`);
+  assert.equal(result.plan.keys[key][2], 1, "the next song comes in at full");
+  assert.equal(from[3], 0, "the current song has lost its bass by then");
+  assert.equal(from[2], 0);
+  const tail = result.plan.keys.at(-1)[0] - swapAt;
+  assert.ok(tail > 0.3 && tail < 0.7, `the current song is gone a beat later (${tail} s)`);
+  assert.ok(result.plan.keys.at(-1)[0] <= 200 - 3, "and the swap leaves the kernel its room");
+});
+
+test("a song that fades out by itself, or hardly danceable ones, keep the crossfade", () => {
+  const b = song({ bpm: 138, firstBeat: 2.5, attributes: { albumName: "Other" } });
+  const fading = song({ fadeOut: { startInMilliseconds: 190000, endInMilliseconds: 198000 } });
+  assert.equal(planMix(fading, b, OPTIONS).kind, "crossfade");
+  assert.equal(planMix(fading, b, OPTIONS).why, "this song fades out by itself", "the log says what was in the way");
+  assert.equal(planMix(song({ danceability: 0.1 }), b, OPTIONS).why, "this song ends with little beat");
+  // Apple reports a short fade at the end of most songs, where the last note dies: that one is swapped before
+  const dying = song({ fadeOut: { startInMilliseconds: 196000, endInMilliseconds: 198000 } });
+  const swap = planMix(dying, b, OPTIONS);
+  assert.equal(swap.kind, "swap");
+  assert.ok(swap.plan.keys.at(-1)[0] <= 196, "the swap is over when the last note starts dying");
+  assert.equal(planMix(song({ danceability: 0.1 }), b, OPTIONS).kind, "crossfade");
+  assert.equal(planMix(song(), song({ bpm: 138, firstBeat: 2.5, danceability: 0.1, attributes: { albumName: "Other" } }),
+                       OPTIONS).kind, "crossfade");
+});
+
+test("a next song that starts right on its first bar has no room for a swap: a crossfade", () => {
+  const b = song({ bpm: 138, attributes: { albumName: "Other" } });
+  assert.equal(planMix(song(), b, OPTIONS).kind, "crossfade");
 });
 
 test("the current song is brought to the next one's tempo, and their bars stay together for the whole mix", () => {
@@ -290,8 +330,16 @@ test("songs without Apple's analysis get a six-second crossfade over the song's 
   assert.equal(result.plan.bStart, 0);
 });
 
+test("songs Apple finds a little danceable still mix on the beat, those it finds hardly so do not", () => {
+  const b = song({ attributes: { albumName: "Other" }, danceability: 0.2 });
+  assert.equal(planMix(song({ danceability: 0.2 }), b, OPTIONS).kind, "beat");
+  assert.equal(planMix(song({ danceability: 0.1 }), b, OPTIONS).kind, "crossfade");
+  assert.equal(planMix(song({ danceability: 0.2 }), song({ attributes: { albumName: "Other" }, danceability: 0.1 }),
+                       OPTIONS).kind, "crossfade");
+});
+
 test("a crossfade follows the current song's own fade-out, the next song nearly full when it begins", () => {
-  const a = song({ danceability: 0.2, fadeOut: { startInMilliseconds: 190000, endInMilliseconds: 198000 } });
+  const a = song({ danceability: 0.1,fadeOut: { startInMilliseconds: 190000, endInMilliseconds: 198000 } });
   const b = song({ attributes: { albumName: "Other" } });
   const result = planMix(a, b, OPTIONS);
   assert.equal(result.kind, "crossfade");
@@ -314,7 +362,12 @@ test("a crossfade leaves no hole when the current song dies out fast and the nex
     fadeIn: { startInMilliseconds: 320, endInMilliseconds: 2320 },
     level: (t) => [-19.9, -14.5, -11, -10.7, -9.9, -10.6][Math.floor(t * 2)] ?? -10,
   });
-  const result = planMix(a, b, OPTIONS);
+  // both have a beat, 143 against 91 bpm: a swap on a bar, before the song dies out, and no hole either
+  const swap = planMix(a, b, OPTIONS);
+  assert.equal(swap.kind, "swap");
+  assertPlayable(swap.plan, a, b);
+  assert.ok(deepestHole(a, b, swap.plan) < 3);
+  const result = planMix(a, b, { ...OPTIONS, style: "Crossfade only" });
   assert.equal(result.kind, "crossfade");
   assertPlayable(result.plan, a, b);
   assert.ok(result.plan.keys.at(-1)[0] < 163.5, `the mix is over once the song is silent (${result.plan.keys.at(-1)[0]})`);
