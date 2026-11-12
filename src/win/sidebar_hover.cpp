@@ -779,6 +779,43 @@ void TraceState(const State& state, const controls::NavigationView& navigation) 
     Trace(line);
 }
 
+// Apple's own pane (the hover off) in its own state: what FillApplesOverlay changed in it, and nothing else.
+State& ApplesOwn() {
+    static State* state = new State();  // XAML references: released with the process, as TheState
+    return *state;
+}
+
+void LetGoApplesOverlay() {
+    State& own = ApplesOwn();
+    RemoveFill(own);
+    own.navigation = nullptr;
+    own.pane = nullptr;
+    own.column = nullptr;
+}
+
+// In a narrow window Apple's own pane opens over the pages (compact or minimal mode). Left as Apple draws it, or on the
+// window's material as Fluent sets it, the pages showed through its entries. It gets the same fill as the hovered
+// pane there, under every theme that does not paint it; laid beside the pages (expanded), it stays as the theme has it.
+void FillApplesOverlay() {
+    State& own = ApplesOwn();
+    auto navigation = own.navigation.get();
+    if (!navigation || !navigation.IsLoaded()) {
+        LetGoApplesOverlay();
+        xaml::Window window = AppWindowOf(WindowRole::Main);
+        xaml::UIElement content = window ? window.Content() : nullptr;
+        navigation = content ? FindFirst<controls::NavigationView>(content, L"", 0) : nullptr;
+        auto pane = navigation ? FindFirst<xaml::FrameworkElement>(navigation, L"PaneRoot", 0) : nullptr;
+        if (!pane) return;
+        own.navigation = winrt::make_weak(navigation);
+        own.pane = winrt::make_weak(pane);
+    }
+    if (navigation.DisplayMode() == controls::NavigationViewDisplayMode::Expanded) {
+        RemoveFill(own);
+    } else {
+        FillPane(own, navigation);
+    }
+}
+
 }  // namespace
 
 void KeepSidebarOnHover(Journal& journal) noexcept {
@@ -791,8 +828,10 @@ void KeepSidebarOnHover(Journal& journal) noexcept {
                 Release(state);
                 journal.Write("Sidebar: given back to Apple Music");
             }
+            FillApplesOverlay();
             return;
         }
+        LetGoApplesOverlay();
         // Cheap once in place: the tree is searched again only when Apple rebuilt it.
         if (auto navigation = state.navigation.get(); navigation && navigation.IsLoaded()) {
             // Apple puts its own mode back as the window changes size: fold it again, or pin again for the new width.

@@ -518,7 +518,15 @@ void FillPane(State& state, const controls::NavigationView& navigation) {
     auto grid = state.fillGrid ? state.fillGrid : Column(state, navigation);
     if (!pane || !grid) return;
     auto panel = pane.try_as<controls::Panel>();
-    auto themes = [](const media::Brush& brush) { return Paints(brush) && !ApplesPaneBrush(brush); };
+    // Only a brush the pages cannot show through: Fluent's layer colour is 30 % opaque, its entries were unreadable
+    // over the artwork of the page under them. An acrylic or an image covers by itself.
+    auto covers = [](const media::Brush& brush) {
+        auto solid = brush.try_as<media::SolidColorBrush>();
+        return !solid || (solid.Color().A == 255 && brush.Opacity() >= 1);
+    };
+    auto themes = [&](const media::Brush& brush) {
+        return Paints(brush) && covers(brush) && !ApplesPaneBrush(brush);
+    };
     const bool painted = themes(grid.Background()) || (panel && themes(panel.Background()));
     if (!state.fill && !painted) {
         state.fill = MakeFill(grid);
