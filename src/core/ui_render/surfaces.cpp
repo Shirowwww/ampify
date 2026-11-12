@@ -54,6 +54,12 @@ const char* SurfaceKindName(SurfaceKind kind) {
 }
 
 SurfaceChanges SurfaceTracker::Poll(const UiModel& model) {
+    // A model that did not move since the last reading changed nothing: its trees are not copied and printed again.
+    const std::uint64_t version = model.Version();
+    if (m_polled && version == m_version) return {};
+    m_polled = true;
+    m_version = version;
+
     std::vector<Surface> now;
     for (const UiSlot& slot : model.Panels()) now.push_back(FromSlot(SurfaceKind::Panel, slot, slot.id, model));
     for (const UiSlot& slot : model.Pages()) now.push_back(FromSlot(SurfaceKind::Page, slot, slot.id, model));

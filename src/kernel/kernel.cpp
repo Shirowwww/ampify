@@ -30,6 +30,7 @@
 #include "../core/version_list.hpp"
 #include "../win/audio/audio_hooks.hpp"
 #include "../win/audio/audio_sharing.hpp"
+#include "../win/kit_watch.hpp"
 #include "../win/network_fix.hpp"
 #include "../win/player_buttons.hpp"
 #include "../win/reliability_watch.hpp"
@@ -204,6 +205,7 @@ DWORD WINAPI KernelMain(LPVOID) {
         ampify::PlayerWatcher playerWatcher;
         int ticks = 0;
         ampify::ReloadWatcher reload;
+        ampify::win::KitWatch kitFiles(kit);  // reload.txt is read again only once something at the kit's root moved
         auto nextReload = std::chrono::steady_clock::now();
         while (true) {
             winHost.Service([](const std::string& elementId, const std::string& combo) {
@@ -223,7 +225,7 @@ DWORD WINAPI KernelMain(LPVOID) {
                 if (playerWatcher.Progressed()) loader.DeliverPlayer("progress", snapshot);
             }
             if (std::chrono::steady_clock::now() >= nextReload) {
-                ServiceReloadRequests(kit, reload, loader, settings);
+                if (kitFiles.Moved()) ServiceReloadRequests(kit, reload, loader, settings);
                 nextReload = std::chrono::steady_clock::now() + kReloadEvery;
             }
             std::this_thread::sleep_for(ampify::kServiceTick);

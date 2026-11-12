@@ -52,6 +52,8 @@ public:
 
     // The surfaces of the last poll, in model order.
     const std::vector<Surface>& Current() const { return m_current; }
+    // The UiModel::Version the last poll read.
+    std::uint64_t Version() const { return m_version; }
 
 private:
     std::vector<Surface> m_current;
@@ -61,6 +63,8 @@ private:
     std::uint64_t m_applePlayerRequests = 0;
     std::uint64_t m_hoverSerial = 0;
     std::uint64_t m_revision = 0;
+    std::uint64_t m_version = 0;  // UiModel::Version at the last reading
+    bool m_polled = false;
 };
 
 const char* SurfaceKindName(SurfaceKind kind);

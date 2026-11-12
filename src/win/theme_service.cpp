@@ -8,9 +8,11 @@
 #undef GetCurrentTime  // windows.h macro that breaks Storyboard::GetCurrentTime in the projection
 #endif
 
+#include <atomic>
 #include <chrono>
 #include <fstream>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <set>
 #include <string>
@@ -24,6 +26,7 @@
 #include "artwork_passthrough.hpp"
 #include "sidebar_hover.hpp"
 #include "kit_command.hpp"
+#include "kit_watch.hpp"
 #include "ui_thread.hpp"
 #include "win_common.hpp"
 #include "window_backdrop.hpp"
@@ -44,6 +47,7 @@
 #include "../core/theme/library.hpp"
 #include "../core/theme/session.hpp"
 #include "../core/theme/theme_settings.hpp"
+#include "../core/theme/tick_pace.hpp"
 #include "../core/theme/worker.hpp"
 #include "../core/ui_watchdog.hpp"
 
@@ -59,15 +63,6 @@ constexpr int kTimedPasses = 5;
 constexpr long long kSlowPassMs = 120;
 constexpr int kMaxTimedPasses = 40;
 constexpr int kMaxAsideCopies = 100;  // copies of one retired folder kept in kit/retired
-
-// When settings.txt and reload.txt were last written. `ampify theme set`, the Marketplace and `ampify dev` write one of
-// them: the next pass then starts at once instead of at the end of the tick.
-std::pair<std::filesystem::file_time_type, std::filesystem::file_time_type> ChangeStamp(const std::filesystem::path& kit) {
-    std::error_code error;
-    std::filesystem::file_time_type settings = std::filesystem::last_write_time(kit / "settings.txt", error);
-    std::filesystem::file_time_type reload = std::filesystem::last_write_time(kit / "reload.txt", error);
-    return {settings, reload};
-}
 
 // After an inspection, writes sidebar.json when it does not exist yet: every NavigationViewItem of the tree, in the
 // current order, none hidden. The user then edits it (docs/themes/format.md, "Sidebar and home").
@@ -198,6 +193,14 @@ struct UiSide {
     theme::ThemeSession session;
     bool attached = false;
     bool ticked = false;  // a first tick ran: the theme is on the window, whatever its visibility then
+    // Which ticks go over the whole window, and the request the last of them applied.
+    theme::TickPace pace;
+    std::uint64_t appliedGeneration = 0;
+    std::string appliedTheme;
+    int rewrites = 0;  // periodic passes that had to write again, written to the log
+    // The window showing again: the next tick applies at once instead of after the rest of the wait (worker thread).
+    std::atomic<bool> wake{false};
+    std::unique_ptr<PresenceListener> presence;
     int timedPasses = 0;  // passes after a change whose duration went to the log
     int timedRefreshes = 0;  // the same for the window's resource refreshes
     std::size_t heldStates = 0;  // the counts last written to the log
@@ -278,6 +281,13 @@ void ThemeService::Run(HINSTANCE module) {
     std::shared_ptr<ArtworkColours> artwork = m_ui->backend.ArtworkSample();
     std::map<std::string, std::string> lastArtwork;
     int artworkReports = 0;
+    // The settings, the theme and the snippets are read again only when something in the kit moved, Windows' mode
+    // changed, a minute passed (theme.schedule) or the artwork's colours changed: not every three seconds.
+    KitWatch kitFiles(m_kit, {"themes", "snippets"});
+    bool kitMoved = true;
+    std::optional<bool> lastDark;
+    int lastMinute = -1;
+    theme::SessionRequest request;
 
     while (m_running) {
         if (replaced->exchange(false)) MoveRetiredElements(m_kit, m_journal);  // what failed is tried at the next start
@@ -285,15 +295,16 @@ void ThemeService::Run(HINSTANCE module) {
             elementsAsked = true;
             UpdateElementsForRelease(m_kit, m_journal);
         }
-        auto stamp = ChangeStamp(m_kit);
-        Settings settings;
-        settings.Load((m_kit / "settings.txt").string());
-        worker.SetSystemDark(SystemUsesDarkMode());
+        kitMoved = kitFiles.Moved() || kitMoved;
+        const bool dark = SystemUsesDarkMode();
+        const int minute = LocalMinute();
+        bool artworkMoved = false;
         {
             std::lock_guard<std::mutex> guard(artwork->lock);
             if (artwork->variables != lastArtwork) {
                 lastArtwork = artwork->variables;
                 worker.SetArtwork(lastArtwork);
+                artworkMoved = true;
                 if (artworkReports++ < kTimedPasses) {
                     std::string list;
                     for (const auto& [name, value] : lastArtwork) list += (list.empty() ? "" : ", ") + name + " " + value;
@@ -301,7 +312,15 @@ void ThemeService::Run(HINSTANCE module) {
                 }
             }
         }
-        theme::SessionRequest request = worker.Tick(settings, LocalMinute());
+        if (kitMoved || artworkMoved || dark != lastDark || minute != lastMinute) {
+            Settings settings;
+            settings.Load((m_kit / "settings.txt").string());
+            worker.SetSystemDark(dark);
+            request = worker.Tick(settings, minute);
+            kitMoved = false;
+            lastDark = dark;
+            lastMinute = minute;
+        }
         OfferMiniPlayerTheme(request, m_journal);  // Apple's mini player, on its own thread, gets the same
 
         std::shared_ptr<UiSide> ui = m_ui;
@@ -320,12 +339,21 @@ void ThemeService::Run(HINSTANCE module) {
                 WatchPresence(journal);  // the work that only draws follows the windows
                 // New pages and rows get the theme within a fraction of a second instead of at the next tick.
                 std::weak_ptr<UiSide> weak = ui;
+                // Hidden or covered, the periodic pass waits; seen again, it goes over the window at once.
+                ui->presence = std::make_unique<PresenceListener>(InterfacePresence(), [weak](bool seen) {
+                    if (!seen) return;
+                    if (std::shared_ptr<UiSide> side = weak.lock()) {
+                        side->pace.Force();
+                        side->wake = true;
+                    }
+                });
                 ui->backend.WatchChanges([weak, &journal] {
                     std::shared_ptr<UiSide> side = weak.lock();
                     if (!side || side->backend.WindowClosed()) return;
                     ampify::ActivityScope activity("theme pass after a change");
                     auto start = std::chrono::steady_clock::now();
                     side->session.Reapply(side->backend);
+                    side->pace.PassedAfterChange(side->session.LastApplied());
                     auto end = std::chrono::steady_clock::now();
                     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
                     NoteMinute(*side, end, end - start, journal);
@@ -348,7 +376,10 @@ void ThemeService::Run(HINSTANCE module) {
             // Hidden in the notification area (music playing, window closed to the tray) or minimized: the periodic
             // pass waits, and the first tick once the window shows again applies what changed meanwhile. Not the very
             // first tick: a window that starts hidden still gets its theme before it first shows.
-            if (ui->ticked && !ui->backend.WindowShown()) return;
+            // Covered by other windows counts as hidden: nobody sees it (src/core/presence.hpp). An inspection asked
+            // meanwhile (ampify devtools, from a terminal over the window) still runs.
+            const bool covered = !InterfacePresence().Seen() && !request.inspect;
+            if (ui->ticked && (!ui->backend.WindowShown() || covered)) return;
             bool firstTick = !ui->ticked;
             ui->ticked = true;
             {
@@ -358,9 +389,19 @@ void ThemeService::Run(HINSTANCE module) {
             }
 
             std::optional<theme::Inspection> inspection;
-            {
+            bool requestChanged = firstTick || request.inspect || request.generation != ui->appliedGeneration ||
+                                  request.themeId != ui->appliedTheme;
+            if (ui->pace.Due(requestChanged)) {
                 ampify::ActivityScope step("theme tick: apply the theme");
                 inspection = ui->session.Tick(ui->backend, request);
+                ui->appliedGeneration = request.generation;
+                ui->appliedTheme = request.themeId;
+                ui->pace.Ticked(ui->session.LastApplied());
+                // A periodic pass that writes again means Apple put values back meanwhile: the pace stays quick.
+                if (!firstTick && !requestChanged && ui->session.LastApplied() > 0 && ui->rewrites++ < kTimedPasses) {
+                    journal.Write("Themes: the periodic pass wrote " + std::to_string(ui->session.LastApplied()) +
+                                  " value(s) again (Apple put them back)");
+                }
             }
             // The first tick puts the whole theme on the window: its length is part of the start-up time.
             if (firstTick) {
@@ -432,7 +473,11 @@ void ThemeService::Run(HINSTANCE module) {
                     break;
                 }
             }
-            if (ChangeStamp(m_kit) != stamp) break;
+            if (kitFiles.Moved()) {
+                kitMoved = true;
+                break;
+            }
+            if (m_ui->wake.exchange(false)) break;
         }
     }
 }

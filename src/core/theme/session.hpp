@@ -46,6 +46,8 @@ public:
     void Reapply(TreeBackend& tree);
 
     bool Active() const { return m_engine.Active(); }
+    // How many values the last Tick or Reapply wrote (0 when nothing is applied).
+    int LastApplied() const { return m_lastApplied; }
     const std::map<std::pair<NodeId, std::string>, Value>& Originals() const { return m_engine.Originals(); }
     const std::map<std::string, ThemeEngine::Refusal>& Refusals() const { return m_engine.Refusals(); }
     void RecordRefusedElements(bool on) { m_engine.RecordRefusedElements(on); }
@@ -62,6 +64,7 @@ private:
     bool m_hasGeneration = false;
     std::string m_themeId;
     std::shared_ptr<const Theme> m_composed;
+    int m_lastApplied = 0;
 };
 
 }  // namespace ampify::theme

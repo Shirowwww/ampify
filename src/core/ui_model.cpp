@@ -267,7 +267,7 @@ bool ChangeControl(std::vector<UiControl>& controls, const std::string& elementI
 int UiModel::AddControl(const std::string& elementId, const std::string& placement, const std::string& label,
                         const std::string& icon, bool clickable, int parent) {
     if (!IsPlacement(placement)) return 0;
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     if (parent != 0) {
         auto submenu = std::find_if(m_controls.begin(), m_controls.end(), [&](const UiControl& other) {
             return other.id == parent && other.elementId == elementId && other.placement == placement &&
@@ -288,38 +288,38 @@ int UiModel::AddControl(const std::string& elementId, const std::string& placeme
 }
 
 void UiModel::SetPanel(const std::string& elementId, const std::string& panelId, Json tree) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     Upsert(m_panels, elementId, panelId, std::move(tree));
 }
 
 bool UiModel::RemovePanel(const std::string& elementId, const std::string& panelId) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     return std::erase_if(m_panels, [&](const UiSlot& slot) { return slot.elementId == elementId && slot.id == panelId; }) > 0;
 }
 
 void UiModel::SetPage(const std::string& elementId, const std::string& path, Json tree) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     Upsert(m_pages, elementId, path, std::move(tree));
 }
 
 void UiModel::OpenPopup(const std::string& elementId, Json tree) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     m_popups.push_back(UiSlot{elementId, {}, std::move(tree)});
 }
 
 void UiModel::SetPopup(const std::string& elementId, const std::string& popupId, Json tree) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     Upsert(m_popups, elementId, popupId, std::move(tree));
 }
 
 void UiModel::ClosePopup(const std::string& elementId, const std::string& popupId) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     auto same = [&](const UiSlot& slot) { return slot.elementId == elementId && slot.id == popupId; };
     m_popups.erase(std::remove_if(m_popups.begin(), m_popups.end(), same), m_popups.end());
 }
 
 std::uint64_t UiModel::SetFullscreen(const std::string& elementId, Json tree, std::uint64_t session) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     bool owner = m_fullscreen && m_fullscreen->elementId == elementId;
     if (session != 0) {
         if (!owner || session != m_fullscreenSession) return 0;  // closed or taken meanwhile: a late update
@@ -333,7 +333,7 @@ std::uint64_t UiModel::SetFullscreen(const std::string& elementId, Json tree, st
 }
 
 void UiModel::CloseFullscreen(const std::string& elementId, std::uint64_t session) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     if (!m_fullscreen || m_fullscreen->elementId != elementId) return;
     if (session != 0 && session != m_fullscreenSession) return;
     m_fullscreen.reset();
@@ -356,22 +356,22 @@ int UiModel::ReserveId() {
 }
 
 bool UiModel::SetControlLabel(const std::string& elementId, int controlId, const std::string& label) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     return ChangeControl(m_controls, elementId, controlId, [&](UiControl& control) { control.label = label; });
 }
 
 bool UiModel::SetControlActive(const std::string& elementId, int controlId, bool active) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     return ChangeControl(m_controls, elementId, controlId, [&](UiControl& control) { control.active = active; });
 }
 
 bool UiModel::SetControlDisabled(const std::string& elementId, int controlId, bool disabled) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     return ChangeControl(m_controls, elementId, controlId, [&](UiControl& control) { control.disabled = disabled; });
 }
 
 bool UiModel::SetControlBeside(const std::string& elementId, int controlId, const std::string& beside) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     for (UiControl& control : m_controls) {
         if (control.id != controlId || control.elementId != elementId) continue;
         if (control.placement != "playbar") return false;
@@ -382,7 +382,7 @@ bool UiModel::SetControlBeside(const std::string& elementId, int controlId, cons
 }
 
 bool UiModel::SetControlMark(const std::string& elementId, int controlId, double from, double to) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     for (UiControl& control : m_controls) {
         if (control.id != controlId || control.elementId != elementId) continue;
         if (control.placement != "playbar") return false;
@@ -401,7 +401,7 @@ bool UiModel::SetControlMark(const std::string& elementId, int controlId, double
 }
 
 void UiModel::SetPlaybarReadout(const std::string& elementId, double totalMs) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     auto owned = [&](const auto& readout) { return readout.first == elementId; };
     m_readouts.erase(std::remove_if(m_readouts.begin(), m_readouts.end(), owned), m_readouts.end());
     if (totalMs > 0) m_readouts.emplace_back(elementId, totalMs);  // NaN fails the test too
@@ -409,7 +409,7 @@ void UiModel::SetPlaybarReadout(const std::string& elementId, double totalMs) {
 }
 
 void UiModel::SetPlaybarHoverListener(const std::string& elementId, bool listening) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     auto at = std::find(m_hoverListeners.begin(), m_hoverListeners.end(), elementId);
     if (listening == (at != m_hoverListeners.end())) return;
     if (listening) m_hoverListeners.push_back(elementId);
@@ -427,13 +427,13 @@ UiPlaybarHover UiModel::PlaybarHover() const {
 }
 
 bool UiModel::SetControlKinds(const std::string& elementId, int controlId, std::vector<std::string> kinds) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     return ChangeControl(m_controls, elementId, controlId,
                          [&](UiControl& control) { control.kinds = std::move(kinds); });
 }
 
 bool UiModel::RemoveControl(const std::string& elementId, int controlId) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     auto gone = [&](const UiControl& control) {
         return control.elementId == elementId && (control.id == controlId || control.parent == controlId);
     };
@@ -444,18 +444,18 @@ bool UiModel::RemoveControl(const std::string& elementId, int controlId) {
 }
 
 void UiModel::SetTitle(const std::string& elementId, const std::string& title) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     m_titles[elementId] = title;
 }
 
 void UiModel::Navigate(const std::string& elementId, const std::string& path) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     m_route = std::make_pair(elementId, path);
     m_routeSerial++;
 }
 
 void UiModel::RemoveElement(const std::string& elementId) {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     auto owned = [&](const auto& item) { return item.elementId == elementId; };
     m_controls.erase(std::remove_if(m_controls.begin(), m_controls.end(), owned), m_controls.end());
     m_panels.erase(std::remove_if(m_panels.begin(), m_panels.end(), owned), m_panels.end());
@@ -535,8 +535,23 @@ std::uint64_t UiModel::RouteSerial() const {
 }
 
 void UiModel::RequestApplePlayer() {
-    std::lock_guard<std::mutex> guard(m_mutex);
+    Edit edit(*this);
     m_applePlayerRequests++;
+}
+
+UiModel::Edit::~Edit() {
+    m_model.m_version++;
+    if (m_model.m_onChange) m_model.m_onChange();
+}
+
+std::uint64_t UiModel::Version() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return m_version;
+}
+
+void UiModel::OnChange(std::function<void()> listener) {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    m_onChange = std::move(listener);
 }
 
 std::uint64_t UiModel::ApplePlayerRequests() const {

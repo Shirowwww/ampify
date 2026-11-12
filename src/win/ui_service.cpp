@@ -636,9 +636,14 @@ void UiService::Run() {
     m_shared->journal.Write(std::string("Interface: service started (WinEvent hook ") + (hook ? "set" : "refused") +
                             ", polling the windows every 5 s, the model every 250 ms)");
 
+    // The model wakes this thread when an element changes what shows, instead of a reading four times a second. Two
+    // readings stay a quarter second apart at least, so an element that redraws all the time costs no more than then.
+    HANDLE modelChanged = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (modelChanged) m_model.OnChange([modelChanged] { SetEvent(modelChanged); });
     uirender::SurfaceTracker tracker;
     auto nextDiscovery = std::chrono::steady_clock::now();
     auto nextTweaks = nextDiscovery;
+    auto lastReading = nextDiscovery - kModelPoll;
     std::optional<std::filesystem::file_time_type> tweaksStamp;
     while (m_shared->running) {
         MSG message{};
@@ -661,7 +666,11 @@ void UiService::Run() {
             for (const auto& [elementId, session] : m_model.TakeDisplacedFullscreens()) {
                 if (m_shared->sink) m_shared->sink(FullscreenClosed(elementId, std::to_string(session)));
             }
-            uirender::SurfaceChanges changes = tracker.Poll(m_model);
+            uirender::SurfaceChanges changes;
+            if (now - lastReading >= kModelPoll) {
+                changes = tracker.Poll(m_model);
+                lastReading = now;
+            }
             if (!changes.Empty()) {
                 std::vector<std::shared_ptr<WindowContext>> windows;
                 {
@@ -681,8 +690,25 @@ void UiService::Run() {
         } catch (...) {
             m_shared->Once("worker-error", "Interface: error on the watching thread (unknown exception)");
         }
-        MsgWaitForMultipleObjects(0, nullptr, FALSE, static_cast<DWORD>(kModelPoll.count()), QS_ALLINPUT);
+        // Until the model moves, a window event comes, or the next look at the windows or at settings.txt is due. A
+        // change heard too soon after the last reading waits out the rest of the quarter second, without the event:
+        // an element that edits its view all the time then wakes this thread four times a second, as before.
+        auto now = std::chrono::steady_clock::now();
+        auto due = std::min(nextDiscovery, nextTweaks);
+        const bool pending = modelChanged && m_model.Version() != tracker.Version();
+        if (pending) due = std::min(due, lastReading + kModelPoll);
+        auto wait = std::chrono::duration_cast<std::chrono::milliseconds>(due - now).count();
+        DWORD waitMs = static_cast<DWORD>(std::clamp<long long>(wait, 0, kDiscoveryPoll.count() * 1000));
+        if (modelChanged && !pending) {
+            MsgWaitForMultipleObjects(1, &modelChanged, FALSE, waitMs, QS_ALLINPUT);
+        } else if (modelChanged) {
+            MsgWaitForMultipleObjects(0, nullptr, FALSE, waitMs, QS_ALLINPUT);
+        } else {
+            MsgWaitForMultipleObjects(0, nullptr, FALSE, static_cast<DWORD>(kModelPoll.count()), QS_ALLINPUT);
+        }
     }
+    m_model.OnChange(nullptr);
+    if (modelChanged) CloseHandle(modelChanged);
     if (hook) UnhookWinEvent(hook);
     std::lock_guard<std::mutex> lock(m_shared->mutex);
     for (const auto& context : m_shared->windows) context->ticket.Close();

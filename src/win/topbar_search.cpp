@@ -725,7 +725,8 @@ void Step(State& state, bool search) {
     xaml::UIElement content = window ? window.Content() : nullptr;
     if (!content || !content.XamlRoot()) return;
     WatchClose(state, window);
-    if (!WindowOnScreen(state.window)) return;
+    // Hidden or covered by other windows: nobody sees the strip, the first tick once it shows lays it out again.
+    if (!WindowOnScreen(state.window) || !InterfacePresence().Seen()) return;
     if (state.presenter && !StillHeld(state)) Release(state);
     std::optional<bool> atTop = TransportOnTop(state, content, search);
     if (!atTop) return;

@@ -53,7 +53,7 @@ void ThemeSession::JournalSources(const SessionRequest& request, bool themeWante
 }
 
 void ThemeSession::Reapply(TreeBackend& tree) {
-    if (m_composed) m_engine.Apply(*m_composed, tree);
+    m_lastApplied = m_composed ? m_engine.Apply(*m_composed, tree).applied : 0;
 }
 
 std::optional<Inspection> ThemeSession::Tick(TreeBackend& tree, const SessionRequest& request) {
@@ -89,7 +89,7 @@ std::optional<Inspection> ThemeSession::Tick(TreeBackend& tree, const SessionReq
         }
     }
 
-    if (m_composed) m_engine.Apply(*m_composed, tree);
+    m_lastApplied = m_composed ? m_engine.Apply(*m_composed, tree).applied : 0;
 
     // An empty tree is the window before its content (first-run licence, start-up): no dump yet, the request stays and
     // the next tick tries again (seen on the bench: "Tree (0 elements)" written two seconds after start).

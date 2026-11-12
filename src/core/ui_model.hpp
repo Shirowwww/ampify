@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <optional>
@@ -149,8 +150,28 @@ public:
     std::optional<std::pair<std::string, std::string>> Route() const;  // element and path
     std::uint64_t RouteSerial() const;  // one more at each Navigate, so a second visit to the same page shows too
 
+    // One more after each call that may change what the host shows, so a reader can skip a model that did not move.
+    std::uint64_t Version() const;
+    // Called after each such change, with the model's lock held: it must only wake its reader (an event, a flag).
+    void OnChange(std::function<void()> listener);
+
 private:
+    // The lock of an edit: on leaving, the version moves and the listener hears it.
+    class Edit {
+    public:
+        explicit Edit(UiModel& model) : m_model(model), m_guard(model.m_mutex) {}
+        ~Edit();
+        Edit(const Edit&) = delete;
+        Edit& operator=(const Edit&) = delete;
+
+    private:
+        UiModel& m_model;
+        std::lock_guard<std::mutex> m_guard;
+    };
+
     mutable std::mutex m_mutex;
+    std::uint64_t m_version = 0;
+    std::function<void()> m_onChange;
     int m_nextId = 1;
     std::vector<UiControl> m_controls;
     std::vector<UiSlot> m_panels;

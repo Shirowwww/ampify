@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+An Ampify that does less while nothing changes.
+
+### Performance
+
+- Themes, snippets and settings are read again only when a file of the Ampify folder changes, Windows switches
+  between light and dark, a minute passes or the artwork's colours change, instead of every three seconds.
+- A theme's periodic pass skips itself while the ones before it had nothing to write, and waits while other windows
+  cover Apple Music's. It applies at once when the window shows again.
+- Extension interfaces are drawn again when an extension changes them, instead of being checked four times a second.
+
 ## 1.3.4 (2026-11-11)
 
 Lyrics that glide from line to line, a full-screen button in the player, more room for the song on the playback bar,

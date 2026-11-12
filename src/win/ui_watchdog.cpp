@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 
+#include "../core/presence.hpp"
 #include "../core/ui_watchdog.hpp"
 #include "ui_thread.hpp"
 
@@ -13,6 +14,9 @@ namespace ampify::win {
 namespace {
 
 constexpr auto kMonitorStep = std::chrono::milliseconds(100);
+// While nobody sees the window, a freeze matters less than waking the interface thread five times a second: the
+// steps space out, a beat each second.
+constexpr auto kUnseenMonitorStep = std::chrono::milliseconds(500);
 constexpr int kBeatEveryMonitorSteps = 2;  // 200 ms
 
 int64_t NowMs() {
@@ -41,7 +45,7 @@ void Watch(Journal& journal) {
             }
         }
         for (const std::string& line : monitor->Check(NowMs(), CurrentActivity())) journal.Write(line);
-        std::this_thread::sleep_for(kMonitorStep);
+        std::this_thread::sleep_for(InterfacePresence().Seen() ? kMonitorStep : kUnseenMonitorStep);
     }
 }
 

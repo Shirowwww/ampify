@@ -306,6 +306,39 @@ TEST_CASE(UiRender_AnApplePlayerRequestIsReportedOnce) {
     CHECK(!tracker.Poll(model).applePlayer);
 }
 
+TEST_CASE(UiRender_TheModelTellsEachChangeAndNothingElse) {
+    ampify::UiModel model;
+    int heard = 0;
+    model.OnChange([&] { heard++; });
+    const std::uint64_t start = model.Version();
+
+    model.SetPanel("x", "x", Parse(R"({"type":"text","text":"a"})"));
+    CHECK(model.Version() == start + 1);
+    CHECK(heard == 1);
+
+    // Reading and reserving callback ids change nothing that shows.
+    (void)model.Panels();
+    (void)model.Controls();
+    (void)model.ReserveId();
+    CHECK(model.Version() == start + 1);
+    CHECK(heard == 1);
+
+    int control = model.AddControl("x", "playbar", "A", "<svg/>");
+    model.SetControlActive("x", control, true);
+    model.Navigate("x", "/a");
+    CHECK(heard == 4);
+
+    SurfaceTracker tracker;
+    CHECK(!tracker.Poll(model).Empty());
+    CHECK(tracker.Version() == model.Version());
+    CHECK(tracker.Poll(model).Empty());
+
+    model.OnChange(nullptr);
+    model.SetTitle("x", "Title");
+    CHECK(heard == 4);
+    CHECK(tracker.Poll(model).changed.size() == 1);
+}
+
 TEST_CASE(UiRender_SwitchingAButtonOnOrOffIsAChangeOfItsSurface) {
     ampify::UiModel model;
     int control = model.AddControl("x", "playbar", "Probe", "\xEE\x9C\xB4");
