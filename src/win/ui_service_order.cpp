@@ -1,8 +1,9 @@
 #if defined(AMPIFY_WITH_XAML)
 
-// The Order group of the Look tab: the sidebar's entries and the buttons at the right of the playback bar, each in a
-// list that takes a drag, or the arrows beside it for the keyboard. The sidebar's order goes to sidebar.json, which
-// the theme engine applies with `order`; the buttons' to apple.order.playbar (win/user_order.cpp).
+// The Order group of the Look tab: the sidebar's entries, the entries Ampify adds under them and the buttons at the
+// right of the playback bar, each in a list that takes a drag, or the arrows beside it for the keyboard. The
+// sidebar's order goes to sidebar.json, which the theme engine applies with `order`; the added entries' and the
+// buttons' to apple.order.sidebarEntries and apple.order.playbar (win/user_order.cpp).
 
 #include "ui_service_detail.hpp"
 
@@ -32,9 +33,30 @@ constexpr double kListHeight = 300;
 constexpr wchar_t kUpGlyph[] = L"";    // Segoe Fluent Icons: ChevronUp
 constexpr wchar_t kDownGlyph[] = L"";  // ChevronDown
 
+// What a list orders: its entries, the order they had first, its names on the page and where the order is kept.
+struct OrderKind {
+    std::vector<OrderEntry> (*entries)() noexcept;
+    std::vector<std::string> (*first)() noexcept;
+    const char* setting;  // nullptr: sidebar.json
+    const char* name;     // the list's name, before "Up", "Down" and "Reset"
+    const char* label;
+    const char* help;
+    const char* reset;    // the button that gives the first order back: Apple's, where Apple made it
+    const char* journal;
+    bool elementNames;    // an Ampify button reads as its element's name: its own text can be a value ("55 %")
+};
+
+constexpr OrderKind kSidebar{SidebarEntries, AppleSidebarOrder, nullptr, "AMPIFY_OrderSidebar",
+                             "order.sidebar", "order.sidebarHelp", "order.reset", "sidebar", false};
+constexpr OrderKind kSidebarAdded{SidebarAddedEntries, FirstSidebarAddedOrder, kSidebarEntriesOrderKey,
+                                  "AMPIFY_OrderSidebarAdded", "order.sidebarAdded", "order.sidebarAddedHelp",
+                                  "settings.reset", "entries added to the sidebar", false};
+constexpr OrderKind kPlaybar{PlaybarEntries, ApplePlaybarOrder, kPlaybarOrderKey, "AMPIFY_OrderPlaybar",
+                             "order.playbar", "order.playbarHelp", "order.reset", "playback bar's buttons", true};
+
 struct OrderList {
     UiService::Shared* shared = nullptr;
-    bool sidebar = false;
+    const OrderKind* kind = nullptr;
     controls::ListView list{nullptr};
     winrt::Windows::Foundation::Collections::IObservableVector<winrt::Windows::Foundation::IInspectable> items{nullptr};
     std::vector<std::pair<winrt::Windows::Foundation::IInspectable, std::string>> keys;  // each item's key
@@ -81,9 +103,9 @@ bool WriteSidebar(const std::filesystem::path& kit, const std::vector<std::strin
     return WriteFileAtomically(file, th::WriteLayout(config)) == WriteResult::Written;
 }
 
-// The list in Apple's order again, when Ampify moved something since Apple Music started.
+// The list in its first order again, when Ampify moved something since Apple Music started.
 void ShowAppleOrder(OrderList& order) {
-    const std::vector<std::string> apple = order.sidebar ? AppleSidebarOrder() : ApplePlaybarOrder();
+    const std::vector<std::string> apple = order.kind->first();
     if (apple.empty()) return;
     const std::vector<std::string> keys = KeysInOrder(order);
     std::vector<winrt::Windows::Foundation::IInspectable> items(order.items.begin(), order.items.end());
@@ -99,16 +121,16 @@ void Save(OrderList& order, bool reset) {
     const std::vector<std::string> keys = KeysInOrder(order);
     bool written = false;
     std::string error;
-    if (order.sidebar) {
+    if (!order.kind->setting) {
         // Apple's order is written out when Ampify moved the entries, so the sidebar takes it back now.
         written = WriteSidebar(shared.kit, keys, !reset || !AppleSidebarOrder().empty());
         if (!written) error = "(sidebar.json could not be replaced)";
     } else {
-        written = Settings::UpdateFile((shared.kit / "settings.txt").string(), kPlaybarOrderKey,
+        written = Settings::UpdateFile((shared.kit / "settings.txt").string(), order.kind->setting,
                                        reset ? std::string() : JoinOrder(keys), error);
     }
-    shared.journal.Write(std::string("Settings: order of the ") + (order.sidebar ? "sidebar" : "playback bar's buttons") +
-                         (reset ? " given back to Apple" : " changed") + (written ? "" : ", not written " + error));
+    shared.journal.Write(std::string("Settings: order of the ") + order.kind->journal +
+                         (reset ? " put back as it was" : " changed") + (written ? "" : ", not written " + error));
 }
 
 // Moves the selected entry one place, keeps it selected, and writes the order.
@@ -153,13 +175,17 @@ std::string ShownLabel(const OrderEntry& entry, const std::vector<uirender::ModE
     return entry.label;
 }
 
-void AddOrderRow(UiService::Shared& shared, SettingsNav& nav, const controls::StackPanel& rows, bool sidebar) {
+void AddOrderRow(UiService::Shared& shared, SettingsNav& nav, const controls::StackPanel& rows, const OrderKind& kind,
+                 std::size_t fewest) {
+    const std::vector<OrderEntry> entries = kind.entries();
+    if (entries.size() < fewest) return;
     auto order = std::make_shared<OrderList>();
     order->shared = &shared;
-    order->sidebar = sidebar;
+    order->kind = &kind;
     order->items = winrt::single_threaded_observable_vector<winrt::Windows::Foundation::IInspectable>();
-    const std::vector<uirender::ModEntry> mods = sidebar ? std::vector<uirender::ModEntry>{} : uirender::ListMods(shared.kit);
-    for (const OrderEntry& entry : sidebar ? SidebarEntries() : PlaybarEntries()) {
+    const std::vector<uirender::ModEntry> mods =
+        kind.elementNames ? uirender::ListMods(shared.kit) : std::vector<uirender::ModEntry>{};
+    for (const OrderEntry& entry : entries) {
         auto box = winrt::box_value(Wide(ShownLabel(entry, mods)));
         order->items.Append(box);
         order->keys.emplace_back(box, entry.key);
@@ -176,8 +202,8 @@ void AddOrderRow(UiService::Shared& shared, SettingsNav& nav, const controls::St
     animation::TransitionCollection transitions;  // the entries slide to their new places
     transitions.Append(animation::RepositionThemeTransition());
     list.ItemContainerTransitions(transitions);
-    const std::string prefix = sidebar ? "AMPIFY_OrderSidebar" : "AMPIFY_OrderPlaybar";
-    Name(list, prefix, i18n::Text(sidebar ? "order.sidebar" : "order.playbar"));
+    const std::string prefix = kind.name;
+    Name(list, prefix, i18n::Text(kind.label));
     list.DragItemsCompleted([order](auto const&, auto const&) noexcept {
         try {
             Save(*order, false);
@@ -193,8 +219,8 @@ void AddOrderRow(UiService::Shared& shared, SettingsNav& nav, const controls::St
     auto down = IconButton(shared, kDownGlyph, "order.down", prefix + "Down");
     controls::Button reset;
     if (shared.probe.button) reset.Style(shared.probe.button);
-    reset.Content(winrt::box_value(Wide(i18n::Text("order.reset"))));
-    Name(reset, prefix + "Reset", i18n::Text("order.reset"));
+    reset.Content(winrt::box_value(Wide(i18n::Text(kind.reset))));
+    Name(reset, prefix + "Reset", i18n::Text(kind.reset));
     up.Click([order](auto const&, auto const&) noexcept {
         try {
             Step(order, -1);
@@ -222,16 +248,17 @@ void AddOrderRow(UiService::Shared& shared, SettingsNav& nav, const controls::St
     control.Spacing(8);
     control.Children().Append(list);
     control.Children().Append(buttons);
-    const std::string label = i18n::Text(sidebar ? "order.sidebar" : "order.playbar");
-    const std::string help = i18n::Text(sidebar ? "order.sidebarHelp" : "order.playbarHelp");
+    const std::string label = i18n::Text(kind.label);
+    const std::string help = i18n::Text(kind.help);
     AddSettingsRow(nav, rows, SettingsLabelledRow(shared, label, help, control), {label, help});
 }
 
 }  // namespace
 
 void AddOrderRows(UiService::Shared& shared, SettingsNav& nav, const controls::StackPanel& rows) {
-    AddOrderRow(shared, nav, rows, true);
-    AddOrderRow(shared, nav, rows, false);
+    AddOrderRow(shared, nav, rows, kSidebar, 0);
+    AddOrderRow(shared, nav, rows, kSidebarAdded, 2);  // one entry has nothing to trade places with
+    AddOrderRow(shared, nav, rows, kPlaybar, 0);
 }
 
 }  // namespace ampify::win::ui_service_detail

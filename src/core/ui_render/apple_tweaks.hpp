@@ -59,6 +59,8 @@ struct AppleTweaks {
     int lyricsAfter = -1;
     // The buttons at the right of the playback bar, in the order chosen on the settings page (win/user_order.cpp).
     std::vector<std::string> playbarOrder;
+    // The entries Ampify adds under the sidebar's own, in the order chosen there too.
+    std::vector<std::string> sidebarEntriesOrder;
 };
 
 // An unknown value reads as the default.

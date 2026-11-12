@@ -34,19 +34,23 @@ namespace media = xaml::Media;
 namespace automation = xaml::Automation;
 using Inspectables = winrt::Windows::Foundation::Collections::IVector<winrt::Windows::Foundation::IInspectable>;
 
-constexpr wchar_t kTogglesName[] = L"NowPlayingToggleButtons";  // the playback bar's right panel (names.md)
+// The panels whose children the user orders, by their name in the main window: the playback bar's right panel
+// (names.md) and the one Ampify puts in the sidebar's footer for the entries it adds (ui_service_sidebar.cpp).
+enum Ordered { kPlaybar, kSidebarAdded, kOrderedCount };
+constexpr const wchar_t* kPanelNames[kOrderedCount] = {L"NowPlayingToggleButtons", L"AMPIFY_SidebarHost"};
+constexpr std::string_view kAmpifyPrefix = "AMPIFY_";
 constexpr std::size_t kSearchLimit = 4000;
 constexpr std::size_t kLabelSearchLimit = 30;
 constexpr int kSearchEvery = 4;  // keep passes between two searches while the panel is missing
 
 std::mutex g_mutex;
-std::vector<std::string> g_playbar;        // apple.order.playbar
-std::vector<std::string> g_applePlaybar;   // the buttons' keys before the first move
-std::vector<std::string> g_appleSidebar;   // the sidebar's keys before the theme engine's first move
+std::vector<std::string> g_wanted[kOrderedCount];  // apple.order.playbar, apple.order.sidebarEntries
+std::vector<std::string> g_first[kOrderedCount];   // each panel's keys before the first move
+std::vector<std::string> g_appleSidebar;           // the sidebar's keys before the theme engine's first move
 
 struct Kept {
-    winrt::weak_ref<controls::Panel> toggles;
-    int ticks = 0;
+    winrt::weak_ref<controls::Panel> panels[kOrderedCount];
+    int ticks[kOrderedCount] = {};
 };
 
 Kept& State() {
@@ -72,14 +76,15 @@ xaml::UIElement MainRoot() {
     return window ? window.Content().try_as<xaml::UIElement>() : nullptr;
 }
 
-controls::Panel Toggles(bool search) {
+controls::Panel PanelOf(Ordered which, bool search) {
     Kept& state = State();
-    if (auto panel = state.toggles.get(); panel && panel.XamlRoot()) return panel;
+    if (auto panel = state.panels[which].get(); panel && panel.XamlRoot()) return panel;
     if (!search) return nullptr;
     xaml::UIElement root = MainRoot();
     if (!root) return nullptr;
-    auto panel = FindFirst<controls::Panel>(root, kSearchLimit, [](auto const& p) { return p.Name() == kTogglesName; });
-    state.toggles = panel ? winrt::make_weak(panel) : winrt::weak_ref<controls::Panel>{};
+    auto panel = FindFirst<controls::Panel>(root, kSearchLimit,
+                                            [which](auto const& p) { return p.Name() == kPanelNames[which]; });
+    state.panels[which] = panel ? winrt::make_weak(panel) : winrt::weak_ref<controls::Panel>{};
     return panel;
 }
 
@@ -87,7 +92,7 @@ controls::Panel Toggles(bool search) {
 std::string ButtonKey(const xaml::UIElement& child) {
     auto element = child.try_as<xaml::FrameworkElement>();
     std::string name = element ? Utf8(element.Name()) : std::string();
-    if (name.starts_with("AMPIFY_")) {
+    if (name.starts_with(kAmpifyPrefix)) {
         if (std::size_t control = name.rfind("_control-"); control != std::string::npos) name.resize(control);
     }
     if (!name.empty()) return name;
@@ -157,13 +162,18 @@ std::vector<OrderEntry> SidebarEntries() noexcept {
     return entries;
 }
 
-std::vector<OrderEntry> PlaybarEntries() noexcept {
+namespace {
+
+// The children of an ordered panel, as they stand now; `ampifyOnly` leaves out what Ampify did not add (the
+// separator Apple had in the sidebar's footer).
+std::vector<OrderEntry> EntriesOf(Ordered which, bool ampifyOnly) noexcept {
     std::vector<OrderEntry> entries;
     try {
-        controls::Panel panel = Toggles(true);
+        controls::Panel panel = PanelOf(which, true);
         if (!panel) return entries;
         for (const xaml::UIElement& child : panel.Children()) {
             std::string key = ButtonKey(child);
+            if (ampifyOnly && !key.starts_with(kAmpifyPrefix)) continue;
             std::string label = ButtonsLabel(child);
             entries.push_back({key, label.empty() ? key : label});
         }
@@ -172,21 +182,27 @@ std::vector<OrderEntry> PlaybarEntries() noexcept {
     return entries;
 }
 
-void SetPlaybarOrder(std::vector<std::string> keys) noexcept {
+void SetOrder(Ordered which, std::vector<std::string> keys) noexcept {
     std::lock_guard<std::mutex> lock(g_mutex);
-    g_playbar = std::move(keys);
+    g_wanted[which] = std::move(keys);
 }
 
-void KeepPlaybarOrder() noexcept {
+std::vector<std::string> FirstOrder(Ordered which) noexcept {
+    std::lock_guard<std::mutex> lock(g_mutex);
+    return g_first[which];
+}
+
+// Puts the panel's children in the wanted order; with no order, in the one they had before the first move.
+void KeepOrder(Ordered which) noexcept {
     try {
         std::vector<std::string> wanted;
         {
             std::lock_guard<std::mutex> lock(g_mutex);
-            wanted = g_playbar.empty() ? g_applePlaybar : g_playbar;
+            wanted = g_wanted[which].empty() ? g_first[which] : g_wanted[which];
         }
         if (wanted.empty()) return;
         Kept& state = State();
-        controls::Panel panel = Toggles(state.ticks++ % kSearchEvery == 0);
+        controls::Panel panel = PanelOf(which, state.ticks[which]++ % kSearchEvery == 0);
         if (!panel) return;
         auto children = panel.Children();
         std::vector<xaml::UIElement> items;
@@ -201,9 +217,9 @@ void KeepPlaybarOrder() noexcept {
         if (!moves) return;
         {
             std::lock_guard<std::mutex> lock(g_mutex);
-            if (g_applePlaybar.empty()) g_applePlaybar = keys;
+            if (g_first[which].empty()) g_first[which] = keys;
         }
-        if (!panel.ChildrenTransitions()) {  // the buttons slide to their new places
+        if (!panel.ChildrenTransitions()) {  // the children slide to their new places
             xaml::Media::Animation::TransitionCollection transitions;
             transitions.Append(xaml::Media::Animation::RepositionThemeTransition());
             panel.ChildrenTransitions(transitions);
@@ -218,6 +234,17 @@ void KeepPlaybarOrder() noexcept {
     }
 }
 
+}  // namespace
+
+std::vector<OrderEntry> PlaybarEntries() noexcept { return EntriesOf(kPlaybar, false); }
+std::vector<OrderEntry> SidebarAddedEntries() noexcept { return EntriesOf(kSidebarAdded, true); }
+
+void SetPlaybarOrder(std::vector<std::string> keys) noexcept { SetOrder(kPlaybar, std::move(keys)); }
+void SetSidebarAddedOrder(std::vector<std::string> keys) noexcept { SetOrder(kSidebarAdded, std::move(keys)); }
+
+void KeepPlaybarOrder() noexcept { KeepOrder(kPlaybar); }
+void KeepSidebarAddedOrder() noexcept { KeepOrder(kSidebarAdded); }
+
 void NoteSidebarOrder(const std::vector<std::string>& keys) noexcept {
     std::lock_guard<std::mutex> lock(g_mutex);
     if (g_appleSidebar.empty()) g_appleSidebar = keys;
@@ -228,10 +255,8 @@ std::vector<std::string> AppleSidebarOrder() noexcept {
     return g_appleSidebar;
 }
 
-std::vector<std::string> ApplePlaybarOrder() noexcept {
-    std::lock_guard<std::mutex> lock(g_mutex);
-    return g_applePlaybar;
-}
+std::vector<std::string> ApplePlaybarOrder() noexcept { return FirstOrder(kPlaybar); }
+std::vector<std::string> FirstSidebarAddedOrder() noexcept { return FirstOrder(kSidebarAdded); }
 
 }  // namespace ampify::win
 

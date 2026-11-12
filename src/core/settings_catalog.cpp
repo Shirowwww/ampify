@@ -63,6 +63,7 @@ const std::vector<KitSetting>& Fixed() {
         {.key = kMidiDeviceKey, .kind = K::Integer, .fallback = "0", .low = 0, .high = 255},
         Text("midi.map", "no key linked"),
         Text(kPlaybarOrderKey, "Apple's order"),
+        Text(kSidebarEntriesOrderKey, "the order the entries were added in"),
         Toggle(kPlayerAppleKey, "1"),
         Toggle(kPlayerAppleCommandsKey, "0"),
         {.key = kGainCeilingSetting, .kind = K::Number, .fallback = "6", .low = 0, .high = 12},

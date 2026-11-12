@@ -67,6 +67,7 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.lyricsBefore = LyricLinesOf(ChoiceOf(settings, kLyricsBeforeKey));
     tweaks.lyricsAfter = LyricLinesOf(ChoiceOf(settings, kLyricsAfterKey));
     tweaks.playbarOrder = ParseOrder(settings.Get(kPlaybarOrderKey).value_or(""));
+    tweaks.sidebarEntriesOrder = ParseOrder(settings.Get(kSidebarEntriesOrderKey).value_or(""));
     return tweaks;
 }
 

@@ -40,6 +40,8 @@ constexpr AppleTweak kTweaks[] = {
     {[](const uirender::AppleTweaks& t, Journal&) { SetLyricsWindow(t.lyricsBefore, t.lyricsAfter); }, nullptr},
     {[](const uirender::AppleTweaks& t, Journal&) { SetPlaybarOrder(t.playbarOrder); },
      [](Journal&) noexcept { KeepPlaybarOrder(); }},
+    {[](const uirender::AppleTweaks& t, Journal&) { SetSidebarAddedOrder(t.sidebarEntriesOrder); },
+     [](Journal&) noexcept { KeepSidebarAddedOrder(); }},
 };
 
 }  // namespace
