@@ -261,9 +261,10 @@ Ampify.audio.eq.presets()           // -> preset names
 #### AutoMix [preview]
 
 `Ampify.automix` (permission `audio.mix`, audio process only) plays the end of the current song into the next one.
-Ampify starts a second player on the current song, puts it in step with Apple's (within a millisecond), moves Apple's
-player to the next song at the plan's start, then crosses the two volumes along the plan. The `automix` extension
-plans each mix from Apple's analysis of the two songs (beats, bars, fades, loudness).
+Ampify starts a second player on the current song a few seconds ahead, delays its sound until it is Apple's to the
+sample, lets it take the song over, moves Apple's player to the next song at the plan's start, then shapes both
+songs along the plan: volumes, bass, and the current song's speed. The `automix` extension plans each mix from
+Apple's analysis of the two songs (beats, bars, phrases, key, fades, loudness).
 
 ```js
 Ampify.automix.state()            // -> { available, playing, current, next, mix }
@@ -271,19 +272,31 @@ Ampify.automix.schedule(plan)     // -> { ok: true } or { ok: false, reason }
 Ampify.automix.cancel(reason)
 ```
 
-- `current` and `next`: `{ name, id, storefront, time, duration }` or `null`. `name` is the song's stream address
-  without its query, the name a plan gives; `id` is its catalog id and `storefront` its store's number (143442 for
-  France), `null` when Apple's player does not say; `time` and `duration` in seconds, 0 while unknown.
-- `mix`: `{ phase, next, reason, stepErrorMs, seeks }`. `phase` is `idle`, `waiting`, `preparing`, `aligning`,
-  `ready`, `taking over`, `mixing`, `recovering`, `done` or `failed` (then `reason` says why); `stepErrorMs` is how
-  far the second player was from Apple's at its last check.
-- A plan is `{ next, bStart, keys }`: `next` is the next song's `name`, `bStart` where that song starts (seconds into
-  it), `keys` 2 to 64 points `[time in the current song, its volume, the next song's volume]` in time order, from
-  `[t, 1, 0]` to `[t2, 0, 1]`, at most 60 s apart and before the end of both songs. Apple's player moves to the next
-  song at the first key; between two keys the squared volumes follow a smoothstep, so a crossfade keeps its power.
-- The second player starts 12 s before the first key and takes a few seconds to be in step: hand a plan over at
-  least 14 s ahead. A plan whose mix has not begun is replaced by the next one. Pausing, seeking, skipping or changing
-  the queue cancels the mix: Apple's player plays on alone, without a jump. Stopping the element cancels its plan.
+- `current` and `next`: `{ name, id, storefront, time, duration, atmos }` or `null`. `name` is the song's stream
+  address without its query, the name a plan gives; `id` is its catalog id and `storefront` its store's number (143442
+  for France), `null` when Apple's player does not say; `time` and `duration` in seconds, 0 while unknown. `atmos`
+  says whether the song plays in Dolby Atmos, `null` until Apple's player has loaded it: always `null` for `next`.
+- `mix`: `{ phase, next, reason, stepErrorDb, seeks }`. `phase` is `idle`, `waiting`, `preparing`, `aligning`,
+  `ready`, `taking over`, `mixing`, `recovering`, `done` or `failed` (then `reason` says why); `stepErrorDb` is what
+  is left when the second player's copy is taken from Apple's sound, in dB below it, `null` until measured.
+- A plan is `{ next, bStart, keys, rate, rateFrom }`: `next` is the next song's `name`, `bStart` where that song
+  starts (seconds into it), `keys` 2 to 64 points in time order, at most 60 s apart and before the end of both songs.
+  The current song must go on for 3 s after the last key (3.3 s when it is stretched, and more when it is slowed:
+  what the mix lasts times `1 - rate`), because the second player runs ahead of what is heard.
+  A key is `[time in the current song, its volume, the next song's volume]`, from `[t, 1, 0]` to `[t2, 0, 1]`, or
+  the same with two more numbers, the bass of each song (1 kept, 0 taken away below 150 Hz), the last key leaving the
+  next song its bass. Apple's player moves to the next song at the first key; between two keys the squared volumes
+  follow a smoothstep, so a crossfade keeps its power.
+- `rate` (0.9 to 1.1, optional) is the speed the current song has during the mix, at its own pitch; it gets there
+  evenly from `rateFrom` (seconds into the song, at most 30 s before the first key). Key times stay those of the song
+  itself: a mix of 16 s at 1.05 lasts 15.2 s.
+- The second player starts 8 s before the song is taken over (the first key, or `rateFrom`), a few seconds more for
+  a stretched song: hand a plan over at least 14 s ahead. A plan whose mix has not begun is replaced by the next one.
+  Pausing, seeking, skipping or changing the queue cancels the mix: Apple's player plays on alone, without a jump.
+  Stopping the element cancels its plan.
+- Dolby Atmos goes out as spatial objects, which a mix cannot take: a plan is refused while the current song plays
+  in it, and a next song that turns out to play in it comes in late and at full volume. Read `audioTraits` in the
+  catalog and leave such songs alone, as the `automix` extension does.
 
 ### 5.5 Interface [stable]
 

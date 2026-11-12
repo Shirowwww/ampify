@@ -14,7 +14,7 @@
 | `tests/` | C++ unit tests (`ampify_tests`); `tests/win/` holds the Windows-only ones |
 | `bench/windows/`, `scripts/` | The Windows bench ([testing.md](testing.md)); build, install, packaging and listening-test scripts, `hooks/pre-push` |
 | `cmake/` | `sources/<package>.cmake` lists each package's files; `layouts.cmake`; templates for the version resource and facts headers |
-| `knowledge/`, `vendor/quickjs/` | What is known about Apple Music's internals; quickjs-ng, unchanged |
+| `knowledge/`, `vendor/` | What is known about Apple Music's internals; quickjs-ng and Signalsmith Stretch, unchanged |
 
 The catalog lives in the `ampify-catalog` repository. Its tests run when a clone sits next to this one (or where
 `AMPIFY_CATALOG` points) and are skipped otherwise.
