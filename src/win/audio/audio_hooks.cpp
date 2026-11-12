@@ -97,12 +97,45 @@ struct StreamFormat {
 std::mutex g_streamLock;  // g_clientFormats and the metered render client
 std::map<void*, StreamFormat> g_clientFormats;
 std::atomic<void*> g_meteredRender{nullptr};
+std::atomic<IAudioClient*> g_meteredClient{nullptr};  // the client g_meteredRender came from
 std::atomic<BYTE*> g_meteredBuffer{nullptr};
 std::atomic<UINT32> g_meteredBufferFrames{0};
 std::atomic<int> g_meteredChannels{0};
 std::atomic<int> g_meteredRate{static_cast<int>(audio::kStartSampleRate)};
+// Each render client gets the next number: AutoMix tells streams apart by it, since a new client often lives at the
+// address of the one just released.
+std::uint64_t g_streamCount = 0;  // under g_streamLock
+std::atomic<std::uint64_t> g_meteredNumber{0};
 audio::GainRamp g_streamRamp(audio::kStartSampleRate);
 std::vector<float> g_streamCurve;  // audio thread only
+
+// AutoMix's second player renders into streams of its own (hooks_detail.hpp). A slot is written under g_streamLock
+// and read by that stream's audio thread.
+struct TailStream {
+    std::atomic<void*> render{nullptr};
+    std::atomic<IAudioClient*> client{nullptr};
+    std::atomic<BYTE*> buffer{nullptr};
+    std::atomic<UINT32> frames{0};
+    std::atomic<int> rate{0};
+    std::atomic<std::uint64_t> number{0};
+};
+std::array<TailStream, detail::kTailStreamSlots> g_tailStreams;
+std::atomic<int> g_tailCount{0};        // slots in use: none outside a mix, so the hooks look no further
+std::atomic<bool> g_tailExpected{false};
+std::atomic<bool> g_tailMissed{false};  // a stream came that could not be taken: the second player must stay silent
+
+// What goes out of the second player's stream gets the gain and the equalizer of Apple's, with a state of its own.
+audio::GainRamp g_tailRamp(audio::kStartSampleRate);
+std::vector<float> g_tailCurve;  // the second player's audio thread only
+float g_tailGain = 1.0f;         // the gain when the old song was last unheard: it keeps its own song's
+
+// Frames written to a stream that Windows has not taken yet. Called from that stream's own write, where its
+// client is in use.
+UINT32 QueuedFrames(IAudioClient* client) {
+    UINT32 queued = 0;
+    if (!client || FAILED(client->GetCurrentPadding(&queued))) return 0;
+    return queued;
+}
 
 // Spatial audio. The stream and the buffers of the pass in progress are used on the audio thread only,
 // between BeginUpdatingAudioObjects and EndUpdatingAudioObjects.
@@ -294,8 +327,28 @@ HRESULT STDMETHODCALLTYPE GetService_Hook(IAudioClient* self, REFIID riid, void*
     if (FAILED(hr) || !service || riid != kIidAudioRenderClient) return hr;
 
     std::lock_guard<std::mutex> guard(g_streamLock);
-    g_meteredRender.store(nullptr);
     auto it = g_clientFormats.find(self);
+    if (g_tailExpected.load()) {
+        // The second player makes a stream when it starts and at each seek; Apple's player does the same, and its
+        // seeks call the expectation off first (automix.cpp).
+        const bool usable = it != g_clientFormats.end() && it->second.sampleRate == g_meteredRate.load() &&
+                            it->second.channels == 2 && g_meteredRender.load() != nullptr;
+        const int slot = g_tailCount.load();
+        if (!usable || slot >= static_cast<int>(g_tailStreams.size())) {
+            g_tailMissed = true;
+            return hr;
+        }
+        g_tailRamp.SetSampleRate(it->second.sampleRate);
+        g_tailStreams[slot].rate = it->second.sampleRate;
+        g_tailStreams[slot].buffer = nullptr;
+        g_tailStreams[slot].client = self;
+        g_tailStreams[slot].number = ++g_streamCount;
+        g_tailStreams[slot].render = *service;
+        g_tailCount = slot + 1;
+        return hr;
+    }
+    g_meteredRender.store(nullptr);
+    g_meteredClient.store(nullptr);
     if (it == g_clientFormats.end()) return hr;
 
     int rate = it->second.sampleRate;
@@ -303,15 +356,30 @@ HRESULT STDMETHODCALLTYPE GetService_Hook(IAudioClient* self, REFIID riid, void*
     g_streamRamp.SetSampleRate(rate);
     g_meteredChannels = it->second.channels;
     g_meteredRate = rate;
+    g_meteredNumber = ++g_streamCount;
+    g_meteredClient.store(self);
     g_meteredRender.store(*service);
     return hr;
 }
 
+// The slot of a stream of AutoMix's second player, or null: outside a mix, one load and no more.
+TailStream* TailStreamOf(void* render) {
+    // The newest first: a stream may live at the address of an older one of the same mix.
+    for (int i = g_tailCount.load(std::memory_order_relaxed) - 1; i >= 0; i--) {
+        if (g_tailStreams[i].render.load(std::memory_order_relaxed) == render) return &g_tailStreams[i];
+    }
+    return nullptr;
+}
+
 HRESULT STDMETHODCALLTYPE GetBuffer_Hook(IAudioRenderClient* self, UINT32 frames, BYTE** data) {
     HRESULT hr = g_getBufferOriginal(self, frames, data);
-    if (SUCCEEDED(hr) && data && self == g_meteredRender.load(std::memory_order_relaxed)) {
+    if (FAILED(hr) || !data) return hr;
+    if (self == g_meteredRender.load(std::memory_order_relaxed)) {
         g_meteredBufferFrames.store(frames, std::memory_order_relaxed);
         g_meteredBuffer.store(*data, std::memory_order_relaxed);
+    } else if (TailStream* tail = TailStreamOf(self)) {
+        tail->frames.store(frames, std::memory_order_relaxed);
+        tail->buffer.store(*data, std::memory_order_relaxed);
     }
     return hr;
 }
@@ -322,6 +390,11 @@ float AppliedGain() { return g_policyGain.load() * ElementGains().Linear(); }
 
 // The stereo samples of one block: measured, then gained, equalized and limited in place.
 void ProcessStream(IAudioRenderClient* self, float* samples, UINT32 count) {
+    // AutoMix first: the leveler, the equalizer and the analysis then see this stream as it is heard.
+    if (detail::AutoMixOpen()) {
+        detail::AutoMixMain(samples, count, g_meteredRate.load(), g_meteredNumber.load(std::memory_order_relaxed),
+                            QueuedFrames(g_meteredClient.load()));
+    }
     if (std::any_of(samples, samples + count * 2, [](float s) { return std::fabs(s) > 1e-4f; })) {
         g_lastSoundTicks.store(std::chrono::steady_clock::now().time_since_epoch().count(), std::memory_order_relaxed);
     }
@@ -338,14 +411,43 @@ void ProcessStream(IAudioRenderClient* self, float* samples, UINT32 count) {
     detail::RecordOutput(samples, count, rate);
 }
 
+// One block of the second player's stream: its sound goes to the deck, and what the deck gives back (the old song as
+// it must be heard, or nothing) leaves in its place, with the gain and the equalizer Apple's stream gets.
+DWORD ProcessTailStream(IAudioRenderClient* self, TailStream& tail, UINT32 frames, DWORD flags) {
+    BYTE* data = tail.buffer.exchange(nullptr, std::memory_order_relaxed);
+    if (frames > tail.frames.load(std::memory_order_relaxed)) data = nullptr;
+    auto* samples = reinterpret_cast<float*>(data);
+    const int rate = tail.rate.load(std::memory_order_relaxed);
+    const bool silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0;
+    const bool heard = detail::AutoMixTail(samples, frames, rate, silent, tail.number.load(std::memory_order_relaxed),
+                                           QueuedFrames(tail.client.load()));
+    if (!heard) {
+        g_tailGain = AppliedGain();
+        g_tailRamp.Curve(frames, g_tailGain, g_tailCurve);
+        return flags | AUDCLNT_BUFFERFLAGS_SILENT;
+    }
+    const bool unity = g_tailRamp.Curve(frames, g_tailGain, g_tailCurve);
+    audio::ApplyCurve(samples, frames, 2, g_tailCurve, unity, g_samplePath.SecondStreamStage(rate), self);
+    return flags & ~static_cast<DWORD>(AUDCLNT_BUFFERFLAGS_SILENT);
+}
+
 HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 frames, DWORD flags) {
     if (frames && self == g_meteredRender.load(std::memory_order_relaxed)) {
         BYTE* data = g_meteredBuffer.exchange(nullptr, std::memory_order_relaxed);
         UINT32 count = std::min(frames, g_meteredBufferFrames.load(std::memory_order_relaxed));
         bool silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0;
+        if (silent && data && count == frames && g_meteredChannels.load() == 2 && detail::AutoMixOpen()) {
+            // Apple's player says nothing: during a mix its silence is counted like any other block, so that the
+            // deck keeps knowing where this stream is.
+            std::fill_n(reinterpret_cast<float*>(data), static_cast<size_t>(count) * 2, 0.0f);
+            flags &= ~static_cast<DWORD>(AUDCLNT_BUFFERFLAGS_SILENT);
+            silent = false;
+        }
         if (data && !silent && count > 0 && g_meteredChannels.load() == 2) {
             ProcessStream(self, reinterpret_cast<float*>(data), count);
         }
+    } else if (TailStream* tail = TailStreamOf(self)) {
+        if (frames) flags = ProcessTailStream(self, *tail, frames, flags);
     }
     return g_releaseBufferOriginal(self, frames, flags);
 }
@@ -700,6 +802,28 @@ std::string Fixed(double value, int decimals) {
     char text[32];
     std::snprintf(text, sizeof(text), "%.*f", decimals, value);
     return text;
+}
+
+void ExpectTailStreams(bool expected) {
+    std::lock_guard<std::mutex> guard(g_streamLock);
+    g_tailExpected = expected;
+}
+
+void ForgetTailStreams() {
+    std::lock_guard<std::mutex> guard(g_streamLock);
+    g_tailExpected = false;
+    g_tailMissed = false;
+    g_tailCount = 0;  // a render client's address may serve again: none is remembered past its mix
+    for (TailStream& stream : g_tailStreams) {
+        stream.render = nullptr;
+        stream.client = nullptr;
+    }
+}
+
+bool TailStreamsClaimed() { return g_tailCount.load() > 0 && !g_tailMissed.load(); }
+
+int MainStreamRate() {
+    return g_meteredRender.load() != nullptr && g_meteredChannels.load() == 2 ? g_meteredRate.load() : 0;
 }
 
 }  // namespace detail

@@ -57,6 +57,8 @@ public:
     void BeforeStream(const float* samples, size_t frames, int channels, int sampleRate, float playerVolume);
     // The equalizer stage for ApplyCurve, at the stream's rate.
     SampleStage* StreamStage(int sampleRate);
+    // The same equalizer for a second stereo stream that plays at the same time, on a thread of its own (AutoMix).
+    SampleStage* SecondStreamStage(int sampleRate);
     // After the gain, the equalizer and the knee: the analysis sees what is heard, slider at full.
     void AfterStream(const float* samples, size_t frames, int channels, int sampleRate, float playerVolume);
 
@@ -71,6 +73,7 @@ public:
 private:
     AudioEngine& m_engine;
     EqStage m_streamEq;
+    EqStage m_secondEq;
     EqStage m_objectEq;
     LiveLoudness m_streamLoudness;
     LiveLoudness m_objectLoudness;

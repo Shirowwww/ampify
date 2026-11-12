@@ -45,6 +45,7 @@ void EqStage::Run(const void* key, float* interleaved, size_t frames, int channe
 SamplePath::SamplePath(AudioEngine& engine)
     : m_engine(engine),
       m_streamEq(engine.Eq(), kStreamEqProcessors),
+      m_secondEq(engine.Eq(), kStreamEqProcessors),
       m_objectEq(engine.Eq(), ObjectPass::kMaxObjects),
       m_streamLoudness(kStartSampleRate, 2),
       m_objectLoudness(kStartSampleRate, 1) {}
@@ -60,6 +61,11 @@ void SamplePath::BeforeStream(const float* samples, size_t frames, int channels,
 SampleStage* SamplePath::StreamStage(int sampleRate) {
     m_streamEq.SetSampleRate(sampleRate);
     return &m_streamEq;
+}
+
+SampleStage* SamplePath::SecondStreamStage(int sampleRate) {
+    m_secondEq.SetSampleRate(sampleRate);
+    return &m_secondEq;
 }
 
 void SamplePath::AfterStream(const float* samples, size_t frames, int channels, int sampleRate, float playerVolume) {

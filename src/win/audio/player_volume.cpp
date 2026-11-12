@@ -37,6 +37,7 @@ SetVolume_t g_setVolumeOriginal = nullptr;
 
 std::atomic<float> g_playerVolume{1.0f};      // last volume Apple Music set on the player
 std::atomic<bool> g_playerVolumeSeen{false};  // once true, the player's volume replaces the stored one
+std::atomic<float> g_storedVolume{1.0f};      // the slider's gain in Apple's preferences, 1 until read
 
 // The player Apple Music set a volume on last. Retained, and changed only under g_playerLock.
 std::mutex g_playerLock;
@@ -65,9 +66,9 @@ bool Resolve(const char* name, void* out) {
 }
 
 // Observes the volume Apple Music sets on its player. The volume itself is passed through unchanged, so
-// the slider does not move; only during an AutoMix mix is it scaled by the mix's share of the current song.
+// the slider does not move.
 void __cdecl SetVolume_Hook(void* player, float volume) {
-    g_setVolumeOriginal(player, volume * detail::AutoMixMainGain(player));
+    g_setVolumeOriginal(player, volume);
 
     g_playerVolume = volume;
     g_playerVolumeSeen = true;
@@ -126,16 +127,7 @@ bool HookPlayerVolume() {
     return true;
 }
 
-float LastPlayerVolume() { return g_playerVolume.load(); }
-
-bool PlayerVolumeSeen() { return g_playerVolumeSeen.load(); }
-
-void SetPlayerVolumeDirect(void* player, float volume) {
-    static const SetVolume_t direct = detail::FromAddress<SetVolume_t>(reinterpret_cast<void*>(
-        GetProcAddress(GetModuleHandleW(L"AVFoundationCF.dll"), "AVCFPlayerSetVolume")));
-    SetVolume_t setVolume = g_setVolumeOriginal ? g_setVolumeOriginal : direct;
-    if (setVolume) setVolume(player, volume);
-}
+float LastPlayerVolume() { return g_playerVolumeSeen.load() ? g_playerVolume.load() : g_storedVolume.load(); }
 
 void PublishStoredVolume() {
     static bool resolved = ResolveStoredVolume();
@@ -148,6 +140,7 @@ void PublishStoredVolume() {
                   g_stored.NumberGetValue(value, kCFNumberDoubleType, &gain) != 0;
     g_release(value);
     if (!number || g_playerVolumeSeen.load()) return;
+    g_storedVolume = static_cast<float>(gain);
     audio::ProcessAudio().PublishPlayerVolume(gain);
     if (!noted) Note("volume read from Apple Music's preferences: " + Fixed(gain, 3));
     noted = true;

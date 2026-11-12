@@ -35,7 +35,8 @@ Json SongJson(const std::optional<AutoMixSong>& song) {
                              {"id", song->id.empty() ? Json() : Json(song->id)},
                              {"storefront", song->storefront.empty() ? Json() : Json(song->storefront)},
                              {"time", Num(song->time)},
-                             {"duration", Num(song->duration)}});
+                             {"duration", Num(song->duration)},
+                             {"atmos", song->atmos ? Json(*song->atmos) : Json()}});
 }
 
 std::string StateJson(const AutoMixState& state) {
@@ -43,7 +44,7 @@ std::string StateJson(const AutoMixState& state) {
     Json::Object mixJson{{"phase", Json(std::string(automix::PhaseName(mix.phase)))},
                          {"next", mix.next.empty() ? Json() : Json(mix.next)},
                          {"reason", mix.reason.empty() ? Json() : Json(mix.reason)},
-                         {"stepErrorMs", Num(mix.alignErrorMs)},
+                         {"stepErrorDb", Num(mix.copyErrorDb)},
                          {"seeks", Json(static_cast<double>(mix.seeks))}};
     Json::Object out{{"available", Json(state.available)},
                      {"playing", Json(state.playing)},

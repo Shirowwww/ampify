@@ -1,0 +1,18 @@
+Signalsmith Stretch and the part of Signalsmith Linear it needs, vendored unchanged (both MIT).
+
+signalsmith-stretch.h
+  source: https://github.com/Signalsmith-Audio/signalsmith-stretch
+  commit: 88061fd4eda56a2353c5d65c74aa3f4ccf76f9da ("Bump Linear version", 2026-10-22)
+  licence: LICENSE-stretch.txt
+
+signalsmith-linear/stft.h, signalsmith-linear/fft.h
+  source: https://github.com/Signalsmith-Audio/linear
+  commit: 7bb1c8f36794d6980080ce817c91f8da8fe56a66 (tag 0.6.6, the version signalsmith-stretch's CMakeLists.txt asks for)
+  licence: LICENSE-linear.txt
+
+sha256 of each vendored file, identical to those commits:
+  45a0b93b1e00257014d48e7ae494ec4e604f56b4ee15189a355cd9794653a37d  signalsmith-stretch.h
+  c186bb805ba931c16b8da98eb1ccf66afa28117c18d3a31223948013ad88d0c8  signalsmith-linear/stft.h
+  af0df3ff84c6f69ec00f09e0e53634b7ccacd3198a4acb2b482cb7d93854d207  signalsmith-linear/fft.h
+  16bf62d475af149d96a24853e77c9e0d939259a9d55b23b41da7f9939db85085  LICENSE-stretch.txt
+  a91f5703b0f5fa22e8c14a8bd854559a7c512bbe58656ea8bdcd4964e923ab2f  LICENSE-linear.txt

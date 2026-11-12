@@ -20,6 +20,9 @@ struct AutoMixSong {
     std::string storefront;  // the store it plays from, as Apple numbers it (143442 for France), or empty
     double time = 0;         // seconds into the song (0 for the next song)
     double duration = 0;     // seconds, 0 while unknown
+    // It goes out in Dolby Atmos, which no mix can take: unknown until Apple's player has loaded its tracks, which
+    // it does when the song starts.
+    std::optional<bool> atmos;
 };
 
 struct AutoMixState {

@@ -110,7 +110,7 @@ type AudioAnalysis = {
 };
 type EqBand = { frequency: number; gainDb: number; q: number; type: "peaking" | "lowshelf" | "highshelf" };
 // name: the song's stream address without its query, what a plan's `next` gives
-type AutoMixSong = { name: string; id: string | null; storefront: string | null; time: number; duration: number };
+type AutoMixSong = { name: string; id: string | null; storefront: string | null; time: number; duration: number; atmos: boolean | null };
 type AutoMixPhase = "idle" | "waiting" | "preparing" | "aligning" | "ready" | "taking over" | "mixing" | "recovering" |
   "done" | "failed";
 type AutoMixState = {
@@ -118,10 +118,17 @@ type AutoMixState = {
   playing: boolean;
   current: AutoMixSong | null;
   next: AutoMixSong | null;
-  mix: { phase: AutoMixPhase; next: string | null; reason: string | null; stepErrorMs: number | null; seeks: number };
+  mix: { phase: AutoMixPhase; next: string | null; reason: string | null; stepErrorDb: number | null; seeks: number };
 };
-// keys: [time in the current song, its volume, the next song's volume], from [t, 1, 0] to [t2, 0, 1]
-type AutoMixPlan = { next: string; bStart: number; keys: [number, number, number][] };
+// keys: [time in the current song, its volume, the next song's volume], from [t, 1, 0] to [t2, 0, 1], or the same
+// with the bass of each song (1 kept, 0 taken away). rate: the current song's speed in the mix, reached from rateFrom
+type AutoMixPlan = {
+  next: string;
+  bStart: number;
+  keys: ([number, number, number] | [number, number, number, number, number])[];
+  rate?: number;
+  rateFrom?: number;
+};
 type ExtractedColors = {
   PROMINENT: string;
   VIBRANT: string;

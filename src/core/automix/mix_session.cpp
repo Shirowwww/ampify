@@ -8,16 +8,21 @@ namespace {
 
 bool Running(Phase phase) { return phase != Phase::Idle && phase != Phase::Done && phase != Phase::Failed; }
 
-// Phases where both players may be heard: a failure there fades back instead of cutting.
+// Phases where the deck's copy may be heard: a failure there fades back instead of cutting.
 bool Audible(Phase phase) { return phase == Phase::TakingOver || phase == Phase::Mixing; }
 
-constexpr double kSeekSafety = 1.0;     // no seek of the second player closer than this to the mix
+constexpr double kSeekSafety = 1.0;     // no seek of the second player closer than this to the takeover
+constexpr double kAlignSafety = 0.2;    // the deck must have found Apple's sound this long before it
 constexpr double kMaxLatency = 1.0;     // a seek that lands later than this tells nothing about the next one
 constexpr int kLatencyMemory = 8;
-constexpr double kStallSeconds = 1.5;   // Apple's player not moving for this long: paused or stuck
+constexpr double kStallSeconds = 1.5;   // a player not moving for this long: paused or stuck
 constexpr double kSwitchMargin = 0.5;   // Apple's player still on A this long after the switch point: it will not
 constexpr double kMaxSwitchDelay = 0.25;  // a later start of B is a stall, not the player's usual delay
-constexpr double kSwitchSlack = 0.1;      // Apple's player on B this long before the switch point: the user skipped
+constexpr double kSwitchSlack = 0.2;      // Apple's player on B this long before the switch point: the user skipped
+
+constexpr DeckGains kApplesAlone{1, 0, 1, 1};
+
+double Lerp(double from, double to, double t) { return from + (to - from) * t; }
 
 }  // namespace
 
@@ -42,7 +47,7 @@ std::string MixSession::Start(const MixPlan& plan, double aDuration, double bDur
     if (!problem.empty()) return problem;
     std::lock_guard<std::mutex> guard(m_lock);
     if (Audible(m_status.phase) || m_status.phase == Phase::Recovering) return "a mix is playing";
-    // A plan whose mix has not begun is replaced: its second player is silent, nothing is heard.
+    // A plan whose mix has not begun is replaced: nothing of its second player is heard.
     if (m_ghostOn) m_decks.StopGhost();
     if (m_armed) m_decks.Disarm(true);
     m_ghostOn = m_armed = m_lagMeasured = false;
@@ -52,10 +57,8 @@ std::string MixSession::Start(const MixPlan& plan, double aDuration, double bDur
     m_status.next = plan.next;
     m_cancel.reset();
     m_phaseSince = -1;
-    m_lastA = NAN;
-    m_lastAMoved = -1;
-    m_lastGhost = NAN;
-    m_lastGhostMoved = -1;
+    m_lastA = m_lastGhost = m_lastHeard = NAN;
+    m_lastAMoved = m_lastHeardMoved = -1;
     return {};
 }
 
@@ -97,15 +100,17 @@ void MixSession::Enter(Phase phase, double now) {
     m_phaseSince = now;
 }
 
-void MixSession::Gain(double main, double ghost) {
-    m_gains = {main, ghost};
-    m_decks.SetGains(main, ghost);
+void MixSession::Gain(const DeckGains& gains) {
+    m_gains = gains;
+    m_decks.SetGains(gains);
 }
 
 bool MixSession::SwitchedOnPlan() {
     if (!m_decks.MainOnNext()) return false;
-    std::optional<double> ghost = m_decks.GhostTime();  // A's time: Apple's player leaves A at the first key
-    return ghost && *ghost >= m_plan.keys.front().at - kSwitchSlack;
+    // A's time: Apple's player leaves A at the first key. A deck that lost its place no longer tells it: the last
+    // time it gave stands, or B, switched on the plan, would go back to its start.
+    const double heard = m_decks.HeardTime().value_or(m_lastHeard);
+    return heard >= m_plan.keys.front().at - kSwitchSlack;
 }
 
 void MixSession::LetGo() {
@@ -124,79 +129,90 @@ void MixSession::Fail(const std::string& reason, double now, bool quick) {
         m_armed = false;
     }
     if (Audible(m_status.phase)) {
-        // Something of the second player is heard: back to Apple's player alone without a jump. Before the switch
-        // both play A in step, so the crossing is short; after it the second player's A fades out under B.
+        // The deck's copy is heard: back to Apple's player alone without a jump. Before the switch both play A, so
+        // the crossing is short; after it the deck's A fades out under B.
         m_recoverFrom = m_gains;
         m_recoverSeconds = quick ? kQuickRecoverSeconds : switched ? kRecoverSeconds : kTakeOverSeconds;
         Enter(Phase::Recovering, now);
         return;
     }
     LetGo();
-    Gain(1, 0);
+    Gain(kApplesAlone);
     Enter(Phase::Failed, now);
 }
 
+// The second player is sent ahead of Apple's by what the plan needs; it lands m_latency behind its target.
 void MixSession::SeekNow(double aTime, double now) {
-    m_seekOffset = m_latency;  // the second player wants A's very time; it lands m_latency behind its target
-    m_decks.SeekGhost(aTime + m_seekOffset);
-    m_lastSeek = now;
+    m_wantedLead = LeadFor(m_plan) + kLeadSlack;
+    m_decks.SeekGhost(aTime + m_wantedLead + m_latency);
+    m_lastSeek = m_lastCheck = now;
     m_status.seeks++;
 }
 
-// The second player against Apple's, both on A: the gap between them. Empty when a clock is unknown.
-std::optional<double> MixSession::AlignError() {
-    std::optional<double> ghost = m_decks.GhostTime();
-    std::optional<double> a = m_decks.MainTime();
-    if (!ghost || !a) return std::nullopt;
-    double error = *ghost - *a;
-    m_status.alignErrorMs = error * 1000;
-    return error;
-}
-
-// Half a second into the mix, B's clock against A's (carried by the second player) says how late Apple's player
-// started B: B was sought m_armedDelay further, so it stands at bStart + m_armedDelay + (time since the switch -
-// the delay). The status keeps what the compensation left over.
-void MixSession::LearnSwitchDelay(double sinceSwitch) {
-    std::optional<double> b = m_decks.MainTime();
-    if (!b) return;
-    double delay = sinceSwitch - (*b - (m_plan.bStart + m_armedDelay));
+// Apple's player leaves a silence between A's last sample and B's first: B was sought m_armedDelay further to make
+// up for it. The deck counts that silence in samples; the status keeps what was not made up for.
+void MixSession::LearnSwitchDelay() {
+    const std::optional<double> gap = m_decks.SwitchGap();
+    if (!gap) return;
+    m_lagMeasured = true;
+    const double delay = *gap + kUnseenDelay;
     m_status.switchLagMs = (delay - m_armedDelay) * 1000;
     if (!(delay >= 0 && delay < kMaxSwitchDelay)) return;
     m_switchDelay = (m_switchDelay * m_switchDelaySamples + delay) / (m_switchDelaySamples + 1);
     m_switchDelaySamples = std::min(m_switchDelaySamples + 1, kLatencyMemory);
 }
 
+// A's time at which the deck's copy starts to replace Apple's.
+double MixSession::TakeAt() const { return CarryFrom(m_plan) - kTakeOverLead; }
+
+// The second player far enough ahead for the plan, and not further than what the deck keeps.
+bool MixSession::LeadFits(double lead) const {
+    return lead >= LeadFor(m_plan) && lead <= MostLead(m_plan) - kLeadSlack;
+}
+
 void MixSession::TickAligning(double now, double aTime) {
-    const double first = m_plan.keys.front().at;
-    if (now - m_lastSeek < kSettle) return;
-    std::optional<double> error = AlignError();
-    if (!error) return;
-    // Seeks land a few milliseconds apart: a mix should not fail for want of luck. Within 3 ms the two copies of A
-    // cross in 0.1 s without a sound of their own.
-    const int seeks = m_status.seeks;
-    const double tolerance = seeks <= kExactSeeks       ? kTolerance
-                             : seeks <= kExactSeeks + 4 ? 2 * kTolerance
-                                                        : 3 * kTolerance;
-    if (std::abs(*error) <= tolerance) {
-        if (!m_armed) {
-            m_armedDelay = m_switchDelay;
-            if (!m_decks.ArmSwitch(first, m_plan.bStart + m_armedDelay)) {
-                return Fail("Apple's player refused the switch", now);
-            }
+    const double takeAt = TakeAt();
+    if (now - m_lastSeek < kSettle || now - m_lastCheck < kRetry) return;
+    m_lastCheck = now;
+    std::optional<DeckStep> step = m_decks.Align();
+    if (!step) {
+        // Silence, or a seek that has not landed yet: the search is tried again until time runs out.
+        if (aTime > takeAt - kAlignSafety) return Fail("the second player could not be put in step", now);
+        return;
+    }
+    m_status.leadSeconds = step->lead;
+    if (!LeadFits(step->lead)) {
+        const double landed = m_latency + (m_wantedLead - step->lead);  // how far behind its target the seek landed
+        if (landed > 0 && landed < kMaxLatency) m_latency = landed;
+        if (m_status.seeks >= kMaxSeeks || aTime > takeAt - kSeekSafety) {
+            return Fail("the second player could not be put in step", now);
         }
-        m_armed = true;
+        return SeekNow(aTime, now);
+    }
+    m_armedDelay = m_switchDelay;
+    if (!m_decks.ArmSwitch(SwitchTime(m_plan), m_plan.bStart + m_armedDelay)) {
+        return Fail("Apple's player refused the switch", now);
+    }
+    m_armed = true;
+    Enter(Phase::Ready, now);
+}
+
+void MixSession::TickReady(double now, double aTime) {
+    if (m_decks.NextItem() != m_plan.next) return Fail("the queue changed", now);
+    const double takeAt = TakeAt();
+    if (now - m_lastCheck >= kRetry) {
         m_lastCheck = now;
-        return Enter(Phase::Ready, now);
+        m_status.copyErrorDb = m_decks.CopyErrorDb();
+        // A stream that dropped a block: the deck looks for Apple's sound again while nothing of it is heard.
+        if (m_status.copyErrorDb > kMaxCopyErrorDb) {
+            const std::optional<DeckStep> step = m_decks.Align();
+            if (step && !LeadFits(step->lead)) return Fail("the second player drifted", now);
+            if (step) m_status.copyErrorDb = NAN;
+        }
     }
-    double landed = m_seekOffset - *error;  // how far behind its target this seek landed
-    if (landed > 0 && landed < kMaxLatency) {
-        m_latency = (m_latency * m_latencySamples + landed) / (m_latencySamples + 1);
-        m_latencySamples = std::min(m_latencySamples + 1, kLatencyMemory);
-    }
-    if (m_status.seeks >= kMaxSeeks || aTime > first - kSeekSafety) {
-        return Fail("the second player could not be put in step", now);
-    }
-    SeekNow(aTime, now);
+    if (aTime < takeAt) return;
+    if (m_status.copyErrorDb > kMaxCopyErrorDb) return Fail("the second player drifted", now);
+    Enter(Phase::TakingOver, now);
 }
 
 void MixSession::TickLocked(double now) {
@@ -210,22 +226,27 @@ void MixSession::TickLocked(double now) {
     }
     if (phase == Phase::Recovering) {
         double p = std::clamp((now - m_phaseSince) / m_recoverSeconds, 0.0, 1.0);
-        Gain(m_recoverFrom.a + (1 - m_recoverFrom.a) * p, m_recoverFrom.b * (1 - p));
+        Gain({Lerp(m_recoverFrom.main, 1, p), m_recoverFrom.tail * (1 - p), Lerp(m_recoverFrom.mainLow, 1, p),
+              m_recoverFrom.tailLow});
         if (p < 1) return;
         LetGo();
+        Gain(kApplesAlone);
         return Enter(Phase::Failed, now);
     }
-    // While it is heard, the second player carries A: frozen, A falls silent and the mix would never end.
+    // While it is heard, the deck carries A: starved of the second player's sound, A falls silent and its time
+    // stands still.
     if (Audible(phase)) {
-        std::optional<double> ghost = m_decks.GhostTime();
-        if (m_lastGhostMoved < 0 || (ghost && *ghost != m_lastGhost)) {
-            m_lastGhost = ghost.value_or(NAN);
-            m_lastGhostMoved = now;
-        } else if (now - m_lastGhostMoved > kStallSeconds) {
+        std::optional<double> heard = m_decks.HeardTime();
+        if (!heard) return Fail("the second player stopped", now, true);
+        if (m_lastHeardMoved < 0 || *heard != m_lastHeard) {
+            m_lastHeard = *heard;
+            m_lastHeardMoved = now;
+        } else if (now - m_lastHeardMoved > kStallSeconds) {
             return Fail("the second player stopped", now, true);
         }
     }
     const double first = m_plan.keys.front().at;
+    const double takeAt = TakeAt();
     std::optional<double> a = m_decks.MainTime();  // A until the switch, then B
     if (a) {
         if (m_lastAMoved < 0 || *a != m_lastA) m_lastAMoved = now;
@@ -239,16 +260,21 @@ void MixSession::TickLocked(double now) {
         case Phase::Waiting:
             if (m_decks.NextItem() != m_plan.next) return Fail("the queue changed", now);
             if (!a) return;
-            if (*a > first - kSeekSafety - kSettle) return Fail("too late for this mix", now);
-            if (*a < first - kPrepareLead) return;
-            if (!m_decks.StartGhost()) return Fail("the second player did not start", now);
+            // The deck finds Apple's sound only once Apple's player reaches what the second player, sent ahead,
+            // played first: the lead is waited for, on top of the second player's start.
+            if (*a > takeAt - kSeekSafety - kSettle - LeadFor(m_plan) - kLeadSlack) {
+                return Fail("too late for this mix", now);
+            }
+            if (*a < takeAt - kPrepareLead - LeadFor(m_plan)) return;
+            if (!m_decks.StartGhost(m_plan)) return Fail("the second player did not start", now);
             m_ghostOn = true;
             m_lastGhost = NAN;
             return Enter(Phase::Preparing, now);
         case Phase::Preparing: {
-            // Seeks are measured once the second player plays: its first start takes far longer than a seek.
+            // The second player's first start takes far longer than a seek, and it must be seen to play into its
+            // own stream before anything of it may sound.
             std::optional<double> ghost = m_decks.GhostTime();
-            if (ghost && !std::isnan(m_lastGhost) && *ghost > m_lastGhost && a) {
+            if (ghost && !std::isnan(m_lastGhost) && *ghost > m_lastGhost && a && m_decks.GhostCaptured()) {
                 SeekNow(*a, now);
                 return Enter(Phase::Aligning, now);
             }
@@ -259,46 +285,29 @@ void MixSession::TickLocked(double now) {
         case Phase::Aligning:
             if (a) TickAligning(now, *a);
             return;
-        case Phase::Ready: {
-            if (m_decks.NextItem() != m_plan.next) return Fail("the queue changed", now);
-            if (!a) return;
-            if (now - m_lastCheck >= 0.5) {
-                m_lastCheck = now;
-                std::optional<double> error = AlignError();
-                if (error && std::abs(*error) > 3 * kTolerance) {
-                    if (*a > first - 2 * kSeekSafety || m_status.seeks >= kMaxSeeks) {
-                        return Fail("the second player drifted", now);
-                    }
-                    SeekNow(*a, now);
-                    return Enter(Phase::Aligning, now);
-                }
-            }
-            if (*a >= first - kTakeOverLead) return Enter(Phase::TakingOver, now);
+        case Phase::Ready:
+            if (a) TickReady(now, *a);
             return;
-        }
         case Phase::TakingOver: {
-            // Both players on A in step: a straight crossfade leaves the sound unchanged.
+            // Both copies of A, sample for sample: a straight crossfade leaves the sound unchanged.
             double p = std::clamp((now - m_phaseSince) / kTakeOverSeconds, 0.0, 1.0);
-            Gain(1 - p, p);
+            Gain({1 - p, p, 1, 1});
             if (p < 1) return;
             if (m_decks.MainOnNext()) return Enter(Phase::Mixing, now);
-            std::optional<double> ghost = m_decks.GhostTime();
-            if (ghost && *ghost > first + kSwitchMargin) return Fail("Apple's player did not switch", now);
+            std::optional<double> heard = m_decks.HeardTime();
+            if (heard && *heard > first + kSwitchMargin) return Fail("Apple's player did not switch", now);
             return;
         }
         case Phase::Mixing: {
             if (!m_decks.MainOnNext()) return Fail("Apple's player left the next song", now);
-            std::optional<double> ghost = m_decks.GhostTime();  // A's time, carried by the second player
-            if (!ghost) return;
-            if (!m_lagMeasured && now - m_phaseSince >= kLagSettle) {
-                m_lagMeasured = true;
-                LearnSwitchDelay(*ghost - first);
-            }
-            Gains gains = GainsAt(m_plan.keys, *ghost);
-            Gain(gains.b, gains.a);
-            if (*ghost < m_plan.keys.back().at) return;
+            std::optional<double> heard = m_decks.HeardTime();  // A's time, carried by the deck
+            if (!heard) return;
+            if (!m_lagMeasured) LearnSwitchDelay();
+            Gains gains = GainsAt(m_plan.keys, *heard);
+            Gain({gains.b, gains.a, gains.bLow, gains.aLow});
+            if (*heard < m_plan.keys.back().at) return;
             LetGo();
-            Gain(1, 0);
+            Gain(kApplesAlone);
             return Enter(Phase::Done, now);
         }
         default:
