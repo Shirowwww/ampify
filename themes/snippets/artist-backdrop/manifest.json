@@ -2,20 +2,20 @@
   "$schema": "../../../schemas/manifest.schema.json",
   "id": "artist-backdrop",
   "name": "Artist backdrop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "kind": "snippet",
   "author": "Shirowwww",
-  "description": "Blurs and darkens the large picture or video behind an artist's page, so the name, the buttons and the shelves on top of it read clearly. Soft, medium or strong.",
+  "description": "Blurs and darkens the large picture behind an artist's page so the text on it reads clearly, with a blur of its own for ordinary pages (a photo and a round portrait) and for featured ones made full screen (Eminem, The Weeknd).",
   "translations": {
-    "fr": {"name": "Fond d'artiste", "description": "Floute et assombrit la grande photo ou la vidéo derrière la page d'un artiste, pour que le nom, les boutons et les rayons posés dessus se lisent bien. Léger, moyen ou fort.", "settings": {"look": "Intensité"}, "options": {"Soft": "Léger", "Medium": "Moyen", "Strong": "Fort"}},
-    "de": {"name": "Künstlerhintergrund", "description": "Macht das große Bild oder Video hinter einer Künstlerseite unscharf und dunkler, damit Name, Schaltflächen und Regale darüber gut lesbar sind. Leicht, mittel oder stark.", "settings": {"look": "Stärke"}, "options": {"Soft": "Leicht", "Medium": "Mittel", "Strong": "Stark"}},
-    "es": {"name": "Fondo de artista", "description": "Desenfoca y oscurece la gran foto o el vídeo detrás de la página de un artista, para que el nombre, los botones y las secciones encima se lean bien. Suave, medio o fuerte.", "settings": {"look": "Intensidad"}, "options": {"Soft": "Suave", "Medium": "Medio", "Strong": "Fuerte"}},
-    "pt": {"name": "Fundo do artista", "description": "Desfoca e escurece a grande foto ou o vídeo atrás da página de um artista, para que o nome, os botões e as seções por cima fiquem legíveis. Suave, médio ou forte.", "settings": {"look": "Intensidade"}, "options": {"Soft": "Suave", "Medium": "Médio", "Strong": "Forte"}},
-    "ru": {"name": "Фон исполнителя", "description": "Размывает и затемняет большое фото или видео за страницей исполнителя, чтобы имя, кнопки и разделы поверх него хорошо читались. Слабо, средне или сильно.", "settings": {"look": "Сила"}, "options": {"Soft": "Слабо", "Medium": "Средне", "Strong": "Сильно"}},
-    "ja": {"name": "アーティストの背景", "description": "アーティストページの後ろにある大きな写真や動画をぼかして暗くし、上に重なる名前、ボタン、棚を読みやすくします。弱、中、強。", "settings": {"look": "強さ"}, "options": {"Soft": "弱", "Medium": "中", "Strong": "強"}},
-    "zh": {"name": "艺人背景", "description": "把艺人页面后面的大照片或视频模糊并调暗，让上面的名字、按钮和栏目清晰可读。轻、中或强。", "settings": {"look": "强度"}, "options": {"Soft": "轻", "Medium": "中", "Strong": "强"}},
-    "it": {"name": "Sfondo dell'artista", "description": "Sfoca e scurisce la grande foto o il video dietro la pagina di un artista, perché il nome, i pulsanti e le sezioni sopra si leggano bene. Leggero, medio o forte.", "settings": {"look": "Intensità"}, "options": {"Soft": "Leggero", "Medium": "Medio", "Strong": "Forte"}},
-    "ko": {"name": "아티스트 배경", "description": "아티스트 페이지 뒤의 큰 사진이나 동영상을 흐리고 어둡게 해서, 위에 놓인 이름과 버튼, 섹션이 잘 읽히게 합니다. 약하게, 중간, 강하게.", "settings": {"look": "강도"}, "options": {"Soft": "약하게", "Medium": "중간", "Strong": "강하게"}}
+    "fr": {"name": "Fond d'artiste", "description": "Floute et assombrit la grande photo derrière la page d'un artiste pour que le texte se lise bien, avec un flou à part pour les pages ordinaires (photo et portrait rond) et pour les pages mises en avant, en plein écran (Eminem, The Weeknd).", "settings": {"ordinary-blur": "Flou des pages ordinaires (pixels)", "featured-blur": "Flou des pages mises en avant (pixels)", "darken": "Assombrir (%)", "hide-portrait": "Masquer le portrait rond"}},
+    "de": {"name": "Künstlerhintergrund", "description": "Macht das große Bild hinter einer Künstlerseite unscharf und dunkler, damit der Text lesbar ist, mit eigener Unschärfe für gewöhnliche Seiten (Foto und rundes Porträt) und für hervorgehobene im Vollbild (Eminem, The Weeknd).", "settings": {"ordinary-blur": "Unschärfe gewöhnlicher Seiten (Pixel)", "featured-blur": "Unschärfe hervorgehobener Seiten (Pixel)", "darken": "Abdunkeln (%)", "hide-portrait": "Rundes Porträt ausblenden"}},
+    "es": {"name": "Fondo de artista", "description": "Desenfoca y oscurece la gran foto detrás de la página de un artista para que el texto se lea bien, con un desenfoque propio para las páginas comunes (foto y retrato redondo) y para las destacadas a pantalla completa (Eminem, The Weeknd).", "settings": {"ordinary-blur": "Desenfoque de páginas comunes (píxeles)", "featured-blur": "Desenfoque de páginas destacadas (píxeles)", "darken": "Oscurecer (%)", "hide-portrait": "Ocultar el retrato redondo"}},
+    "pt": {"name": "Fundo do artista", "description": "Desfoca e escurece a grande foto atrás da página de um artista para que o texto fique legível, com desfoque próprio para páginas comuns (foto e retrato redondo) e para as em destaque, em tela cheia (Eminem, The Weeknd).", "settings": {"ordinary-blur": "Desfoque das páginas comuns (pixels)", "featured-blur": "Desfoque das páginas em destaque (pixels)", "darken": "Escurecer (%)", "hide-portrait": "Ocultar o retrato redondo"}},
+    "ru": {"name": "Фон исполнителя", "description": "Размывает и затемняет большое фото за страницей исполнителя, чтобы текст читался, с отдельным размытием для обычных страниц (фото и круглый портрет) и для особых, во весь экран (Eminem, The Weeknd).", "settings": {"ordinary-blur": "Размытие обычных страниц (пиксели)", "featured-blur": "Размытие особых страниц (пиксели)", "darken": "Затемнение (%)", "hide-portrait": "Скрыть круглый портрет"}},
+    "ja": {"name": "アーティストの背景", "description": "アーティストページの後ろにある大きな写真をぼかして暗くし、文字を読みやすくします。通常のページ（写真と丸い肖像）と全画面の特集ページ（Eminem、The Weeknd）でぼかしを別々に設定できます。", "settings": {"ordinary-blur": "通常のページのぼかし（ピクセル）", "featured-blur": "特集ページのぼかし（ピクセル）", "darken": "暗さ（%）", "hide-portrait": "丸い肖像を隠す"}},
+    "zh": {"name": "艺人背景", "description": "模糊并调暗艺人页面后面的大照片，让文字清晰可读；普通页面（照片加圆形头像）和全屏精选页面（Eminem、The Weeknd）可分别设置模糊程度。", "settings": {"ordinary-blur": "普通页面模糊（像素）", "featured-blur": "精选页面模糊（像素）", "darken": "调暗（%）", "hide-portrait": "隐藏圆形头像"}},
+    "it": {"name": "Sfondo dell'artista", "description": "Sfoca e scurisce la grande foto dietro la pagina di un artista perché il testo si legga bene, con una sfocatura propria per le pagine normali (foto e ritratto rotondo) e per quelle in evidenza a schermo intero (Eminem, The Weeknd).", "settings": {"ordinary-blur": "Sfocatura pagine normali (pixel)", "featured-blur": "Sfocatura pagine in evidenza (pixel)", "darken": "Scurisci (%)", "hide-portrait": "Nascondi il ritratto rotondo"}},
+    "ko": {"name": "아티스트 배경", "description": "아티스트 페이지 뒤의 큰 사진을 흐리고 어둡게 해서 글자가 잘 읽히게 합니다. 일반 페이지(사진과 둥근 초상)와 전체 화면 특별 페이지(Eminem, The Weeknd)의 흐림을 따로 정할 수 있습니다.", "settings": {"ordinary-blur": "일반 페이지 흐림(픽셀)", "featured-blur": "특별 페이지 흐림(픽셀)", "darken": "어둡게(%)", "hide-portrait": "둥근 초상 숨기기"}}
   },
   "kitApi": "1.0",
   "minAmpify": "1.4.0",
@@ -25,6 +25,9 @@
     "layout"
   ],
   "settings": [
-    {"key": "look", "label": "Strength", "type": "choice", "options": ["Soft", "Medium", "Strong"], "default": "Medium"}
+    {"key": "ordinary-blur", "label": "Blur on ordinary pages (pixels)", "type": "number", "min": 0, "max": 40, "default": 20},
+    {"key": "featured-blur", "label": "Blur on featured pages (pixels)", "type": "number", "min": 0, "max": 40, "default": 0},
+    {"key": "darken", "label": "Darken (%)", "type": "number", "min": 0, "max": 80, "default": 35},
+    {"key": "hide-portrait", "label": "Hide the round portrait", "type": "toggle", "default": false}
   ]
 }

@@ -801,7 +801,9 @@ A theme can create its own roles (`--font-lyrics`). Extensions read them with `A
   empty and the element disappears. The picture behind an artist's page (`.page-background`) is one. Blur it from
   above instead, with a `backdrop` on the next layer up, as the
   [`artist-backdrop`](../../themes/snippets/artist-backdrop/) snippet does:
-  `.page-background:has(ArtistPageBackgroundView) + ListView { backdrop: acrylic(#000000, 0.45); }`.
+  `.page-background:has(ArtistPageBackgroundView) + ListView { backdrop: liquid-glass(#000000, 0.35, 20px, 1); }`
+  (`liquid-glass` takes a blur radius, `acrylic` keeps Windows' own). An ordinary artist page holds the round
+  portrait's image, `#CircleArtworkImage #StaticArtwork`; a featured one, made full screen, does not.
 - `overflow: hidden` cuts what spills out of an element (a child moved by `transform`, a decorative image); many of
   Apple's panels already cut their children. `clip-path: inset(0 0 40px 0)` cuts 40 pixels off the bottom. The clip
   follows the element's size. Only rectangles: no `round`, `circle()` or `polygon()` (use `corner-radius`).

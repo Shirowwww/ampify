@@ -1,24 +1,30 @@
-/* Artist backdrop: the large picture Apple lays behind an artist's page, seen through a dark frosted veil, so the
-   name, the buttons and the shelves on top of it read clearly. The picture stays there as a mood. Apple draws that
-   picture straight on the compositor, out of reach of `filter`: the veil is the page's own list, the next layer up,
-   and blurs what lies behind it. Only on an artist's page. The look setting picks how dark: soft, medium or strong. */
+/* Artist backdrop: the large picture Apple lays behind an artist's page, blurred and darkened so the name, the
+   buttons and the shelves on top of it read clearly, with a blur of its own for each kind of page. Apple has two: an
+   ordinary page puts the photo behind the page and a round portrait in the middle; a featured page (Eminem,
+   The Weeknd) is made for it, the picture full screen with no portrait, sometimes a logo for the name. Apple builds
+   the portrait's image only on an ordinary page, which tells them apart. Apple draws the picture straight on the
+   compositor, out of reach of `filter`: the glass is the page's own list, the next layer up, and blurs what lies
+   behind it (saturation 1 keeps the picture's colours). A blur of 0 leaves that kind of page as Apple draws it. */
 
 :root {
-    --backdrop-veil: 0.45;
+    --backdrop-tint: calc(var(--setting-darken) / 100);
 }
 
-@setting look = Soft {
-    :root {
-        --backdrop-veil: 0.25;
+@setting ordinary-blur != 0 {
+    .page-background:has(ArtistPageBackgroundView) + ListView:has(#CircleArtworkImage #StaticArtwork) {
+        backdrop: liquid-glass(#000000, var(--backdrop-tint), var(--setting-ordinary-blur), 1);
     }
 }
 
-@setting look = Strong {
-    :root {
-        --backdrop-veil: 0.65;
+@setting featured-blur != 0 {
+    .page-background:has(ArtistPageBackgroundView) + ListView:not(:has(#CircleArtworkImage #StaticArtwork)) {
+        backdrop: liquid-glass(#000000, var(--backdrop-tint), var(--setting-featured-blur), 1);
     }
 }
 
-.page-background:has(ArtistPageBackgroundView) + ListView {
-    backdrop: acrylic(#000000, var(--backdrop-veil));
+/* The portrait faded out, not collapsed: its room keeps the name low on the picture, as on a featured page. */
+@setting hide-portrait {
+    #ArtistDetailHeaderContent #CircleArtworkImage {
+        opacity: 0;
+    }
 }
