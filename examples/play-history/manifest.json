@@ -1,0 +1,36 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "play-history",
+  "name": "Play history",
+  "version": "1.0.0",
+  "kind": "app",
+  "author": "Shirowwww",
+  "description": "Every song played on this PC, newest first, stations such as Discovery included: Apple Music shows no history for them. Each line opens the song in Apple Music.",
+  "translations": {
+    "fr": {"name": "Historique d'écoute", "description": "Tous les morceaux écoutés sur ce PC, du plus récent au plus ancien, stations comme Discovery comprises : Apple Music n'en garde aucun historique. Chaque ligne ouvre le morceau dans Apple Music."},
+    "de": {"name": "Wiedergabeverlauf", "description": "Alle Titel, die auf diesem PC liefen, die neuesten zuerst, auch aus Sendern wie Discovery, für die Apple Music keinen Verlauf zeigt. Jede Zeile öffnet den Titel in Apple Music."},
+    "es": {"name": "Historial de reproducción", "description": "Todas las canciones que sonaron en este PC, de la más reciente a la más antigua, incluidas emisoras como Discovery, de las que Apple Music no muestra historial. Cada línea abre la canción en Apple Music."},
+    "pt": {"name": "Histórico de reprodução", "description": "Todas as músicas tocadas neste PC, da mais recente à mais antiga, incluindo estações como Discovery, das quais o Apple Music não mostra histórico. Cada linha abre a música no Apple Music."},
+    "ru": {"name": "История прослушивания", "description": "Все треки, сыгранные на этом ПК, от новых к старым, включая станции вроде Discovery, для которых Apple Music не показывает историю. Каждая строка открывает трек в Apple Music."},
+    "ja": {"name": "再生履歴", "description": "この PC で再生したすべての曲を新しい順に表示します。Apple Music が履歴を残さない Discovery などのステーションも含みます。各行から曲を Apple Music で開けます。"},
+    "zh": {"name": "播放历史", "description": "在这台电脑上播放过的所有歌曲，从新到旧，包括 Apple Music 不显示历史的 Discovery 等电台。点击任一行即可在 Apple Music 中打开该歌曲。"},
+    "it": {"name": "Cronologia di ascolto", "description": "Tutti i brani ascoltati su questo PC, dal più recente, incluse le stazioni come Discovery, di cui Apple Music non mostra la cronologia. Ogni riga apre il brano in Apple Music."},
+    "ko": {"name": "재생 기록", "description": "이 PC에서 재생한 모든 곡을 최신순으로 보여 줍니다. Apple Music이 기록을 남기지 않는 Discovery 같은 스테이션도 포함됩니다. 각 줄을 누르면 Apple Music에서 곡이 열립니다."}
+  },
+  "kitApi": "1.0",
+  "minAmpify": "1.3.0",
+  "main": "main.js",
+  "permissions": [
+    "player.read",
+    "storage",
+    "ui.page",
+    "ui.sidebar",
+    "network:music.apple.com",
+    "network:amp-api.music.apple.com",
+    "network:itunes.apple.com"
+  ],
+  "tags": [
+    "history",
+    "stations"
+  ]
+}

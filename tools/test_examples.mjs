@@ -1307,6 +1307,294 @@ test("listening-stats opens the page of the very song, never another one of the 
     "counted before first listens were kept: the day it joined the library");
 });
 
+// ---- Play history ---------------------------------------------------------------------------------------------------
+
+// Runs play-history with a player, a queue, an iTunes search and a page whose state can be set; every call that needs
+// a permission checks it against the manifest.
+function historyAmpify({ stored = new Map(), queue = [], replies = () => ({ status: 200, text: '{"results":[]}' }), language = "en" } = {}) {
+  const { manifest, source } = load("play-history");
+  const granted = new Set(manifest.permissions ?? []);
+  const used = new Set();
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+    used.add(permission);
+  };
+  const world = { state: null, intervals: [], listeners: {}, entries: [], opened: [], gets: [], effects: [], states: new Map() };
+  const Ampify = {
+    React: {
+      h: (type, props, ...children) => ({ type, props: props ?? {}, children }),
+      Fragment: "fragment",
+      // The hooks of one draw, by their order: a setter changes what the next draw reads.
+      useState: (v) => {
+        const index = world.hook++;
+        if (!world.states.has(index)) world.states.set(index, v);
+        const set = (next) => world.states.set(index, typeof next === "function" ? next(world.states.get(index)) : next);
+        return [world.states.get(index), set];
+      },
+      useEffect: (fn) => world.effects.push(fn),
+    },
+    components: { Button: "Button", Card: "Card", Text: "Text" },
+    i18n: fakeI18n(language),
+    locale: "fr-FR",
+    log: () => {},
+    storage: {
+      get: (key, fallback) => (need("storage"), stored.has(key) ? structuredClone(stored.get(key)) : fallback),
+      set: (key, value) => (need("storage"), stored.set(key, structuredClone(value))),
+      remove: (key) => (need("storage"), stored.delete(key)),
+    },
+    player: {
+      state: () => (need("player.read"), world.state),
+      on: (name, fn) => (world.listeners[name] = fn),
+      queue: { list: () => (need("player.read"), { available: true, items: queue }) },
+    },
+    http: {
+      get: (url, options = {}) => {
+        need("network:" + new URL(url).host);
+        world.gets.push(url);
+        return Promise.resolve(replies(url, options.headers || {}));
+      },
+      open: (url) => (need("network:" + new URL(url).host), world.opened.push(url), true),
+    },
+    uri: { build: (kind, id, { storefront }) => `https://music.apple.com/${storefront}/${kind}/_/${id}` },
+    ui: { sidebar: { addItem: (item) => (need("ui.sidebar"), world.entries.push(item)) }, navigate: () => {} },
+    onStop: () => {},
+  };
+  const context = { Ampify, setInterval: (fn, ms) => world.intervals.push({ fn, ms }) - 1, clearInterval: () => {}, setTimeout: () => 0, clearTimeout: () => {} };
+  runIn(source, context);
+  const tick = (times = 1) => {
+    for (let i = 0; i < times; i++) world.intervals.find((interval) => interval.ms === 5000).fn();
+  };
+  // The page drawn once, its function components expanded; the hooks start again at each draw.
+  const expand = (node) => {
+    if (!node || typeof node !== "object") return node;
+    if (typeof node.type === "function") return expand(node.type({ ...node.props, children: node.children }));
+    return { ...node, children: node.children.flat().map(expand) };
+  };
+  const draw = () => {
+    need("ui.page");  // the app's page itself, drawn through render()
+    world.effects = [];
+    world.hook = 0;
+    return expand(context.render());
+  };
+  return { manifest, context, world, stored, used, tick, draw };
+}
+
+const historyTexts = (node, out = []) => {
+  if (!node || typeof node !== "object") return (typeof node === "string" && out.push(node), out);
+  node.children.forEach((child) => historyTexts(child, out));
+  return out;
+};
+const nodeCount = (node) => (!node || typeof node !== "object" ? 0 : 1 + node.children.reduce((sum, child) => sum + nodeCount(child), 0));
+const findNodes = (node, test, out = []) => {
+  if (!node || typeof node !== "object") return out;
+  if (test(node)) out.push(node);
+  node.children.forEach((child) => findNodes(child, test, out));
+  return out;
+};
+
+test("play-history lists a song once it has played 10 seconds, each play on its own line, newest first", () => {
+  const fake = historyAmpify();
+  const { world, stored, tick } = fake;
+  assert.equal(world.entries[0].label, "Play history");
+  const track = { id: "t-1", queueItemId: 11, title: "Lucid Dreams", artist: "Juice WRLD", album: "Goodbye", artworkColor: "#112233" };
+  world.state = { playing: true, positionMs: 0, track };
+  tick();
+  assert.equal(stored.get("entries"), undefined, "5 seconds: skipped at once, not a listen");
+  tick();
+  assert.equal(stored.get("entries").length, 1);
+  tick(10);
+  assert.equal(stored.get("entries").length, 1, "listed once per play");
+  assert.deepEqual(Object.keys(stored.get("entries")[0]).sort(), ["album", "artist", "at", "color", "title"]);
+
+  world.state = { playing: false, positionMs: 60000, track: { ...track, queueItemId: 12, title: "Paused" } };
+  tick(4);
+  assert.equal(stored.get("entries").length, 1, "a paused song is not heard");
+
+  // A station: the next song comes with a new queue entry.
+  world.listeners.trackchange();
+  world.state = { playing: true, positionMs: 0, track: { id: "t-2", queueItemId: 13, title: "Next", artist: "Someone" } };
+  tick(2);
+  assert.deepEqual(stored.get("entries").map((entry) => entry.title), ["Next", "Lucid Dreams"]);
+
+  // Repeat one: back at its start without a track change, a new listen.
+  world.state = { playing: true, positionMs: 150000, track: world.state.track };
+  tick();
+  world.state = { playing: true, positionMs: 2000, track: world.state.track };
+  tick(2);
+  assert.deepEqual(stored.get("entries").map((entry) => entry.title), ["Next", "Next", "Lucid Dreams"]);
+});
+
+test("play-history started again in the middle of a song it listed does not list it twice", () => {
+  const song = { title: "Boss", artist: "Makala", album: "Chaos Kiss" };
+  const stored = new Map([["entries", [{ ...song, at: Date.now() - 70000 }]]]);
+  const fake = historyAmpify({ stored });  // an element restarts when one of Ampify's settings changes
+  fake.world.state = { playing: true, positionMs: 80000, track: { id: "t-1", queueItemId: 5, ...song } };
+  fake.tick(4);
+  assert.equal(fake.stored.get("entries").length, 1);
+
+  // The same song played again from its start, long after: a new listen.
+  const later = historyAmpify({ stored: new Map([["entries", [{ ...song, at: Date.now() - 400000 }]]]) });
+  later.world.state = { playing: true, positionMs: 0, track: { id: "t-1", queueItemId: 6, ...song } };
+  later.tick(2);
+  assert.equal(later.stored.get("entries").length, 2);
+});
+
+test("play-history keeps the catalog id of the queue's current song, never another one's", () => {
+  const queue = [{ section: "history", title: "Old", catalogId: "1" }, { section: "current", title: "Lucid Dreams", catalogId: "1446390" }];
+  const fake = historyAmpify({ queue });
+  fake.world.state = { playing: true, positionMs: 0, track: { id: "t-1", queueItemId: 1, title: "Lucid Dreams", artist: "Juice WRLD" } };
+  fake.tick(2);
+  assert.equal(fake.stored.get("entries")[0].catalogId, "1446390");
+
+  const other = historyAmpify({ queue });
+  other.world.state = { playing: true, positionMs: 0, track: { id: "t-2", queueItemId: 2, title: "Another", artist: "X" } };
+  other.tick(2);
+  assert.equal(other.stored.get("entries")[0].catalogId, undefined, "the queue's current item is another song");
+});
+
+const historyEntries = () => new Map([["entries", [
+  { title: "Capuche", artist: "Ninho", album: "A", at: 3000 },
+  { title: "Lucid Dreams", artist: "Juice WRLD", album: "B", at: 2000, catalogId: "42" },
+]]]);
+const historyFlush = async () => {
+  for (let i = 0; i < 10; i++) await settle();
+};
+
+test("play-history finds covers in the iTunes search when the web player gives no token, and opens them", async () => {
+  const hit = (trackName, artistName, trackId) => ({
+    wrapperType: "track", trackName, artistName, trackId,
+    artworkUrl100: `https://is1-ssl.mzstatic.com/image/thumb/${trackId}/100x100bb.jpg`,
+    trackViewUrl: `https://music.apple.com/fr/album/a/1?i=${trackId}`,
+  });
+  const replies = (url) => (url.startsWith("https://music.apple.com/") ? { status: 0, text: "" } : {
+    status: 200,
+    text: JSON.stringify({ results: url.includes("lookup?id=42") ? [hit("Lucid Dreams", "Juice WRLD", 42)]
+      : [hit("Capuche", "Someone Else", 7), hit("Capuche", "Zola & Ninho", 8)] }),
+  });
+  const fake = historyAmpify({ stored: historyEntries(), replies });
+  fake.draw();
+  fake.world.effects.forEach((effect) => effect());
+  await historyFlush();
+  const searches = fake.world.gets.filter((url) => url.startsWith("https://itunes.apple.com/"));
+  assert.equal(fake.world.gets.filter((url) => url.startsWith("https://music.apple.com/")).length, 1, "the page read once");
+  assert.ok(searches.length === 2 && searches.every((url) => url.includes("country=fr")), "the store of the Windows region");
+  const [capuche, lucid] = fake.stored.get("entries");
+  assert.equal(capuche.link, "https://music.apple.com/fr/album/a/1?i=8", "the song by its artist, credited with another");
+  assert.equal(capuche.cover, "https://is1-ssl.mzstatic.com/image/thumb/8/120x120bb.jpg");
+  assert.equal(lucid.link, "https://music.apple.com/fr/album/a/1?i=42");
+
+  const page = fake.draw();
+  findNodes(page, (node) => node.type === "Card")[0].props.onClick();
+  assert.deepEqual(fake.world.opened, ["https://music.apple.com/fr/album/a/1?i=8"]);
+  const asked = fake.world.gets.length;
+  fake.world.effects.forEach((effect) => effect());
+  await historyFlush();
+  assert.equal(fake.world.gets.length, asked, "asked once per start");
+});
+
+test("play-history asks Apple Music's catalog with the web player's token, the iTunes search when it fails", async () => {
+  const headers = [];
+  const song = (id, name, artistName) => ({
+    id: String(id),
+    attributes: { name, artistName, url: `https://music.apple.com/fr/album/x/1?i=${id}`,
+                  artwork: { url: `https://is1-ssl.mzstatic.com/image/thumb/${id}/{w}x{h}bb.jpg` } },
+  });
+  const replies = (url, sent) => {
+    if (url === "https://music.apple.com/us/search") return { status: 200, text: '<script src="/assets/index~a1-b2.js">' };
+    if (url.startsWith("https://music.apple.com/assets/")) return { status: 200, text: 'x="eyJhbGc.eyJpc3M.sig-1"' };
+    if (url.startsWith("https://amp-api.music.apple.com/")) {
+      headers.push(sent);
+      if (url.includes("/songs/42")) return { status: 500, text: "" };
+      return { status: 200, text: JSON.stringify({ results: { songs: { data: [song(7, "Capuche", "Other"), song(8, "Capuche", "Ninho")] } } }) };
+    }
+    return { status: 200, text: JSON.stringify({ results: [{ trackName: "Lucid Dreams", artistName: "Juice WRLD", trackId: 42,
+      artworkUrl100: "https://is1-ssl.mzstatic.com/image/thumb/42/100x100bb.jpg", trackViewUrl: "https://music.apple.com/fr/album/b/2?i=42" }] }) };
+  };
+  const fake = historyAmpify({ stored: historyEntries(), replies });
+  fake.draw();
+  fake.world.effects.forEach((effect) => effect());
+  await historyFlush();
+  assert.equal(fake.world.gets.filter((url) => url === "https://music.apple.com/us/search").length, 1, "one read of the token for both");
+  assert.ok(fake.world.gets.some((url) => url.startsWith("https://amp-api.music.apple.com/v1/catalog/fr/search?types=songs")));
+  assert.deepEqual({ ...headers[0] }, { Authorization: "Bearer eyJhbGc.eyJpc3M.sig-1", Origin: "https://music.apple.com" });
+  const [capuche, lucid] = fake.stored.get("entries");
+  assert.equal(capuche.cover, "https://is1-ssl.mzstatic.com/image/thumb/8/120x120bb.jpg");
+  assert.equal(capuche.link, "https://music.apple.com/fr/album/x/1?i=8");
+  assert.equal(lucid.link, "https://music.apple.com/fr/album/b/2?i=42", "the catalog failed: the iTunes lookup");
+  assert.equal(fake.stored.get("webToken").token, "eyJhbGc.eyJpc3M.sig-1", "kept for the next pages");
+
+  fake.world.state = { playing: true, positionMs: 0, track: { id: "t-9", queueItemId: 9, title: "New", artist: "Someone" } };
+  fake.tick(2);
+  findNodes(fake.draw(), (node) => node.type === "Card")[1].props.onClick();
+  assert.deepEqual([...fake.used].sort(), [...fake.manifest.permissions].sort(), "exactly the permissions it declares");
+});
+
+test("play-history takes the cover of the very album when the song came out more than once", async () => {
+  const song = (id, album) => ({
+    id: String(id),
+    attributes: { name: "Capuche", artistName: "Ninho", albumName: album, url: `https://music.apple.com/fr/album/x/1?i=${id}`,
+                  artwork: { url: `https://is1-ssl.mzstatic.com/image/thumb/${id}/{w}x{h}bb.jpg` } },
+  });
+  const replies = (url) => {
+    if (url === "https://music.apple.com/us/search") return { status: 200, text: '<script src="/assets/index~a1-b2.js">' };
+    if (url.startsWith("https://music.apple.com/assets/")) return { status: 200, text: 'x="eyJhbGc.eyJpc3M.sig-1"' };
+    return { status: 200, text: JSON.stringify({ results: { songs: { data: [song(7, "Capuche - Single"), song(8, "A")] } } }) };
+  };
+  const fake = historyAmpify({ stored: new Map([["entries", [{ title: "Capuche", artist: "Ninho", album: "A", at: 3000 }]]]), replies });
+  fake.draw();
+  fake.world.effects.forEach((effect) => effect());
+  await historyFlush();
+  assert.equal(fake.stored.get("entries")[0].cover, "https://is1-ssl.mzstatic.com/image/thumb/8/120x120bb.jpg");
+});
+
+test("play-history does not ask again in the same start for a song no search finds", async () => {
+  const fake = historyAmpify({ stored: historyEntries() });  // no token, and no hit in the iTunes search
+  fake.draw();
+  fake.world.effects.forEach((effect) => effect());
+  await historyFlush();
+  const asked = fake.world.gets.length;
+  assert.ok(asked > 0);
+  fake.draw();
+  fake.world.effects.forEach((effect) => effect());
+  await historyFlush();
+  assert.equal(fake.world.gets.length, asked, "asked once per start");
+  assert.equal(fake.stored.get("entries")[0].cover, undefined);
+});
+
+test("play-history shows a page of 30 lines under their day, under 300 nodes, and clears only on a second click", () => {
+  const now = Date.now();
+  const entries = Array.from({ length: 1000 }, (_, i) => ({ title: "Song " + i, artist: "Artist", album: "Album", at: now - i * 3600000 }));
+  const fake = historyAmpify({ stored: new Map([["entries", entries]]) });
+  let page = fake.draw();
+  assert.ok(nodeCount(page) < 300, "the interface takes 300 nodes at most");
+  let texts = historyTexts(page);
+  assert.ok(texts.includes("Today") && texts.includes("Song 0") && texts.includes("Song 29") && !texts.includes("Song 30"));
+  assert.ok(texts.includes("1–30 of 1000"));
+  const button = (label) => findNodes(page, (node) => node.type === "Button" && node.props.label === label)[0];
+  assert.equal(button("Newer").props.disabled, true);
+  button("Older").props.onClick();
+  page = fake.draw();
+  texts = historyTexts(page);
+  assert.ok(texts.includes("Song 30") && texts.includes("31–60 of 1000"));
+
+  button("Clear the history").props.onClick();
+  page = fake.draw();
+  assert.equal(fake.stored.get("entries").length, 1000, "the first click only asks");
+  button("Click again to clear").props.onClick();
+  assert.deepEqual(fake.stored.get("entries"), []);
+  assert.ok(historyTexts(fake.draw()).some((text) => text.startsWith("Nothing yet")));
+});
+
+test("play-history has every string in all ten languages", () => {
+  const fake = historyAmpify({ language: "fr" });
+  const { tables } = fake.context.Ampify.i18n;
+  for (const code of ["en", ...languages]) {
+    assert.deepEqual(Object.keys(tables[code]).sort(), Object.keys(tables.en).sort(), code);
+    if (code !== "en") assert.ok(fake.manifest.translations[code].name && fake.manifest.translations[code].description, code);
+  }
+  assert.equal(fake.world.entries[0].label, "Historique d'écoute");
+});
+
 // ---- Sleep timer and keyboard shortcuts ---------------------------------------------------------------------------
 
 // Runs an example with a player that records its commands, the timers it sets and its notifications.
