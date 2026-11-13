@@ -32,8 +32,9 @@ Register-Case -Id 'extension-hello' -Title 'hello-extension started in AppleMusi
         $started = Wait-Journal -FileName 'AppleMusic.log' -Text 'Extension hello-extension started' -TimeoutSeconds 60
         Add-Check -Ctx $Ctx -Name 'AppleMusic.log: hello-extension started' -Passed $started
 
-        $retained = Test-JournalContains -FileName 'AppleMusic.log' -Text 'JavaScript elements accepted: 1'
-        Add-Check -Ctx $Ctx -Name 'AppleMusic.log: one JavaScript element accepted' -Passed $retained
+        # Now Playing and Time on hover come from the catalog at the first start (1.4.0): the count varies with it.
+        $retained = Test-JournalContains -FileName 'AppleMusic.log' -Text ', rejected: 0'
+        Add-Check -Ctx $Ctx -Name 'AppleMusic.log: no JavaScript element rejected' -Passed $retained
 
         $greeted = Wait-Journal -FileName 'AppleMusic.log' -Text '[hello-extension] Hello, launch #1' -TimeoutSeconds 30
         Add-Check -Ctx $Ctx -Name 'AppleMusic.log: message from hello-extension' -Passed $greeted
