@@ -1,0 +1,30 @@
+{
+  "$schema": "../../../schemas/manifest.schema.json",
+  "id": "artist-backdrop",
+  "name": "Artist backdrop",
+  "version": "1.0.0",
+  "kind": "snippet",
+  "author": "Shirowwww",
+  "description": "Blurs and darkens the large picture or video behind an artist's page, so the name, the buttons and the shelves on top of it read clearly. Soft, medium or strong.",
+  "translations": {
+    "fr": {"name": "Fond d'artiste", "description": "Floute et assombrit la grande photo ou la vidéo derrière la page d'un artiste, pour que le nom, les boutons et les rayons posés dessus se lisent bien. Léger, moyen ou fort.", "settings": {"look": "Intensité"}, "options": {"Soft": "Léger", "Medium": "Moyen", "Strong": "Fort"}},
+    "de": {"name": "Künstlerhintergrund", "description": "Macht das große Bild oder Video hinter einer Künstlerseite unscharf und dunkler, damit Name, Schaltflächen und Regale darüber gut lesbar sind. Leicht, mittel oder stark.", "settings": {"look": "Stärke"}, "options": {"Soft": "Leicht", "Medium": "Mittel", "Strong": "Stark"}},
+    "es": {"name": "Fondo de artista", "description": "Desenfoca y oscurece la gran foto o el vídeo detrás de la página de un artista, para que el nombre, los botones y las secciones encima se lean bien. Suave, medio o fuerte.", "settings": {"look": "Intensidad"}, "options": {"Soft": "Suave", "Medium": "Medio", "Strong": "Fuerte"}},
+    "pt": {"name": "Fundo do artista", "description": "Desfoca e escurece a grande foto ou o vídeo atrás da página de um artista, para que o nome, os botões e as seções por cima fiquem legíveis. Suave, médio ou forte.", "settings": {"look": "Intensidade"}, "options": {"Soft": "Suave", "Medium": "Médio", "Strong": "Forte"}},
+    "ru": {"name": "Фон исполнителя", "description": "Размывает и затемняет большое фото или видео за страницей исполнителя, чтобы имя, кнопки и разделы поверх него хорошо читались. Слабо, средне или сильно.", "settings": {"look": "Сила"}, "options": {"Soft": "Слабо", "Medium": "Средне", "Strong": "Сильно"}},
+    "ja": {"name": "アーティストの背景", "description": "アーティストページの後ろにある大きな写真や動画をぼかして暗くし、上に重なる名前、ボタン、棚を読みやすくします。弱、中、強。", "settings": {"look": "強さ"}, "options": {"Soft": "弱", "Medium": "中", "Strong": "強"}},
+    "zh": {"name": "艺人背景", "description": "把艺人页面后面的大照片或视频模糊并调暗，让上面的名字、按钮和栏目清晰可读。轻、中或强。", "settings": {"look": "强度"}, "options": {"Soft": "轻", "Medium": "中", "Strong": "强"}},
+    "it": {"name": "Sfondo dell'artista", "description": "Sfoca e scurisce la grande foto o il video dietro la pagina di un artista, perché il nome, i pulsanti e le sezioni sopra si leggano bene. Leggero, medio o forte.", "settings": {"look": "Intensità"}, "options": {"Soft": "Leggero", "Medium": "Medio", "Strong": "Forte"}},
+    "ko": {"name": "아티스트 배경", "description": "아티스트 페이지 뒤의 큰 사진이나 동영상을 흐리고 어둡게 해서, 위에 놓인 이름과 버튼, 섹션이 잘 읽히게 합니다. 약하게, 중간, 강하게.", "settings": {"look": "강도"}, "options": {"Soft": "약하게", "Medium": "중간", "Strong": "강하게"}}
+  },
+  "kitApi": "1.0",
+  "minAmpify": "1.4.0",
+  "preview": "preview.jpg",
+  "tags": [
+    "artwork",
+    "layout"
+  ],
+  "settings": [
+    {"key": "look", "label": "Strength", "type": "choice", "options": ["Soft", "Medium", "Strong"], "default": "Medium"}
+  ]
+}

@@ -1,0 +1,24 @@
+/* Artist backdrop: the large picture Apple lays behind an artist's page, seen through a dark frosted veil, so the
+   name, the buttons and the shelves on top of it read clearly. The picture stays there as a mood. Apple draws that
+   picture straight on the compositor, out of reach of `filter`: the veil is the page's own list, the next layer up,
+   and blurs what lies behind it. Only on an artist's page. The look setting picks how dark: soft, medium or strong. */
+
+:root {
+    --backdrop-veil: 0.45;
+}
+
+@setting look = Soft {
+    :root {
+        --backdrop-veil: 0.25;
+    }
+}
+
+@setting look = Strong {
+    :root {
+        --backdrop-veil: 0.65;
+    }
+}
+
+.page-background:has(ArtistPageBackgroundView) + ListView {
+    backdrop: acrylic(#000000, var(--backdrop-veil));
+}

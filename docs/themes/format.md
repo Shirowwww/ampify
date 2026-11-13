@@ -797,6 +797,11 @@ A theme can create its own roles (`--font-lyrics`). Extensions read them with `A
   no composition layer of its own, or the value is refused. A filtered element is drawn again on every frame it
   changes (twice with `edges()`): filter a column, a panel or the artwork of the song playing, not every row of a
   long list.
+- What Apple draws straight on the compositor, with no XAML element under it, cannot be filtered: the copy comes out
+  empty and the element disappears. The picture behind an artist's page (`.page-background`) is one. Blur it from
+  above instead, with a `backdrop` on the next layer up, as the
+  [`artist-backdrop`](../../themes/snippets/artist-backdrop/) snippet does:
+  `.page-background:has(ArtistPageBackgroundView) + ListView { backdrop: acrylic(#000000, 0.45); }`.
 - `overflow: hidden` cuts what spills out of an element (a child moved by `transform`, a decorative image); many of
   Apple's panels already cut their children. `clip-path: inset(0 0 40px 0)` cuts 40 pixels off the bottom. The clip
   follows the element's size. Only rectangles: no `round`, `circle()` or `polygon()` (use `corner-radius`).
