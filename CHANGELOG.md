@@ -4,10 +4,10 @@
 
 AutoMix, steadier lyrics, and an Ampify that does less while nothing changes.
 
-- AutoMix (off by default, Settings > Ampify): each song flows into the next. It reads Apple's analysis of both
-  songs and mixes on the beat when the tempos are close, swaps on a bar or crossfades when they are not. Albums in
-  order, classical music and "repeat one" keep Apple's gapless playback, and Dolby Atmos songs are left alone. It is
-  young, and the mixes will keep getting better. Extensions can plan their own with `Ampify.automix`.
+- AutoMix, in the Marketplace: each song flows into the next. It reads Apple's analysis of both songs and mixes on
+  the beat when the tempos are close, swaps on a bar or crossfades when they are not. Albums in order, classical music
+  and "repeat one" keep Apple's gapless playback, and Dolby Atmos songs are left alone. It is young, and the mixes
+  will keep getting better. Extensions can plan their own with `Ampify.automix`.
 - Lyrics in the full-screen player no longer settle a line too low before each new line, and the Song panel lights a
   whole line at once, as Apple's own pane does.
 - The settings page orders the entries Ampify, its apps and the extensions add to the sidebar, as it already did for
