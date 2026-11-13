@@ -8,6 +8,7 @@ The accent colour you pick now reaches every button, and the Song panel's lyrics
   chosen accent, and follow it when it changes, instead of staying in Apple Music's blue.
 - The Song panel's lyrics scroll with the wheel only once the pointer has rested on them for a second: before that,
   the wheel scrolls the panel, so passing over the lyrics no longer moves them.
+- A setting's slider shows and saves 0.329 instead of 0.32900000000000007.
 
 ## 1.4.0 (2026-11-13)
 

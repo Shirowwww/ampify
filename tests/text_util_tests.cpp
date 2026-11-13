@@ -91,6 +91,14 @@ TEST_CASE(TextUtil_ShortestNumberTextKeepsTheTextOfBothOldFormatters) {
     CHECK(ampify::ShortestNumberText(-0.0) == "0");
 }
 
+TEST_CASE(TextUtil_RoundToStepDropsTheSlidersNoise) {
+    CHECK(ampify::ShortestNumberText(ampify::RoundToStep(0.32900000000000007, 0.0095)) == "0.329");
+    CHECK(ampify::ShortestNumberText(ampify::RoundToStep(0.30000000000000004, 0.01)) == "0.3");
+    CHECK(ampify::ShortestNumberText(ampify::RoundToStep(42.000000001, 1)) == "42");
+    CHECK(ampify::ShortestNumberText(ampify::RoundToStep(1.5, 0.1)) == "1.5");
+    CHECK(ampify::RoundToStep(0.123456, 0) == 0.123456);  // no step: as it is
+}
+
 TEST_CASE(TextUtil_CompareDottedVersionsAgreesWithTheReleaseComparison) {
     const char* corpus[] = {"0.10.0", "0.9.0", "v1.2.3", "1.2.3", "1.2", "1.2.0", "0.1.0", "0.2.0", "1.1.1", "1.10.0",
                             "1.9.0",  "V2.0",  "",      "1.",    ".1",  "1..2",  "1.2-rc1", "10.0.0", "9.99.99"};

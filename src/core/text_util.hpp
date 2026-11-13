@@ -43,6 +43,10 @@ std::string_view ClipUtf8(std::string_view text, size_t maxBytes);
 // 9e15 is written in full, never with an exponent.
 std::string ShortestNumberText(double value);
 
+// `value` kept to the decimals a slider's `step` can tell apart: a slider gives 0.32900000000000007 for 0.329, which
+// ShortestNumberText would write in full. A step of 0 or less leaves the value as it is.
+double RoundToStep(double value, double step);
+
 // The form of a setting key, [a-z0-9][a-z0-9-]{0,31}: the manifest declares it, a theme's @setting block names it,
 // the settings page writes it. Here so that the CSS parser reads it without the manifest.
 bool IsSettingKey(std::string_view key);

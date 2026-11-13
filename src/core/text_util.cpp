@@ -120,6 +120,14 @@ std::string ShortestNumberText(double value) {
     return error == std::errc() ? std::string(buffer, end) : std::to_string(value);
 }
 
+double RoundToStep(double value, double step) {
+    if (!(step > 0) || !std::isfinite(value)) return value;
+    constexpr int kMaxDecimals = 9;
+    int decimals = std::clamp(static_cast<int>(std::ceil(-std::log10(step) - 1e-9)), 0, kMaxDecimals);
+    double scale = std::pow(10.0, decimals);
+    return std::round(value * scale) / scale;
+}
+
 bool IsSettingKey(std::string_view key) {
     constexpr size_t kMaxSettingKey = 32;
     const auto lowerOrDigit = [](char c) { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9'); };

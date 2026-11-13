@@ -222,7 +222,8 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
     if (shared.probe.slider) slider.Style(shared.probe.slider);
     slider.Minimum(low);
     slider.Maximum(high);
-    slider.StepFrequency(whole ? 1.0 : (high - low) / 100);
+    const double step = whole ? 1.0 : (high - low) / 100;
+    slider.StepFrequency(step);
     slider.Width(kSliderWidth);
     slider.Value(std::strtod(start.c_str(), nullptr));
     slider.VerticalAlignment(xaml::VerticalAlignment::Center);
@@ -233,7 +234,7 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
         if (i18n::UsesDecimalComma()) std::replace(text.begin(), text.end(), '.', ',');
         return Wide(text);
     };
-    controls::TextBlock reading = MakeText(shown(slider.Value()).c_str(), "body", false, &shared.probe);
+    controls::TextBlock reading = MakeText(shown(RoundToStep(slider.Value(), step)).c_str(), "body", false, &shared.probe);
     reading.Width(kReadingWidth);
     reading.TextAlignment(xaml::TextAlignment::Right);
     reading.VerticalAlignment(xaml::VerticalAlignment::Center);
@@ -250,7 +251,7 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
     auto last = std::make_shared<std::string>(start);
     // The value is kept aside rather than read from the slider: a weak reference to it would never resolve, and a
     // strong one in the timer would make a cycle with the slider's own handler.
-    auto moved = std::make_shared<double>(slider.Value());
+    auto moved = std::make_shared<double>(RoundToStep(slider.Value(), step));
     UiService::Shared* owner = &shared;
     rest.Tick([owner, target, key = spec.key, last, moved](auto const&, auto const&) noexcept {
         try {
@@ -262,11 +263,11 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
             // A handler runs inside Apple Music's XAML frame: nothing may escape it.
         }
     });
-    slider.ValueChanged([rest, reading, shown, moved](IInspectable const&,
-                                                      primitives::RangeBaseValueChangedEventArgs const& args) noexcept {
+    slider.ValueChanged([rest, reading, shown, moved, step](IInspectable const&,
+                                                            primitives::RangeBaseValueChangedEventArgs const& args) noexcept {
         try {
-            *moved = args.NewValue();
-            reading.Text(shown(args.NewValue()));
+            *moved = RoundToStep(args.NewValue(), step);
+            reading.Text(shown(*moved));
             rest.Stop();
             rest.Start();
         } catch (...) {
