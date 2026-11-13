@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "hover-time",
   "name": "Time on hover",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Shows the time of the song under the pointer on the progress line, with a thin marker where it falls, as Spotify does.",
