@@ -26,8 +26,13 @@ const CROSSFADE_S = 6;
 const MIN_CROSSFADE_S = 3;
 const MAX_CROSSFADE_S = 12;
 const OWN_FADE_S = 4;             // a song quiet for this long at its end fades out by itself; less is a last note dying
-const SWAP_IN_S = 0.06;          // in a swap on a bar, the next song goes from silence to full in this long...
-const SWAP_AHEAD_S = 0.02;        // ...and is in full this long before the bar, so its first beat is heard whole
+const SWAP_IN_S = 0.06;          // in a swap on a bar, the next song's intro needs at least this long to come in...
+const SWAP_AHEAD_S = 0.02;        // ...and it is in full this long before the bar, so its first beat is heard whole
+const SWAP_INTRO_GAIN = 0.6;      // the next song's intro, under the current song's last bar
+const SWAP_OUT_GAIN = 0.7;        // the current song as the next one's first bar lands, then it fades out
+const SWAP_TAIL_BARS = 0.75;      // the current song's fade after the bar: three quarters of a bar...
+const MIN_SWAP_TAIL_S = 1;        // ...within these bounds (half a bar, 0.75 s to silence, was heard as a cut)
+const MAX_SWAP_TAIL_S = 2;
 const OVER_FADE_GAIN = 0.7;       // the next song's volume once the current one starts fading out by itself
 const QUIET_BELOW_DB = 18;        // this far below the song's loudness: silence or a fade, not the music
 const MIN_DANCEABILITY = 0.15;    // Apple scores most rap 0.1 to 0.4: higher, hardly any pair mixes on the beat
@@ -265,27 +270,34 @@ function crossfade(a, b, spanA, spanB, options) {
   return { kind: "crossfade", bars: 0, plan: { bStart: spanB.sound, keys } };
 }
 
-// A swap on a bar, for songs with a beat that cannot share a tempo: the current song loses its bass over its last
-// bar, the next one comes in at full with its first bar on that bar's end, and the current song is gone a beat later.
-// Two beats that do not agree are heard together for that one beat only. Null when the current song fades out by
-// itself (a crossfade follows that fade) or the next song has nothing before its first bar to come in from.
+// A swap on a bar, for songs with a beat that cannot share a tempo. The current song plays whole, bass included, up
+// to the end of a phrase; under its last bar the next song's intro rises without its bass; on that bar's end the
+// basses change hands and the next song's first bar lands in full, while the current song fades out, bassless, over
+// three quarters of a bar, so that nothing stops dead. Null when the current song fades out by itself (a crossfade follows that
+// fade) or the next song has nothing before its first bar to come in from.
 function barSwap(a, b, spanA, spanB, options) {
   const barsA = barsOf(a);
   const barsB = barsOf(b);
   if (beatless(a, b, barsA, barsB) || spanA.silent - spanA.end >= OWN_FADE_S) return null;
   const bar = barLength(barsA, spanA.end);
-  const tail = bar / 4;
+  const tail = Math.min(Math.max(bar * SWAP_TAIL_BARS, MIN_SWAP_TAIL_S), MAX_SWAP_TAIL_S);
   const latest = Math.min(spanA.end, a.duration - endRoom()) - tail;
-  const swapAt = barsA.findLast((time) => time <= latest);
-  const entry = barsB.find((time) => time >= spanB.start - 0.05);
-  if (swapAt === undefined || entry === undefined) return null;
+  let last = barsA.findLastIndex((time) => time <= latest);
+  const phraseEnd = phraseBars(a, barsA).filter((index) => index <= last).at(-1);
+  if (phraseEnd !== undefined && last - phraseEnd < 4) last = phraseEnd;
+  const first = barsB.findIndex((time) => time >= spanB.start - 0.05);
+  if (last < 0 || first < 0) return null;
+  const swapAt = barsA[last];
+  const entry = barsB[first];
   const lead = Math.min(bar, entry);
   const aStart = swapAt - lead;
   if (lead < SWAP_IN_S + 2 * SWAP_AHEAD_S || !(aStart > options.earliest) || !(entry + tail < b.duration)) return null;
+  const handOver = Math.min(bar / 8, lead / 2);  // the basses change hands over the last half beat
+  const intro = lead - handOver > SWAP_IN_S ? [[swapAt - handOver, 1, SWAP_INTRO_GAIN, 1, 0]] : [];
   const keys = [
-    [aStart, 1, 0, 1, 1],
-    [swapAt - SWAP_AHEAD_S - SWAP_IN_S, 1, 0, 0, 1],
-    [swapAt - SWAP_AHEAD_S, 1, 1, 0, 1],
+    [aStart, 1, 0, 1, 0],
+    ...intro,
+    [swapAt - SWAP_AHEAD_S, SWAP_OUT_GAIN, 1, 0, 1],
     [swapAt + tail, 0, 1, 0, 1],
   ];
   return { kind: "swap", bars: 0, plan: { bStart: entry - lead, keys } };

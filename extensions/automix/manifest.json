@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "automix",
   "name": "AutoMix",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Mixes each song into the next like a DJ: Apple's analysis of both songs picks the bar where the next one comes in, and Ampify keeps the two in step to the millisecond while their volumes cross.",

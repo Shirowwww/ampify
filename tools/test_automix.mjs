@@ -159,18 +159,38 @@ test("songs too far apart in tempo swap on a bar: the next song's first bar land
   const result = planMix(a, b, OPTIONS);
   assert.equal(result.kind, "swap");
   assertPlayable(result.plan, a, b);
-  const { key, from, bTime } = entryOf(result.plan);
-  const swapAt = result.plan.keys[key][0];
+  const { from } = entryOf(result.plan);
+  const landed = result.plan.keys.find((k) => k[2] === 1);
+  const swapAt = landed[0];
   const bars = a.analysis.beats.barsInMilliseconds.map((ms) => ms / 1000);
   // the next song is in full a few hundredths before the bar, so that its first beat is heard whole
   assert.ok(bars.some((t) => t >= swapAt && t - swapAt < 0.05), `the swap is at ${swapAt}`);
-  assert.ok(Math.abs(bTime - 2.5) < 0.05, `the next song is at ${bTime} then, its first bar is at 2.5`);
-  assert.equal(result.plan.keys[key][2], 1, "the next song comes in at full");
-  assert.equal(from[3], 0, "the current song has lost its bass by then");
-  assert.equal(from[2], 0);
+  const bTime = result.plan.bStart + (swapAt + 0.02 - result.plan.keys[0][0]);
+  assert.ok(Math.abs(bTime - 2.5) < 0.05, `the next song is at ${bTime} on the bar, its first bar is at 2.5`);
+  assert.equal(landed[3], 0, "the basses have changed hands by then");
+  assert.equal(landed[4], 1);
+  assert.equal(from[3], 1, "the current song keeps its bass while the next one's intro comes in");
+  assert.equal(from[4], 0, "and that intro comes in without its own");
+  const bar = 60 / 124 * 4;
+  const handOver = landed[0] - result.plan.keys[result.plan.keys.indexOf(landed) - 1][0];
+  assert.ok(handOver < bar / 4, `the basses change hands within half a beat (${handOver} s)`);
+  // Measured on 13/11/2026: a current song gone a quarter of a bar after the swap was heard as a cut.
+  assert.ok(landed[1] > 0.5, "the current song is still there when the next one lands");
   const tail = result.plan.keys.at(-1)[0] - swapAt;
-  assert.ok(tail > 0.3 && tail < 0.7, `the current song is gone a beat later (${tail} s)`);
+  assert.ok(tail >= bar * 0.75 - 0.05 && tail <= 2.05, `then it fades out over three quarters of a bar (${tail} s)`);
   assert.ok(result.plan.keys.at(-1)[0] <= 200 - 3, "and the swap leaves the kernel its room");
+});
+
+test("a swap ends the current song on a phrase when one ends within its last bars", () => {
+  const a = song({ bpm: 124, phraseEvery: 8, phraseFrom: 2 });
+  const b = song({ bpm: 138, firstBeat: 2.5, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.equal(result.kind, "swap");
+  assertPlayable(result.plan, a, b);
+  const landed = result.plan.keys.find((k) => k[2] === 1)[0] + 0.02;
+  const bars = a.analysis.beats.barsInMilliseconds.map((ms) => ms / 1000);
+  const index = bars.findIndex((t) => Math.abs(t - landed) < 0.01);
+  assert.equal((index - 2) % 8, 0, `the next song lands on the start of a phrase (bar ${index})`);
 });
 
 test("a song that fades out by itself, or hardly danceable ones, keep the crossfade", () => {
