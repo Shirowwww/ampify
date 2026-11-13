@@ -2,7 +2,8 @@
 // `filter`: XAML has no filters. The element's content is drawn into a surface of its own (Composition's visual
 // surface), filtered there (Direct2D's colour matrix, then its Gaussian blur: image_effects.*), and shown in the
 // element's place, the element itself being clipped away on screen; pointer input still goes to the element. With
-// edges, a mask shows the sharp copy in the middle and the blurred one towards the top and bottom. A blur of the
+// edges, a mask shows the blurred copy towards the top and bottom, and the element itself is left in the sharp middle
+// (a copy loses what Apple draws on its own layers: the lighting of word-by-word lyrics). A blur of the
 // backdrop instead fed back on itself over Apple's own blurred full-screen background. A transition of `filter` eases
 // the blur on the compositor's thread and crossfades a change of colours (Composition animates no colour matrix).
 
@@ -101,6 +102,8 @@ private:
         std::string text;     // as written, for Read
         std::uint64_t generation = 0;  // the write a finished easing belongs to
         bool clipPending = false;      // the copies fade in over the element, which is cut away once they have
+        // The band of the element left on screen (its sharp middle, see ClipAway), as last set; none at first.
+        winrt::Windows::Foundation::Rect kept{-1, -1, -1, -1};
         // Cut away by its XAML clip: its visual is refused (facade properties used on it), only its picture's is free.
         bool xamlClip = false;
         winrt::Microsoft::UI::Xaml::Media::RectangleGeometry xamlClipBefore{nullptr};

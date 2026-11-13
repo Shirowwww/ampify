@@ -10,6 +10,8 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <utility>
 
@@ -56,6 +58,32 @@ comp::CompositionLinearGradientBrush EdgeMask(const comp::Compositor& compositor
         mask.ColorStops().Append(compositor.CreateColorGradientStop(offset, colour));
     }
     return mask;
+}
+
+// The sharp copy's mask when the element itself shows in the middle (ClipAway): the copy only in the bands where it
+// fades into the blurred one, clear in the middle, so the element's own drawing shows there. A copy of Apple's
+// word-by-word lyrics lost the lighting of all but a line's last row.
+comp::CompositionLinearGradientBrush EdgeBandMask(const comp::Compositor& compositor, BlurEdges edges) {
+    comp::CompositionLinearGradientBrush mask = compositor.CreateLinearGradientBrush();
+    mask.StartPoint({0, 0});
+    mask.EndPoint({0, 1});
+    const winrt::Windows::UI::Color shown{255, 0, 0, 0};
+    const winrt::Windows::UI::Color clear{0, 0, 0, 0};
+    constexpr float kStep = 0.0005f;  // two stops this close make a hard edge where the element takes over
+    const float top = edges.top;
+    const float bottom = 1.0f - edges.bottom;
+    for (auto [offset, colour] : {std::pair{0.0f, edges.top > 0 ? clear : shown}, std::pair{top, shown},
+                                  std::pair{top + kStep, clear}, std::pair{bottom - kStep, clear},
+                                  std::pair{bottom, shown}, std::pair{1.0f, edges.bottom > 0 ? clear : shown}}) {
+        mask.ColorStops().Append(compositor.CreateColorGradientStop(offset, colour));
+    }
+    return mask;
+}
+
+// The element itself shows in its sharp middle when the filter only blurs the edges: the copies are needed only where
+// it is blurred (and a colour filter must cover all of it).
+bool ShowsOwnMiddle(const ImageFilter& filter) {
+    return filter.amount > 0 && !(filter.edges == BlurEdges{}) && !filter.colours;
 }
 
 comp::CompositionMaskBrush Masked(const comp::Compositor& compositor, const comp::CompositionBrush& source,
@@ -212,19 +240,36 @@ void ElementBlur::Retry(theme::NodeId id, const xaml::FrameworkElement& element,
     });
 }
 
+// The element is cut away on screen, all of it, or all but its sharp middle (ShowsOwnMiddle). Set again only when that
+// band moves: Place calls it at each layout.
 void ElementBlur::ClipAway(Entry& entry) {
     entry.clipPending = false;
     auto clipped = entry.clipped.get();
     if (!clipped) return;
+    winrt::Windows::Foundation::Rect band{0, 0, 0, 0};  // nothing of the element shows
+    auto sized = clipped.try_as<xaml::FrameworkElement>();
+    if (sized && ShowsOwnMiddle(entry.filter)) {
+        const float width = static_cast<float>(sized.ActualWidth());
+        const float height = static_cast<float>(sized.ActualHeight());
+        const float top = std::round(height * entry.filter.edges.top);
+        const float bottom = std::round(height * (1.0f - entry.filter.edges.bottom));
+        band = {0, top, width, std::max(0.0f, bottom - top)};
+    }
+    if (band == entry.kept) return;
+    entry.kept = band;
     if (entry.xamlClip) {
-        media::RectangleGeometry none;
-        none.Rect({0, 0, 0, 0});  // nothing of the element shows
-        clipped.Clip(none);
+        media::RectangleGeometry shape;
+        shape.Rect(band);
+        clipped.Clip(shape);
         return;
     }
     comp::Visual own = xaml::Hosting::ElementCompositionPreview::GetElementVisual(clipped);
-    // A clip of no size cuts nothing: one pixel outside the element cuts it all.
-    own.Clip(own.Compositor().CreateRectangleClip(-2, -2, -1, -1));
+    if (band.Height <= 0) {
+        // A clip of no size cuts nothing: one pixel outside the element cuts it all.
+        own.Clip(own.Compositor().CreateRectangleClip(-2, -2, -1, -1));
+        return;
+    }
+    own.Clip(own.Compositor().CreateRectangleClip(band.X, band.Y, band.X + band.Width, band.Y + band.Height));
 }
 
 void ElementBlur::Sweep() noexcept {
@@ -430,10 +475,12 @@ void ElementBlur::Place(Entry& entry) {
         look.sharp.Size(size);
         look.blurred.Size(size);
     }
+    if (!entry.clipPending) ClipAway(entry);  // the element's sharp middle follows its size
 }
 
-// Unblurred, the sharp copy shows alone. Blurred without edges, the blurred one alone. With edges, the sharp copy in
-// the middle and the blurred one towards the top and bottom, the two masks adding up to the whole content.
+// Unblurred, the sharp copy shows alone. Blurred without edges, the blurred one alone. With edges, the blurred one
+// towards the top and bottom, the element itself in the middle, and the sharp copy where they meet (in the middle too
+// under a colour filter), the masks adding up to the whole content.
 void ElementBlur::Shape(Entry& entry, Look& look, BlurEdges edges) {
     comp::Compositor compositor = entry.layer.Compositor();
     if (!look.blurs) {
@@ -449,7 +496,9 @@ void ElementBlur::Shape(Entry& entry, Look& look, BlurEdges edges) {
         return;
     }
     look.sharp.IsVisible(true);
-    look.sharp.Brush(Masked(compositor, look.sharpBrush, EdgeMask(compositor, edges, true)));
+    const bool ownMiddle = look.colours.empty();  // as ShowsOwnMiddle: a colour filter covers the whole element
+    look.sharp.Brush(Masked(compositor, look.sharpBrush,
+                            ownMiddle ? EdgeBandMask(compositor, edges) : EdgeMask(compositor, edges, true)));
     look.blurred.Brush(Masked(compositor, look.blurBrush, EdgeMask(compositor, edges, false)));
 }
 
@@ -515,7 +564,7 @@ void ElementBlur::Settle(theme::NodeId id, Entry& entry) {
         m_entries.erase(id);
         return;
     }
-    if (entry.clipPending) ClipAway(entry);  // the copies cover the element now
+    ClipAway(entry);  // the copies cover the element now, or the filter's edges moved
     while (entry.looks.size() > 1) {
         entry.layer.Children().Remove(entry.looks.front().visual);
         entry.looks.erase(entry.looks.begin());

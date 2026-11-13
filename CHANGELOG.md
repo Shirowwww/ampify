@@ -9,6 +9,8 @@ The accent colour you pick now reaches every button, and the Song panel's lyrics
 - The Song panel's lyrics scroll with the wheel only once the pointer has rested on them for a second: before that,
   the wheel scrolls the panel, so passing over the lyrics no longer moves them.
 - A setting's slider shows and saves 0.329 instead of 0.32900000000000007.
+- The full-screen player's full-screen button really fills the screen, over the taskbar.
+- With Lyrics style's blur, word-by-word lyrics light the whole sung line again, not only its last row.
 
 ## 1.4.0 (2026-11-13)
 

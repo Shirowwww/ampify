@@ -219,6 +219,12 @@ Finding the window and the UI thread is in [how-it-works.md](how-it-works.md#the
 - Lyrics: a song timed by line draws each line in a `TextBlock#LineContainer`, one timed by word in a
   `Border#WordByWordHost`. Both sit in the line's `Grid#ContentGrid`, which Apple fades by state (`NotCurrent` 0.5,
   `Current` 1). The tree holds only the lines Apple Music has realized.
+- A copy of an element through a Composition visual surface (`filter`, `src/win/element_blur.cpp`) does not show
+  everything Apple draws: in a word-by-word line, the copy left every row but the last unlit. The filter now leaves the
+  element itself on screen where it is sharp, and copies it only where it blurs.
+- Apple's full-screen player filling the screen: a window that merely covers the monitor stays under the taskbar
+  (`ITaskbarList2::MarkFullscreenWindow` did not change that); WinUI's `FullScreen` presenter does it, and the
+  overlapped presenter comes back for a window.
 - First start: an MPEG LA licence (Agree, Decline, Save As) shows before the main window, then after sign-in a "Welcome
   to Apple Music" screen (Start Listening). No XAML window exists while they are open. The bench closes them through UI
   Automation.
