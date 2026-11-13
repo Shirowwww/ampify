@@ -106,9 +106,10 @@ section + section { border-top: 1px solid var(--line); }
 
 /* ---- What changes ------------------------------------------------------------------------------------------------- */
 .get { padding-block: var(--section); }
-.get-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+.get-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 36px 0; }
 .get-list li { padding: 4px 32px 8px 0; }
-.get-list li + li { padding-left: 32px; border-left: 1px solid var(--line); }
+.get-list li:not(:nth-child(3n+1)) { padding-left: 32px; border-left: 1px solid var(--line); }
 .get-list h3 { font-size: 23px; font-weight: 650; margin: 0 0 10px; }
 .get-list p { color: var(--muted); margin: 0 0 16px; }
 .get-list .fact { color: var(--ink); font: 500 13px var(--mono); }
@@ -267,9 +268,9 @@ section + section { border-top: 1px solid var(--line); }
 /* ---- Narrow screens ----------------------------------------------------------------------------------------------- */
 @media (max-width: 960px) {
   .hero, .make, .market { grid-template-columns: minmax(0, 1fr); }
-  .get-list { grid-template-columns: 1fr; }
+  .get-list { grid-template-columns: 1fr; gap: 0; }
   .get-list li { padding-right: 0; }
-  .get-list li + li { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); padding-top: 22px; margin-top: 14px; }
+  .get-list li:not(:first-child) { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); padding-top: 22px; margin-top: 14px; }
   .safe ul { grid-template-columns: 1fr; }
   .code-pair .code:nth-child(2) { margin-left: 0; }
   .detail-in { grid-template-columns: 1fr; padding: 14px; gap: 18px; }

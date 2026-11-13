@@ -8,14 +8,23 @@ en:
   get_title: What changes in Apple Music
   get:
     - name: Themes
-      text: Colors, glass panels, the artwork of the song behind everything, rounded corners, motion. Pick one in the Marketplace and it applies at once, no restart.
-      fact: 10 themes, 28 light and dark schemes
-    - name: Extensions
-      text: Your Discord status with the cover and buttons, Last.fm scrobbling, a sleep timer, global shortcuts. Each one says what it needs before you switch it on.
-      fact: Permissions shown before anything runs
-    - name: Built in
-      text: A Now Playing button that opens Apple's full-screen player with karaoke lyrics, and an Atmos leveler that brings Dolby Atmos songs to the loudness of stereo ones.
-      fact: Leveled to the stereo loudness, in LUFS
+      text: Glass panels, the song's artwork behind everything, a Windows 11 look, rounded or square corners. Pick one in the Marketplace inside Apple Music and it applies at once.
+      fact: 10 themes, 28 schemes, 11 snippets
+    - name: Discord and Last.fm
+      text: Your Discord status shows the song, its artwork and a progress bar. The scrobbler sends what you play to Last.fm.
+      fact: One click each in the Marketplace
+    - name: Apps
+      text: Pages in the sidebar for your listening stats (hours, plays, top artists, songs and albums) and for the new releases of the artists you play.
+      fact: Listening stats, New releases
+    - name: Lyrics your way
+      text: Choose how many lines show around the sung one, centre them or keep them left, blur the others or leave them sharp, on a dark or artwork background.
+      fact: In the pane and in full screen
+    - name: AutoMix
+      text: Each song flows into the next like a DJ set, on the beat when the tempos are close and with a crossfade when they are not. It is young and still getting better.
+      fact: Off by default, one switch
+    - name: Still Apple Music
+      text: Lossless, Dolby Atmos, your library and its sync, and whatever Apple adds to the app keep working. An Atmos leveler plays Atmos songs as loud as stereo ones.
+      fact: Apple's package is never changed
   market_title: The Marketplace
   market_text: Themes, snippets, extensions and apps, each with a picture of what it does. This page reads the same catalog as Apple Music, so what you see here is what you can install now.
   market_total: "{n} elements in the catalog"
@@ -39,14 +48,23 @@ fr:
   get_title: Ce qui change dans Apple Music
   get:
     - name: Thèmes
-      text: Couleurs, panneaux en verre, la pochette du morceau derrière tout, coins arrondis, mouvement. Choisissez-en un dans le Marketplace, il s'applique tout de suite, sans redémarrer.
-      fact: 10 thèmes, 28 schémas clairs et sombres
-    - name: Extensions
-      text: Votre statut Discord avec la pochette et des boutons, le scrobbling Last.fm, une minuterie de veille, des raccourcis globaux. Chacune dit ce dont elle a besoin avant d'être activée.
-      fact: Permissions affichées avant que rien ne tourne
-    - name: Intégré
-      text: Un bouton À l'écoute qui ouvre le lecteur plein écran d'Apple avec les paroles karaoké, et un niveleur qui ramène les morceaux Dolby Atmos au volume des morceaux stéréo.
-      fact: Nivelé au volume stéréo, en LUFS
+      text: Panneaux en verre, la pochette du morceau derrière tout, un style Windows 11, des coins arrondis ou carrés. Choisissez-en un dans le Marketplace, dans Apple Music, il s'applique tout de suite.
+      fact: 10 thèmes, 28 schémas, 11 snippets
+    - name: Discord et Last.fm
+      text: Votre statut Discord montre le morceau, sa pochette et une barre de progression. Le scrobbler envoie ce que vous écoutez à Last.fm.
+      fact: Un clic chacun dans le Marketplace
+    - name: Apps
+      text: Des pages dans la barre latérale pour vos statistiques d'écoute (heures, écoutes, artistes, morceaux et albums préférés) et pour les nouveautés des artistes que vous écoutez.
+      fact: Statistiques d'écoute, Nouveautés
+    - name: Les paroles à votre façon
+      text: Choisissez combien de lignes entourent celle qui est chantée, centrées ou à gauche, floutez les autres ou gardez-les nettes, sur un fond sombre ou tiré de la pochette.
+      fact: Dans le panneau et en plein écran
+    - name: AutoMix
+      text: Chaque morceau s'enchaîne dans le suivant comme un set de DJ, sur le temps quand les tempos sont proches, en fondu sinon. Il est jeune et s'améliore encore.
+      fact: Désactivé par défaut, un seul bouton
+    - name: Toujours Apple Music
+      text: Lossless, Dolby Atmos, votre bibliothèque et sa synchro, et tout ce qu'Apple ajoute à l'app continuent de marcher. Un niveleur joue les morceaux Atmos aussi fort que la stéréo.
+      fact: Le paquet d'Apple n'est jamais modifié
   market_title: Le Marketplace
   market_text: "Des thèmes, des snippets, des extensions et des apps, chacun avec une image de ce qu'il fait. Cette page lit le même catalogue qu'Apple Music, donc ce que vous voyez ici s'installe dès maintenant."
   market_total: "{n} éléments dans le catalogue"
@@ -70,14 +88,23 @@ it:
   get_title: Cosa cambia in Apple Music
   get:
     - name: Temi
-      text: Colori, pannelli di vetro, la copertina del brano dietro a tutto, angoli arrotondati, movimento. Scegline uno nel Marketplace e si applica subito, senza riavviare.
-      fact: 10 temi, 28 schemi chiari e scuri
-    - name: Estensioni
-      text: Il tuo stato su Discord con la copertina e i pulsanti, lo scrobbling su Last.fm, un timer di spegnimento, scorciatoie globali. Ognuna dice di cosa ha bisogno prima di essere attivata.
-      fact: Permessi mostrati prima che giri qualsiasi cosa
-    - name: Integrato
-      text: Un pulsante Now Playing che apre il lettore a schermo intero di Apple con i testi in stile karaoke, e un livellatore che porta i brani Dolby Atmos al volume dei brani stereo.
-      fact: Livellato al volume stereo, in LUFS
+      text: Pannelli di vetro, la copertina del brano dietro a tutto, uno stile Windows 11, angoli arrotondati o squadrati. Scegline uno nel Marketplace dentro Apple Music e si applica subito.
+      fact: 10 temi, 28 schemi, 11 snippet
+    - name: Discord e Last.fm
+      text: Il tuo stato su Discord mostra il brano, la copertina e una barra di avanzamento. Lo scrobbler invia a Last.fm quello che ascolti.
+      fact: Un clic ciascuno nel Marketplace
+    - name: App
+      text: Pagine nella barra laterale per le tue statistiche di ascolto (ore, ascolti, artisti, brani e album preferiti) e per le novità degli artisti che ascolti.
+      fact: Statistiche di ascolto, Novità
+    - name: Testi a modo tuo
+      text: Scegli quante righe mostrare intorno a quella cantata, centrate o a sinistra, sfoca le altre o lasciale nitide, su uno sfondo scuro o preso dalla copertina.
+      fact: Nel pannello e a schermo intero
+    - name: AutoMix
+      text: Ogni brano sfuma nel successivo come in un set da DJ, a tempo quando i tempi sono vicini, con una dissolvenza quando non lo sono. È giovane e migliora ancora.
+      fact: Spento di default, un solo interruttore
+    - name: Sempre Apple Music
+      text: Lossless, Dolby Atmos, la tua libreria con la sincronizzazione e tutto ciò che Apple aggiunge all'app continuano a funzionare. Un livellatore porta i brani Atmos al volume della stereo.
+      fact: Il pacchetto di Apple non viene mai modificato
   market_title: Il Marketplace
   market_text: Temi, snippet, estensioni e app, ognuno con un'immagine di quello che fa. Questa pagina legge lo stesso catalogo di Apple Music, quindi quello che vedi qui si installa subito.
   market_total: "{n} elementi nel catalogo"
@@ -101,14 +128,23 @@ ko:
   get_title: Apple Music에서 달라지는 점
   get:
     - name: 테마
-      text: 색, 유리 패널, 모든 것 뒤에 깔리는 현재 곡의 앨범 아트, 둥근 모서리, 움직임. Marketplace에서 하나 고르면 다시 시작하지 않아도 바로 적용됩니다.
-      fact: 테마 10개, 밝고 어두운 구성표 28개
-    - name: 확장 기능
-      text: 앨범 아트와 버튼이 들어간 Discord 상태, Last.fm 스크로블링, 취침 타이머, 전역 단축키. 켜기 전에 각각 무엇이 필요한지 알려 줍니다.
-      fact: 아무것도 실행되기 전에 권한을 보여 줍니다
-    - name: 기본 제공
-      text: Apple의 전체 화면 플레이어를 노래방 스타일 가사와 함께 여는 Now Playing 버튼, 그리고 Dolby Atmos 곡의 음량을 스테레오 곡 수준으로 맞춰 주는 레벨러.
-      fact: 스테레오 음량에 맞춰 평준화, LUFS 기준
+      text: 유리 패널, 모든 것 뒤에 깔리는 현재 곡의 앨범 아트, Windows 11 스타일, 둥글거나 각진 모서리. Apple Music 안의 Marketplace에서 하나 고르면 바로 적용됩니다.
+      fact: 테마 10개, 구성표 28개, 스니펫 11개
+    - name: Discord와 Last.fm
+      text: Discord 상태에 지금 듣는 곡, 앨범 아트, 진행 막대가 표시됩니다. 스크로블러는 듣는 곡을 Last.fm에 보냅니다.
+      fact: Marketplace에서 각각 클릭 한 번
+    - name: 앱
+      text: 사이드바에 청취 통계(시간, 재생 수, 자주 듣는 아티스트, 곡, 앨범)와 즐겨 듣는 아티스트의 신곡을 보여 주는 페이지가 생깁니다.
+      fact: 청취 통계, 신곡
+    - name: 원하는 대로 보는 가사
+      text: 부르고 있는 줄 주변에 몇 줄을 보일지 정하고, 가운데 또는 왼쪽으로 맞추고, 나머지 줄을 흐리게 하거나 선명하게 두고, 어두운 배경이나 앨범 아트 배경을 고를 수 있습니다.
+      fact: 가사 패널과 전체 화면 모두
+    - name: AutoMix
+      text: DJ 세트처럼 곡과 곡을 이어 줍니다. 템포가 비슷하면 박자에 맞춰, 아니면 크로스페이드로 넘어갑니다. 아직 초기 기능이라 계속 다듬고 있습니다.
+      fact: 기본값은 꺼짐, 스위치 하나
+    - name: 그대로 Apple Music
+      text: 무손실, Dolby Atmos, 라이브러리와 동기화, 그리고 Apple이 앱에 새로 더하는 기능도 그대로 작동합니다. Atmos 레벨러는 Atmos 곡을 스테레오 곡과 같은 음량으로 재생합니다.
+      fact: Apple 패키지는 절대 수정하지 않습니다
   market_title: Marketplace
   market_text: 테마, 스니펫, 확장 기능, 앱이 각각 무엇을 하는지 보여 주는 이미지와 함께 있습니다. 이 페이지는 Apple Music과 같은 카탈로그를 읽으므로, 여기서 보이는 것은 지금 바로 설치할 수 있습니다.
   market_total: "카탈로그의 요소 {n}개"
@@ -122,3 +158,243 @@ ko:
     - 복사 방지는 절대 건드리지 않습니다.
     - 아직 테스트하지 않은 Apple Music 버전에서는 테스트가 끝날 때까지 Ampify가 꺼진 채로 있습니다.
     - Marketplace의 모든 테마와 확장 기능은 소스가 GitHub에 있으며, 목록에 오르기 전에 검토를 거칩니다.
+de:
+  title: Apple Music nach Ihrem Geschmack
+  lede: Designs, Erweiterungen und ein Marketplace für die offizielle Apple-Music-App unter Windows. Lossless, Dolby Atmos, Songtexte und Ihre Mediathek funktionieren wie bisher.
+  install_cmd: irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
+  install_note: Ohne Administratorrechte. Ampify lädt danach bei jedem Start zusammen mit Apple Music, und `ampify restore` schaltet es aus.
+  or_zip: oder das Installationsprogramm herunterladen
+  theme_label: Angezeigtes Design
+  get_title: Was sich in Apple Music ändert
+  get:
+    - name: Designs
+      text: Glasflächen, das Cover des Titels hinter allem, ein Windows-11-Look, runde oder eckige Ecken. Wählen Sie eines im Marketplace in Apple Music, und es gilt sofort.
+      fact: 10 Designs, 28 Schemata, 11 Snippets
+    - name: Discord und Last.fm
+      text: Ihr Discord-Status zeigt den Titel, sein Cover und einen Fortschrittsbalken. Der Scrobbler schickt, was Sie hören, an Last.fm.
+      fact: Je ein Klick im Marketplace
+    - name: Apps
+      text: Seiten in der Seitenleiste für Ihre Hörstatistik (Stunden, Wiedergaben, meistgehörte Künstler, Titel und Alben) und für die Neuerscheinungen der Künstler, die Sie hören.
+      fact: Hörstatistik, Neuerscheinungen
+    - name: Songtexte nach Ihrem Geschmack
+      text: Wählen Sie, wie viele Zeilen um die gesungene stehen, zentriert oder linksbündig, die anderen weichgezeichnet oder scharf, auf dunklem Grund oder auf dem Cover.
+      fact: Im Bereich und im Vollbild
+    - name: AutoMix
+      text: Jeder Titel geht wie in einem DJ-Set in den nächsten über, im Takt, wenn die Tempi nah beieinander liegen, sonst mit Überblendung. Er ist noch jung und wird weiter besser.
+      fact: Standardmäßig aus, ein Schalter
+    - name: Weiter Apple Music
+      text: Lossless, Dolby Atmos, Ihre Mediathek samt Sync und alles, was Apple der App hinzufügt, funktioniert weiter. Ein Leveler spielt Atmos-Titel so laut wie Stereo-Titel.
+      fact: Das Paket von Apple wird nie verändert
+  market_title: Der Marketplace
+  market_text: Designs, Snippets, Erweiterungen und Apps, jedes mit einem Bild von dem, was es tut. Diese Seite liest denselben Katalog wie Apple Music, was Sie hier sehen, können Sie also jetzt installieren.
+  market_total: "{n} Elemente im Katalog"
+  market_cta: Marketplace öffnen
+  make_title: Machen Sie Ihr eigenes
+  make_text: Ein Design sind ein paar Zeilen CSS auf den Elementen von Apple Music. Eine Erweiterung ist JavaScript (oder TypeScript) mit dem Objekt `Ampify`. `ampify dev` lädt Ihre Arbeit bei jedem Speichern neu, und `ampify publish` schickt sie an den Marketplace.
+  make_cta: In fünf Minuten starten
+  safe_title: Apple Music bleibt Apple Music
+  safe:
+    - Nichts wird ins Paket von Apple Music geschrieben; beim Deinstallieren ist alles wieder wie vorher.
+    - Der Kopierschutz wird nie angetastet.
+    - Bei einer Apple-Music-Version, die noch nicht getestet wurde, bleibt Ampify aus, bis sie es ist.
+    - Jedes Design und jede Erweiterung im Marketplace hat ihren Quellcode auf GitHub, geprüft, bevor sie gelistet wird.
+es:
+  title: Apple Music a tu manera
+  lede: Temas, extensiones y un Marketplace para la app oficial de Apple Music en Windows. Lossless, Dolby Atmos, letras y tu biblioteca siguen funcionando como siempre.
+  install_cmd: irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
+  install_note: Sin derechos de administrador. Ampify se carga después con Apple Music en cada inicio, y `ampify restore` lo apaga.
+  or_zip: o descarga el instalador
+  theme_label: Tema mostrado
+  get_title: Qué cambia en Apple Music
+  get:
+    - name: Temas
+      text: Paneles de cristal, la portada de la canción detrás de todo, un aspecto Windows 11, esquinas redondeadas o cuadradas. Elige uno en el Marketplace, dentro de Apple Music, y se aplica al instante.
+      fact: 10 temas, 28 esquemas, 11 snippets
+    - name: Discord y Last.fm
+      text: Tu estado de Discord muestra la canción, su portada y una barra de progreso. El scrobbler envía lo que escuchas a Last.fm.
+      fact: Un clic para cada uno en el Marketplace
+    - name: Apps
+      text: Páginas en la barra lateral con tus estadísticas de escucha (horas, reproducciones, artistas, canciones y álbumes favoritos) y con los lanzamientos nuevos de los artistas que escuchas.
+      fact: Estadísticas de escucha, Novedades
+    - name: Las letras a tu manera
+      text: Elige cuántas líneas rodean a la que se canta, centradas o a la izquierda, las demás desenfocadas o nítidas, sobre fondo oscuro o con la portada.
+      fact: En el panel y a pantalla completa
+    - name: AutoMix
+      text: Cada canción enlaza con la siguiente como en una sesión de DJ, al compás cuando los tempos se parecen y con un fundido cuando no. Es joven y sigue mejorando.
+      fact: Desactivado por defecto, un solo interruptor
+    - name: Sigue siendo Apple Music
+      text: Lossless, Dolby Atmos, tu biblioteca y su sincronización, y todo lo que Apple añada a la app siguen funcionando. Un igualador hace que las canciones Atmos suenen tan fuerte como las estéreo.
+      fact: El paquete de Apple nunca se modifica
+  market_title: El Marketplace
+  market_text: Temas, snippets, extensiones y apps, cada uno con una imagen de lo que hace. Esta página lee el mismo catálogo que Apple Music, así que lo que ves aquí se puede instalar ya.
+  market_total: "{n} elementos en el catálogo"
+  market_cta: Abrir el Marketplace
+  make_title: Crea los tuyos
+  make_text: Un tema son unas pocas líneas de CSS sobre los elementos de Apple Music. Una extensión es JavaScript (o TypeScript) con el objeto `Ampify`. `ampify dev` recarga tu trabajo cada vez que guardas, y `ampify publish` lo envía al Marketplace.
+  make_cta: Empieza en cinco minutos
+  safe_title: Apple Music sigue siendo Apple Music
+  safe:
+    - No se escribe nada en el paquete de Apple Music; al desinstalar, todo vuelve a como estaba.
+    - La protección contra copia nunca se toca.
+    - En una versión de Apple Music que aún no se ha probado, Ampify se queda apagado hasta que se pruebe.
+    - Cada tema y extensión del Marketplace tiene su código en GitHub, revisado antes de aparecer en la lista.
+pt:
+  title: O Apple Music do seu jeito
+  lede: Temas, extensões e um Marketplace para o app oficial do Apple Music no Windows. Lossless, Dolby Atmos, letras e a sua biblioteca continuam funcionando como antes.
+  install_cmd: irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
+  install_note: Sem direitos de administrador. Depois, o Ampify carrega junto com o Apple Music a cada abertura, e `ampify restore` o desliga.
+  or_zip: ou baixe o instalador
+  theme_label: Tema exibido
+  get_title: O que muda no Apple Music
+  get:
+    - name: Temas
+      text: Painéis de vidro, a capa da música atrás de tudo, um visual Windows 11, cantos arredondados ou retos. Escolha um no Marketplace, dentro do Apple Music, e ele vale na hora.
+      fact: 10 temas, 28 esquemas, 11 snippets
+    - name: Discord e Last.fm
+      text: Seu status do Discord mostra a música, a capa e uma barra de progresso. O scrobbler envia o que você ouve para o Last.fm.
+      fact: Um clique para cada um no Marketplace
+    - name: Apps
+      text: Páginas na barra lateral com suas estatísticas de audição (horas, reproduções, artistas, músicas e álbuns mais ouvidos) e com os lançamentos dos artistas que você ouve.
+      fact: Estatísticas de audição, Lançamentos
+    - name: As letras do seu jeito
+      text: Escolha quantas linhas ficam em volta da que está sendo cantada, centralizadas ou à esquerda, as outras desfocadas ou nítidas, sobre fundo escuro ou com a capa.
+      fact: No painel e em tela cheia
+    - name: AutoMix
+      text: Cada música emenda na seguinte como num set de DJ, no tempo quando os andamentos são parecidos e com um fade quando não são. Ele ainda é novo e continua melhorando.
+      fact: Desligado por padrão, um só interruptor
+    - name: Continua sendo o Apple Music
+      text: Lossless, Dolby Atmos, a sua biblioteca com a sincronização e tudo o que a Apple acrescentar ao app continuam funcionando. Um nivelador faz as músicas em Atmos tocarem tão alto quanto as estéreo.
+      fact: O pacote da Apple nunca é alterado
+  market_title: O Marketplace
+  market_text: Temas, snippets, extensões e apps, cada um com uma imagem do que faz. Esta página lê o mesmo catálogo do Apple Music, então o que você vê aqui dá para instalar agora.
+  market_total: "{n} elementos no catálogo"
+  market_cta: Abrir o Marketplace
+  make_title: Crie os seus
+  make_text: Um tema são algumas linhas de CSS sobre os elementos do Apple Music. Uma extensão é JavaScript (ou TypeScript) com o objeto `Ampify`. `ampify dev` recarrega seu trabalho a cada vez que você salva, e `ampify publish` o envia ao Marketplace.
+  make_cta: Comece em cinco minutos
+  safe_title: O Apple Music continua sendo o Apple Music
+  safe:
+    - Nada é escrito no pacote do Apple Music; ao desinstalar, tudo volta como estava.
+    - A proteção contra cópia nunca é tocada.
+    - Numa versão do Apple Music que ainda não foi testada, o Ampify fica desligado até que seja.
+    - Cada tema e extensão do Marketplace tem o código no GitHub, revisado antes de entrar na lista.
+ru:
+  title: Apple Music под себя
+  lede: Темы, расширения и Marketplace для официального приложения Apple Music на Windows. Lossless, Dolby Atmos, тексты песен и ваша медиатека работают как раньше.
+  install_cmd: irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
+  install_note: Права администратора не нужны. Дальше Ampify загружается вместе с Apple Music при каждом запуске, а `ampify restore` его отключает.
+  or_zip: или скачайте установщик
+  theme_label: Показана тема
+  get_title: Что меняется в Apple Music
+  get:
+    - name: Темы
+      text: Стеклянные панели, обложка трека за всем интерфейсом, вид в стиле Windows 11, скруглённые или прямые углы. Выберите тему в Marketplace прямо в Apple Music, и она сразу применится.
+      fact: 10 тем, 28 схем, 11 сниппетов
+    - name: Discord и Last.fm
+      text: Статус в Discord показывает трек, его обложку и полосу прогресса. Скробблер отправляет в Last.fm то, что вы слушаете.
+      fact: По одному клику в Marketplace
+    - name: Приложения
+      text: Страницы в боковой панели со статистикой прослушивания (часы, прослушивания, топ исполнителей, треков и альбомов) и с новинками исполнителей, которых вы слушаете.
+      fact: Статистика прослушивания, Новинки
+    - name: Тексты по-вашему
+      text: Выберите, сколько строк показывать вокруг той, что поётся, выровняйте их по центру или по левому краю, размойте остальные или оставьте чёткими, на тёмном фоне или на фоне обложки.
+      fact: В панели и на весь экран
+    - name: AutoMix
+      text: Каждый трек перетекает в следующий, как в диджейском сете. В такт, если темпы близки, и плавным переходом, если нет. Функция совсем молодая и пока улучшается.
+      fact: По умолчанию выключен, один переключатель
+    - name: Всё тот же Apple Music
+      text: Lossless, Dolby Atmos, ваша медиатека с синхронизацией и всё, что Apple добавляет в приложение, продолжает работать. Выравниватель Atmos делает треки Atmos такими же громкими, как стереотреки.
+      fact: Пакет Apple никогда не меняется
+  market_title: Marketplace
+  market_text: Темы, сниппеты, расширения и приложения, у каждого есть картинка с тем, что он делает. Эта страница читает тот же каталог, что и Apple Music, так что всё, что вы здесь видите, можно установить прямо сейчас.
+  market_total: "Элементов в каталоге: {n}"
+  market_cta: Открыть Marketplace
+  make_title: Сделайте свои
+  make_text: Тема — это несколько строк CSS для элементов самого Apple Music. Расширение — это JavaScript (или TypeScript) с объектом `Ampify`. `ampify dev` перезагружает вашу работу при каждом сохранении, а `ampify publish` отправляет её в Marketplace.
+  make_cta: Начать за пять минут
+  safe_title: Apple Music остаётся Apple Music
+  safe:
+    - В пакет Apple Music ничего не записывается; при удалении всё возвращается как было.
+    - Защита от копирования никогда не затрагивается.
+    - На версии Apple Music из непроверенного семейства Ampify остаётся выключенным, пока её не проверят.
+    - У каждой темы и каждого расширения в Marketplace исходный код лежит на GitHub, и его проверяют до публикации в списке.
+ja:
+  title: Apple Music を、自分らしく
+  lede: Windows 版の公式 Apple Music アプリに、テーマ、拡張機能、Marketplace を。ロスレス、Dolby Atmos、歌詞、ライブラリはこれまでどおり使えます。
+  install_cmd: irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
+  install_note: 管理者権限は不要です。Ampify はそのあと Apple Music の起動のたびに一緒に読み込まれ、`ampify restore` でオフにできます。
+  or_zip: またはインストーラーをダウンロード
+  theme_label: 表示中のテーマ
+  get_title: Apple Music で変わること
+  get:
+    - name: テーマ
+      text: ガラスのパネル、すべての背後に広がる曲のアートワーク、Windows 11 風の見た目、丸い角や四角い角。Apple Music の中の Marketplace で選べば、すぐに反映されます。
+      fact: テーマ 10 種、スキーム 28 種、スニペット 11 個
+    - name: Discord と Last.fm
+      text: Discord のステータスに、曲、アートワーク、進行バーを表示します。スクロブラーは、聴いた曲を Last.fm に送ります。
+      fact: Marketplace でそれぞれワンクリック
+    - name: アプリ
+      text: サイドバーに、再生の統計 (時間、再生回数、よく聴くアーティスト、曲、アルバム) のページと、聴いているアーティストの新作のページが加わります。
+      fact: 再生の統計、新作
+    - name: 歌詞を好みの形に
+      text: 歌われている行の前後に何行表示するか、中央にそろえるか左にそろえるか、ほかの行をぼかすかくっきり見せるか、背景を暗くするかアートワークにするかを選べます。
+      fact: パネルでもフルスクリーンでも
+    - name: AutoMix
+      text: 曲から曲へ、DJ セットのようにつながります。テンポが近ければビートに合わせ、離れていればクロスフェードで。まだ生まれたばかりで、改良を続けています。
+      fact: 初期設定はオフ、スイッチ 1 つ
+    - name: やっぱり Apple Music
+      text: ロスレス、Dolby Atmos、ライブラリとその同期、Apple がアプリに加える新機能は、そのまま使えます。Atmos レベラーが、Atmos の曲をステレオの曲と同じ音量にそろえます。
+      fact: Apple のパッケージは変更しません
+  market_title: Marketplace
+  market_text: テーマ、スニペット、拡張機能、アプリを、それぞれ何をするかがわかる画像つきで。このページは Apple Music と同じカタログを読むので、ここに見えるものは今すぐインストールできます。
+  market_total: "カタログの項目 {n} 件"
+  market_cta: Marketplace を開く
+  make_title: 自分で作る
+  make_text: テーマは、Apple Music 自身の要素に当てる数行の CSS です。拡張機能は、`Ampify` オブジェクトを使う JavaScript (または TypeScript) です。`ampify dev` は保存のたびに作業内容を読み込み直し、`ampify publish` は Marketplace に送ります。
+  make_cta: 5 分で始める
+  safe_title: Apple Music は Apple Music のまま
+  safe:
+    - Apple Music のパッケージには何も書き込みません。アンインストールすれば、すべて元に戻ります。
+    - コピー保護には一切手を触れません。
+    - まだテストしていない系統の Apple Music では、テストが済むまで Ampify はオフのままです。
+    - Marketplace のテーマと拡張機能はすべて、ソースが GitHub にあり、掲載前に確認しています。
+zh:
+  title: 让 Apple Music 成为你的
+  lede: 为 Windows 版官方 Apple Music 应用带来主题、扩展和 Marketplace。无损音质、杜比全景声、歌词和资料库照常使用。
+  install_cmd: irm https://raw.githubusercontent.com/Shirowwww/ampify/main/scripts/install.ps1 | iex
+  install_note: 无需管理员权限。之后每次启动 Apple Music 时，Ampify 都会随之加载；`ampify restore` 可以把它关掉。
+  or_zip: 或下载安装程序
+  theme_label: 当前显示的主题
+  get_title: Apple Music 会有什么变化
+  get:
+    - name: 主题
+      text: 玻璃质感的面板，歌曲封面铺在一切之后，Windows 11 风格，圆角或直角。在 Apple Music 里的 Marketplace 中选一个，立刻生效。
+      fact: 10 个主题、28 种配色、11 个代码片段
+    - name: Discord 和 Last.fm
+      text: Discord 状态会显示当前歌曲、封面和进度条。scrobbler 会把你播放的歌曲发送到 Last.fm。
+      fact: 在 Marketplace 中各点一下即可
+    - name: 应用
+      text: 侧边栏里的页面，用来看你的收听统计（时长、播放次数、常听的艺人、歌曲和专辑），以及你常听艺人的新发行。
+      fact: 收听统计、新发行
+    - name: 歌词由你定
+      text: 选择正在演唱的那一行前后显示几行，居中还是靠左，其余行模糊还是保持清晰，背景用深色还是封面。
+      fact: 侧边面板和全屏中都适用
+    - name: AutoMix
+      text: 歌曲之间像 DJ 现场混音一样衔接。节奏相近时卡着拍子，不相近时用淡入淡出。它还很年轻，仍在不断改进。
+      fact: 默认关闭，只有一个开关
+    - name: 依然是 Apple Music
+      text: 无损音质、杜比全景声、资料库及其同步，以及 Apple 日后给应用加的功能，都照常工作。全景声均衡器让全景声歌曲和立体声歌曲一样响。
+      fact: 绝不改动 Apple 的程序包
+  market_title: Marketplace
+  market_text: 主题、代码片段、扩展和应用，每一项都配有说明它做什么的图片。这个页面读取的和 Apple Music 是同一个目录，所以这里看到的，现在就能安装。
+  market_total: "目录中有 {n} 个项目"
+  market_cta: 打开 Marketplace
+  make_title: 做你自己的
+  make_text: 主题就是写在 Apple Music 自身元素上的几行 CSS。扩展是使用 `Ampify` 对象的 JavaScript（或 TypeScript）。`ampify dev` 在每次保存时重新加载你的作品，`ampify publish` 把它发送到 Marketplace。
+  make_cta: 五分钟上手
+  safe_title: Apple Music 还是 Apple Music
+  safe:
+    - 不会向 Apple Music 的程序包写入任何内容；卸载后一切恢复原样。
+    - 绝不触碰版权保护。
+    - 在尚未测试的 Apple Music 版本系列上，Ampify 会保持关闭，直到测试完成。
+    - Marketplace 中的每个主题和扩展，源码都在 GitHub 上，并在上架前经过审核。

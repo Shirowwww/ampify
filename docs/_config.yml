@@ -32,3 +32,15 @@ defaults:
     values: { lang: it }
   - scope: { path: "ko" }
     values: { lang: ko }
+  - scope: { path: "zh" }
+    values: { lang: zh }
+  - scope: { path: "ja" }
+    values: { lang: ja }
+  - scope: { path: "ru" }
+    values: { lang: ru }
+  - scope: { path: "pt" }
+    values: { lang: pt }
+  - scope: { path: "es" }
+    values: { lang: es }
+  - scope: { path: "de" }
+    values: { lang: de }

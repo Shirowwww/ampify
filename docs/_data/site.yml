@@ -1,7 +1,7 @@
 # Interface texts of the site, per language. Page content lives in the pages themselves. A language is a block here, one
 # in home.yml, a folder of pages (index, marketplace, themes, snippets, extensions, getting-started, create) and a line
 # in _config.yml's defaults; the language menu lists every block in the order of `languages`.
-languages: [en, fr, it, ko]
+languages: [en, fr, de, es, pt, ru, ja, zh, it, ko]
 en:
   home: Home
   marketplace: Marketplace
@@ -162,3 +162,243 @@ ko:
   kind_snippet: 스니펫
   kind_extension: 확장 기능
   kind_app: 앱
+de:
+  home: Start
+  marketplace: Marketplace
+  themes: Designs
+  snippets: Snippets
+  extensions: Erweiterungen
+  apps: Apps
+  create: Erstellen
+  docs: Dokumentation
+  name: Deutsch
+  root: /de/
+  skip: Zum Inhalt springen
+  language: Sprache
+  menu: Menü
+  install: Installieren
+  install_line: Beenden Sie Apple Music, fügen Sie diese Zeile in PowerShell ein und öffnen Sie Apple Music dann wie gewohnt.
+  copy: Kopieren
+  copied: Kopiert
+  footer: Ampify ist für jede nicht kommerzielle Nutzung kostenlos, unter der PolyForm Noncommercial License 1.0.0. Apple Music ist eine Marke von Apple Inc.; Ampify steht in keiner Verbindung zu Apple.
+  gallery_loading: Katalog wird gelesen…
+  gallery_error: Der Katalog konnte nicht gelesen werden. Öffnen Sie ihn stattdessen auf GitHub.
+  gallery_updated: Der Katalog hat sich gerade geändert; die Liste ist aktuell.
+  install_with: Installieren Sie es über den Marketplace, oder
+  permissions: Verlangt
+  no_permission: Verlangt nichts
+  schemes: Farbschemata
+  search: Suchen
+  gallery_empty: Nichts passt.
+  by: Von
+  all: Alle
+  count: "{n} angezeigt"
+  details: Details
+  close: Schließen
+  version: Version
+  in_app: "Öffnen Sie in Apple Music unten in der Seitenleiste Ampify und dann den Marketplace. Oder fügen Sie diese Zeile in PowerShell ein:"
+  whole_market: Der ganze Marketplace
+  kind_theme: Design
+  kind_snippet: Snippet
+  kind_extension: Erweiterung
+  kind_app: App
+es:
+  home: Inicio
+  marketplace: Marketplace
+  themes: Temas
+  snippets: Snippets
+  extensions: Extensiones
+  apps: Apps
+  create: Crear
+  docs: Documentación
+  name: Español
+  root: /es/
+  skip: Saltar al contenido
+  language: Idioma
+  menu: Menú
+  install: Instalar
+  install_line: Cierra Apple Music, pega esta línea en PowerShell y abre Apple Music como siempre.
+  copy: Copiar
+  copied: Copiado
+  footer: Ampify es gratuito para cualquier uso no comercial, bajo la licencia PolyForm Noncommercial 1.0.0. Apple Music es una marca de Apple Inc.; Ampify no está afiliado a Apple.
+  gallery_loading: Leyendo el catálogo…
+  gallery_error: No se pudo leer el catálogo. Ábrelo en GitHub.
+  gallery_updated: El catálogo acaba de cambiar; la lista está al día.
+  install_with: Instálalo desde el Marketplace, o
+  permissions: Pide
+  no_permission: No pide nada
+  schemes: Esquemas de color
+  search: Buscar
+  gallery_empty: No hay coincidencias.
+  by: De
+  all: Todo
+  count: "{n} mostrados"
+  details: Detalles
+  close: Cerrar
+  version: Versión
+  in_app: "En Apple Music, abre Ampify abajo en la barra lateral y luego Marketplace. O pega esta línea en PowerShell:"
+  whole_market: Todo el Marketplace
+  kind_theme: Tema
+  kind_snippet: Snippet
+  kind_extension: Extensión
+  kind_app: App
+pt:
+  home: Início
+  marketplace: Marketplace
+  themes: Temas
+  snippets: Snippets
+  extensions: Extensões
+  apps: Apps
+  create: Criar
+  docs: Documentação
+  name: Português
+  root: /pt/
+  skip: Ir para o conteúdo
+  language: Idioma
+  menu: Menu
+  install: Instalar
+  install_line: Feche o Apple Music, cole esta linha no PowerShell e abra o Apple Music como de costume.
+  copy: Copiar
+  copied: Copiado
+  footer: O Ampify é gratuito para qualquer uso não comercial, sob a licença PolyForm Noncommercial 1.0.0. Apple Music é uma marca da Apple Inc.; o Ampify não é afiliado à Apple.
+  gallery_loading: Lendo o catálogo…
+  gallery_error: Não foi possível ler o catálogo. Abra-o no GitHub.
+  gallery_updated: O catálogo acabou de mudar; a lista está atualizada.
+  install_with: Instale pelo Marketplace, ou
+  permissions: Pede
+  no_permission: Não pede nada
+  schemes: Esquemas de cores
+  search: Buscar
+  gallery_empty: Nada corresponde.
+  by: Por
+  all: Tudo
+  count: "{n} exibidos"
+  details: Detalhes
+  close: Fechar
+  version: Versão
+  in_app: "No Apple Music, abra o Ampify no fim da barra lateral e depois o Marketplace. Ou cole esta linha no PowerShell:"
+  whole_market: Todo o Marketplace
+  kind_theme: Tema
+  kind_snippet: Snippet
+  kind_extension: Extensão
+  kind_app: App
+ru:
+  home: Главная
+  marketplace: Marketplace
+  themes: Темы
+  snippets: Сниппеты
+  extensions: Расширения
+  apps: Приложения
+  create: Создать
+  docs: Документация
+  name: Русский
+  root: /ru/
+  skip: Перейти к содержимому
+  language: Язык
+  menu: Меню
+  install: Установить
+  install_line: Закройте Apple Music, вставьте эту строку в PowerShell и откройте Apple Music как обычно.
+  copy: Копировать
+  copied: Скопировано
+  footer: Ampify бесплатен для любого некоммерческого использования по лицензии PolyForm Noncommercial 1.0.0. Apple Music — товарный знак Apple Inc.; Ampify не связан с Apple.
+  gallery_loading: Читаем каталог…
+  gallery_error: Не удалось прочитать каталог. Откройте его на GitHub.
+  gallery_updated: Каталог только что изменился; список обновлён.
+  install_with: Установите из Marketplace или
+  permissions: Запрашивает
+  no_permission: Ничего не запрашивает
+  schemes: Цветовые схемы
+  search: Поиск
+  gallery_empty: Ничего не найдено.
+  by: Автор
+  all: Все
+  count: "Показано: {n}"
+  details: Подробнее
+  close: Закрыть
+  version: Версия
+  in_app: "В Apple Music откройте Ampify внизу боковой панели, затем Marketplace. Или вставьте эту строку в PowerShell:"
+  whole_market: Весь Marketplace
+  kind_theme: Тема
+  kind_snippet: Сниппет
+  kind_extension: Расширение
+  kind_app: Приложение
+ja:
+  home: ホーム
+  marketplace: Marketplace
+  themes: テーマ
+  snippets: スニペット
+  extensions: 拡張機能
+  apps: アプリ
+  create: 作る
+  docs: ドキュメント
+  name: 日本語
+  root: /ja/
+  skip: 本文へ移動
+  language: 言語
+  menu: メニュー
+  install: インストール
+  install_line: Apple Music を閉じて、この 1 行を PowerShell に貼り付け、いつもどおり Apple Music を開いてください。
+  copy: コピー
+  copied: コピーしました
+  footer: Ampify は、PolyForm Noncommercial License 1.0.0 のもと、非商用の用途であれば無料です。Apple Music は Apple Inc. の商標です。Ampify は Apple とは関係ありません。
+  gallery_loading: カタログを読み込み中…
+  gallery_error: カタログを読み込めませんでした。GitHub で開いてください。
+  gallery_updated: カタログが更新されました。一覧は最新です。
+  install_with: Marketplace からインストールするか、
+  permissions: 必要な権限
+  no_permission: 権限は不要
+  schemes: カラースキーム
+  search: 検索
+  gallery_empty: 該当するものがありません。
+  by: 作者
+  all: すべて
+  count: "{n} 件を表示"
+  details: 詳細
+  close: 閉じる
+  version: バージョン
+  in_app: "Apple Music でサイドバー下部の Ampify を開き、Marketplace を開きます。または、この 1 行を PowerShell に貼り付けます:"
+  whole_market: Marketplace 全体
+  kind_theme: テーマ
+  kind_snippet: スニペット
+  kind_extension: 拡張機能
+  kind_app: アプリ
+zh:
+  home: 首页
+  marketplace: Marketplace
+  themes: 主题
+  snippets: 代码片段
+  extensions: 扩展
+  apps: 应用
+  create: 创作
+  docs: 文档
+  name: 简体中文
+  root: /zh/
+  skip: 跳到正文
+  language: 语言
+  menu: 菜单
+  install: 安装
+  install_line: 先关闭 Apple Music，把这一行粘贴到 PowerShell，再像平常一样打开 Apple Music。
+  copy: 复制
+  copied: 已复制
+  footer: Ampify 可免费用于任何非商业用途，遵循 PolyForm Noncommercial License 1.0.0。Apple Music 是 Apple Inc. 的商标；Ampify 与 Apple 无关。
+  gallery_loading: 正在读取目录…
+  gallery_error: 无法读取目录。请改在 GitHub 上打开。
+  gallery_updated: 目录刚刚更新，列表已是最新。
+  install_with: 从 Marketplace 安装，或者
+  permissions: 需要
+  no_permission: 无需任何权限
+  schemes: 配色方案
+  search: 搜索
+  gallery_empty: 没有匹配的项目。
+  by: 作者
+  all: 全部
+  count: "显示 {n} 项"
+  details: 详情
+  close: 关闭
+  version: 版本
+  in_app: "在 Apple Music 中，打开侧边栏底部的 Ampify，再打开 Marketplace。或者把这一行粘贴到 PowerShell："
+  whole_market: 完整的 Marketplace
+  kind_theme: 主题
+  kind_snippet: 代码片段
+  kind_extension: 扩展
+  kind_app: 应用

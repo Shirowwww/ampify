@@ -6,8 +6,8 @@
 
 **Themes, extensions and a Marketplace for Apple Music on Windows.**
 
-The official Apple Music app, dressed and extended the way Spicetify does it for Spotify. Lossless, Dolby Atmos,
-lyrics, your library and its sync all keep working.
+The official Apple Music app, dressed and extended the way Spicetify does it for Spotify. It stays Apple Music:
+lossless, Dolby Atmos, lyrics, your library and its sync keep working, and what Apple adds to the app keeps coming.
 
 [![Latest release](https://img.shields.io/github/v/release/Shirowwww/ampify?display_name=tag&sort=semver&style=flat-square&color=fa233b)](https://github.com/Shirowwww/ampify/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Shirowwww/ampify/total?style=flat-square&color=2ea043)](https://github.com/Shirowwww/ampify/releases)
@@ -32,21 +32,21 @@ schemes. Pick one in the Marketplace inside Apple Music and it is on at once, no
 scrobbler sends what you play to Last.fm. Both are one click away in the Marketplace.</td>
 </tr>
 <tr>
-<td valign="top"><img src="extensions/song-panel/preview.jpg" alt="The Song panel beside an album, with a large artwork"><br>
-<b>Lyrics word by word.</b> The Song panel slides over the window with a large artwork, lyrics that light up word by
-word, the credits and what plays next. The Now Playing button opens Apple's full-screen player, karaoke lyrics
-included.</td>
+<td valign="top"><img src="themes/snippets/lyrics-style/preview.jpg" alt="Lyrics centred, the lines around the sung one blurred"><br>
+<b>Lyrics your way.</b> Choose how many lines show around the sung one, centre them or keep them left, blur the
+others or leave them sharp, on a dark or artwork background. The Song panel and Apple's full-screen player both
+follow.</td>
 <td valign="top"><img src="examples/listening-stats/preview.jpg" alt="Listening stats: time listened, plays, top artists and songs (names blurred here)"><br>
 <b>Your listening stats.</b> Hours listened, plays, your top artists, songs and albums, over all time or a
 period. A second page lists the new releases of the artists you play.</td>
 </tr>
 <tr>
-<td valign="top"><img src="themes/snippets/progress-line/preview.jpg" alt="The playback bar with and without Progress line"><br>
-<b>A playback bar of your own.</b> At the top, the bottom or centred under any theme. Snippets add a thicker
-progress line with the time under the pointer, an equalizer that moves with the music, a spinning record.</td>
+<td valign="top"><img src="extensions/automix/preview.jpg" alt="Two songs overlapping as one fades into the other"><br>
+<b>AutoMix.</b> Each song flows into the next like a DJ set: on the beat when the tempos are close, a swap on a bar
+or a crossfade when they are not. It is young and still getting better; switch it on in Settings > Ampify.</td>
 <td valign="top"><img src="docs/assets/screens/settings-card.png" alt="Ampify's settings page in Apple Music, Sound and extensions tab"><br>
-<b>Everything in Apple Music's settings.</b> Five tabs and a search box that finds any setting. Extensions add an
-A-B loop, a sleep timer, global shortcuts, bookmarks, a skip list, and an Atmos leveler that plays Dolby Atmos
+<b>Everything in Apple Music's settings.</b> Five tabs and a search box. Move the playback bar to the top, the bottom
+or the centre, and switch on an A-B loop, a sleep timer, global shortcuts, or an Atmos leveler that plays Dolby Atmos
 songs as loud as stereo ones.</td>
 </tr>
 </table>
@@ -57,19 +57,11 @@ songs as loud as stereo ones.</td>
 |---|---|---|
 | 10 themes and 28 colour schemes, light and dark, switched without a restart | Discord presence, Last.fm scrobbling, a sleep timer, global shortcuts, an A-B loop | Nothing is written into Apple Music's package: uninstall and the original app is back |
 | 11 snippets to layer on any theme: corners, lyrics style, artwork filters, an equalizer that moves with the music | Pages for your listening stats and the new releases of the artists you play | Every extension lists its permissions before you switch it on |
-| One accent colour of your choice, or the colours of the song playing | A Song panel, the time under the pointer on the progress line, a full-screen player with karaoke lyrics, and an Atmos leveler that plays Dolby Atmos songs as loud as stereo ones | A new Apple Music version stays untouched until Ampify has been tested on it |
+| One accent colour of your choice, or the colours of the song playing | AutoMix between songs, a Song panel, the time under the pointer on the progress line, and an Atmos leveler | A new Apple Music version stays untouched until Ampify has been tested on it |
 | The playback bar at the top, the bottom or centred, under every theme | A Marketplace inside Apple Music, one click to install | Updates check their SHA-256 and install while Apple Music is closed |
 
 Ampify speaks English, French, German, Spanish, Portuguese, Russian, Japanese, Simplified Chinese, Italian and Korean.
-Spicetify `color.ini` palettes work as they are.
-
-### New in 1.3
-
-A new installer and uninstaller with a window of their own. A settings page in five tabs, with a search box that finds
-any setting. Fewer snippets with more settings each, and your choices carry over. One place for the playback bar under
-every theme. Liquid glass for Glass, and colour filters for the artwork. 1.3.1 and 1.3.2 fix the sidebar that opens
-under the pointer, theme colours in the playback bar and the song panel in narrow windows. The full list is in the
-[changelog](CHANGELOG.md).
+Spicetify `color.ini` palettes work as they are. What changed in each version is in the [changelog](CHANGELOG.md).
 
 ## Install
 
