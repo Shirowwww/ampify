@@ -89,12 +89,11 @@ help). The settings of a theme, a snippet or an extension stay folded under its 
 box above the tabs looks through every tab at once, those folded settings included. Changes take effect at once.
 
 Extensions you install start switched off, and you see the permissions an extension asks for before you switch it on.
-Five ship with Ampify: Now Playing, the Song panel (a column about the song playing, opened from a button of the
-playback bar), Time on hover (the time of the song under the pointer on the progress line, on from the start), the
-playback guard (restarts a song Apple Music leaves stuck, on from the start) and the Atmos
-leveler, under **Sound**: Dolby Atmos songs often play quieter than stereo ones, and the
-leveler brings them to the same loudness so you do not reach for the volume between songs. It is off until you switch
-it on.
+Two ship with Ampify: the playback guard (restarts a song Apple Music leaves stuck, on from the start) and the Atmos
+leveler, under **Sound**: Dolby Atmos songs often play quieter than stereo ones, and the leveler brings them to the
+same loudness so you do not reach for the volume between songs. It is off until you switch it on. Ampify's other
+extensions come from the Marketplace and update from it: Now Playing and Time on hover (the time of the song under the
+pointer on the progress line) are installed and on at the first start, the Song panel and AutoMix wait for you there.
 
 ## Languages
 

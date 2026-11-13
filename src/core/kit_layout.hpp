@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 
+#include "element_ref.hpp"
 #include "release_facts.hpp"
 
 namespace ampify {
@@ -31,8 +32,13 @@ bool IsUpdateLeftover(std::string_view fileName);
 bool IsKitDataFolder(std::string_view path);
 
 // The elements of kKitElements that ship as a folder, as <folder>/<id>: under examples\ in the package, under the
-// user's data folder once installed. Each install or update replaces them, as it replaces the binaries.
+// user's data folder once installed. Each install or update replaces them, as it replaces the binaries. Catalog
+// elements are not among them: the Marketplace delivers and updates those.
 std::vector<std::string> BundledElements();
+
+// The catalog elements of kKitElements that start on: installed from the catalog once, at the first start of a kit
+// that does not have them, and left alone after that (the user may remove them).
+std::vector<ElementRef> CatalogStarters();
 
 // True for one of BundledElements(): `folder` is "apps" or "extensions", `id` the element's folder name.
 bool IsBundledElement(std::string_view folder, std::string_view id);

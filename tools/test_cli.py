@@ -972,10 +972,11 @@ class KitUpdate(AmpifyTestCase):
         with open(os.path.join(install_dir, "ampify.exe.old"), encoding="utf-8") as handle:
             self.assertEqual(handle.read(), "old")
         self.assertTrue(os.path.exists(os.path.join(install_dir, "ampify_kernel.dll")))
-        # The update puts the Marketplace and Now Playing in the user's folder too. That an older copy is replaced
-        # is tested in tests/kit_tests.cpp (InstallBundledElements).
+        # The update puts the Marketplace and the playback guard in the user's folder too, and leaves the catalog
+        # elements to the Marketplace. That an older copy is replaced is tested in tests/kit_tests.cpp.
         self.assertTrue(os.path.exists(os.path.join(self.kit, "apps", "marketplace", "manifest.json")))
-        self.assertTrue(os.path.exists(os.path.join(self.kit, "extensions", "now-playing", "manifest.json")))
+        self.assertTrue(os.path.exists(os.path.join(self.kit, "extensions", "playback-guard", "manifest.json")))
+        self.assertFalse(os.path.exists(os.path.join(self.kit, "extensions", "now-playing")))
 
     def test_auto_update_looks_once_a_day(self):
         release = self.make_release("0.1.0")

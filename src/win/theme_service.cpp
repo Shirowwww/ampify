@@ -8,6 +8,7 @@
 #undef GetCurrentTime  // windows.h macro that breaks Storyboard::GetCurrentTime in the projection
 #endif
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <fstream>
@@ -33,6 +34,7 @@
 #include "xaml_backend.hpp"
 #include "xaml_watcher.hpp"
 #include "release_facts.hpp"
+#include "../core/kit_layout.hpp"
 #include "../core/manifest.hpp"
 #include "../core/panel_radius.hpp"
 #include "../core/settings.hpp"
@@ -99,7 +101,7 @@ theme::InstalledCheck InstalledIn(const std::filesystem::path& kit) {
 // At each start: settings.txt moves the keys of the elements Ampify retired or merged (theme/retired.hpp), and
 // Ampify's own copies of those elements move to kit/retired, so that the settings page no longer offers them. A
 // folder someone else wrote under the same name stays. A merged element in use waits for its replacement, which the
-// catalog gives (InstallReplacements): returns those to install.
+// catalog gives (InstallFromCatalog): returns those to install.
 std::vector<ElementRef> MoveRetiredElements(const std::filesystem::path& kit, Journal& journal) {
     const std::string path = (kit / "settings.txt").string();
     Settings settings;
@@ -139,25 +141,51 @@ std::vector<ElementRef> MoveRetiredElements(const std::filesystem::path& kit, Jo
     return wanted;
 }
 
-// Fetches the replacements from the catalog one after the other (they share its download), with ampify.exe as
-// `ampify install` would. Offline, the elements that wait keep the look, and the next start tries again. `done` runs
-// once every one was tried.
-void InstallReplacements(std::vector<ElementRef> wanted, std::filesystem::path kit, Journal& journal,
-                         std::function<void()> done) {
+// Fetches elements from the catalog one after the other (they share its download), with ampify.exe as `ampify install`
+// would. Offline, what waits keeps the look, and the next start tries again. `done` runs once every one was tried,
+// with the ids that were not installed.
+void InstallFromCatalog(std::vector<ElementRef> wanted, std::filesystem::path kit, Journal& journal,
+                        std::vector<std::string> failed, std::function<void(std::vector<std::string>)> done) {
     if (wanted.empty()) {
-        done();
+        done(std::move(failed));
         return;
     }
     ElementRef next = wanted.front();
     wanted.erase(wanted.begin());
-    journal.Write("Themes: installing " + next.id + " from the catalog, which replaces a retired element");
+    journal.Write("Themes: installing " + next.id + " from the catalog");
     RunAmpifyInBackground({"install", next.id, "--yes", "--kit-dir", ToUtf8(kit.wstring())},
-                          [next, wanted = std::move(wanted), kit, &journal, done = std::move(done)](int code) mutable {
+                          [next, wanted = std::move(wanted), kit, &journal, failed = std::move(failed),
+                           done = std::move(done)](int code) mutable {
                               journal.Write(code == 0 ? "Themes: " + next.id + " installed"
                                                       : "Themes: " + next.id + " not installed (code " +
                                                             std::to_string(code) + "), tried again at the next start");
-                              InstallReplacements(std::move(wanted), std::move(kit), journal, std::move(done));
+                              if (code != 0) failed.push_back(next.id);
+                              InstallFromCatalog(std::move(wanted), std::move(kit), journal, std::move(failed),
+                                                 std::move(done));
                           });
+}
+
+constexpr const char* kStartersKey = "catalog_starters";  // state.txt: "installed" once the starters were put in
+
+// The catalog elements that start on (Now Playing, Time on hover) and that this kit lacks, or none once they were put
+// in: a kit that had them is left alone after that, so an element the user removed stays removed.
+std::vector<ElementRef> MissingCatalogStarters(const std::filesystem::path& kit) {
+    Settings state;
+    state.Load((kit / "state.txt").string());
+    if (state.GetString(kStartersKey, "") == "installed") return {};
+    const theme::InstalledCheck installed = InstalledIn(kit);
+    std::vector<ElementRef> missing;
+    for (ElementRef& element : CatalogStarters()) {
+        if (!installed(element)) missing.push_back(std::move(element));
+    }
+    return missing;
+}
+
+void MarkStartersInstalled(const std::filesystem::path& kit, Journal& journal) {
+    std::string error;
+    if (!Settings::UpdateFile((kit / "state.txt").string(), kStartersKey, "installed", error)) {
+        journal.Write("Themes: state.txt not written, " + error);
+    }
 }
 
 constexpr const char* kElementsUpdatedKey = "elements_updated_for";  // state.txt: the release that last updated them
@@ -264,13 +292,26 @@ void ThemeService::Run(HINSTANCE module) {
     // Once the replacements are in, the elements that waited for them move, in the same session.
     auto replaced = std::make_shared<std::atomic<bool>>(false);
     std::vector<ElementRef> wanted = MoveRetiredElements(m_kit, m_journal);
+    const bool replacing = !wanted.empty();
+    // The catalog elements that start on come in the same queue, so that two installs never run at once.
+    std::vector<ElementRef> starters = MissingCatalogStarters(m_kit);
+    if (starters.empty()) MarkStartersInstalled(m_kit, m_journal);
+    std::vector<std::string> starterIds;
+    for (const ElementRef& element : starters) starterIds.push_back(element.id);
+    wanted.insert(wanted.end(), starters.begin(), starters.end());
     // The elements are updated after the replacements are in and the elements that waited for them moved.
     auto migrated = std::make_shared<std::atomic<bool>>(wanted.empty());
     if (!wanted.empty()) {
-        InstallReplacements(std::move(wanted), m_kit, m_journal, [replaced, migrated] {
-            *replaced = true;
-            *migrated = true;
-        });
+        InstallFromCatalog(std::move(wanted), m_kit, m_journal, {},
+                           [kit = m_kit, &journal = m_journal, replaced, migrated, replacing,
+                            starterIds](std::vector<std::string> failed) {
+                               const bool startersIn = std::ranges::none_of(starterIds, [&](const std::string& id) {
+                                   return std::ranges::find(failed, id) != failed.end();
+                               });
+                               if (!starterIds.empty() && startersIn) MarkStartersInstalled(kit, journal);
+                               *replaced = replacing;
+                               *migrated = true;
+                           });
     }
     bool elementsAsked = false;
 

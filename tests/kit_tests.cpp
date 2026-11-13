@@ -61,13 +61,14 @@ TEST_CASE(KitLayout_OnlyTheDataFolderCanBeRemovedWholesale) {
     CHECK(!ampify::IsKitDataFolder(""));
 }
 
-TEST_CASE(KitLayout_TheMarketplaceAndNowPlayingShipWithTheKit) {
+TEST_CASE(KitLayout_TheMarketplaceAndThePlaybackGuardShipWithTheKit) {
     CHECK(ampify::IsBundledElement("apps", "marketplace"));
-    CHECK(ampify::IsBundledElement("extensions", "now-playing"));
     CHECK(ampify::IsBundledElement("extensions", "playback-guard"));
-    CHECK(ampify::IsBundledElement("extensions", "song-panel"));
-    CHECK(ampify::IsBundledElement("extensions", "hover-time"));
-    CHECK(ampify::IsBundledElement("extensions", "automix"));
+    // The catalog delivers and updates Ampify's other elements.
+    CHECK(!ampify::IsBundledElement("extensions", "now-playing"));
+    CHECK(!ampify::IsBundledElement("extensions", "song-panel"));
+    CHECK(!ampify::IsBundledElement("extensions", "hover-time"));
+    CHECK(!ampify::IsBundledElement("extensions", "automix"));
     // A community element, or a bundled id in another folder, is not one of them.
     CHECK(!ampify::IsBundledElement("apps", "lyrics"));
     CHECK(!ampify::IsBundledElement("extensions", "marketplace"));
@@ -87,7 +88,18 @@ TEST_CASE(KitLayout_TheAtmosLevelerIsBuiltInStartsOffAndShipsNoFolder) {
     CHECK(!ampify::IsBuiltInExtension("marketplace"));
     CHECK(!ampify::IsBundledElement("extensions", "atmos-leveler"));
     CHECK(!ampify::IsOnByDefault("extensions", "atmos-leveler"));
-    CHECK(ampify::BundledElements().size() == 6);
+    CHECK(ampify::BundledElements().size() == 2);
+}
+
+TEST_CASE(KitLayout_TheCatalogElementsThatStartOnAreInstalledAtTheFirstStart) {
+    std::vector<ampify::ElementRef> starters = ampify::CatalogStarters();
+    std::vector<std::string> ids;
+    for (const ampify::ElementRef& element : starters) {
+        CHECK(element.kind == ampify::ElementKind::Extension);
+        ids.push_back(element.id);
+    }
+    // Song panel and AutoMix are off by default: the Marketplace offers them, nothing installs them.
+    CHECK((ids == std::vector<std::string>{"now-playing", "hover-time"}));
 }
 
 TEST_CASE(KitLayout_TheBundledElementsShipTurnedOn) {
@@ -117,7 +129,8 @@ TEST_CASE(KitLayout_InstallReplacesTheBundledElementsWithThePackagedOnes) {
     CHECK(ampify::InstallBundledElements(package, kit).empty());
     CHECK(ReadAll(kit / "apps" / "marketplace" / "main.js") == "new");
     CHECK(!fs::exists(kit / "apps" / "marketplace" / "dropped.js"));
-    CHECK(ReadAll(kit / "extensions" / "now-playing" / "main.js") == "new");  // a first install gets it too
+    CHECK(ReadAll(kit / "extensions" / "playback-guard" / "main.js") == "new");  // a first install gets it too
+    CHECK(!fs::exists(kit / "extensions" / "now-playing"));  // the catalog's, installed at the first start
 }
 
 TEST_CASE(KitLayout_ABundledElementMissingFromThePackageIsReportedAndKept) {

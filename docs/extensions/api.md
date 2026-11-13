@@ -407,7 +407,7 @@ Ampify.ui.navigate(path)
 - `playbar.readout(totalMs)` shows, while the pointer is over the progress line, a thin marker where it is and, above
   it, the time at that point of a span `totalMs` long (`m:ss`, or `h:mm:ss` from an hour on). Ampify draws both at the
   pointer's own pace, so the element only says how long the line is: `state().durationMs` for the song playing, as the
-  bundled Time on hover does. `readout()` or `readout(0)` takes it away. The label takes the colours of Apple Music's
+  Time on hover extension does. `readout()` or `readout(0)` takes it away. The label takes the colours of Apple Music's
   tooltips, the marker the text colour of the bar; both follow the light and dark modes and every theme's line, and
   the label goes under the line when the bar sits at the top of the window. When several elements ask, the last one
   shows.

@@ -38,14 +38,27 @@ const KitElement* FindKitElement(std::string_view folder, std::string_view id) {
 std::vector<std::string> BundledElements() {
     std::vector<std::string> bundled;
     for (const KitElement& element : kKitElements) {
-        if (!element.builtIn) bundled.push_back(std::string(element.folder) + "/" + std::string(element.id));
+        if (!element.builtIn && !element.catalog) {
+            bundled.push_back(std::string(element.folder) + "/" + std::string(element.id));
+        }
     }
     return bundled;
 }
 
 bool IsBundledElement(std::string_view folder, std::string_view id) {
     const KitElement* element = FindKitElement(folder, id);
-    return element != nullptr && !element->builtIn;
+    return element != nullptr && !element->builtIn && !element->catalog;
+}
+
+std::vector<ElementRef> CatalogStarters() {
+    std::vector<ElementRef> starters;
+    for (const KitElement& element : kKitElements) {
+        if (!element.catalog || !element.startsOn) continue;
+        if (std::optional<ElementKind> kind = KindNamed(element.kind)) {
+            starters.push_back(ElementRef{*kind, std::string(element.id)});
+        }
+    }
+    return starters;
 }
 
 bool IsOnByDefault(std::string_view folder, std::string_view id) {

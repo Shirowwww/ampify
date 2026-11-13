@@ -12,8 +12,9 @@
 #
 # The zip is flat, as `ampify update` and ampify_setup.exe both need: ampify.exe, ampify_launcher.exe and ampify_kernel.dll at the
 # root, next to ampify_setup.exe (the installer copies the launcher and the kernel from its own folder). The elements
-# that ship with the kit (the Marketplace, Now Playing) and example extensions and themes go under examples/. The
-# installer and `ampify update --apply` put the first ones in the user's Ampify folder (src/core/kit_layout.hpp).
+# Ampify's own (the Marketplace, the playback guard, the catalog ones) and example extensions and themes go under
+# examples/. The installer and `ampify update --apply` put the bundled ones in the user's Ampify folder
+# (src/core/kit_layout.hpp).
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -56,7 +57,9 @@ checksums="$(fact package.checksums)"
 setup_file="$(fact files.setup)"
 cli_file="$(fact files.cli)"
 binaries=("$setup_file" "$(fact files.launcher)" "$(fact files.kernel)")
-# The bundled elements that ship as a folder, as <folder>/<id> (the built-in ones live in the kernel).
+# Ampify's own elements that have a folder, as <folder>/<id> (the built-in ones live in the kernel). The catalog ones
+# (Now Playing, Song panel...) stay in the zip too: the installer leaves them to the Marketplace, but an Ampify 1.3
+# that updates itself still looks for them there.
 mapfile -t bundled < <(python3 -I - "$root/facts/release.json" <<'PY' | tr -d "$CR"
 import json, sys
 for element in json.load(open(sys.argv[1], encoding="utf-8"))["elements"]:

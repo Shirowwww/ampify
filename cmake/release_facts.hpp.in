@@ -27,8 +27,9 @@ inline constexpr std::string_view kPackagePrefix = "@AMPIFY_PACKAGE_prefix@";
 inline constexpr std::string_view kPackageSuffix = "@AMPIFY_PACKAGE_suffix@";
 inline constexpr std::string_view kChecksumsFile = "@AMPIFY_PACKAGE_checksums@";
 
-// An element Ampify ships. A built-in one lives in the kernel: no folder, no manifest, only its settings key. A
-// first-party one may hold the permissions reserved for Ampify's own elements.
+// An element of Ampify's own. A built-in one lives in the kernel: no folder, no manifest, only its settings key. A
+// first-party one may hold the permissions reserved for Ampify's own elements. A catalog one is not in the package:
+// the Marketplace delivers and updates it, and one that starts on is installed from the catalog at the first start.
 struct KitElement {
     std::string_view kind;    // "app" or "extension"
     std::string_view folder;  // "apps" or "extensions"
@@ -36,6 +37,7 @@ struct KitElement {
     bool startsOn;
     bool firstParty;
     bool builtIn;
+    bool catalog;
 };
 
 inline constexpr KitElement kKitElements[] = {

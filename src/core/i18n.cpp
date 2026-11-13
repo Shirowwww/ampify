@@ -227,7 +227,7 @@ constexpr Message kKit[] = {
      "\"ampify apply\" to try again."},
     {"setup.noAppleMusic", "Apple Music was not found: install it from the Microsoft Store."},
     {"setup.bundledFailed",
-     "The Marketplace or Now Playing could not be copied to your Ampify folder (details in logs\\install.log). Run "
+     "The Marketplace could not be copied to your Ampify folder (details in logs\\install.log). Run "
      "the install again from the extracted folder."},
     {"setup.fileMissing", "A file is missing next to the installer: {name}\n\nExtract the whole zip first, then run the installer again."},
     {"setup.folderFailed", "The install folder could not be created."},
@@ -247,7 +247,7 @@ constexpr Message kKit[] = {
     {"setup.installing", "Installing Ampify"},
     {"setup.stepCloseAppleMusic", "Close Apple Music"},
     {"setup.stepCopy", "Copy Ampify's files"},
-    {"setup.stepBundled", "Add the Marketplace and Now Playing"},
+    {"setup.stepBundled", "Add the Marketplace"},
     {"setup.stepAutoStart", "Load Ampify with Apple Music"},
     {"setup.stepEntry", "Add Ampify to Settings > Apps"},
     {"setup.installedTitle", "Ampify is installed"},
@@ -470,7 +470,7 @@ constexpr Message kKitFr[] = {
      "\"ampify apply\" pour réessayer."},
     {"setup.noAppleMusic", "Apple Music est introuvable : installez-le depuis le Microsoft Store."},
     {"setup.bundledFailed",
-     "Le Marketplace ou « À l'écoute » n'a pas pu être copié dans votre dossier Ampify (détails dans "
+     "Le Marketplace n'a pas pu être copié dans votre dossier Ampify (détails dans "
      "logs\\install.log). Relancez l'installation depuis le dossier extrait."},
     {"setup.fileMissing",
      "Un fichier manque à côté de l'installateur : {name}\n\nExtrayez d'abord tout le zip, puis relancez "
@@ -492,7 +492,7 @@ constexpr Message kKitFr[] = {
     {"setup.installing", "Installation d'Ampify"},
     {"setup.stepCloseAppleMusic", "Fermer Apple Music"},
     {"setup.stepCopy", "Copier les fichiers d'Ampify"},
-    {"setup.stepBundled", "Ajouter le Marketplace et Now Playing"},
+    {"setup.stepBundled", "Ajouter le Marketplace"},
     {"setup.stepAutoStart", "Charger Ampify avec Apple Music"},
     {"setup.stepEntry", "Ajouter Ampify dans Paramètres > Applications"},
     {"setup.installedTitle", "Ampify est installé"},
@@ -713,7 +713,7 @@ constexpr Message kKitDe[] = {
      "Sie „ampify apply“ aus, um es erneut zu versuchen."},
     {"setup.noAppleMusic", "Apple Music wurde nicht gefunden: Installieren Sie es aus dem Microsoft Store."},
     {"setup.bundledFailed",
-     "Der Marketplace oder „Jetzt läuft“ konnte nicht in Ihren Ampify-Ordner kopiert werden (Details in "
+     "Der Marketplace konnte nicht in Ihren Ampify-Ordner kopiert werden (Details in "
      "logs\\install.log). Starten Sie die Installation erneut aus dem entpackten Ordner."},
     {"setup.fileMissing",
      "Neben dem Installationsprogramm fehlt eine Datei: {name}\n\nEntpacken Sie zuerst das gesamte Zip-Archiv und starten Sie das "
@@ -735,7 +735,7 @@ constexpr Message kKitDe[] = {
     {"setup.installing", "Ampify wird installiert"},
     {"setup.stepCloseAppleMusic", "Apple Music schließen"},
     {"setup.stepCopy", "Dateien von Ampify kopieren"},
-    {"setup.stepBundled", "Marketplace und Now Playing hinzufügen"},
+    {"setup.stepBundled", "Marketplace hinzufügen"},
     {"setup.stepAutoStart", "Ampify mit Apple Music laden"},
     {"setup.stepEntry", "Ampify zu Einstellungen > Apps hinzufügen"},
     {"setup.installedTitle", "Ampify ist installiert"},
@@ -956,7 +956,7 @@ constexpr Message kKitEs[] = {
      "\"ampify apply\" para volver a intentarlo."},
     {"setup.noAppleMusic", "No se encontró Apple Music: instálalo desde Microsoft Store."},
     {"setup.bundledFailed",
-     "No se pudo copiar el Marketplace o «Reproduciendo» a tu carpeta de Ampify (detalles en logs\\install.log). "
+     "No se pudo copiar el Marketplace a tu carpeta de Ampify (detalles en logs\\install.log). "
      "Vuelve a ejecutar la instalación desde la carpeta extraída."},
     {"setup.fileMissing", "Falta un archivo junto al instalador: {name}\n\nExtrae primero todo el zip y vuelve a ejecutar el instalador."},
     {"setup.folderFailed", "No se pudo crear la carpeta de instalación."},
@@ -976,7 +976,7 @@ constexpr Message kKitEs[] = {
     {"setup.installing", "Instalando Ampify"},
     {"setup.stepCloseAppleMusic", "Cerrar Apple Music"},
     {"setup.stepCopy", "Copiar los archivos de Ampify"},
-    {"setup.stepBundled", "Añadir el Marketplace y Now Playing"},
+    {"setup.stepBundled", "Añadir el Marketplace"},
     {"setup.stepAutoStart", "Cargar Ampify con Apple Music"},
     {"setup.stepEntry", "Añadir Ampify a Configuración > Aplicaciones"},
     {"setup.installedTitle", "Ampify está instalado"},
@@ -1197,7 +1197,7 @@ constexpr Message kKitPt[] = {
      "\"ampify apply\" para tentar de novo."},
     {"setup.noAppleMusic", "O Apple Music não foi encontrado: instale-o pela Microsoft Store."},
     {"setup.bundledFailed",
-     "Não foi possível copiar o Marketplace ou o \"Tocando agora\" para a sua pasta do Ampify (detalhes em "
+     "Não foi possível copiar o Marketplace para a sua pasta do Ampify (detalhes em "
      "logs\\install.log). Execute a instalação de novo a partir da pasta extraída."},
     {"setup.fileMissing", "Falta um arquivo ao lado do instalador: {name}\n\nExtraia primeiro todo o zip e execute o instalador de novo."},
     {"setup.folderFailed", "Não foi possível criar a pasta de instalação."},
@@ -1217,7 +1217,7 @@ constexpr Message kKitPt[] = {
     {"setup.installing", "Instalando o Ampify"},
     {"setup.stepCloseAppleMusic", "Fechar o Apple Music"},
     {"setup.stepCopy", "Copiar os arquivos do Ampify"},
-    {"setup.stepBundled", "Adicionar o Marketplace e o Now Playing"},
+    {"setup.stepBundled", "Adicionar o Marketplace"},
     {"setup.stepAutoStart", "Carregar o Ampify com o Apple Music"},
     {"setup.stepEntry", "Adicionar o Ampify em Configurações > Aplicativos"},
     {"setup.installedTitle", "O Ampify está instalado"},
@@ -1438,7 +1438,7 @@ constexpr Message kKitRu[] = {
      "\"ampify apply\", чтобы попробовать снова."},
     {"setup.noAppleMusic", "Apple Music не найден: установите его из Microsoft Store."},
     {"setup.bundledFailed",
-     "Не удалось скопировать Marketplace или «Сейчас играет» в папку Ampify (подробности в logs\\install.log). "
+     "Не удалось скопировать Marketplace в папку Ampify (подробности в logs\\install.log). "
      "Запустите установку снова из распакованной папки."},
     {"setup.fileMissing",
      "Рядом с установщиком не хватает файла: {name}\n\nСначала распакуйте весь zip-архив, затем снова запустите "
@@ -1460,7 +1460,7 @@ constexpr Message kKitRu[] = {
     {"setup.installing", "Установка Ampify"},
     {"setup.stepCloseAppleMusic", "Закрыть Apple Music"},
     {"setup.stepCopy", "Скопировать файлы Ampify"},
-    {"setup.stepBundled", "Добавить Marketplace и Now Playing"},
+    {"setup.stepBundled", "Добавить Marketplace"},
     {"setup.stepAutoStart", "Загружать Ampify вместе с Apple Music"},
     {"setup.stepEntry", "Добавить Ampify в Параметры > Приложения"},
     {"setup.installedTitle", "Ampify установлен"},
@@ -1681,7 +1681,7 @@ constexpr Message kKitJa[] = {
      "\"ampify apply\" を実行してもう一度お試しください。"},
     {"setup.noAppleMusic", "Apple Music が見つかりません。Microsoft Store からインストールしてください。"},
     {"setup.bundledFailed",
-     "Marketplace または「再生中」を Ampify フォルダーにコピーできませんでした (詳細は logs\\install.log)。"
+     "Marketplace を Ampify フォルダーにコピーできませんでした (詳細は logs\\install.log)。"
      "展開したフォルダーからもう一度インストールしてください。"},
     {"setup.fileMissing", "インストーラーと同じ場所にファイルがありません: {name}\n\nまず zip をすべて展開してから、もう一度インストーラーを実行してください。"},
     {"setup.folderFailed", "インストール先のフォルダーを作成できませんでした。"},
@@ -1701,7 +1701,7 @@ constexpr Message kKitJa[] = {
     {"setup.installing", "Ampify をインストールしています"},
     {"setup.stepCloseAppleMusic", "Apple Music を閉じる"},
     {"setup.stepCopy", "Ampify のファイルをコピー"},
-    {"setup.stepBundled", "Marketplace と Now Playing を追加"},
+    {"setup.stepBundled", "Marketplace を追加"},
     {"setup.stepAutoStart", "Apple Music と一緒に Ampify を読み込む"},
     {"setup.stepEntry", "Ampify を [設定] > [アプリ] に追加"},
     {"setup.installedTitle", "Ampify をインストールしました"},
@@ -1920,7 +1920,7 @@ constexpr Message kKitZh[] = {
     {"setup.noBackground", "Ampify 无法在后台启动（详情见 logs\\install.log）。请重启电脑，或运行 \"ampify apply\" 再试一次。"},
     {"setup.noAppleMusic", "未找到 Apple Music：请从 Microsoft Store 安装。"},
     {"setup.bundledFailed",
-     "无法将 Marketplace 或“正在播放”复制到你的 Ampify 文件夹（详情见 logs\\install.log）。请从解压后的文件夹"
+     "无法将 Marketplace 复制到你的 Ampify 文件夹（详情见 logs\\install.log）。请从解压后的文件夹"
      "重新运行安装。"},
     {"setup.fileMissing", "安装程序旁缺少一个文件：{name}\n\n请先解压整个 zip，再重新运行安装程序。"},
     {"setup.folderFailed", "无法创建安装文件夹。"},
@@ -1940,7 +1940,7 @@ constexpr Message kKitZh[] = {
     {"setup.installing", "正在安装 Ampify"},
     {"setup.stepCloseAppleMusic", "关闭 Apple Music"},
     {"setup.stepCopy", "复制 Ampify 的文件"},
-    {"setup.stepBundled", "添加 Marketplace 和 Now Playing"},
+    {"setup.stepBundled", "添加 Marketplace"},
     {"setup.stepAutoStart", "随 Apple Music 加载 Ampify"},
     {"setup.stepEntry", "将 Ampify 添加到“设置 > 应用”"},
     {"setup.installedTitle", "Ampify 已安装"},
@@ -2158,7 +2158,7 @@ constexpr Message kKitIt[] = {
     {"setup.closeFailed", "Impossibile chiudere Apple Music. Chiudilo tu, poi riprova."},
     {"setup.noBackground", "Ampify non è riuscito ad avviarsi in background (dettagli in logs\\install.log). Riavvia il PC, oppure esegui \"ampify apply\" per riprovare."},
     {"setup.noAppleMusic", "Apple Music non è stato trovato: installalo dal Microsoft Store."},
-    {"setup.bundledFailed", "Impossibile copiare il Marketplace o Now Playing nella cartella Ampify (dettagli in logs\\install.log). Riavvia l'installazione dalla cartella estratta."},
+    {"setup.bundledFailed", "Impossibile copiare il Marketplace nella cartella Ampify (dettagli in logs\\install.log). Riavvia l'installazione dalla cartella estratta."},
     {"setup.fileMissing", "Manca un file accanto al programma di installazione: {name}\n\nEstrai prima tutto lo zip, poi riavvia il programma di installazione."},
     {"setup.folderFailed", "Impossibile creare la cartella di installazione."},
     {"setup.copyFailed", "L'installazione non è riuscita a copiare {name}. Chiudi Apple Music, poi riavvia l'installazione."},
@@ -2177,7 +2177,7 @@ constexpr Message kKitIt[] = {
     {"setup.installing", "Installazione di Ampify"},
     {"setup.stepCloseAppleMusic", "Chiudi Apple Music"},
     {"setup.stepCopy", "Copia i file di Ampify"},
-    {"setup.stepBundled", "Aggiungi il Marketplace e Now Playing"},
+    {"setup.stepBundled", "Aggiungi il Marketplace"},
     {"setup.stepAutoStart", "Carica Ampify con Apple Music"},
     {"setup.stepEntry", "Aggiungi Ampify in Impostazioni > App"},
     {"setup.installedTitle", "Ampify è installato"},
@@ -2395,7 +2395,7 @@ constexpr Message kKitKo[] = {
     {"setup.closeFailed", "Apple Music을 닫지 못했습니다. 직접 닫고 다시 시도하세요."},
     {"setup.noBackground", "Ampify가 백그라운드에서 시작되지 못했습니다 (자세한 내용은 logs\\install.log). PC를 다시 시작하거나 \"ampify apply\"를 실행해 다시 시도하세요."},
     {"setup.noAppleMusic", "Apple Music을 찾을 수 없습니다. Microsoft Store에서 설치하세요."},
-    {"setup.bundledFailed", "Marketplace 또는 Now Playing을 Ampify 폴더로 복사하지 못했습니다 (자세한 내용은 logs\\install.log). 압축을 푼 폴더에서 설치를 다시 실행하세요."},
+    {"setup.bundledFailed", "Marketplace를 Ampify 폴더로 복사하지 못했습니다 (자세한 내용은 logs\\install.log). 압축을 푼 폴더에서 설치를 다시 실행하세요."},
     {"setup.fileMissing", "설치 프로그램 옆에 파일이 없습니다: {name}\n\n먼저 zip을 모두 풀고 설치 프로그램을 다시 실행하세요."},
     {"setup.folderFailed", "설치 폴더를 만들지 못했습니다."},
     {"setup.copyFailed", "설치 중 {name}을(를) 복사하지 못했습니다. Apple Music을 닫고 설치를 다시 실행하세요."},
@@ -2414,7 +2414,7 @@ constexpr Message kKitKo[] = {
     {"setup.installing", "Ampify 설치 중"},
     {"setup.stepCloseAppleMusic", "Apple Music 닫기"},
     {"setup.stepCopy", "Ampify 파일 복사"},
-    {"setup.stepBundled", "Marketplace와 Now Playing 추가"},
+    {"setup.stepBundled", "Marketplace 추가"},
     {"setup.stepAutoStart", "Apple Music과 함께 Ampify 로드"},
     {"setup.stepEntry", "설정 > 앱에 Ampify 추가"},
     {"setup.installedTitle", "Ampify가 설치되었습니다"},

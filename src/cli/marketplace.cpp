@@ -519,7 +519,7 @@ int InstallKitRelease(Context& ctx, const std::string& source, const std::string
     error = ReplaceProgramFiles(staged, installDir);
     installing.Finish(error.empty(), "Version " + release->version + " installed in " + Utf8(installDir));
     if (!error.empty()) return Failure(ctx, error);
-    // The Marketplace and Now Playing ship with the kit (src/core/kit_layout.hpp): an update replaces them too.
+    // The Marketplace and the playback guard ship with the kit (src/core/kit_layout.hpp): an update replaces them too.
     for (const std::string& line : InstallBundledElements(staged, ctx.kit.Root())) {
         ctx.err << "ampify: not updated: " << line << "\n";
     }

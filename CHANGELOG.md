@@ -12,6 +12,8 @@ AutoMix, steadier lyrics, and an Ampify that does less while nothing changes.
   whole line at once, as Apple's own pane does.
 - The settings page orders the entries Ampify, its apps and the extensions add to the sidebar, as it already did for
   Apple's entries and the playback bar's buttons.
+- Now Playing, Time on hover, the Song panel and AutoMix now come from the Marketplace and update from it, like every
+  other element. Now Playing and Time on hover are installed and on at the first start; the copies you have stay.
 - Time on hover works with the centred playback bar.
 - AutoMix and Time on hover have a picture in the Marketplace.
 - Themes and settings are read again only when something changes, instead of every three seconds, and nothing is

@@ -15,13 +15,13 @@
     "checksums": "SHA256SUMS.txt"
   },
   "elements": [
-    {"id": "marketplace", "kind": "app", "folder": "apps", "startsOn": true, "firstParty": true, "builtIn": false},
-    {"id": "now-playing", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
-    {"id": "song-panel", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false},
-    {"id": "playback-guard", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
-    {"id": "hover-time", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false},
-    {"id": "automix", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false},
-    {"id": "atmos-leveler", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": true}
+    {"id": "marketplace", "kind": "app", "folder": "apps", "startsOn": true, "firstParty": true, "builtIn": false, "catalog": false},
+    {"id": "playback-guard", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false, "catalog": false},
+    {"id": "atmos-leveler", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": true, "catalog": false},
+    {"id": "now-playing", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false, "catalog": true},
+    {"id": "hover-time", "kind": "extension", "folder": "extensions", "startsOn": true, "firstParty": false, "builtIn": false, "catalog": true},
+    {"id": "song-panel", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false, "catalog": true},
+    {"id": "automix", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false, "catalog": true}
   ],
   "languages": [
     {"code": "fr", "decimalComma": true},

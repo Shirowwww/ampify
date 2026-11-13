@@ -10,7 +10,7 @@
 // Exit codes: 0 done (or cancelled by the user), 1 error, 3 refused (Apple Music is open and could not or may not be closed).
 //
 // Ampify never writes into Apple Music's package folder. Installing copies the kit's files, puts the elements that ship
-// with it (the Marketplace, Now Playing) in the user's Ampify folder, writes an uninstall entry, and starts the
+// with it (the Marketplace, the playback guard) in the user's Ampify folder, writes an uninstall entry, and starts the
 // background launcher, now and at each Windows sign-in: from then on Apple Music starts with Ampify from its usual
 // icon (src/win/background.hpp). Uninstalling stops it and removes all of it, so Apple Music starts as it did before.
 
@@ -568,7 +568,7 @@ InstallRun RunInstall(const fs::path& source, const fs::path& target, Steps<Inst
     std::vector<std::string> notInstalled = ampify::InstallBundledElements(source, ampify::win::KitDirectory());
     for (const std::string& line : notInstalled) log.Write("Not installed: " + line);
     run.bundledOk = notInstalled.empty();
-    if (run.bundledOk) log.Write("Marketplace and Now Playing installed in the Ampify folder");
+    if (run.bundledOk) log.Write("Marketplace and playback guard installed in the Ampify folder");
     RemoveOldShortcut(log);
     log.Write(UpdateUserPath(target, true) ? "Install folder in the user's Path: ampify works in a new terminal"
                                            : "Could not add the install folder to the user's Path");
