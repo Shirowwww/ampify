@@ -457,33 +457,12 @@ const char* ModeName(uirender::PlayerMode mode) {
     return "?";
 }
 
-// Filling its screen, the player reads as a full screen: no frame, square corners. The overlapped presenter leaves the
-// dialog frame Apple's window was made with, a 3 px light line around the screen, and puts it back on any
-// style change: the client area fills `target` and a window region cuts the frame off.
-void FillWithClient(HWND window, const RECT& target) {
-    RECT outer{};
-    RECT client{};
-    POINT origin{0, 0};
-    GetWindowRect(window, &outer);
-    GetClientRect(window, &client);
-    ClientToScreen(window, &origin);
-    int left = origin.x - outer.left;
-    int top = origin.y - outer.top;
-    int right = outer.right - (origin.x + client.right);
-    int bottom = outer.bottom - (origin.y + client.bottom);
-    int width = target.right - target.left;
-    int height = target.bottom - target.top;
-    SetWindowPos(window, HWND_TOP, target.left - left, target.top - top, width + left + right, height + top + bottom,
-                 SWP_NOOWNERZORDER);
-    SetWindowRgn(window, CreateRectRgn(left, top, left + width, top + height), TRUE);  // the window owns the region
-}
-
-// A window mode gets the system's frame and corners back.
-void SetScreenFrame(HWND window, bool screenLike) {
-    if (!screenLike) SetWindowRgn(window, nullptr, TRUE);
-    DWM_WINDOW_CORNER_PREFERENCE corner = screenLike ? DWMWCP_DONOTROUND : DWMWCP_DEFAULT;
+// A window gets the system's frame and corners back (a region and a frameless look were set by Ampify before 1.4.1).
+void SetScreenFrame(HWND window) {
+    SetWindowRgn(window, nullptr, TRUE);
+    DWM_WINDOW_CORNER_PREFERENCE corner = DWMWCP_DEFAULT;
     DwmSetWindowAttribute(window, DWMWA_WINDOW_CORNER_PREFERENCE, &corner, sizeof(corner));
-    COLORREF border = screenLike ? DWMWA_COLOR_NONE : DWMWA_COLOR_DEFAULT;
+    COLORREF border = DWMWA_COLOR_DEFAULT;
     DwmSetWindowAttribute(window, DWMWA_BORDER_COLOR, &border, sizeof(border));
 }
 
@@ -536,25 +515,31 @@ void WidenScrubberRow(Placement& state, const xaml::UIElement& root) {
 }
 
 
-// The player as a window with a border that resizes and moves, or filling its whole screen, with neither: a full
-// screen of its own that Windows does not make exclusive, so other windows still come over it. Its button follows.
+// The player as a window with a border that resizes and moves, or filling its whole screen with WinUI's full-screen
+// presenter: a window that only covered the screen left the taskbar over its bottom. Its button follows.
 void Frame(const xaml::Window& player, Placement& state, const RECT& target) {
     HWND hwnd = WindowHandle(player);
-    auto presenter = player.AppWindow().Presenter().try_as<windowing::OverlappedPresenter>();
+    windowing::AppWindow window = player.AppWindow();
+    if (state.filled) {
+        ClearCaption(player, state);
+        SetScreenFrame(hwnd);
+        window.SetPresenter(windowing::AppWindowPresenterKind::FullScreen);
+        ShowFillButton(player.Content().try_as<xaml::UIElement>(), true, [] { SetFilled(!State().filled); });
+        return;
+    }
+    if (window.Presenter().Kind() != windowing::AppWindowPresenterKind::Overlapped) {
+        window.SetPresenter(windowing::OverlappedPresenter::Create());
+    }
+    auto presenter = window.Presenter().try_as<windowing::OverlappedPresenter>();
     if (presenter) {
         if (presenter.State() == windowing::OverlappedPresenterState::Maximized) presenter.Restore();
-        presenter.SetBorderAndTitleBar(!state.filled, false);
-        presenter.IsResizable(!state.filled);
+        presenter.SetBorderAndTitleBar(true, false);
+        presenter.IsResizable(true);
     }
-    SetScreenFrame(hwnd, state.filled);
-    if (state.filled) {
-        FillWithClient(hwnd, target);
-        ClearCaption(player, state);
-    } else {
-        PlaceVisible(hwnd, target);
-        SetCaption(player, state);
-    }
-    ShowFillButton(player.Content().try_as<xaml::UIElement>(), state.filled, [] { SetFilled(!State().filled); });
+    SetScreenFrame(hwnd);
+    PlaceVisible(hwnd, target);
+    SetCaption(player, state);
+    ShowFillButton(player.Content().try_as<xaml::UIElement>(), false, [] { SetFilled(!State().filled); });
 }
 
 // Ampify's button, or Escape on the way back: the screen it is on, then where it was as a window.
@@ -568,8 +553,7 @@ void SetFilled(bool filled) {
         if (!state.windowZoomed) state.windowRect = VisibleRect(hwnd);
     }
     state.filled = filled;
-    const RECT target = filled ? MonitorRect(hwnd, false) : state.windowRect;
-    Frame(player, state, target);
+    Frame(player, state, state.windowRect);
     auto presenter = player.AppWindow().Presenter().try_as<windowing::OverlappedPresenter>();
     if (!filled && state.windowZoomed && presenter) presenter.Maximize();
     state.journal->Write(filled ? "Apple player: fills its screen, " + RectText(VisibleRect(hwnd))
@@ -744,7 +728,7 @@ void Step(Placement& state) {
         if (window.Presenter().Kind() != windowing::AppWindowPresenterKind::FullScreen) {
             ClearCaption(player, state);
             window.SetPresenter(windowing::AppWindowPresenterKind::FullScreen);  // Ampify's from an earlier opening
-            SetScreenFrame(WindowHandle(player), false);
+            SetScreenFrame(WindowHandle(player));
             ShowShrinkButton(player.Content().try_as<xaml::UIElement>(), true);
             RemoveFillButton(player.Content().try_as<xaml::UIElement>());
         }
