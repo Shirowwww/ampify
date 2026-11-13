@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.1 (2026-11-13)
+
+The accent colour you pick now reaches every button, and the Song panel's lyrics stop catching the wheel by accident.
+
+- The repeat button, the dot under shuffle, Ampify's entry in the sidebar and the Song panel's button take the
+  chosen accent, and follow it when it changes, instead of staying in Apple Music's blue.
+- The Song panel's lyrics scroll with the wheel only once the pointer has rested on them for a second: before that,
+  the wheel scrolls the panel, so passing over the lyrics no longer moves them.
+
 ## 1.4.0 (2026-11-13)
 
 AutoMix, steadier lyrics, and an Ampify that does less while nothing changes.
