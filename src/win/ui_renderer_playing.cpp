@@ -278,6 +278,8 @@ constexpr auto kLyricsBackFade = std::chrono::milliseconds(150);
 constexpr double kLyricsAnchor = 0.3;      // the line being sung stands about a third down the view
 constexpr double kLyricsWheelStep = 0.4;   // pixels per unit of wheel turn: a notch (120) moves 48 pixels
 constexpr double kLyricsBackSize = 32;
+// The wheel scrolls the lines only once the pointer has rested on them this long: passing over, it scrolls the panel.
+constexpr auto kLyricsWheelRest = std::chrono::milliseconds(1000);
 constexpr wchar_t kGlyphUp[] = L"\uE70E";    // ChevronUp, in Segoe Fluent Icons
 constexpr wchar_t kGlyphDown[] = L"\uE70D";  // ChevronDown
 
@@ -308,14 +310,22 @@ void ShowLyricsBack(LyricsView& view, bool shown, bool lineAbove = false) {
     if (shown) view.backIcon.Glyph(lineAbove ? kGlyphUp : kGlyphDown);
 }
 
-// The wheel goes to the panel the lyrics stand in while it can still move that way.
-bool PanelTakesWheel(const xaml::DependencyObject& from, bool down) {
-    for (auto node = media::VisualTreeHelper::GetParent(from); node; node = media::VisualTreeHelper::GetParent(node)) {
-        if (auto scroll = node.try_as<controls::ScrollViewer>()) {
-            return down ? scroll.VerticalOffset() < scroll.ScrollableHeight() - 0.5 : scroll.VerticalOffset() > 0.5;
-        }
+// The lines can still move that way.
+bool LyricsCanMove(const LyricsView& view, bool down) {
+    double room = std::max(0.0, view.lines.ActualHeight() - view.viewport.ActualHeight());
+    return down ? view.offset < room - 0.5 : view.offset > 0.5;
+}
+
+// The wheel goes to the lines once the pointer has rested on them (kLyricsWheelRest) and while they can move that way,
+// otherwise to the panel they stand in. A turn the panel takes starts the rest again, so scrolling the panel past the
+// lyrics never lands in them.
+bool LyricsTakeWheel(LyricsView& view, bool down) {
+    auto now = std::chrono::steady_clock::now();
+    if (now - view.resting < kLyricsWheelRest || !LyricsCanMove(view, down)) {
+        view.resting = now;
+        return false;
     }
-    return false;
+    return true;
 }
 
 controls::TextBlock LyricLineBlock(LyricsView& view, const LyricLine& line, bool timed) {
@@ -532,12 +542,15 @@ xaml::FrameworkElement MakeLyricsView(const std::shared_ptr<LyricsView>& view) {
         } catch (...) {
         }
     });
+    view->viewport.PointerEntered([weak](IInspectable const&, xaml::Input::PointerRoutedEventArgs const&) noexcept {
+        if (std::shared_ptr<LyricsView> alive = weak.lock()) alive->resting = std::chrono::steady_clock::now();
+    });
     view->viewport.PointerWheelChanged([weak](IInspectable const&, xaml::Input::PointerRoutedEventArgs const& args) noexcept {
         try {
             std::shared_ptr<LyricsView> alive = weak.lock();
             if (!alive || !alive->shown) return;
             int delta = args.GetCurrentPoint(alive->viewport).Properties().MouseWheelDelta();
-            if (delta == 0 || PanelTakesWheel(alive->viewport, delta < 0)) return;
+            if (delta == 0 || !LyricsTakeWheel(*alive, delta < 0)) return;
             MoveLyrics(*alive, alive->offset - delta * kLyricsWheelStep);
             args.Handled(true);
             if (!alive->shown->synced) return;  // nothing is sung: nothing to come back to

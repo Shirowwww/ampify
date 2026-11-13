@@ -328,7 +328,7 @@ written by hand as in a React one.
 | `dropdown`, `option` | `label`, `value`, `disabled`, `onChange`; children are `option` nodes with `value`, `label` |
 | `image` | `src` (https, a file path, `"artwork"`: Apple's image of the song playing, following it, the previous cover fading out in 500 ms on a new song except in eco glass or with Windows' animation effects off, or `"artwork:<id>"`: the cover of a queue entry, as `queue.list()` gives it), `label`, `onClick`, `fit` (`cover`, `contain`, `fill`), `cornerRadius`, `width`, `height` |
 | `icon` | `icon` (SVG), `label`, `onClick` |
-| `lyrics` | `size`, `color`, `placeholder`, `onChange`: the lyrics of the song playing, lit as Apple's own view does (the whole line, or word by word when Apple times the words), the current line larger and kept in view; `placeholder` shows while the song has none; a click on a line gives its start in ms to `onChange` |
+| `lyrics` | `size`, `color`, `placeholder`, `onChange`: the lyrics of the song playing, lit as Apple's own view does (the whole line, or word by word when Apple times the words), the current line larger and kept in view; `placeholder` shows while the song has none; a click on a line gives its start in ms to `onChange`; the wheel scrolls the lines once the pointer has rested on them for a second, and scrolls the page or panel around them before that |
 | any | `tooltip`, `tooltipPlacement` (`top`, `bottom`, `left`, `right`), `tooltipDelay` (0 to 10000 ms) |
 
 A `card`, `image` or `icon` with an `onClick` works from the keyboard as well: Tab stops on it, Enter or Space clicks

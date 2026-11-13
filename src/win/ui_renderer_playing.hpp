@@ -4,6 +4,7 @@
 
 #if defined(AMPIFY_WITH_XAML)
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -75,6 +76,7 @@ struct LyricsView {
     controls::FontIcon backIcon{nullptr};
     double offset = 0;    // how far the lines are moved up
     bool manual = false;  // the user moved them
+    std::chrono::steady_clock::time_point resting{};  // since when the pointer rests on the lines
     SeenTimer timer;  // a frame of the karaoke, while the view is loaded and the window seen
     std::shared_ptr<const Lyrics> shown;
     std::vector<std::vector<media::SolidColorBrush>> words;  // per line, per word (one per line without word times)
