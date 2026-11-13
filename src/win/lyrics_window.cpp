@@ -131,6 +131,9 @@ void Fade(const xaml::UIElement& element, bool shown) {
 // Translation: a filter may hold the element's visual (src/win/element_blur.*, the lyrics' blur), which refuses
 // XAML's then, and its copies follow this one.
 void Move(const xaml::UIElement& block, double shift) {
+    // On a whole screen pixel: a shift between two drew every line resampled, softer than the text around it.
+    const double scale = block.XamlRoot() ? block.XamlRoot().RasterizationScale() : 1.0;
+    if (scale > 0) shift = std::round(shift * scale) / scale;
     comp::Visual visual = hosting::ElementCompositionPreview::GetElementVisual(block);
     hosting::ElementCompositionPreview::SetIsTranslationEnabled(block, true);
     winrt::Windows::Foundation::Numerics::float3 now{};

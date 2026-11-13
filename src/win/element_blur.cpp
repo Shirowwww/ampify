@@ -125,6 +125,31 @@ xaml::Controls::Grid HostBeside(const xaml::FrameworkElement& element, const xam
     return host;
 }
 
+// Where `content` is laid out in `host`, from the layout offsets alone (no transform, no Translation): `host` is the
+// parent, or Ampify's grid in that parent. Nothing when `content` is not under the parent.
+std::optional<winrt::Windows::Foundation::Point> LayoutOrigin(const xaml::UIElement& content, const xaml::UIElement& host,
+                                                              const xaml::UIElement& parent) {
+    constexpr int kMaxDepth = 16;
+    if (!parent) return std::nullopt;
+    float x = 0;
+    float y = 0;
+    xaml::DependencyObject at = content;
+    for (int depth = 0; at && at != parent; depth++) {
+        if (depth == kMaxDepth) return std::nullopt;
+        if (auto node = at.try_as<xaml::UIElement>()) {
+            x += node.ActualOffset().x;
+            y += node.ActualOffset().y;
+        }
+        at = media::VisualTreeHelper::GetParent(at);
+    }
+    if (!at) return std::nullopt;
+    if (host != parent) {
+        x -= host.ActualOffset().x;
+        y -= host.ActualOffset().y;
+    }
+    return winrt::Windows::Foundation::Point{x, y};
+}
+
 }  // namespace
 
 std::optional<ImageFilter> ImageFilter::Parse(const std::string& text) {
@@ -269,7 +294,19 @@ void ElementBlur::ClipAway(Entry& entry) {
         own.Clip(own.Compositor().CreateRectangleClip(-2, -2, -1, -1));
         return;
     }
-    own.Clip(own.Compositor().CreateRectangleClip(band.X, band.Y, band.X + band.Width, band.Y + band.Height));
+    // The clip is in the element's own space, which its Translation moves: taken back by it, the sharp middle stays
+    // where the copies' masks leave room for it.
+    comp::Compositor compositor = own.Compositor();
+    comp::RectangleClip clip = compositor.CreateRectangleClip(band.X, band.Y, band.X + band.Width, band.Y + band.Height);
+    if (entry.place) {
+        for (auto [side, edge] : {std::pair{L"Top", band.Y}, std::pair{L"Bottom", band.Y + band.Height}}) {
+            comp::ExpressionAnimation back = compositor.CreateExpressionAnimation(L"edge - own.Translation.Y");
+            back.SetScalarParameter(L"edge", edge);
+            back.SetReferenceParameter(L"own", own);
+            clip.StartAnimation(side, back);
+        }
+    }
+    own.Clip(clip);
 }
 
 void ElementBlur::Sweep() noexcept {
@@ -370,10 +407,15 @@ ElementBlur::Entry* ElementBlur::Start(theme::NodeId id, const xaml::FrameworkEl
         xaml::Hosting::ElementCompositionPreview::SetIsTranslationEnabled(pair->clipped, true);
         entry.place = compositor.CreatePropertySet();
         entry.place.InsertVector3(L"Offset", {0, 0, 0});
-        comp::ExpressionAnimation follow = compositor.CreateExpressionAnimation(L"place.Offset + clipped.Translation");
+        // The layer and its masks stay where the element is laid out; the content inside moves with the element. Moving
+        // the whole layer took the blurred edges along: shifted down to centre the sung line, the top edge blurred it.
+        comp::ExpressionAnimation follow = compositor.CreateExpressionAnimation(L"place.Offset");
         follow.SetReferenceParameter(L"place", entry.place);
-        follow.SetReferenceParameter(L"clipped", own);
         entry.layer.StartAnimation(L"Offset", follow);
+        comp::ExpressionAnimation inside =
+            compositor.CreateExpressionAnimation(L"Vector2(-clipped.Translation.X, -clipped.Translation.Y)");
+        inside.SetReferenceParameter(L"clipped", own);
+        entry.surface.StartAnimation(L"SourceOffset", inside);
     }
     xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(host, entry.layer);
     Entry& kept = m_entries.insert_or_assign(id, std::move(entry)).first->second;
@@ -451,17 +493,13 @@ void ElementBlur::Place(Entry& entry) {
             if (grid.Height() != element.ActualHeight()) grid.Height(element.ActualHeight());
         }
     }
-    winrt::Windows::Foundation::Point origin = content.TransformToVisual(host).TransformPoint({0, 0});
-    if (entry.place) {
-        // Without the clipped element's Translation, which the expression adds: TransformToVisual counts it once
-        // enabled, and the copies went twice as far as the element.
-        winrt::Windows::Foundation::Numerics::float3 moved{};
-        if (auto clipped = entry.clipped.get()) {
-            xaml::Hosting::ElementCompositionPreview::GetElementVisual(clipped).Properties().TryGetVector3(L"Translation", moved);
-        }
-        origin.X -= moved.x;
-        origin.Y -= moved.y;
-    }
+    // The expression adds the clipped element's Translation, so the place leaves it out. TransformToVisual counted it
+    // some times and not others (a Translation set on the compositor reaches XAML late): the copies then stood a
+    // shift away from the element's sharp middle, a line cut at the top and doubled at the bottom. The layout's own
+    // offsets never count it.
+    std::optional<winrt::Windows::Foundation::Point> laid = entry.place ? LayoutOrigin(content, host, entry.parent.get())
+                                                                        : std::nullopt;
+    winrt::Windows::Foundation::Point origin = laid ? *laid : content.TransformToVisual(host).TransformPoint({0, 0});
     const winrt::Windows::Foundation::Numerics::float2 size{static_cast<float>(content.ActualWidth()),
                                                              static_cast<float>(content.ActualHeight())};
     if (entry.place) {

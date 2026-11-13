@@ -17,7 +17,12 @@ Neither view lives in the main window. `AMP.UI.Views.FullScreenPlayer.Instance()
 `Ampify.ui.applePlayer` calls) brings up a window of its own, which Apple names `FullScreenPlayerWindow` among its app
 properties (`GetAppProperty`, like `MainWindow` and `MiniPlayerWindow`). Measured on 1.1792: it is created within
 200 ms of `Show`, on the main window's interface thread, with the FullScreen presenter. That presenter puts its own
-Win32 style back after any change; swapping it for an overlapped presenter (border, no title bar) holds.
+Win32 style back after any change; swapping it for an overlapped presenter (border, no title bar) holds. Not always:
+with the main window on a second, upright screen, Apple showed it with an overlapped presenter (title bar and all)
+stretched over that screen and never switched; a wait for the FullScreen presenter alone then never ends.
+
+Word-by-word lyrics draw softer than the text around them at 125 %, Ampify's effects off or on (seen 13/11/2026):
+Apple's own drawing. Line-synced lyrics are sharp, as long as anything that moves them lands on a whole pixel.
 
 ## Mini player (`MiniPlayerPage`, `MiniPlayerView`)
 

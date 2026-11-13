@@ -56,6 +56,9 @@ namespace xaml = winrt::Microsoft::UI::Xaml;
 
 constexpr auto kPollStep = std::chrono::milliseconds(50);
 constexpr int kPollTicks = 60;  // 3 s for Apple to create the window and give it its FullScreen presenter
+// Apple may also show it as an ordinary window stretched over the screen, and leave it so: taken as it is once it
+// has stayed that way this long, rather than waited for in vain (seen on a second, upright screen).
+constexpr int kOverlappedTicks = 12;  // 600 ms
 constexpr auto kReportDelay = std::chrono::seconds(1);
 constexpr auto kWatchStep = std::chrono::milliseconds(250);  // while laid out: notices the close soon enough
 constexpr int kPressReports = 3;     // presses described in the log, to see what takes them
@@ -69,6 +72,7 @@ constexpr int kDragStart = 4;       // pixels the pointer moves, button down, be
 struct Placement {
     dispatching::DispatcherQueueTimer timer{nullptr};
     int ticks = 0;
+    int overlappedTicks = 0;  // ticks the window was shown without the FullScreen presenter (kOverlappedTicks)
     uirender::PlayerMode mode = uirender::PlayerMode::Window;
     bool laid = false;           // Ampify placed the player: the timer now follows it until it closes
     bool everLaid = false;       // Ampify placed it once: Apple then shows it again with Ampify's presenter
@@ -712,13 +716,21 @@ void Step(Placement& state) {
     }
     // Apple gives a new window the FullScreen presenter after showing it; a window Ampify laid out before keeps
     // Ampify's presenter when it shows again, so it is ready as soon as it shows.
-    bool ready = visible && (state.everLaid || window.Presenter().Kind() == windowing::AppWindowPresenterKind::FullScreen);
+    bool fullScreen = visible && window.Presenter().Kind() == windowing::AppWindowPresenterKind::FullScreen;
+    if (visible && !fullScreen) state.overlappedTicks++;
+    bool ready = visible && (state.everLaid || fullScreen || state.overlappedTicks >= kOverlappedTicks);
     if (!ready && ++state.ticks < kPollTicks) return;
     if (!ready) {
         state.timer.Stop();
-        state.journal->Write(window ? "Apple player: its window did not go full screen within 3 s, left as it is"
+        state.journal->Write(window ? "Apple player: its window was not shown within 3 s (" +
+                                          std::string(PresenterName(window.Presenter().Kind())) +
+                                          " presenter), left as it is"
                                     : "Apple player: shown, but Apple Music gave no FullScreenPlayerWindow, left as it is");
         return;
+    }
+    if (!fullScreen && !state.everLaid) {
+        state.journal->Write("Apple player: Apple showed it as a " + std::string(PresenterName(window.Presenter().Kind())) +
+                             " window, " + RectText(VisibleRect(WindowHandle(player))) + ", taken as it is");
     }
     AddPlayerControls(player.Content(), state.mainRoot.get(), *state.journal);
     HugArtwork(player.Content().try_as<xaml::UIElement>());
@@ -766,6 +778,7 @@ void Watch(const xaml::Window& mainWindow, Journal& journal, uirender::PlayerMod
     state.mainRoot = winrt::make_weak(mainWindow.Content());
     state.journal = &journal;
     state.ticks = 0;
+    state.overlappedTicks = 0;
     state.laid = false;
     state.reportPending = false;
     if (!state.timer) {
@@ -811,8 +824,8 @@ void FollowApplePlayer(const xaml::Window& mainWindow, Journal& journal, uirende
         if (mode == uirender::PlayerMode::Screen && !State().everLaid) return;  // Apple's own way, nothing to undo
         xaml::Window player = AppWindowOf(WindowRole::Player);
         windowing::AppWindow window = player ? player.AppWindow() : nullptr;
-        bool fresh = window && window.Presenter().Kind() == windowing::AppWindowPresenterKind::FullScreen;
-        if (!window || !window.IsVisible() || !(fresh || State().everLaid)) return;
+        // Shown and not laid out (the timer is idle): whatever presenter Apple gave it, Step waits for it to settle.
+        if (!window || !window.IsVisible()) return;
         journal.Write("Apple player: opened by Apple Music itself");
         Watch(mainWindow, journal, mode);
     } catch (...) {
