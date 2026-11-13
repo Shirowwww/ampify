@@ -590,6 +590,41 @@ void ReadAppleTweaks(UiService::Shared& shared, std::optional<std::filesystem::f
     }
 }
 
+// The accent text colour as the window holds it now. Ampify's lit buttons take the brush the key held when they were
+// drawn: a theme, a chosen accent or the artwork's that comes later leaves them in the old colour, so they are drawn
+// again once it moves.
+std::optional<winrt::Windows::UI::Color> AccentTextNow() noexcept {
+    try {
+        if (auto brush = ThemeResource(L"AccentTextFillColorPrimaryBrush").try_as<media::SolidColorBrush>()) {
+            return brush.Color();
+        }
+    } catch (...) {
+    }
+    return std::nullopt;
+}
+
+void QueueAccentCheck(const std::shared_ptr<UiService::Shared>& shared) {
+    std::vector<std::shared_ptr<WindowContext>> windows;
+    {
+        std::lock_guard<std::mutex> lock(shared->mutex);
+        windows = shared->windows;
+    }
+    WeakShared weakShared = shared;
+    for (const auto& context : windows) {
+        if (context->role != WindowRole::Main) continue;
+        WeakContext weakContext = context;
+        context->dispatcher.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [weakShared, weakContext]() noexcept {
+            std::shared_ptr<WindowContext> live = weakContext.lock();
+            if (!live || live->ticket.Closed()) return;
+            std::optional<winrt::Windows::UI::Color> now = AccentTextNow();
+            if (now == live->accentSeen) return;
+            live->accentSeen = now;
+            for (auto& item : live->placed) item.second.restain = item.second.active;
+            QueueRefresh(weakShared, live);
+        });
+    }
+}
+
 // A window showed: the next refresh of the main window looks for Apple's full-screen player to lay it out.
 void QueuePlayerCheck(const std::shared_ptr<UiService::Shared>& shared) {
     std::vector<std::shared_ptr<WindowContext>> windows;
@@ -659,6 +694,7 @@ void UiService::Run() {
             }
             if (now >= nextTweaks) {
                 ReadAppleTweaks(*m_shared, tweaksStamp);
+                QueueAccentCheck(m_shared);
                 nextTweaks = now + kTweaksPoll;
             }
             if (g_windowShown.exchange(false)) QueuePlayerCheck(m_shared);

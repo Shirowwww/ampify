@@ -5054,6 +5054,9 @@ TEST_CASE(Accent_ChosenOneReplacesSpicetifysButton) {
     options.accent = th::Argb{0xFF, 0x0A, 0x84, 0xFF};
     th::Theme theme = Load(files, options);
     CHECK(ResourceValue(theme, "AccentFillColorDefaultBrush") == "#FF0A84FF");
+    // Apple's repeat icon, the shuffle dot and the lit sidebar entries read the accent text keys.
+    CHECK(ResourceValue(theme, "AccentTextFillColorPrimaryBrush") == "#FF0A84FF");
+    CHECK(ResourceValue(theme, "AccentTextFillColorSecondaryBrush") == "#E60A84FF");
     CHECK(Assigned(theme, "ScrubberControl#LCDScrubber", "Foreground") == "#FF0A84FF");
     CHECK(theme.variables["spice-button"] == "#FF0A84FF");
 }
@@ -5065,6 +5068,7 @@ TEST_CASE(Accent_WithoutAThemeAppliesTheAccentAlone) {
     CHECK(alone.usable && alone.id == th::kAccentOnlyId);
     CHECK(ResourceValue(alone, "AccentFillColorDefaultBrush") == "#FFFA2D48");
     CHECK(ResourceValue(alone, "ToggleSwitchFillOn") == "#FFFA2D48");
+    CHECK(ResourceValue(alone, "AccentTextFillColorPrimaryBrush") == "#FFFA2D48");
     CHECK(Assigned(alone, ".scrubber", "Foreground") == "#FFFA2D48");
     CHECK(!alone.dark.has_value());  // Apple Music keeps its own light or dark mode
 

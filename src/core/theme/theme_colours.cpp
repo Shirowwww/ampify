@@ -180,6 +180,18 @@ void DefineAccentControls(Colours& colours, const std::set<std::string>& owned) 
         {"HyperlinkButtonForegroundPointerOver", kLink, 0.9},
         {"HyperlinkButtonForegroundPressed", kLink, 0.8},
     };
+    // Apple's repeat icon, the shuffle dot and Ampify's own lit entries read the accent text keys: a theme or a chosen
+    // accent that names none left them in Apple Music's blue.
+    if (std::optional<Argb> accent = theme.palette.Find(kAccent)) {
+        for (const auto& [key, opacity] : {std::pair{"AccentTextFillColorPrimaryBrush", 1.0},
+                                           std::pair{"AccentTextFillColorSecondaryBrush", 0.9},
+                                           std::pair{"AccentTextFillColorTertiaryBrush", 0.8}}) {
+            if (theme.palette.Find(key)) continue;
+            Argb color = *accent;
+            color.a = static_cast<std::uint8_t>(std::lround(accent->a * opacity));
+            DefineDerived(colours, owned, kAccent, key, color);
+        }
+    }
     for (const Derived& derived : kControls) {
         std::optional<Argb> color = theme.palette.Find(derived.from);
         if (!color) continue;

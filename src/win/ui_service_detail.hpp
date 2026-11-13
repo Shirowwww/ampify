@@ -138,6 +138,7 @@ struct PlacedControl {
     std::string label;     // shown now: a new one from setLabel replaces it in place
     bool hasIcon = false;  // the label is then the tooltip only
     bool active = false;   // on (Ampify.ui.setActive): drawn in the accent colour
+    bool restain = false;  // the accent changed since it was drawn: drawn again at the next refresh
     bool disabled = false;  // greyed (Ampify.ui.setDisabled)
     bool inHeader = false;  // a sidebar entry standing in the sidebar's header (ampify.entry = header)
     // A sidebar entry in the list: the pane state it was laid out for, and its control, for a change of pane.
@@ -164,6 +165,7 @@ struct WindowContext : std::enable_shared_from_this<WindowContext> {
 
     // Interface thread only, from here on.
     bool observed = false;
+    std::optional<winrt::Windows::UI::Color> accentSeen;  // the accent text colour the lit buttons were drawn in
     winrt::weak_ref<xaml::DependencyObject> root;
     winrt::event_token rootLayout{};
     winrt::event_token rootSize{};

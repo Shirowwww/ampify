@@ -92,7 +92,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
                 controls::ToolTipService::SetToolTip(placed.button, winrt::box_value(Wide(control.label)));
                 automation::AutomationProperties::SetName(placed.button, Wide(control.label));
             }
-            if (placed.active != control.active) {
+            if (placed.active != control.active || std::exchange(placed.restain, false)) {
                 placed.active = control.active;
                 TintControl(placed.button, control, placed.hasIcon);
             }

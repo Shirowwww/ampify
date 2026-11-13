@@ -270,7 +270,8 @@ void LayoutSidebarEntry(PlacedControl& placed, const controls::NavigationView& n
         paneOpen ? kAutoWidth : ampify::FoldedEntryWidth(navigation.CompactPaneLength(), margin.Left, margin.Right);
     const ampify::EntryLayout shown{placed.paneOpen, placed.active, placed.button.Width(), placed.iconShift};
     const ampify::EntryLayout wanted{paneOpen, active, width, shift};
-    if (placed.laidOut && !ampify::EntryLayoutChanged(shown, wanted)) return;
+    bool restain = std::exchange(placed.restain, false);
+    if (placed.laidOut && !ampify::EntryLayoutChanged(shown, wanted) && !restain) return;
     placed.laidOut = true;
     placed.paneOpen = paneOpen;
     placed.active = active;
@@ -480,7 +481,7 @@ void UpdatePlacedEntry(WindowContext& context, PlacedControl& placed, const UiCo
         return;
     }
     KeepBesideMore(header, placed.button);
-    if (placed.active == active) return;
+    if (placed.active == active && !std::exchange(placed.restain, false)) return;
     placed.active = active;
     placed.button.Content(SidebarIcon(control, active));
     automation::AutomationProperties::SetItemStatus(placed.button, active ? L"on" : L"");
