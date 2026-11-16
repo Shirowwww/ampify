@@ -27,10 +27,10 @@ const OPTIONS = { style: "Auto", maxSeconds: 20, albums: true, earliest: 30 };
 // Apple's structure: a phrase starts on every `phraseEvery`-th bar from bar `phraseFrom`.
 function song({ duration = 200, bpm = 124, firstBeat = 0, loudFrom = 0, loudTo = duration, vocals = [],
                 attributes = {}, danceability = 0.8, fadeIn = null, fadeOut = null, level = null, key = null,
-                melodicness = 0.7, phraseEvery = 0, phraseFrom = 0 } = {}) {
-  const beat = 60 / bpm;
+                melodicness = 0.7, phraseEvery = 0, phraseFrom = 0, beatAt = null } = {}) {
+  // beatAt(t, i): the length of the beat that starts at t, the i-th one, when the tempo moves along the song.
   const beats = [];
-  for (let t = firstBeat; t < duration; t += beat) beats.push(Math.round(t * 1000));
+  for (let t = firstBeat, i = 0; t < duration; t += beatAt ? beatAt(t, i) : 60 / bpm, i++) beats.push(Math.round(t * 1000));
   const bars = beats.filter((_, i) => i % 4 === 0);
   const curve = [];
   for (let t = 0; t < duration; t += 0.5) curve.push(level ? level(t) : t >= loudFrom && t < loudTo ? -8 : -60);
@@ -230,6 +230,36 @@ test("the current song is brought to the next one's tempo, and their bars stay t
     const apart = barsApart(a, b, result.plan, t);
     assert.ok(apart <= 0.003, `bars ${(apart * 1000).toFixed(1)} ms apart at ${t}`);
   }
+});
+
+// The widest gap, in seconds as heard, between a beat of one song and the nearest beat of the other over the mix.
+function widestBeatGap(a, b, plan) {
+  const rate = plan.rate ?? 1;
+  const start = plan.keys[0][0];
+  const length = (plan.keys.at(-1)[0] - start) / rate;
+  const heardA = a.analysis.beats.beatsInMilliseconds.map((ms) => (ms / 1000 - start) / rate);
+  const heardB = b.analysis.beats.beatsInMilliseconds.map((ms) => ms / 1000 - plan.bStart);
+  return Math.max(...heardB.filter((u) => u >= 0 && u <= length)
+    .map((u) => Math.min(...heardA.map((v) => Math.abs(v - u)))));
+}
+
+test("the speed comes from the bars mixed: a next song whose tempo moves after its start still mixes beat on beat", () => {
+  const a = song({ bpm: 126 });
+  // 120 bpm for its first eight seconds, then 126: the tempo near its start is not the one of most of the mix.
+  const b = song({ beatAt: (t) => (t < 8 ? 0.5 : 60 / 126), attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.equal(result.kind, "beat");
+  assertPlayable(result.plan, a, b);
+  const gap = widestBeatGap(a, b, result.plan);
+  assert.ok(gap <= 0.025, `beats ${(gap * 1000).toFixed(1)} ms apart at worst`);
+});
+
+test("a beat grid too uneven for one speed is not mixed on the beat", () => {
+  const a = song({ bpm: 124 });
+  // Every other bar six percent faster: no speed keeps the beats of any two bars together.
+  const b = song({ beatAt: (t, i) => (Math.floor(i / 4) % 2 ? 0.47 : 0.5), attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.notEqual(result.kind, "beat");
 });
 
 test("a slower next song slows the current one down", () => {

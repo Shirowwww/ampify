@@ -15,6 +15,7 @@ const MAX_STRETCH = 0.08;         // the current song plays this much faster or 
 const NO_STRETCH = 0.002;         // tempos this close are left alone: the bars drift 20 ms at most over a long mix
 const SHORT_ABOVE = 0.05;         // past this much stretch, or when the keys clash, a short mix
 const SHORT_BARS = 4;
+const MAX_BEAT_GAP_S = 0.025;     // two beats further apart than this are heard as two hits: the mix is not on the beat
 const RAMP_S = 8;                 // the current song reaches its new speed over this long, before the mix
 const MIN_RAMP_S = 4;
 const END_ROOM_S = 3.1;           // the kernel wants 3 s of the current song after a mix...
@@ -54,6 +55,34 @@ function seconds(list) {
 
 function barsOf(song) {
   return seconds(song.analysis?.beats?.barsInMilliseconds);
+}
+
+function beatsOf(song) {
+  const beats = seconds(song.analysis?.beats?.beatsInMilliseconds);
+  return beats.length ? beats : barsOf(song);
+}
+
+function nearestIn(sorted, x) {
+  let lo = 0;
+  let hi = sorted.length - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (sorted[mid] < x) lo = mid;
+    else hi = mid;
+  }
+  return Math.abs(sorted[lo] - x) <= Math.abs(sorted[hi] - x) ? sorted[lo] : sorted[hi];
+}
+
+// The widest gap between the two songs' beats over a mix, in seconds as heard: A plays from aStart at `rate`, B from
+// bStart at its own speed, for `length` seconds. The sparser pulse is laid on the denser one (70 bpm on 140).
+function worstBeatGap(beatsA, beatsB, aStart, rate, bStart, length) {
+  const heardA = beatsA.map((t) => (t - aStart) / rate);
+  const heardB = beatsB.map((t) => t - bStart);
+  const within = (list) => list.filter((u) => u >= 0 && u <= length);
+  const [sparse, dense] = within(heardA).length <= within(heardB).length ? [heardA, heardB] : [heardB, heardA];
+  const laid = within(sparse);
+  if (laid.length < 2 || dense.length < 2) return Infinity;
+  return Math.max(...laid.map((u) => Math.abs(nearestIn(dense, u) - u)));
 }
 
 // The usual length of a bar around `time`: the median of the eight bars nearest to it.
@@ -213,8 +242,7 @@ function beatMix(a, b, spanA, spanB, options) {
   if (beatless(a, b, barsA, barsB)) return null;
   const match = tempoMatch(barLength(barsA, spanA.end), barLength(barsB, spanB.start));
   if (!(Math.abs(match.rate - 1) <= MAX_STRETCH)) return null;
-  const stretched = Math.abs(match.rate - 1) > NO_STRETCH;
-  const rate = stretched ? match.rate : 1;
+  const rate = Math.abs(match.rate - 1) > NO_STRETCH ? match.rate : 1;
   const latest = Math.min(spanA.end, a.duration - endRoom(rate, RAMP_S, options.maxSeconds * rate));
   let last = barsA.length - 1;
   while (last > 0 && barsA[last] > latest) last--;
@@ -229,29 +257,49 @@ function beatMix(a, b, spanA, spanB, options) {
   const short = Math.abs(rate - 1) > SHORT_ABOVE || keysClash(a, b);
   const counts = short && choices.some((count) => count <= SHORT_BARS)
     ? choices.filter((count) => count <= SHORT_BARS) : choices;
+  const grids = { barsA, barsB, beatsA: beatsOf(a), beatsB: beatsOf(b), span: match.span };
   for (const count of counts) {
     const from = last - count;
     if (from < 0) continue;
-    const aStart = barsA[from];
-    const aEnd = barsA[last];
-    const length = (aEnd - aStart) / rate;
-    const ramp = stretched ? Math.min(RAMP_S, aStart - options.earliest) : 0;
-    if (length > options.maxSeconds || aStart < options.earliest || (stretched && ramp < MIN_RAMP_S)) continue;
-    // Lined up on the middle bar: what is left of a tempo gap shows half as much at each end.
-    const middle = count / 2;
-    const across = middle * match.span;
-    if (!Number.isInteger(across)) continue;
-    const startFor = (bar) => barsB[bar + across] - (barsA[from + middle] - aStart) / rate;
-    const entry = entries.find((bar) => bar + count * match.span < barsB.length && startFor(bar) >= 0);
-    if (entry === undefined) continue;
-    const bStart = startFor(entry);
-    // Two singers at once for long sounds like a clash: then only the shortest mix.
-    const clash = vocalShare(a, aStart, aEnd) > 0.4 && vocalShare(b, bStart, bStart + length) > 0.4;
-    if (clash && count > 2 && counts.includes(2)) continue;
-    const plan = { bStart, keys: blendKeys(aStart, aEnd), ...(stretched ? { rate, rateFrom: aStart - ramp } : {}) };
-    return { kind: "beat", bars: count, plan };
+    for (const entry of entries) {
+      const fit = beatFit(a, grids, from, last, entry, options);
+      if (!fit) continue;
+      // Two singers at once for long sounds like a clash: then only the shortest mix.
+      const clash = vocalShare(a, fit.aStart, fit.aEnd) > 0.4 && vocalShare(b, fit.bStart, fit.bStart + fit.length) > 0.4;
+      if (clash && count > 2 && counts.includes(2)) continue;
+      const plan = {
+        bStart: fit.bStart, keys: blendKeys(fit.aStart, fit.aEnd),
+        ...(fit.rate !== 1 ? { rate: fit.rate, rateFrom: fit.aStart - fit.ramp } : {}),
+      };
+      return { kind: "beat", bars: count, plan };
+    }
   }
   return null;
+}
+
+// The current song's bars `from` to `last` laid on the next song's from bar `entry`: the speed is the one at which
+// those very bars of A last as long as B's (Apple's tempo moves along a song, so the tempo near either end misled
+// the mix), lined up on the middle bar, and kept only when every beat of the mix falls with one of the other song's.
+function beatFit(a, grids, from, last, entry, options) {
+  const { barsA, barsB, beatsA, beatsB, span } = grids;
+  const count = last - from;
+  const middle = count / 2;
+  const across = middle * span;
+  if (!Number.isInteger(across) || entry + count * span >= barsB.length) return null;
+  const aStart = barsA[from];
+  const aEnd = barsA[last];
+  const fitted = (aEnd - aStart) / (barsB[entry + count * span] - barsB[entry]);
+  if (!(Math.abs(fitted - 1) <= MAX_STRETCH)) return null;
+  const rate = Math.abs(fitted - 1) > NO_STRETCH ? fitted : 1;
+  if (Math.abs(rate - 1) > SHORT_ABOVE && count > SHORT_BARS) return null;  // every style tries four bars or fewer
+  const length = (aEnd - aStart) / rate;
+  const ramp = rate !== 1 ? Math.min(RAMP_S, aStart - options.earliest) : 0;
+  if (length > options.maxSeconds || aStart < options.earliest || (rate !== 1 && ramp < MIN_RAMP_S)) return null;
+  if (aEnd > a.duration - endRoom(rate, ramp, length * rate)) return null;
+  const bStart = barsB[entry + across] - (barsA[from + middle] - aStart) / rate;
+  if (bStart < 0) return null;
+  if (worstBeatGap(beatsA, beatsB, aStart, rate, bStart, length) > MAX_BEAT_GAP_S) return null;
+  return { aStart, aEnd, rate, ramp, length, bStart };
 }
 
 // A crossfade on the music itself: the next song, from where it is first heard, comes in under the current song's

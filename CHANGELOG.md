@@ -5,6 +5,11 @@
 - Apple Music's own lyrics are word by word again with Ampify on: Ampify asked Apple's player for a lyrics source that
   does not exist, and Apple then kept the line-by-line lyrics for its own panel (#5). Ampify's lyrics, the Song
   panel's karaoke and `player.lyrics()` now get the word times too, from the song's start.
+- AutoMix 1.0.2: a mix on the beat takes its speed from the very bars it mixes, and is planned only when every beat
+  of one song falls within 25 ms of one of the other's, from Apple's beat grids. Before, the speed came from the
+  tempo near the end of one song and the start of the other: over 2,337 mixes planned between chart songs, the beats
+  drifted up to 34 ms apart in half of them and past 227 ms in one in ten. A pair that cannot keep together swaps on
+  a bar instead.
 
 ## 1.4.1 (2026-11-13)
 

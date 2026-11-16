@@ -131,6 +131,14 @@ by recording the default output (WASAPI loopback) while a song was mixed into it
 - Fade-outs are loose: one song's says 161.6 to 166.7 s, while its loudness curve drops 15 dB within a second of
   162.3 s. The curve says where a song really falls silent.
 - Tempos rarely match: on 49 pairs of songs in a row in the French chart, one pair was within 3 % of each other.
+- Since the grid moves, one speed fitted to the tempo near the end of A and the start of B lets the beats drift
+  apart over a mix (16/11/2026, 2,337 beat mixes planned between the songs of six charts, from Apple's grids alone):
+  half of them drifted past 34 ms somewhere, one in ten past 227 ms. Taking the speed from the very bars mixed, and
+  keeping a mix only when every beat of the sparser grid falls within 25 ms of one of the other's, gives 15 ms at the
+  median and 22 ms in the worst tenth; a fifth of those pairs swap on a bar instead.
+- One switch of 16/11/2026 counted 200 ms instead of 60-70 (B 135 ms behind its point, "Newjack" into "Phantom",
+  a variant named by a 64-digit hash rather than the usual short one). Not seen again yet: the learned delay only
+  adapts from the second mix of a session, so a stream that switches late puts the first mix off the beat.
 
 ## Signatures (x64)
 
