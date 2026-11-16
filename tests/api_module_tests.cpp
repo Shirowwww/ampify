@@ -87,7 +87,7 @@ const Expected kMembers[] = {
                "queue:object!{list:f0=list,add:f2=add,remove:f1=remove}}"},
     {"audio", "object!{setGainDb:f1=setGainDb,onFrame:f1=onFrame,analyze:f0=analyze,loudness:f0=loudness,"
               "volume:f0=volume,eq:object!{setBand:f2=setBand,preset:f1=preset,reset:f0=reset,bands:f0=bands,"
-              "presets:f0=presets}}"},
+              "presets:f0=presets},sing:object!{set:f1=set,state:f0=state,onChange:f1=onChange}}"},
     {"keyboard", "object!{bind:f2=bind,unbind:f1=unbind}"},  // unbind added in kitApi 1.x
     {"notify", "f1="},
     // post, put, patch, del, postForm, gifFromVideo and open added in kitApi 1.x, compatible additions

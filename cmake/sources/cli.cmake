@@ -1,5 +1,6 @@
 list(APPEND AMPIFY_CLI_PORTABLE_SOURCES
     src/cli/sha256.cpp
+    src/cli/sing.cpp
     src/cli/element.cpp
     src/cli/catalog.cpp
     src/cli/kit.cpp

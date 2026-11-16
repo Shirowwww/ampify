@@ -3389,3 +3389,145 @@ test("the site hides the same retired elements as the kernel", () => {
   assert.ok(retired.length > 0);
   assert.deepEqual([...new Set(listed)].sort(), [...new Set(retired)].sort());
 });
+
+// Sing ships with Ampify, in extensions/: the playback bar's microphone, a popup, and Ampify.audio.sing behind them.
+function fakeSing({ storage = new Map(), language = "en", sing = {} } = {}) {
+  const dir = join(examples, "..", "extensions", "sing");
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+  const granted = new Set(manifest.permissions ?? []);
+  const used = new Set();
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+    used.add(permission);
+  };
+  const react = fakeReact();
+  const node = (type) => (props) => react.React.h(type, props);
+  const world = {
+    sets: [], buttons: [], active: [], listeners: [], stops: [], popups: [],
+    state: { available: null, mode: "off", voice: 0, phase: "off", progress: 0, delay: 0, reason: "none", ...sing },
+  };
+  const Ampify = {
+    log: () => {},
+    onStop: (fn) => world.stops.push(fn),
+    i18n: fakeI18n(language),
+    storage: {
+      get: (key, fallback) => (need("storage"), storage.has(key) ? structuredClone(storage.get(key)) : fallback),
+      set: (key, value) => (need("storage"), storage.set(key, structuredClone(value))),
+    },
+    audio: {
+      sing: {
+        state: () => (need("audio.sing"), structuredClone(world.state)),
+        set: ({ mode, voice }) => {
+          need("audio.sing");
+          world.sets.push({ mode, voice });
+          world.state = { ...world.state, mode, voice };
+          return true;
+        },
+        onChange: (fn) => (need("audio.sing"), world.listeners.push(fn), () => world.listeners.splice(world.listeners.indexOf(fn), 1)),
+      },
+    },
+    ui: {
+      playbar: { addButton: (button) => (need("ui.playbar"), world.buttons.push(button), world.buttons.length) },
+      setActive: (id, on) => (need("ui.playbar"), world.active.push(on)),
+    },
+    React: react.React,
+    components: Object.fromEntries(["Toggle", "Slider", "Tabs", "Text"].map((name) => [name, node(name.toLowerCase())])),
+    ReactDOM: { createRoot: (target) => (need("ui.popup"), {
+      render: (tree) => (world.popups.push(target), react.mount(() => tree)),
+      unmount: () => react.mount(() => null),
+    }) },
+  };
+  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify });
+  const emit = (next) => {
+    world.state = { ...world.state, ...next };
+    world.listeners.slice().forEach((fn) => fn(structuredClone(world.state)));
+  };
+  const open = () => world.buttons[0].onClick();
+  const find = (type) => allNodes(react.page.tree).find((child) => child.type === type);
+  return { world, manifest, used, storage, react, emit, open, find, Ampify };
+}
+
+test("sing offers a microphone on the playback bar that is lit while Sing is asked for", () => {
+  const fake = fakeSing();
+  assert.equal(fake.world.buttons.length, 1);
+  assert.equal(fake.world.buttons[0].icon, "");
+  assert.equal(fake.world.active.at(-1), false);
+  fake.emit({ mode: "light" });
+  assert.equal(fake.world.active.at(-1), true);
+  fake.emit({ mode: "off" });
+  assert.equal(fake.world.active.at(-1), false);
+});
+
+test("sing writes the voice as the slider moves and remembers it", () => {
+  const fake = fakeSing();
+  fake.open();
+  assert.deepEqual(fake.world.popups, ["popup:sing"]);
+  fake.find("toggle").onChange(true);
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "studio", voice: 0.1 }, "default: Studio at a tenth of the voice");
+  fake.find("slider").onChange(55);
+  fake.find("slider").onChange(60);
+  assert.deepEqual(fake.world.sets.slice(-2), [{ mode: "studio", voice: 0.55 }, { mode: "studio", voice: 0.6 }]);
+  assert.deepEqual(fake.storage.get("sing"), { enabled: true, mode: null, voice: 0.6 });
+  fake.find("tabs").onChange("light");
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "light", voice: 0.6 });
+  fake.find("toggle").onChange(false);
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "off", voice: 0.6 });
+  assert.equal(fake.storage.get("sing").mode, "light", "the quality chosen stays for the next time");
+});
+
+test("sing picks Light by default when the graphics card cannot run Studio", () => {
+  const fake = fakeSing({ sing: { available: false } });
+  fake.open();
+  fake.find("toggle").onChange(true);
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "light", voice: 0.1 });
+});
+
+test("sing applies what it remembered when it starts, and nothing when it was off", () => {
+  const remembered = fakeSing({ storage: new Map([["sing", { enabled: true, mode: "light", voice: 0.7 }]]) });
+  assert.deepEqual(remembered.world.sets, [{ mode: "light", voice: 0.7 }]);
+  const off = fakeSing({ storage: new Map([["sing", { enabled: false, mode: "studio", voice: 0.7 }]]) });
+  assert.deepEqual(off.world.sets, []);
+  const broken = fakeSing({ storage: new Map([["sing", { enabled: true, mode: "loud", voice: "x" }]]) });
+  assert.deepEqual(broken.world.sets, [{ mode: "studio", voice: 0.1 }], "a bad saved value falls back to the defaults");
+});
+
+test("sing says in plain words how far it is", () => {
+  const fake = fakeSing();
+  fake.open();
+  const line = () => textsOf(fake.react.page.tree)[0];
+  assert.equal(line(), "Off");
+  fake.emit({ mode: "studio", phase: "downloading", progress: 0.42 });
+  assert.equal(line(), "Downloading 42 %");
+  fake.emit({ phase: "loading", progress: 0 });
+  assert.equal(line(), "Getting ready");
+  fake.emit({ phase: "on" });
+  assert.equal(line(), "On");
+  fake.emit({ phase: "off", reason: "no-graphics-card" });
+  assert.equal(line(), "Studio needs a graphics card");
+  fake.emit({ phase: "failed", reason: "download-failed" });
+  assert.equal(line(), "The download failed");
+  fake.emit({ phase: "off", reason: "dolby-atmos" });
+  assert.equal(line(), "Not available for Dolby Atmos songs");
+});
+
+test("sing turns itself off when it stops, keeps the choice, declares exactly the permissions it uses, and speaks French", () => {
+  const fake = fakeSing({ language: "fr" });
+  fake.open();
+  fake.find("toggle").onChange(true);
+  fake.world.stops.forEach((fn) => fn());
+  assert.equal(fake.world.sets.at(-1).mode, "off");
+  assert.equal(fake.world.listeners.length, 0, "no listener left");
+  assert.equal(fake.storage.get("sing").enabled, true, "stopping does not forget that it was on");
+  assert.equal(fake.world.buttons[0].label, "Chanter");
+  assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+});
+
+test("sing has every string in all ten languages, with a name and a description each", () => {
+  const fake = fakeSing();
+  const { tables } = fake.Ampify.i18n;
+  for (const code of languages) {
+    assert.deepEqual(Object.keys(tables[code]).sort(), Object.keys(tables.en).sort(), code);
+    if (code === "en") continue;
+    assert.ok(fake.manifest.translations[code].name && fake.manifest.translations[code].description, code);
+  }
+});

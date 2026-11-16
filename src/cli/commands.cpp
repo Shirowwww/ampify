@@ -901,6 +901,7 @@ constexpr Command kCommands[] = {
     {"profile", CmdProfile},
     {"export", CmdExport},
     {"test", CmdTest},
+    {"sing", CmdSing},
 };
 
 const Command* FindCommand(std::string_view name) {

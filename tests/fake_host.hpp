@@ -14,6 +14,7 @@
 #include "../src/core/natives/kit.hpp"
 
 #include "../src/core/audio/audio_host.hpp"
+#include "../src/core/audio/sing_host.hpp"
 #include "../src/core/host.hpp"
 #include "../src/core/image_host.hpp"
 
@@ -130,6 +131,8 @@ struct FakeHost : Host, KeyUnbindHost {
 
     // Optional audio: a test that sets it (usually to an ampify::audio::AudioEngine it feeds) offers AudioHost.
     AudioHost* audio = nullptr;
+    // Optional Sing, for Ampify.audio.sing.
+    SingHost* sing = nullptr;
     // Optional image decoding, for Ampify.color.fromArtwork.
     ImageHost* images = nullptr;
     // Optional cover of the song playing, for Ampify.color.playing.
@@ -139,6 +142,7 @@ struct FakeHost : Host, KeyUnbindHost {
 
     void* QueryCapability(std::string_view name) override {
         if (audio && name == AudioHost::kCapabilityName) return audio;
+        if (sing && name == SingHost::kCapabilityName) return sing;
         if (images && name == ImageHost::kCapabilityName) return images;
         if (artwork && name == ArtworkHost::kCapabilityName) return artwork;
         if (kit && name == KitCommandHost::kCapabilityName) return kit;

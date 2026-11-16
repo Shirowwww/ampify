@@ -79,6 +79,7 @@ A function whose permission is not declared throws `PermissionDenied` and does n
 | `audio.gain` | `Ampify.audio.setGainDb`, a gain on the samples | [preview] |
 | `audio.eq` | A 10-band equalizer | [preview] |
 | `audio.mix` | `Ampify.automix`: the current song mixed into the next one, in the audio process | [preview] |
+| `audio.sing` | `Ampify.audio.sing`: the karaoke mode, from either process | [preview] |
 | `ui.topbar`, `ui.playbar`, `ui.sidebar`, `ui.menu`, `ui.popup` | Buttons, sidebar entries, menu entries, dialogs | [stable] |
 | `ui.panel`, `ui.window` | A side panel, a secondary window | [preview] |
 | `ui.fullscreen` | A view over the whole window, and Apple's own full-screen player | [stable] |
@@ -257,6 +258,28 @@ Ampify.audio.eq.presets()           // -> preset names
 - Order: gain, then equalizer, then a soft limiter. A flat equalizer leaves the samples untouched. There is one
   equalizer per process; the last element that sets it wins.
 - Scripts only receive these numbers, never the samples, and nothing is written to disk.
+
+#### Sing [preview]
+
+Permission `audio.sing`. Sing turns the singer's voice down, as Apple Music Sing does on the iPhone. The interface asks
+and the audio process does the work, so `set` and `state` work from both processes, through the block they share.
+
+```js
+Ampify.audio.sing.set({ mode, voice })   // mode "off" | "light" | "studio", voice 0 to 1; true once the request is written
+Ampify.audio.sing.state()                // -> { available, mode, voice, phase, progress, delay, reason }
+Ampify.audio.sing.onChange(fn)           // fn(state) when the state moves (polled every 250 ms); returns the function that stops
+```
+
+- `Light` is the lighter quality; `Studio` is the studio quality, run on the graphics card, which holds the sound back
+  for `delay` seconds so that the lyrics stay in step.
+- `mode` and `voice` are what was asked last (`voice` stays when `set` is called without one). The rest is what the
+  audio process says: `phase` is `off`, `downloading`, `loading`, `buffering`, `on` or `failed`; `progress` is 0 to 1
+  while downloading or loading; `available` is whether Studio can run on this PC (`null` until known).
+- `reason` says why Sing is not fully on: `none`, `no-graphics-card`, `download-failed`, `model-failed`,
+  `dolby-atmos` or `automix-mixing`.
+- A mode other than the three, or a voice outside 0 to 1, throws `RangeError`. Where nothing shares the request (a host
+  without audio) `set` answers `false` and `state()` says `off` and `null`, without throwing.
+- Example: `extensions/sing/`.
 
 #### AutoMix [preview]
 

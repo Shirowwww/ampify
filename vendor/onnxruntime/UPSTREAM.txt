@@ -1,0 +1,6 @@
+ONNX Runtime's C interface, vendored unchanged (MIT, see LICENSE). Only the headers: the library itself is
+downloaded on first use of Sing's studio mode (src/core/sing_pack.hpp) and loaded at run time.
+
+onnxruntime_c_api.h, onnxruntime_ep_c_api.h
+  source: NuGet package Microsoft.ML.OnnxRuntime.DirectML 1.24.4, build/native/include/
+  package sha256: 57e9f11b73437bef7a309496135d4c1f96b1a8e9ddba60013fa27bfc1d788681

@@ -108,6 +108,17 @@ type AudioAnalysis = {
   bands: number[];
   frequencies: number[];
 };
+type SingMode = "off" | "light" | "studio";
+// available: whether Studio can run on this PC, null until known. mode and voice: what was asked last.
+type SingState = {
+  available: boolean | null;
+  mode: SingMode;
+  voice: number;
+  phase: "off" | "downloading" | "loading" | "buffering" | "on" | "failed";
+  progress: number;
+  delay: number;
+  reason: "none" | "no-graphics-card" | "download-failed" | "model-failed" | "dolby-atmos" | "automix-mixing";
+};
 type EqBand = { frequency: number; gainDb: number; q: number; type: "peaking" | "lowshelf" | "highshelf" };
 // name: the song's stream address without its query, what a plan's `next` gives
 type AutoMixSong = { name: string; id: string | null; storefront: string | null; time: number; duration: number; atmos: boolean | null };
@@ -274,6 +285,12 @@ declare const Ampify: {
     analyze(): AudioAnalysis;
     loudness(): Loudness;
     volume(): number | null;
+    // permission audio.sing; voice is the share of the singer's voice kept, 0 to 1
+    sing: {
+      set(options: { mode: SingMode; voice?: number }): boolean;
+      state(): SingState;
+      onChange(fn: (state: SingState) => void): () => void;
+    };
     eq: {
       setBand(index: number, gainDb: number): boolean;
       preset(name: string): boolean;

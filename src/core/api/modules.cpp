@@ -27,6 +27,7 @@ extern const char kTimers[];
 extern const char kConsole[];
 extern const char kUi[];
 extern const char kAudioAnalysis[];
+extern const char kAudioSing[];
 extern const char kColor[];
 extern const char kReact[];
 extern const char kCrypto[];
@@ -56,6 +57,7 @@ void StartUi(ScriptExtension& extension);
 void StopUi(ScriptExtension& extension);
 void DefineAudioAnalysis(api::NativeScope& scope);
 void StopAudioAnalysis(ScriptExtension& extension);
+void DefineAudioSing(api::NativeScope& scope);
 void DefineColor(api::NativeScope& scope);
 void DefineReact(api::NativeScope& scope);
 void DefineCrypto(api::NativeScope& scope);
@@ -97,6 +99,7 @@ const ApiModule kModules[] = {
     {"player", prelude::kPlayer, natives::DefinePlayer, nullptr, nullptr},
     {"audio", prelude::kAudio, natives::DefineAudio, nullptr, natives::StopAudio},
     {"audioAnalysis", prelude::kAudioAnalysis, natives::DefineAudioAnalysis, nullptr, natives::StopAudioAnalysis},
+    {"audioSing", prelude::kAudioSing, natives::DefineAudioSing, nullptr, nullptr},
     {"keyboard", prelude::kKeyboard, natives::DefineKeyboard, nullptr, natives::StopKeyboard},
     {"notify", prelude::kNotify, natives::DefineNotify, nullptr, nullptr},
     {"http", prelude::kHttp, natives::DefineHttp, nullptr, nullptr},

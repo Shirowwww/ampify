@@ -109,6 +109,7 @@ int CmdNew(Context& ctx);
 // Commands in marketplace.cpp.
 int CmdMarket(Context& ctx);
 int CmdInstall(Context& ctx);
+int CmdSing(Context& ctx);
 int CmdRemove(Context& ctx);
 int CmdUpdate(Context& ctx);
 int CmdInstallKit(Context& ctx);

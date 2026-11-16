@@ -493,6 +493,7 @@ public:
         void* current = const_cast<void*>(A().arrayAt(items.get(), 0));
         void* next = const_cast<void*>(A().arrayAt(items.get(), 1));
         if (NameOf(next) != plan.next) return "the next song changed";
+        if (detail::SingHoldsSound()) return "Sing's studio mode holds the sound back";
         // Dolby Atmos goes out as objects, not as a stereo stream the deck could mix into.
         if (detail::MainStreamRate() == 0) return "the sound does not go out as a stereo stream";
         std::string refused;
@@ -620,8 +621,13 @@ void* __cdecl CreateQueue_Hook(void* a, void* b, void* options, void* notify, vo
 
 SetRate_t g_setRate = nullptr;
 void __cdecl SetRate_Hook(void* player, float rate) {
+    const bool apples = player == g_queue.load();
+    if (apples && rate != 0.0f) detail::SingPlays();
     g_setRate(player, rate);
-    if (rate == 0.0f && player == g_queue.load()) Instance().Interrupt("paused");
+    if (apples && rate == 0.0f) {
+        Instance().Interrupt("paused");
+        detail::SingPaused();
+    }
 }
 
 Seek_t g_seekPlayer = nullptr;
@@ -633,22 +639,66 @@ void AppleSeeks() {
 void __cdecl SeekPlayer_Hook(void* player, CMTime time) {
     if (player == g_queue.load()) AppleSeeks();
     g_seekPlayer(player, time);
-    if (player == g_queue.load()) Instance().Interrupt("moved in the song");
+    if (player == g_queue.load()) {
+        Instance().Interrupt("moved in the song");
+        detail::SingSeeked();
+    }
 }
 
 Seek_t g_seekItem = nullptr;
+// Whether `item` is the song Apple's queue plays: a seek of a song still waiting in the queue moves nothing heard.
+bool PlaysNow(void* item) {
+    void* queue = g_queue.load();
+    if (!queue || !item || !A().ready) return true;  // unknown: taken as a move in the song heard, as before
+    Ref current(A().copyCurrentItem(queue));
+    return !current || current.item() == item;
+}
+
 void __cdecl SeekItem_Hook(void* item, CMTime time) {
     AppleSeeks();
     g_seekItem(item, time);
     Instance().Interrupt("moved in the song");
+    if (PlaysNow(item)) detail::SingSeeked();
 }
 
+// The other ways Apple's agent imports to seek an item (16/11/2026): its scrubber uses ...WithTolerance.
 Generic_t g_seekItemTolerance = nullptr;
-void* __cdecl SeekItemTolerance_Hook(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h) {
+Generic_t g_seekItemCallback = nullptr;
+Generic_t g_seekItemToleranceOnly = nullptr;
+
+void* AppleSeekedWith(Generic_t original, void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h) {
     AppleSeeks();
-    void* result = g_seekItemTolerance(a, b, c, d, e, f, g, h);
+    void* result = original(a, b, c, d, e, f, g, h);
     Instance().Interrupt("moved in the song");
+    if (PlaysNow(a)) detail::SingSeeked();  // `a` is the item
     return result;
+}
+
+void* __cdecl SeekItemTolerance_Hook(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h) {
+    return AppleSeekedWith(g_seekItemTolerance, a, b, c, d, e, f, g, h);
+}
+
+void* __cdecl SeekItemCallback_Hook(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h) {
+    return AppleSeekedWith(g_seekItemCallback, a, b, c, d, e, f, g, h);
+}
+
+void* __cdecl SeekItemToleranceOnly_Hook(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h) {
+    return AppleSeekedWith(g_seekItemToleranceOnly, a, b, c, d, e, f, g, h);
+}
+
+// Sing's studio mode: Apple's player reads its time that much earlier, so its lyrics and position follow the sound
+// Sing holds back. Ampify's own reads go through A(), the unhooked functions, and keep the true time.
+std::atomic<double> g_clockHold{0};
+using ItemTime_t = CMTime(__cdecl*)(void*);
+ItemTime_t g_itemTime = nullptr;
+CMTime __cdecl ItemTime_Hook(void* item) {
+    CMTime time = g_itemTime(item);
+    const double hold = g_clockHold.load(std::memory_order_relaxed);
+    if (hold > 0 && (time.flags & kTimeValid) && time.timescale > 0) {
+        const auto back = static_cast<std::int64_t>(std::llround(hold * time.timescale));
+        time.value = time.value > back ? time.value - back : 0;
+    }
+    return time;
 }
 
 Generic_t g_advance = nullptr;
@@ -656,6 +706,7 @@ void* __cdecl Advance_Hook(void* a, void* b, void* c, void* d, void* e, void* f,
     AppleSeeks();
     void* result = g_advance(a, b, c, d, e, f, g, h);
     Instance().Interrupt("skipped");
+    detail::SingSeeked();
     return result;
 }
 
@@ -690,12 +741,18 @@ void StartAutoMixWatch() {
         Note("AutoMix: a function of AVFoundationCF is missing, AutoMix stays off");
         return;
     }
+    size_t clock = Hook("AVCFPlayerItemGetCurrentTime", &ItemTime_Hook, g_itemTime);
+    if (clock == 0) Note("Sing: Apple's player time not followed, the studio mode's lyrics would run ahead");
     size_t queue = Hook("AVCFQueuePlayerCreateWithPlayerItemsAndOptions", &CreateQueue_Hook, g_createQueue);
     size_t watched = Hook("AVCFPlayerSetRate", &SetRate_Hook, g_setRate) +
                      Hook("AVCFPlayerSeekToTime", &SeekPlayer_Hook, g_seekPlayer) +
                      Hook("AVCFPlayerItemSeekToTime", &SeekItem_Hook, g_seekItem) +
                      Hook("AVCFPlayerItemSeekToTimeWithToleranceAndCompletionCallback", &SeekItemTolerance_Hook,
                           g_seekItemTolerance) +
+                     Hook("AVCFPlayerItemSeekToTimeWithCompletionCallback", &SeekItemCallback_Hook,
+                          g_seekItemCallback) +
+                     Hook("AVCFPlayerItemSeekToTimeWithTolerance", &SeekItemToleranceOnly_Hook,
+                          g_seekItemToleranceOnly) +
                      Hook("AVCFQueuePlayerAdvanceToNextItem", &Advance_Hook, g_advance) +
                      Hook("AVCFQueuePlayerRemoveItem", &Remove_Hook, g_remove) +
                      Hook("AVCFQueuePlayerRemoveAllItems", &RemoveAll_Hook, g_removeAll);
@@ -727,6 +784,28 @@ bool AutoMixTail(float* samples, unsigned frames, int rate, bool silent, std::ui
     if (early > g_feed.latest.load(std::memory_order_relaxed)) g_feed.latest = early;
     g_feed.frames += frames;
     return true;
+}
+
+void HoldClockBack(double seconds) { g_clockHold.store(seconds > 0 ? seconds : 0, std::memory_order_relaxed); }
+
+// A seek to where Apple's player is, to the sample: it reads its time again (through ItemTime_Hook) and tells its
+// interface, as after any seek.
+bool JumpInPlace(double back) {
+    void* queue = g_queue.load();
+    if (!A().ready || !queue) return false;
+    Ref item(A().copyCurrentItem(queue));
+    if (!item) return false;
+    const std::optional<double> time = ToSeconds(A().itemTime(item.item()));
+    if (!time) return false;
+    SeekItemExactly(item.item(), std::max(0.0, *time - back));
+    return true;
+}
+
+bool InAtmosNow() {
+    void* queue = g_queue.load();
+    if (!A().ready || !queue) return false;
+    Ref item(A().copyCurrentItem(queue));
+    return item && InAtmos(item.item()).value_or(false);
 }
 
 }  // namespace detail

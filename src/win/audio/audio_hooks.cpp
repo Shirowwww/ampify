@@ -395,6 +395,8 @@ void ProcessStream(IAudioRenderClient* self, float* samples, UINT32 count) {
         detail::AutoMixMain(samples, count, g_meteredRate.load(), g_meteredNumber.load(std::memory_order_relaxed),
                             QueuedFrames(g_meteredClient.load()));
     }
+    // Sing before the meters and the gain: they then measure the song as it is heard, voice turned down.
+    detail::SingMain(samples, count, g_meteredRate.load());
     if (std::any_of(samples, samples + count * 2, [](float s) { return std::fabs(s) > 1e-4f; })) {
         g_lastSoundTicks.store(std::chrono::steady_clock::now().time_since_epoch().count(), std::memory_order_relaxed);
     }
@@ -772,6 +774,7 @@ StartResult PlaceHooks(const char* why) {
     if (installed == 0) return StartResult::Failed;
 
     std::thread(PollLoop).detach();
+    detail::StartSing();
     g_hooksPlaced = true;
     Note("leveler started: " + std::to_string(installed) + " audio hook(s)");
     return StartResult::Placed;

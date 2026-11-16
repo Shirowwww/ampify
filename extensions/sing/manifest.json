@@ -1,0 +1,25 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "sing",
+  "name": "Sing",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "A karaoke mode: a microphone button on the playback bar turns the singer's voice down, or all the way off, while the music plays on, with a Light quality and a Studio quality that uses the graphics card.",
+  "translations": {
+    "fr": {"name": "Chanter", "description": "Un mode karaoké : un bouton micro sur la barre de lecture baisse la voix du chanteur, ou la coupe, pendant que la musique continue, en qualité Léger ou Studio sur la carte graphique."},
+    "de": {"name": "Singen", "description": "Ein Karaoke-Modus: Ein Mikrofon-Knopf in der Wiedergabeleiste senkt die Stimme des Sängers oder blendet sie ganz aus, während die Musik weiterspielt, in Leicht oder in Studio-Qualität auf der Grafikkarte."},
+    "es": {"name": "Cantar", "description": "Un modo karaoke: un botón de micrófono en la barra de reproducción baja la voz del cantante, o la quita, mientras la música sigue, con calidad Ligero o Estudio en la tarjeta gráfica."},
+    "pt": {"name": "Cantar", "description": "Um modo karaokê: um botão de microfone na barra de reprodução baixa a voz do cantor, ou a tira, enquanto a música continua, com qualidade Leve ou Estúdio na placa de vídeo."},
+    "ru": {"name": "Петь", "description": "Режим караоке: кнопка микрофона на панели воспроизведения приглушает или убирает голос певца, пока музыка играет, в качестве «Лёгкий» или «Студия» на видеокарте."},
+    "ja": {"name": "歌う", "description": "カラオケモードです。再生バーのマイクボタンで、音楽はそのままに歌手の声を小さく、または消せます。ライト品質と、グラフィックスカードを使うスタジオ品質があります。"},
+    "zh": {"name": "演唱", "description": "卡拉 OK 模式：播放栏上的麦克风按钮可在音乐继续播放时调低或去掉歌手的人声，提供轻量和使用显卡的录音室两种质量。"},
+    "it": {"name": "Canta", "description": "Una modalità karaoke: un pulsante microfono sulla barra di riproduzione abbassa o toglie la voce del cantante mentre la musica continua, in qualità Leggero o Studio sulla scheda grafica."},
+    "ko": {"name": "노래하기", "description": "노래방 모드입니다. 재생 막대의 마이크 버튼으로 음악은 그대로 두고 가수의 목소리를 줄이거나 없앱니다. 라이트 품질과 그래픽 카드를 쓰는 스튜디오 품질이 있습니다."}
+  },
+  "kitApi": "1.0",
+  "minAmpify": "1.4.2",
+  "main": "main.js",
+  "processes": ["ui"],
+  "permissions": ["audio.sing", "storage", "ui.playbar", "ui.popup"]
+}

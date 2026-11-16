@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Sing: the singer's voice turned down, as Apple Music Sing does on the iPhone. A microphone button in the playback
+  bar opens a switch, a slider for how much of the voice stays, and two qualities. Light takes the centre of the
+  stereo image out in the voice's band, at once. Studio separates the voice on the graphics card with UVR's MDX-Net
+  Voc_FT model, whose files (about 92 MB) download the first time: the sound is held back 1.3 s and Apple's position,
+  lyrics included, is moved back as much, so both stay on what is heard. The music stops for that long when Studio
+  starts, after a move in the song and when playback resumes; a pause is silent at once. Songs playing in Dolby Atmos
+  have no stereo stream, so Sing leaves them alone. Elements get the same through `Ampify.audio.sing`, and
+  `ampify sing` installs, checks or removes the files.
+- AutoMix and Sing see a move made with Apple's progress bar: Apple seeks there through a function Ampify did not
+  follow.
 - Apple Music's own lyrics are word by word again with Ampify on: Ampify asked Apple's player for a lyrics source that
   does not exist, and Apple then kept the line-by-line lyrics for its own panel (#5). Ampify's lyrics, the Song
   panel's karaoke and `player.lyrics()` now get the word times too, from the song's start.

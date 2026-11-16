@@ -564,6 +564,87 @@ TEST_CASE(AudioShare_TheVolumeAsksForTheHooksAlone) {
     CHECK(ampify::audio::SoundWanted(block, 6000));  // the analysis needs the hooks too
 }
 
+TEST_CASE(AudioShare_ASingRequestIsReadWithANewSequence) {
+    using namespace ampify::audio;
+    SharedAudio block{};
+    ClaimShared(block);
+    SingRequest request;
+    CHECK(ReadSingRequest(block, request));
+    CHECK(request.mode == SingMode::Off && request.voice == 0 && request.sequence == 0);
+
+    CHECK(WriteSingRequest(block, SingMode::Studio, 0.2));
+    CHECK(ReadSingRequest(block, request));
+    CHECK(request.mode == SingMode::Studio);
+    CHECK_NEAR(request.voice, 0.2, 1e-9);
+    uint32_t first = request.sequence;
+    CHECK(WriteSingRequest(block, SingMode::Studio, 0.2));  // the same request again is still a request
+    CHECK(ReadSingRequest(block, request));
+    CHECK(request.sequence != first);
+}
+
+TEST_CASE(AudioShare_ASingVoiceOutOfRangeIsClamped) {
+    using namespace ampify::audio;
+    SharedAudio block{};
+    ClaimShared(block);
+    SingRequest request;
+    WriteSingRequest(block, SingMode::Light, 7.0);
+    ReadSingRequest(block, request);
+    CHECK_NEAR(request.voice, 1.0, 1e-9);
+    WriteSingRequest(block, SingMode::Light, -3.0);
+    ReadSingRequest(block, request);
+    CHECK_NEAR(request.voice, 0.0, 1e-9);
+    WriteSingRequest(block, SingMode::Light, std::nan(""));
+    ReadSingRequest(block, request);
+    CHECK_NEAR(request.voice, 0.0, 1e-9);
+}
+
+TEST_CASE(AudioShare_TheSingStatusCrossesWithEveryField) {
+    using namespace ampify::audio;
+    SharedAudio block{};
+    ClaimShared(block);
+    SingStatus status;
+    CHECK(ReadSingStatus(block, status));
+    CHECK(status.phase == SingPhase::Off && status.studio == SingStudio::Unknown && status.reason == SingReason::None);
+
+    CHECK(WriteSingStatus(block, {SingMode::Studio, SingPhase::Downloading, 0.42, 1.5, SingStudio::Yes, SingReason::None}));
+    CHECK(ReadSingStatus(block, status));
+    CHECK(status.mode == SingMode::Studio && status.phase == SingPhase::Downloading);
+    CHECK_NEAR(status.progress, 0.42, 1e-9);
+    CHECK_NEAR(status.delaySeconds, 1.5, 1e-9);
+    CHECK(status.studio == SingStudio::Yes);
+
+    WriteSingStatus(block, {SingMode::Light, SingPhase::Failed, 0, 0, SingStudio::No, SingReason::NoGraphicsCard});
+    ReadSingStatus(block, status);
+    CHECK(status.phase == SingPhase::Failed && status.studio == SingStudio::No);
+    CHECK(status.reason == SingReason::NoGraphicsCard);
+}
+
+TEST_CASE(AudioShare_ASingFieldOfAnotherBuildReadsAsOff) {
+    using namespace ampify::audio;
+    SharedAudio block{};
+    ClaimShared(block);
+    block.singRequestMode = 99;
+    block.singPhase = 99;
+    block.singReason = 99;
+    SingRequest request;
+    SingStatus status;
+    CHECK(ReadSingRequest(block, request) && request.mode == SingMode::Off);
+    CHECK(ReadSingStatus(block, status));
+    CHECK(status.phase == SingPhase::Off && status.reason == SingReason::None);
+}
+
+TEST_CASE(AudioShare_SingIsNotWrittenInABlockOfAnotherLayout) {
+    using namespace ampify::audio;
+    SharedAudio block{};
+    block.magic = 0x12345678;
+    SingRequest request;
+    SingStatus status;
+    CHECK(!WriteSingRequest(block, SingMode::Light, 0.5));
+    CHECK(!ReadSingRequest(block, request));
+    CHECK(!WriteSingStatus(block, {}));
+    CHECK(!ReadSingStatus(block, status));
+}
+
 TEST_CASE(AudioShare_ABlockOfAnotherLayoutIsNotRead) {
     ampify::audio::SharedAudio block{};
     block.magic = 0x12345678;

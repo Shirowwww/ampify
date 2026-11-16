@@ -34,6 +34,17 @@ answers. AutoMix (`src/win/audio/automix.cpp`, `src/core/automix/`) is built on 
 - `AVCFPlayerItemSeekToTime` seeks with an infinite tolerance (`CoreMedia.dll` ordinal 718 as both tolerances, seen
   in its code); `AVCFPlayerItemSeekToTimeWithTolerance(item, time, before, after)` with zero tolerances is exact: the
   item starts on the very frame asked for.
+- Apple's agent imports `AVCFPlayerItemSeekToTime`, `...WithTolerance`, `...WithCompletionCallback`,
+  `...WithToleranceAndCompletionCallback` and `...SeekToDateWithCompletionCallback`, and never `AVCFPlayerSeekToTime`.
+  Its progress bar seeks with `...WithTolerance` (2026-11-16): a hook on the other two alone misses every such move.
+  Play and pause go through `AVCFPlayerSetRate` only (1 and 0).
+- **Apple's position comes from `AVCFPlayerItemGetCurrentTime`**, read when the song plays, pauses or is moved; the
+  interface counts on from there. Hooking that import to return an earlier time moves the position, the progress bar
+  and the lyrics back by as much (Sing's studio mode, 2026-11-16: the position shown stayed within 45 to 120 ms of the
+  sound heard, inside the noise of the SMTC readings). A seek of the item to where it is makes Apple read it again.
+  That time runs about 150 ms behind the samples Apple writes to WASAPI at that moment, so a seek to it plays the last
+  150 ms again.
+- While paused, Apple's stream keeps running: a delay line in the audio hook would play on after the pause.
 - **Overlapped playback**: `AVCFPlayerItemSetAdvanceTimeForOverlappedPlayback(current, t)` starts the next item at
   `t` while the current one goes on to its end (or its forward end time). Both play at full volume, in exact step.
 - **A second player** on Apple's own asset: `AVCFPlayerItemCreateWithAsset(NULL, asset, queue)` and

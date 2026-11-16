@@ -192,6 +192,101 @@ TEST_CASE(AudioModule_WithoutAudioNothingThrows) {
 
 namespace {
 
+// Sing over a block of shared memory held in the test, as the Windows host does it between the two processes.
+struct BlockSing : ampify::SingHost {
+    ampify::audio::SharedAudio block{};
+    BlockSing() { ampify::audio::ClaimShared(block); }
+    bool Set(ampify::audio::SingMode mode, double voice) override { return ampify::audio::WriteSingRequest(block, mode, voice); }
+    std::optional<ampify::audio::SingRequest> Request() override {
+        ampify::audio::SingRequest request;
+        return ampify::audio::ReadSingRequest(block, request) ? std::optional(request) : std::nullopt;
+    }
+    std::optional<ampify::audio::SingStatus> Status() override {
+        ampify::audio::SingStatus status;
+        return ampify::audio::ReadSingStatus(block, status) ? std::optional(status) : std::nullopt;
+    }
+};
+
+}  // namespace
+
+TEST_CASE(AudioSing_SetWritesTheRequestAndStateReadsItBackWithTheEngineStatus) {
+    Fixture f(false);
+    BlockSing sing;
+    f.host.sing = &sing;
+    auto element = f.Make("singer", R"(
+        const first = Ampify.audio.sing.state();
+        Ampify.log("first " + JSON.stringify(first));
+        Ampify.log("set " + Ampify.audio.sing.set({ mode: "studio", voice: 0.2 }));
+        Ampify.log("then " + JSON.stringify(Ampify.audio.sing.state()));
+        Ampify.log("voice only " + Ampify.audio.sing.set({ mode: "light" }) + " " + Ampify.audio.sing.state().voice);
+    )", R"("audio.sing")");
+    CHECK(element->Start());
+    CHECK(f.Logged(R"([singer] first {"available":null,"mode":"off","voice":0,"phase":"off","progress":0,"delay":0,"reason":"none"})"));
+    CHECK(f.Logged("[singer] set true"));
+    CHECK(f.Logged(R"([singer] then {"available":null,"mode":"studio","voice":0.2,"phase":"off","progress":0,"delay":0,"reason":"none"})"));
+    CHECK(f.Logged("[singer] voice only true 0.2"));
+
+    ampify::audio::WriteSingStatus(sing.block, {ampify::audio::SingMode::Light, ampify::audio::SingPhase::Downloading, 0.42, 0,
+                                                 ampify::audio::SingStudio::No, ampify::audio::SingReason::NoGraphicsCard});
+    auto reader = f.Make("reader", R"(Ampify.log("status " + JSON.stringify(Ampify.audio.sing.state()));)", R"("audio.sing")");
+    CHECK(reader->Start());
+    CHECK(f.Logged(R"([reader] status {"available":false,"mode":"light","voice":0.2,"phase":"downloading","progress":0.42,"delay":0,"reason":"no-graphics-card"})"));
+    element->Stop();
+    reader->Stop();
+}
+
+TEST_CASE(AudioSing_SetRefusesAnUnknownModeOrAVoiceOutOfRange) {
+    Fixture f(false);
+    BlockSing sing;
+    f.host.sing = &sing;
+    auto element = f.Make("strict", R"(
+        for (const options of [{ mode: "loud", voice: 0.5 }, { mode: "light", voice: 2 }, { mode: "light", voice: "x" }, {}, null]) {
+            try { Ampify.audio.sing.set(options); Ampify.log("accepted"); } catch (e) { Ampify.log(e.name); }
+        }
+    )", R"("audio.sing")");
+    CHECK(element->Start());
+    CHECK(f.Count("[strict] RangeError") == 3);
+    CHECK(f.Count("[strict] TypeError") == 2);
+    CHECK(!f.Logged("[strict] accepted"));
+    element->Stop();
+}
+
+TEST_CASE(AudioSing_NeedsItsPermissionAndNothingThrowsWithoutTheCapability) {
+    Fixture f(false);
+    auto denied = f.Make("sing-denied", R"(
+        try { Ampify.audio.sing.state(); Ampify.log("allowed"); } catch (e) { Ampify.log(e.name + " " + e.message); }
+    )", "");
+    CHECK(denied->Start());
+    CHECK(f.Logged("[sing-denied] PermissionDenied missing permission: audio.sing"));
+
+    auto bare = f.Make("sing-bare", R"(
+        Ampify.log("set " + Ampify.audio.sing.set({ mode: "light", voice: 0.5 }) + " " + Ampify.audio.sing.state().phase);
+    )", R"("audio.sing")");
+    CHECK(bare->Start());
+    CHECK(f.Logged("[sing-bare] set false off"));
+    denied->Stop();
+    bare->Stop();
+}
+
+TEST_CASE(AudioSing_OnChangeHearsAStatusChangeOnceAndStopsWhenAsked) {
+    Fixture f(false);
+    BlockSing sing;
+    f.host.sing = &sing;
+    auto element = f.Make("watcher", R"(
+        const stop = Ampify.audio.sing.onChange((state) => Ampify.log("heard " + state.phase));
+        globalThis.stopWatching = stop;
+    )", R"("audio.sing")");
+    CHECK(element->Start());
+    ampify::audio::WriteSingStatus(sing.block, {ampify::audio::SingMode::Studio, ampify::audio::SingPhase::On, 1, 0.8,
+                                                 ampify::audio::SingStudio::Yes, ampify::audio::SingReason::None});
+    CHECK(ampify::test::PumpUntil(*element, [&] { return f.Logged("[watcher] heard on"); }));
+    element->Pump();
+    CHECK(f.Count("[watcher] heard on") == 1);
+    element->Stop();
+}
+
+namespace {
+
 // The interface process's AudioHost: what the engine shares, read only, with no equalizer bands.
 struct ReadOnlyAudio : ampify::audio::AudioEngine {
     ampify::AudioReach Reach() const override { return ampify::AudioReach::AnalysisOnly; }

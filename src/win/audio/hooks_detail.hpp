@@ -57,6 +57,21 @@ void ForgetTailStreams();               // the mix is over
 bool TailStreamsClaimed();              // one or more seen, and none that could not be taken
 int MainStreamRate();                   // the rate of Apple's stereo stream, 0 when there is none to mix into
 
+// Sing's studio mode holds the sound back (sing.cpp): Apple's player is told that much earlier a time
+// (AVCFPlayerItemGetCurrentTime), so that its lyrics and position follow what is heard. It reads its time when it
+// starts, pauses or jumps; JumpInPlace makes it jump to where it is. automix.cpp holds the player, so both live there.
+void HoldClockBack(double seconds);  // 0: Apple's own time again
+bool JumpInPlace(double back);       // to `back` seconds before where it is; false when the player is not known yet
+bool InAtmosNow();                   // the song playing goes out as Dolby Atmos objects
+// Sing (sing.cpp), called from the hooks: one block of Apple's stereo stream, in place, on its audio thread; and a
+// seek or a skip, after which what is held back belongs to another moment of the song.
+void StartSing();  // once the hooks are in: Sing's thread follows what the interface asks
+void SingMain(float* samples, unsigned frames, int rate);
+void SingSeeked();
+void SingPaused();  // after Apple's player paused
+void SingPlays();   // before Apple's player plays
+bool SingHoldsSound();  // studio mode on: AutoMix stands aside
+
 // Diagnostic (output_record.cpp): while record.on exists in the kit, what the stereo stream sends goes to a WAV file.
 void RecordOutput(const float* samples, unsigned frames, int rate);  // audio thread, after Ampify's steps
 void PollRecording();                                                // poll thread

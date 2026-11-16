@@ -24,6 +24,23 @@ void EndWrite(SharedAudio& block) {
     block.sequence.fetch_add(1, std::memory_order_relaxed);
 }
 
+constexpr double kMilli = 1000.0;
+constexpr uint32_t kMilliMax = 1000;
+constexpr uint32_t kMaxDelayMs = 60 * 1000;
+
+uint32_t ToMilli(double unit) {
+    if (!(unit > 0)) return 0;  // also NaN
+    return static_cast<uint32_t>(std::lround(std::min(unit, 1.0) * kMilli));
+}
+
+double FromMilli(uint32_t milli) { return std::min(milli, kMilliMax) / kMilli; }
+
+// What was stored, or the first value (the "nothing" one) when the number is not one of the enum's.
+template <typename Enum>
+Enum Checked(uint32_t raw, Enum last) {
+    return raw <= static_cast<uint32_t>(last) ? static_cast<Enum>(raw) : static_cast<Enum>(0);
+}
+
 }  // namespace
 
 bool ClaimShared(SharedAudio& block) {
@@ -75,7 +92,10 @@ bool SharedWanted(const SharedAudio& block, int64_t nowMs) {
 }
 
 bool SoundWanted(const SharedAudio& block, int64_t nowMs) {
-    return SharedWanted(block, nowMs) || block.soundWantedUntilMs.load(std::memory_order_relaxed) > nowMs;
+    // Sing works on the samples: asking for it puts the hooks in like any other listener.
+    SingRequest sing;
+    const bool singing = ReadSingRequest(block, sing) && sing.mode != SingMode::Off;
+    return singing || SharedWanted(block, nowMs) || block.soundWantedUntilMs.load(std::memory_order_relaxed) > nowMs;
 }
 
 void DemandShared(SharedAudio& block, int64_t nowMs) {
@@ -84,6 +104,47 @@ void DemandShared(SharedAudio& block, int64_t nowMs) {
 
 void DemandSound(SharedAudio& block, int64_t nowMs) {
     block.soundWantedUntilMs.store(nowMs + kWantedForMs, std::memory_order_relaxed);
+}
+
+bool WriteSingRequest(SharedAudio& block, SingMode mode, double voice) {
+    if (!SharedUsable(block)) return false;
+    block.singRequestMode.store(static_cast<uint32_t>(mode), std::memory_order_relaxed);
+    block.singRequestVoiceMilli.store(ToMilli(voice), std::memory_order_relaxed);
+    block.singRequestSequence.fetch_add(1, std::memory_order_release);
+    return true;
+}
+
+bool ReadSingRequest(const SharedAudio& block, SingRequest& out) {
+    if (!SharedUsable(block)) return false;
+    out.sequence = block.singRequestSequence.load(std::memory_order_acquire);
+    out.mode = Checked(block.singRequestMode.load(std::memory_order_relaxed), SingMode::Studio);
+    out.voice = FromMilli(block.singRequestVoiceMilli.load(std::memory_order_relaxed));
+    return true;
+}
+
+bool WriteSingStatus(SharedAudio& block, const SingStatus& status) {
+    if (!SharedUsable(block)) return false;
+    double delay = std::isfinite(status.delaySeconds) ? std::max(status.delaySeconds, 0.0) : 0.0;
+    block.singMode.store(static_cast<uint32_t>(status.mode), std::memory_order_relaxed);
+    block.singPhase.store(static_cast<uint32_t>(status.phase), std::memory_order_relaxed);
+    block.singProgressMilli.store(ToMilli(status.progress), std::memory_order_relaxed);
+    block.singDelayMs.store(static_cast<uint32_t>(std::min(delay * kMilli, static_cast<double>(kMaxDelayMs))),
+                            std::memory_order_relaxed);
+    block.singStudio.store(static_cast<uint32_t>(status.studio), std::memory_order_relaxed);
+    block.singReason.store(static_cast<uint32_t>(status.reason), std::memory_order_release);
+    return true;
+}
+
+bool ReadSingStatus(const SharedAudio& block, SingStatus& out) {
+    if (!SharedUsable(block)) return false;
+    std::atomic_thread_fence(std::memory_order_acquire);
+    out.mode = Checked(block.singMode.load(std::memory_order_relaxed), SingMode::Studio);
+    out.phase = Checked(block.singPhase.load(std::memory_order_relaxed), SingPhase::Failed);
+    out.progress = FromMilli(block.singProgressMilli.load(std::memory_order_relaxed));
+    out.delaySeconds = block.singDelayMs.load(std::memory_order_relaxed) / kMilli;
+    out.studio = Checked(block.singStudio.load(std::memory_order_relaxed), SingStudio::No);
+    out.reason = Checked(block.singReason.load(std::memory_order_relaxed), SingReason::AutoMixMixing);
+    return true;
 }
 
 bool ReadShared(const SharedAudio& block, int64_t nowMs, SharedAudioReading& out) {

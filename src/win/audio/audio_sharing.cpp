@@ -155,4 +155,28 @@ SharedAudioHost& InterfaceAudio() {
     return *host;
 }
 
+bool SharedSingHost::Set(audio::SingMode mode, double voice) {
+    audio::SharedAudio* block = SharedAudioBlock();
+    return block && audio::WriteSingRequest(*block, mode, voice);
+}
+
+std::optional<audio::SingRequest> SharedSingHost::Request() {
+    audio::SharedAudio* block = SharedAudioBlock();
+    audio::SingRequest request;
+    if (!block || !audio::ReadSingRequest(*block, request)) return std::nullopt;
+    return request;
+}
+
+std::optional<audio::SingStatus> SharedSingHost::Status() {
+    audio::SharedAudio* block = SharedAudioBlock();
+    audio::SingStatus status;
+    if (!block || !audio::ReadSingStatus(*block, status)) return std::nullopt;
+    return status;
+}
+
+SharedSingHost& SharedSing() {
+    static SharedSingHost* host = new SharedSingHost();  // leaked on purpose, like InterfaceAudio
+    return *host;
+}
+
 }  // namespace ampify::win

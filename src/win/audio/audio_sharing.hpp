@@ -15,6 +15,7 @@
 
 #include "../../core/audio/audio_engine.hpp"
 #include "../../core/audio/audio_share.hpp"
+#include "../../core/audio/sing_host.hpp"
 #include "../../core/journal.hpp"
 
 namespace ampify::win {
@@ -52,5 +53,16 @@ private:
 
 // The host of this process. Never destroyed, like ProcessAudio(): its thread may run while the process exits.
 SharedAudioHost& InterfaceAudio();
+
+// Sing, in both processes: Ampify.audio.sing writes the request and reads the status through the shared block. The
+// engine's own side (reading the request, writing the status) uses audio::ReadSingRequest and WriteSingStatus.
+class SharedSingHost final : public SingHost {
+public:
+    bool Set(audio::SingMode mode, double voice) override;
+    std::optional<audio::SingRequest> Request() override;
+    std::optional<audio::SingStatus> Status() override;
+};
+
+SharedSingHost& SharedSing();
 
 }  // namespace ampify::win

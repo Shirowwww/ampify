@@ -248,6 +248,8 @@ void* WinHost::QueryCapability(std::string_view name) {
         return static_cast<AudioHost*>(&engine);
     }
     if (m_process == "ui" && name == AudioHost::kCapabilityName) return static_cast<AudioHost*>(&win::InterfaceAudio());
+    // Ampify.audio.sing, in both processes: the request and the status cross through the shared block.
+    if (name == SingHost::kCapabilityName) return static_cast<SingHost*>(&win::SharedSing());
     // Ampify.automix: Apple's queue player and Ampify's second player live in the audio process only.
     if (m_process == "engine" && name == AutoMixHost::kCapabilityName) return &win::audio_hooks::AutoMix();
     return Host::QueryCapability(name);
