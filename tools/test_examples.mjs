@@ -2422,14 +2422,15 @@ test("ui-palette shows a check box, a spinner, progress, a divider and a greyed 
 });
 
 // A player whose position the test moves, with a clock the test advances: setInterval and setTimeout both run on it.
-function fakeGuard() {
+function fakeGuard({ withSing = true } = {}) {
   const dir = join(examples, "..", "extensions", "playback-guard");  // ships with Ampify, in extensions/
   const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
   const granted = new Set(manifest.permissions ?? []);
   const need = (permission) => {
     if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
   };
-  const world = { now: 0, timers: [], commands: [], logs: [], state: { playing: false, positionMs: 0, durationMs: 0, track: null } };
+  const world = { now: 0, timers: [], commands: [], logs: [], sing: [],
+                  state: { playing: false, positionMs: 0, durationMs: 0, track: null } };
   const command = (name) => (...args) => (need("player.control"), world.commands.push([name, ...args].join(" ")), true);
   const ampify = {
     log: (message) => world.logs.push(String(message)),
@@ -2439,6 +2440,7 @@ function fakeGuard() {
       previous: command("previous"),
       seek: command("seek"),
     },
+    audio: withSing ? { sing: { onChange: (fn) => (need("audio.sing"), world.sing.push(fn), () => {}) } } : undefined,
   };
   const later = (repeat) => (fn, ms) => world.timers.push({ fn, ms, due: world.now + ms, repeat });
   runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify: ampify, setInterval: later(true), setTimeout: later(false) });
@@ -2501,6 +2503,26 @@ test("playback-guard sends previous again when Apple ignored it, never past the 
   run(25);
   assert.deepEqual(world.commands, ["previous", "next", "previous", "previous"]);
   assert.match(world.logs.join("\n"), /did not play again after the reload: Apple did not go back/);
+});
+
+test("playback-guard lets a song stand still for 10 s after Sing changes, then watches it again", () => {
+  const { world, run } = fakeGuard();
+  world.state = rollout(40_000);
+  run(2);
+  for (const listener of world.sing) listener({ mode: "studio", phase: "buffering" });  // a Dolby Atmos song switches
+  run(9, { frozen: true });
+  assert.deepEqual(world.commands, [], "Apple's position stands still while the song reloads in stereo");
+
+  run(5, { frozen: true });
+  assert.deepEqual(world.commands, ["previous"], "once Sing settled, a song that stays frozen is restarted");
+});
+
+test("playback-guard still guards where Sing cannot be followed", () => {
+  const { world, run } = fakeGuard({ withSing: false });
+  world.state = rollout(20_000);
+  run(5, { frozen: true });
+  assert.deepEqual(world.commands, ["previous"]);
+  assert.match(world.logs.join("\n"), /Sing not followed/);
 });
 
 test("playback-guard leaves a paused song, a loading song and a song it already repaired twice", () => {

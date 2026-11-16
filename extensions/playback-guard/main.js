@@ -11,12 +11,29 @@ const BACK_TRIES = 2;              // "previous" again when Apple ignored the fi
 const BACK_AGAIN_AFTER_MS = 1000;  // time Apple gets to come back before "previous" is sent again
 const REPAIRS_PER_SONG = 2;        // a song that freezes again after that is left alone, rather than loop
 const GIVE_UP_AFTER_MS = 20000;    // a reload that never plays again ends the repair
+// Sing switches a Dolby Atmos song to its stereo version and holds the sound back: Apple's position then stands still
+// for 3 to 4 s (measured on 16/11/2026) with nothing stuck.
+const SING_SETTLES_MS = 10000;
 
 let watched = "";    // the song being watched
 let lastMs = -1;
 let stillMs = 0;
 const repairs = new Map();
 let repair = null;   // { song, title, frozenMs, sinceMs, reloading, backTries, lastBackMs }
+let singQuietMs = 0; // left of the time given to a change of Sing
+
+// Without Sing (an Ampify that lacks it, or its permission refused) the guard watches as before.
+let singSeen = "";
+try {
+  Ampify.audio.sing.onChange((sing) => {
+    const now = `${sing.mode} ${sing.phase}`;
+    if (now === singSeen) return;
+    singSeen = now;
+    singQuietMs = SING_SETTLES_MS;
+  });
+} catch (error) {
+  Ampify.log(`Sing not followed: ${error}`);
+}
 
 // The song, not its queue entry: Apple may give the reloaded song a new entry.
 function songOf(state) {
@@ -74,6 +91,10 @@ function check() {
   // Position 0 is a song still loading, which may take a while on a slow network.
   stillMs = state.playing && state.positionMs > 0 && state.positionMs === lastMs ? stillMs + CHECK_EVERY_MS : 0;
   lastMs = state.positionMs;
+  if (singQuietMs > 0) {
+    singQuietMs -= CHECK_EVERY_MS;
+    stillMs = 0;
+  }
 
   if (repair) {
     followRepair(state, song);

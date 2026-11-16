@@ -73,5 +73,21 @@ loop came back to the same passage, and comparing with that passage played throu
 `ObjectPass` is made again for each new stream, so it fades its gain in: held at -12 dB for 0.4 s, then up to the
 gain by 0.8 s (`object_pass.cpp`). It only does so while it gains the objects: at unity the samples stay untouched.
 
+## What the 16 objects hold (2026-11-16, for Sing)
+
+Recorded raw, one channel per object in the order of the pass, on two songs of "The Life of a Showgirl"
+(Apple Music `1.1792.39942.0`, a diagnostic kept in `.notes/atmos/`), with Voc_FT run on each object alone:
+
+- The layout stays the same through a song. Objects 1 and 4 move together (correlation 0.95 to 0.97) and hold 78 to
+  89 % of the energy: a front pair, about 22 % voice each, which carries about three quarters of the singer. Object 0
+  is near silent.
+- A second correlated pair (7 and 12 in one song, 7 and 8 in the other, 3 to 4 % of the energy each) is a third to a
+  half voice. The few objects that are mostly voice (80 to 95 %) are small (0.2 to 1 % each) and change from song to
+  song.
+- So there are no stems to take out: silencing the voice objects alone lowers the voice by 1.7 dB. The model on the
+  front pair takes it down 10 dB, on both pairs 28 dB (Voc_FT's own measure, on a plain downmix of the objects).
+- The objects come out of Apple's process before Windows renders them: a recording of them holds nothing else,
+  where a loopback recording of the output also takes whatever else plays (a call, a video).
+
 Apple Music's own "Dolby Atmos" setting (Settings > Playback) can come up empty; Apple Music then plays every song in
 stereo, with no spatial stream at all. Choosing "Automatic" again brings Atmos back.

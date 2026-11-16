@@ -277,6 +277,9 @@ Ampify.audio.sing.onChange(fn)           // fn(state) when the state moves (poll
   while downloading or loading; `available` is whether Studio can run on this PC (`null` until known).
 - `reason` says why Sing is not fully on: `none`, `no-graphics-card`, `download-failed`, `model-failed`,
   `dolby-atmos` or `automix-mixing`.
+- Sing works on Apple's stereo stream. While any mode is on, a song playing in Dolby Atmos is switched to its stereo
+  version, and back when Sing goes off; Apple Music reloads the song each time, and its position stands still for 3 to
+  4 s. `dolby-atmos` is left for an Apple Music that cannot be asked.
 - A mode other than the three, or a voice outside 0 to 1, throws `RangeError`. Where nothing shares the request (a host
   without audio) `set` answers `false` and `state()` says `off` and `null`, without throwing.
 - Example: `extensions/sing/`.

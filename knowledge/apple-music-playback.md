@@ -97,6 +97,12 @@ by recording the default output (WASAPI loopback) while a song was mixed into it
 - `AVCFPlayerItemSetAllowedAudioSpatializationFormats` (Apple always passes 4) and
   `AVCFPlayerItemSetVariantPreferences` (4, then 7) do not decide it: with 0 or 3 for the first, or 0 for the second
   (which only took the lossless version away), the song still played in Atmos.
+- What does decide it (2026-11-16): `AVCFPlayerSetMultichannelAudioStrategy` on Apple's queue player. Apple sets
+  `AVCFPlayerMultichannelAudioStrategy_MatchMultichannelTrackPreferenceToAudioDevice` as a song plays;
+  `..._PreferStereo`, then a seek of the item to where it is, makes the song playing take its stereo version within
+  0.3 s (a new stereo stream, another variant id), and Apple's strategy plus a seek brings Dolby Atmos back the same
+  way. A seek alone changes nothing. Apple's position then stands still for 3 to 4 s while the song reloads. Sing
+  uses it (`HoldStereo`, `src/win/audio/automix.cpp`). A song sometimes starts in stereo with Apple's own strategy.
 - An item made without variant preferences (0) plays the stream's first, lossy version. The second player's item so
   takes those of Apple's item (`AVCFPlayerItemGetVariantPreferences`, then `Set`): measured, Apple's item on variant
   `ek6n0nusx` with preferences 7, the second player's on `j2lqjiv2c` with 0 before, both on `ek6n0nusx` with 7 after

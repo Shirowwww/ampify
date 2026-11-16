@@ -2,15 +2,17 @@
 
 ## Unreleased
 
-- Atmos leveler: turning it off and on again kept only the songs measured in between, and forgot every other level.
 - Sing: the singer's voice turned down, as Apple Music Sing does on the iPhone. A microphone button in the playback
   bar opens a switch, a slider for how much of the voice stays, and two qualities. Light takes the centre of the
   stereo image out in the voice's band, at once. Studio separates the voice on the graphics card with UVR's MDX-Net
   Voc_FT model, whose files (about 92 MB) download the first time: the sound is held back 1.3 s and Apple's position,
   lyrics included, is moved back as much, so both stay on what is heard. The music stops for that long when Studio
-  starts, after a move in the song and when playback resumes; a pause is silent at once. Songs playing in Dolby Atmos
-  have no stereo stream, so Sing leaves them alone. Elements get the same through `Ampify.audio.sing`, and
-  `ampify sing` installs, checks or removes the files.
+  starts, after a move in the song and when playback resumes; a pause is silent at once. A song playing in Dolby Atmos
+  is switched to its stereo version while Sing is on and back to Dolby Atmos after (Apple Music reloads it each time).
+  Elements get the same through `Ampify.audio.sing`, and `ampify sing` installs, checks or removes the files.
+- Atmos leveler: turning it off and on again kept only the songs measured in between, and forgot every other level.
+- AutoMix tells a song playing in Dolby Atmos again: the description of its format ran past what Ampify read.
+- Playback guard 1.0.2: leaves a song alone for 10 s after Sing changes, while Apple Music reloads it.
 - AutoMix and Sing see a move made with Apple's progress bar: Apple seeks there through a function Ampify did not
   follow.
 - Apple Music's own lyrics are word by word again with Ampify on: Ampify asked Apple's player for a lyrics source that

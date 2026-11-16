@@ -41,6 +41,9 @@ constexpr auto kTick = 10ms;            // the thread's pace while the model has
 constexpr auto kRequestEvery = 100ms;   // how often the interface's request is read
 constexpr double kStudioDelay = 1.3;    // seconds held back: two hops of the model, its run and some margin
 constexpr double kStudioHop = 0.5;
+// A song switched to stereo has its new stream by then: measured 0.1 to 0.3 s, though Apple's position then stands
+// still for 3 to 4 s while the song reloads.
+constexpr auto kSwitchSettles = 4s;
 constexpr int kRates[] = {44100, 48000, 88200, 96000, 176400, 192000};
 
 enum class Mode : int { Off = 0, Light = 1, Studio = 2 };
@@ -209,6 +212,10 @@ private:
     int m_studioRate = 0;
     Mode m_reported = Mode::Off;
     Mode m_wished = Mode::Off;
+    bool m_stereoHeld = false;  // Apple's player asked for stereo versions (FollowStereo)
+    bool m_stereoAsked = false;  // Sing was asked for at the last look
+    std::chrono::steady_clock::time_point m_switchJumpAt{};  // the jump that last made a song pick stereo
+    bool m_switchHold = false;  // that jump held the clock back for studio mode, which has not started yet
 
     // The interface's request, applied: the voice at once, the mode once what it needs is there.
     void Follow() {
@@ -219,22 +226,70 @@ private:
             m_studio.reason.clear();
         }
         m_wished = wish.mode;
+        FollowStereo(wish.mode != Mode::Off, wish.mode == Mode::Studio && m_studio.model != nullptr);
         Mode effective = wish.mode;
         std::string reason;
         if (wish.mode == Mode::Studio && !StudioUsable(reason)) effective = reason.empty() ? Mode::Off : Mode::Light;
         if (effective != Mode::Studio && m_studioOn) StopStudio();
         if (effective == Mode::Studio && (!m_studioOn || m_studioRate != detail::MainStreamRate())) StartStudio();
-        if (effective != Mode::Studio) g_mode.store(static_cast<int>(effective), std::memory_order_relaxed);
+        if (effective != Mode::Studio) {
+            g_mode.store(static_cast<int>(effective), std::memory_order_relaxed);
+            DropSwitchHold();
+        }
         if (effective != m_reported) Note("Sing: " + ModeName(effective) + (reason.empty() ? "" : " (" + reason + ")"));
         m_reported = effective;
         PublishState(wish, effective, reason);
+    }
+
+    // Sing works on Apple's stereo stream, which a song playing in Dolby Atmos does not have: while Sing is asked
+    // for, Apple's player is asked for the songs' stereo versions, and gets its own choice back when Sing goes off.
+    // A change of that choice then a jump in place makes the song playing pick its version again (measured: 0.3 s
+    // each way); a jump alone does not. Turning off with studio mode on, StopStudio's own jump does it.
+    void FollowStereo(bool asked, bool studio) {
+        const bool wasAsked = m_stereoAsked;
+        m_stereoAsked = asked;
+        if (asked && !m_stereoHeld && detail::InAtmosNow() && detail::HoldStereo(true)) {
+            m_stereoHeld = true;
+            Note("Sing: Apple's player asked for the song's stereo version");
+            // One jump for both: a second one right after reads the player's time while the first still lands,
+            // and once read 0 (the song started again). Studio mode's hold is set first, so Apple reads its time
+            // held back; StartStudio then leaves the jump out.
+            if (studio) {
+                std::lock_guard lock(g_transition);
+                if (!g_paused) {  // paused, SingPlays holds it when the player plays
+                    detail::HoldClockBack(kStudioDelay);
+                    m_switchHold = true;
+                }
+            }
+            detail::JumpInPlace(0);
+            m_switchJumpAt = std::chrono::steady_clock::now();
+            return;
+        }
+        if (asked || !wasAsked) return;
+        // Apple sometimes starts a song in stereo by itself: with studio mode on, whose stop jumps anyway, the choice
+        // is changed and given back even when Sing did not hold it, so that the song looks again for its Dolby Atmos
+        // version. Otherwise only a held choice is, which saves a jump on a plain stereo song.
+        if (!m_stereoHeld && !(m_studioOn && detail::HoldStereo(true))) return;
+        detail::HoldStereo(false);
+        m_stereoHeld = false;
+        bool paused = false;
+        {
+            std::lock_guard lock(g_transition);
+            paused = g_paused;
+            if (m_switchHold && g_held <= 0) detail::HoldClockBack(0);  // the studio mode it was for never started
+        }
+        m_switchHold = false;
+        Note("Sing: Apple's player back on its own choice, Dolby Atmos included");
+        if (!m_studioOn || paused) detail::JumpInPlace(0);  // paused, StopStudio does not jump
     }
 
     // Whether studio mode can run now; while it cannot, `reason` says why, or stays empty while it is being prepared
     // or Apple has no stereo stream yet (the sound is then left alone rather than switched to light mode a while).
     bool StudioUsable(std::string& reason) {
         if (detail::InAtmosNow()) {
-            reason = "dolby atmos";
+            // Asked for its stereo version, the song comes in a moment; one that never comes stays Dolby Atmos.
+            const bool switching = m_stereoHeld && std::chrono::steady_clock::now() - m_switchJumpAt < kSwitchSettles;
+            if (!switching) reason = "dolby atmos";
             return false;
         }
         if (detail::AutoMixOpen()) {
@@ -306,12 +361,25 @@ private:
             g_mode.store(static_cast<int>(Mode::Studio), std::memory_order_relaxed);
             if (!g_paused) {  // paused, the clock is held back when the player plays (SingPlays)
                 detail::HoldClockBack(g_held);
-                jump = true;
+                jump = !m_switchHold;  // the stereo switch's jump, just made, reads the time held back already
             }
         }
         if (jump) detail::JumpInPlace(0);
+        m_switchHold = false;
         m_studioOn = true;
         m_studioRate = rate;
+    }
+
+    // The stereo switch held the clock back for a studio mode that did not start after all: Apple's own time again.
+    void DropSwitchHold() {
+        if (!m_switchHold || std::chrono::steady_clock::now() - m_switchJumpAt < kSwitchSettles) return;
+        m_switchHold = false;
+        {
+            std::lock_guard lock(g_transition);
+            if (g_held > 0) return;  // studio mode holds it
+            detail::HoldClockBack(0);
+        }
+        detail::JumpInPlace(0);
     }
 
     // Back to Apple's own time: the player goes back by what was held and not heard, so nothing is skipped. Paused,

@@ -87,6 +87,11 @@ struct Api {
     // Optional: without them the second player plays the stream's first version, not Apple's player's.
     unsigned long long(__cdecl* variantPrefs)(void*) = nullptr;
     void(__cdecl* setVariantPrefs)(void*, unsigned long long) = nullptr;
+    // Optional: Sing asks for stereo with them on a Dolby Atmos song.
+    void(__cdecl* setStrategy)(void*, const void*) = nullptr;
+    const void*(__cdecl* copyStrategy)(void*) = nullptr;
+    const void* preferStereo = nullptr;  // AVCFPlayerMultichannelAudioStrategy_PreferStereo, a CFString
+    const void* matchDevice = nullptr;   // ..._MatchMultichannelTrackPreferenceToAudioDevice, Apple's at each play
     bool ready = false;
 };
 
@@ -129,6 +134,14 @@ const Api& A() {
         a.copyDescription = FromAddress<decltype(a.copyDescription)>(get(cf, "CFCopyDescription"));
         a.variantPrefs = FromAddress<decltype(a.variantPrefs)>(get(av, "AVCFPlayerItemGetVariantPreferences"));
         a.setVariantPrefs = FromAddress<decltype(a.setVariantPrefs)>(get(av, "AVCFPlayerItemSetVariantPreferences"));
+        a.setStrategy = FromAddress<decltype(a.setStrategy)>(get(av, "AVCFPlayerSetMultichannelAudioStrategy"));
+        a.copyStrategy = FromAddress<decltype(a.copyStrategy)>(get(av, "AVCFPlayerCopyMultichannelAudioStrategy"));
+        auto constant = [&](const char* name) {
+            auto* value = static_cast<const void* const*>(get(av, name));  // an exported CFStringRef variable
+            return value ? *value : nullptr;
+        };
+        a.preferStereo = constant("AVCFPlayerMultichannelAudioStrategy_PreferStereo");
+        a.matchDevice = constant("AVCFPlayerMultichannelAudioStrategy_MatchMultichannelTrackPreferenceToAudioDevice");
         a.ready = a.copyTracks && a.copyTrackAsset && a.copyFormats && a.copyDescription && a.copyCurrentItem &&
                   a.copyItems && a.itemAsset && a.itemTime && a.itemDuration && a.seekItem &&
                   a.endTime && a.createItem && a.createPlayer && a.seekPlayer && a.play && a.pause && a.rate &&
@@ -260,6 +273,9 @@ std::optional<bool> InAtmos(void* item) {
     Ref tracks(A().copyTracks(item));
     if (!tracks) return std::nullopt;
     std::vector<std::string> descriptions;
+    // CFStringGetCString gives nothing when the text does not fit: a Dolby Atmos format runs past 1024 bytes
+    // (found on 16/11/2026, the song then counted as neither), so the room is large.
+    std::vector<char> buffer(64 * 1024);
     for (long long i = 0; i < A().arrayCount(tracks.get()); i++) {
         Ref asset(A().copyTrackAsset(A().arrayAt(tracks.get(), i)));
         if (!asset) continue;
@@ -267,8 +283,8 @@ std::optional<bool> InAtmos(void* item) {
         if (!formats) continue;
         for (long long j = 0; j < A().arrayCount(formats.get()); j++) {
             Ref text(A().copyDescription(A().arrayAt(formats.get(), j)));
-            char buffer[1024] = {};
-            if (text && A().cstring(text.get(), buffer, sizeof(buffer), kUtf8)) descriptions.emplace_back(buffer);
+            const auto room = static_cast<long long>(buffer.size());
+            if (text && A().cstring(text.get(), buffer.data(), room, kUtf8)) descriptions.emplace_back(buffer.data());
         }
     }
     const atmos::TrackKind kind = atmos::ClassifyDescriptions(descriptions);
@@ -630,6 +646,27 @@ void __cdecl SetRate_Hook(void* player, float rate) {
     }
 }
 
+// Sing on a Dolby Atmos song: Apple's player is asked to prefer stereo, which its studio mode needs, and Apple's own
+// choice comes back when Sing lets go. A choice Apple makes meanwhile is kept for then.
+using SetStrategy_t = void(__cdecl*)(void*, const void*);
+SetStrategy_t g_setStrategy = nullptr;
+std::mutex g_strategyLock;
+const void* g_appleStrategy = nullptr;  // retained; what the player had before stereo was held, or Apple's since
+bool g_stereoHeld = false;
+
+void __cdecl SetStrategy_Hook(void* player, const void* strategy) {
+    if (player == g_queue.load()) {
+        std::lock_guard lock(g_strategyLock);
+        if (g_stereoHeld) {
+            if (strategy) A().retain(strategy);
+            if (g_appleStrategy) A().release(g_appleStrategy);
+            g_appleStrategy = strategy;
+            return;
+        }
+    }
+    g_setStrategy(player, strategy);
+}
+
 Seek_t g_seekPlayer = nullptr;
 // Apple's player makes a new stream when it seeks: while a mix expects the second player's, that one is Apple's.
 void AppleSeeks() {
@@ -744,6 +781,7 @@ void StartAutoMixWatch() {
     size_t clock = Hook("AVCFPlayerItemGetCurrentTime", &ItemTime_Hook, g_itemTime);
     if (clock == 0) Note("Sing: Apple's player time not followed, the studio mode's lyrics would run ahead");
     size_t queue = Hook("AVCFQueuePlayerCreateWithPlayerItemsAndOptions", &CreateQueue_Hook, g_createQueue);
+    Hook("AVCFPlayerSetMultichannelAudioStrategy", &SetStrategy_Hook, g_setStrategy);
     size_t watched = Hook("AVCFPlayerSetRate", &SetRate_Hook, g_setRate) +
                      Hook("AVCFPlayerSeekToTime", &SeekPlayer_Hook, g_seekPlayer) +
                      Hook("AVCFPlayerItemSeekToTime", &SeekItem_Hook, g_seekItem) +
@@ -806,6 +844,34 @@ bool InAtmosNow() {
     if (!A().ready || !queue) return false;
     Ref item(A().copyCurrentItem(queue));
     return item && InAtmos(item.item()).value_or(false);
+}
+
+bool HoldStereo(bool hold) {
+    void* queue = g_queue.load();
+    // Without the hook Apple would set its own choice again at the next song.
+    if (!A().ready || !queue || !g_setStrategy || !A().setStrategy || !A().copyStrategy || !A().preferStereo) return false;
+    // Apple's player is only called outside the lock, which its own thread takes in SetStrategy_Hook.
+    const void* current = hold ? A().copyStrategy(queue) : nullptr;  // a copy: already retained
+    const void* apply = nullptr;
+    const void* drop = current;
+    {
+        std::lock_guard lock(g_strategyLock);
+        if (g_stereoHeld != hold) {
+            g_stereoHeld = hold;
+            drop = g_appleStrategy;
+            if (hold) {
+                g_appleStrategy = current;
+                apply = A().preferStereo;
+            } else {
+                // Apple's own, or the one it sets as a song starts (seen on 16/11/2026) when it had none.
+                apply = g_appleStrategy ? g_appleStrategy : A().matchDevice;
+                g_appleStrategy = nullptr;
+            }
+        }
+    }
+    if (apply) A().setStrategy(queue, apply);
+    if (drop) A().release(drop);  // after the call: `apply` may be it
+    return true;
 }
 
 }  // namespace detail

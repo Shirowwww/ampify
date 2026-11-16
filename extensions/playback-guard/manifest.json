@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "playback-guard",
   "name": "Playback guard",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "Restarts a song that Apple Music leaves stuck at the same second while it says it plays, then goes back to that second.",
@@ -10,5 +10,5 @@
   "kitApi": "1.0",
   "preview": "preview.jpg",
   "main": "main.js",
-  "permissions": ["player.read", "player.control"]
+  "permissions": ["player.read", "player.control", "audio.sing"]
 }
