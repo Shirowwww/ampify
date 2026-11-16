@@ -13,7 +13,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <string>
+#include <tuple>
 #include <utility>
+#include <vector>
 
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -43,6 +46,14 @@ constexpr size_t kMaxFactories = 64;  // a theme uses a handful of colour filter
 constexpr size_t kAmountOnly = 1;
 constexpr size_t kWithEdges = 3;
 constexpr size_t kWithColours = 23;
+
+// Apple's footers under the lines of a scroller (the writers of the lyrics, at the end of their column). A filter on
+// the scroller never blurs them, wherever its edges fall: they are read, not sung, and blurred they cannot be.
+constexpr const wchar_t* kSharpFooters[] = {L"TimeBasedLyricsFooter"};
+constexpr float kNoFooter = 1.0e7f;  // the footer's top while none is laid out: below any content
+// Where the content stops blurring, in the copies' space: at the footer's top as scrolled (and moved by the element's
+// Translation, as the content inside the copies is), never above the element's own sharp middle.
+constexpr wchar_t kCut[] = L"Max(place.Band, place.Footer + scroll.Translation.Y + own.Translation.Y)";
 
 // The gradient that shows the blurred copy at the top and bottom (opaque there) and the sharp one in the middle (its
 // inverse). A side of 0 starts clear.
@@ -148,6 +159,24 @@ std::optional<winrt::Windows::Foundation::Point> LayoutOrigin(const xaml::UIElem
         y -= host.ActualOffset().y;
     }
     return winrt::Windows::Foundation::Point{x, y};
+}
+
+// A footer of kSharpFooters under `root`, a few levels down: it sits beside the lines, never among them.
+xaml::UIElement FindFooter(const xaml::DependencyObject& root) {
+    constexpr int kMaxDepth = 6;
+    std::vector<std::pair<xaml::DependencyObject, int>> todo{{root, 0}};
+    for (size_t i = 0; i < todo.size(); i++) {
+        const auto [node, depth] = todo[i];
+        if (auto element = node.try_as<xaml::FrameworkElement>()) {
+            for (const wchar_t* name : kSharpFooters) {
+                if (element.Name() == name) return element;
+            }
+        }
+        if (depth == kMaxDepth || node.try_as<xaml::Controls::ItemsControl>()) continue;
+        const int count = media::VisualTreeHelper::GetChildrenCount(node);
+        for (int child = 0; child < count; child++) todo.emplace_back(media::VisualTreeHelper::GetChild(node, child), depth + 1);
+    }
+    return nullptr;
 }
 
 }  // namespace
@@ -280,6 +309,7 @@ void ElementBlur::ClipAway(Entry& entry) {
         const float bottom = std::round(height * (1.0f - entry.filter.edges.bottom));
         band = {0, top, width, std::max(0.0f, bottom - top)};
     }
+    if (entry.scroll) entry.place.InsertScalar(L"Band", band.Y + band.Height);
     if (band == entry.kept) return;
     entry.kept = band;
     if (entry.xamlClip) {
@@ -416,6 +446,11 @@ ElementBlur::Entry* ElementBlur::Start(theme::NodeId id, const xaml::FrameworkEl
             compositor.CreateExpressionAnimation(L"Vector2(-clipped.Translation.X, -clipped.Translation.Y)");
         inside.SetReferenceParameter(L"clipped", own);
         entry.surface.StartAnimation(L"SourceOffset", inside);
+        if (auto scroller = element.try_as<xaml::Controls::ScrollViewer>()) {
+            entry.scroll = xaml::Hosting::ElementCompositionPreview::GetScrollViewerManipulationPropertySet(scroller);
+            entry.place.InsertScalar(L"Footer", kNoFooter);
+            entry.place.InsertScalar(L"Band", 0);
+        }
     }
     xaml::Hosting::ElementCompositionPreview::SetElementChildVisual(host, entry.layer);
     Entry& kept = m_entries.insert_or_assign(id, std::move(entry)).first->second;
@@ -470,7 +505,50 @@ ElementBlur::Look ElementBlur::MakeLook(Entry& entry, const ImageFilter& filter,
     look.blurred = compositor.CreateSpriteVisual();
     look.visual.Children().InsertAtTop(look.sharp);
     look.visual.Children().InsertAtTop(look.blurred);
+    CutAtFooter(entry, look);
     return look;
+}
+
+// In a scroller with a footer, the look's copies stop at the footer's top, and the content as it is shows from there
+// down: no blur reaches the footer, and the lines' blur does not run into it.
+void ElementBlur::CutAtFooter(const Entry& entry, Look& look) {
+    auto clipped = entry.clipped.get();
+    if (!entry.scroll || !clipped) return;
+    comp::Compositor compositor = look.visual.Compositor();
+    const comp::Visual own = xaml::Hosting::ElementCompositionPreview::GetElementVisual(clipped);
+    look.below = compositor.CreateSpriteVisual();
+    look.below.Brush(look.sharpBrush);
+    look.visual.Children().InsertAtTop(look.below);
+    const std::wstring cut = kCut;
+    for (auto [sprite, side, text] : {std::tuple{look.sharp, L"BottomInset", L"Max(0, sprite.Size.Y - " + cut + L")"},
+                                      std::tuple{look.blurred, L"BottomInset", L"Max(0, sprite.Size.Y - " + cut + L")"},
+                                      std::tuple{look.below, L"TopInset", L"Max(0, " + cut + L")"}}) {
+        comp::InsetClip clip = compositor.CreateInsetClip();
+        comp::ExpressionAnimation inset = compositor.CreateExpressionAnimation(text);
+        inset.SetReferenceParameter(L"place", entry.place);
+        inset.SetReferenceParameter(L"scroll", entry.scroll);
+        inset.SetReferenceParameter(L"own", own);
+        inset.SetReferenceParameter(L"sprite", sprite);
+        clip.StartAnimation(side, inset);
+        sprite.Clip(clip);
+    }
+}
+
+// The footer's top in the scrolled content, from layout: Apple lays it out once the lyrics are in.
+void ElementBlur::FollowFooter(Entry& entry) {
+    auto element = entry.element.get();
+    if (!entry.scroll || !element) return;
+    xaml::UIElement footer = entry.footer.get();
+    if (!footer) {
+        footer = FindFooter(element);
+        if (footer) entry.footer = winrt::make_weak(footer);
+    }
+    std::optional<winrt::Windows::Foundation::Point> origin =
+        footer ? LayoutOrigin(footer, element, element) : std::nullopt;
+    const float top = origin ? origin->Y : kNoFooter;
+    float before = 0;
+    if (entry.place.TryGetScalar(L"Footer", before) == comp::CompositionGetValueStatus::Succeeded && before == top) return;
+    entry.place.InsertScalar(L"Footer", top);
 }
 
 // Puts `look` on top, blurred by `blur` for a start.
@@ -512,7 +590,9 @@ void ElementBlur::Place(Entry& entry) {
         if (look.sharp.Size() == size) continue;
         look.sharp.Size(size);
         look.blurred.Size(size);
+        if (look.below) look.below.Size(size);
     }
+    FollowFooter(entry);
     if (!entry.clipPending) ClipAway(entry);  // the element's sharp middle follows its size
 }
 

@@ -77,6 +77,8 @@ private:
         winrt::Microsoft::UI::Composition::ContainerVisual visual{nullptr};
         winrt::Microsoft::UI::Composition::SpriteVisual sharp{nullptr};
         winrt::Microsoft::UI::Composition::SpriteVisual blurred{nullptr};
+        // The content as it is, from the top of a scroller's footer down (kSharpFooters): nothing blurs it.
+        winrt::Microsoft::UI::Composition::SpriteVisual below{nullptr};
         winrt::Microsoft::UI::Composition::CompositionBrush sharpBrush{nullptr};        // the content in its colours
         winrt::Microsoft::UI::Composition::CompositionEffectBrush blurBrush{nullptr};   // and blurred, when it blurs
     };
@@ -98,6 +100,10 @@ private:
         // sharp middle back by it, so the blurred edges stay at the edges of where the element is laid out.
         winrt::Microsoft::UI::Composition::CompositionPropertySet place{nullptr};
         std::vector<Look> looks;
+        // A filtered scroller: its scrolling (the ScrollViewer's manipulation set) and its footer, found once laid out.
+        // The footer's top in the scrolled content is the place's "Footer".
+        winrt::Microsoft::UI::Composition::CompositionPropertySet scroll{nullptr};
+        winrt::weak_ref<winrt::Microsoft::UI::Xaml::UIElement> footer;
         winrt::Microsoft::UI::Xaml::FrameworkElement::LayoutUpdated_revoker laidOut;
         ImageFilter filter;   // the last written
         std::string text;     // as written, for Read
@@ -134,6 +140,8 @@ private:
     void AddLook(Entry& entry, Look look, float blur);
     void Place(Entry& entry);
     void Shape(Entry& entry, Look& look, BlurEdges edges);
+    static void CutAtFooter(const Entry& entry, Look& look);
+    static void FollowFooter(Entry& entry);
     void Animate(theme::NodeId id, Entry& entry, const ImageFilter& filter, double ms);
     void Settle(theme::NodeId id, Entry& entry);
     winrt::Microsoft::UI::Composition::CompositionEffectFactory Factory(const std::string& key,

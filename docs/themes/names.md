@@ -338,7 +338,7 @@ which writes `inspector.json`), and run `ampify theme names` on it; a class that
 | `.lyrics` | The lyrics view |
 | `.lyrics-menu-button` | Its menu button |
 | `.lyrics-synced` | The lyrics that follow the song |
-| `.lyrics-lines` | Their lines, in the scroller that shows them: without the menu button and the credits strip around it (a `filter` there leaves the button sharp) |
+| `.lyrics-lines` | Their lines, in the scroller that shows them, with the credits strip that ends them; without the menu button (a `filter` there leaves the button sharp, and never blurs the credits) |
 | `.lyrics-static` | The lyrics without timing |
 | `.lyrics-message` | The text that stands in for lyrics: nothing playing, loading, not available |
 | `.lyrics-line` | One line of the synced lyrics, whole; `:current` while it is the line being sung |
@@ -347,7 +347,7 @@ which writes `inspector.json`), and run `ampify theme names` on it; a class that
 | `.lyrics-words` | The sung text of a line: a plain text when the song is timed by line, the word by word host when it is timed by word |
 | `.lyrics-background-words` | The background vocals of a line, when it has some |
 | `.lyrics-instrumental` | The three dots of an instrumental break |
-| `.lyrics-footer` | The strip under the lyrics |
+| `.lyrics-footer` | The strip under the lyrics, at the end of their scroller |
 | `.lyrics-writers` | Its credits line |
 | `.queue` | The Up Next list |
 | `.queue-clear` | Its "Clear" button, in Apple's red; a theme with an accent paints it in the accent |

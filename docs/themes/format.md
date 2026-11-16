@@ -778,7 +778,8 @@ A theme can create its own roles (`--font-lyrics`). Extensions read them with `A
   Windows, and the shadow may not show on every element.
 - `filter: blur(3px)` draws the element blurred, with the same standard deviation as in CSS; what lies behind it
   stays sharp. `filter: blur(9px) edges(30%)`, Ampify's own, blurs only towards the top and bottom, over 30% of the
-  height each (`edges(10% 50%)`: top, then bottom), fading to sharp in the middle.
+  height each (`edges(10% 50%)`: top, then bottom), fading to sharp in the middle. On `.lyrics-lines`, the songwriter
+  credits at the end of the lyrics (`.lyrics-footer`) always stay sharp: the blur stops at their top.
 - The colour filters of CSS go in the same `filter`, before or after the blur, applied in the order written:
   `saturate()`, `grayscale()`, `sepia()`, `brightness()`, `contrast()`, `invert()` (a number or a percentage, as in
   CSS, up to 10) and `hue-rotate(90deg)`. Ampify adds `tint(color[, amount])`, which multiplies the colours by
