@@ -57,7 +57,7 @@ songs as loud as stereo ones.</td>
 |---|---|---|
 | 10 themes and 28 colour schemes, light and dark, switched without a restart | Discord presence, Last.fm scrobbling, a sleep timer, global shortcuts, an A-B loop | Nothing is written into Apple Music's package: uninstall and the original app is back |
 | 11 snippets to layer on any theme: corners, lyrics style, artwork filters, an equalizer that moves with the music | Pages for your listening stats and the new releases of the artists you play | Every extension lists its permissions before you switch it on |
-| One accent colour of your choice, or the colours of the song playing | AutoMix between songs, a Song panel, the time under the pointer on the progress line, and an Atmos leveler | A new Apple Music version stays untouched until Ampify has been tested on it |
+| One accent colour of your choice, or the colours of the song playing | AutoMix between songs, Sing to turn the singer's voice down, a Song panel, the time under the pointer on the progress line, and an Atmos leveler | A new Apple Music version stays untouched until Ampify has been tested on it |
 | The playback bar at the top, the bottom or centred, under every theme | A Marketplace inside Apple Music, one click to install | Updates check their SHA-256 and install while Apple Music is closed |
 
 Ampify speaks English, French, German, Spanish, Portuguese, Russian, Japanese, Simplified Chinese, Italian and Korean.
