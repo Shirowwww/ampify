@@ -96,7 +96,7 @@ class CatalogTests(unittest.TestCase):
 
     @needs_catalog
     def test_the_catalog_this_release_reads_is_valid(self):
-        # facts/release.json names it: Ampify 1.2.1 keeps catalog.json, 1.3.0 and later read their own file.
+        # facts/release.json names it: older releases keep catalog.json and catalog-1.3.json.
         with open(os.path.join(REPO, "facts", "release.json"), encoding="utf-8") as handle:
             name = json.load(handle)["project"]["catalogUrl"].rsplit("/", 1)[-1]
         path = os.path.join(CATALOG, name)

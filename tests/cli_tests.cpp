@@ -323,7 +323,7 @@ std::string CatalogWith(const std::string& entry) {
 }  // namespace
 
 // The public catalog lives in its own repository: checked when a clone of ampify-catalog sits next to this one.
-// It is the file the default address names (catalog-1.3.json: Ampify 1.2.1 keeps catalog.json).
+// It is the file the default address names (catalog-1.5.json: older releases keep catalog-1.3.json and catalog.json).
 TEST_CASE(Catalog_PublicCatalogIsValid) {
     const std::string_view url = ampify::kDefaultCatalogUrl;
     CHECK(url.starts_with("https://raw.githubusercontent.com/") && url.ends_with(".json"));
@@ -434,6 +434,27 @@ TEST_CASE(Catalog_LeavesOutAnElementThisAmpifyIsTooOldFor) {
     std::optional<ampify::Catalog> catalog = ampify::ParseCatalog(CatalogWith(entry), false, errors, "1.3.0");
     CHECK(errors.empty());
     CHECK(catalog && catalog->entries.empty());
+}
+
+// Ampify 1.4.1 refused the whole catalog over Sing's new audio.sing permission: a version for a later Ampify may use
+// what this one does not know.
+TEST_CASE(Catalog_PassesOverWhatAVersionForALaterAmpifyAsksFor) {
+    std::string later = NewerDemo("1.4.0", "9.0.0");
+    later.replace(later.find("\"storage\""), 9, "\"audio.future\"");
+    std::vector<std::string> errors;
+    std::optional<ampify::Catalog> catalog = ampify::ParseCatalog(CatalogWithNewer(later), false, errors, "1.3.0");
+    CHECK(errors.empty());
+    CHECK(catalog && catalog->entries.size() == 1 && catalog->entries[0].version == "1.2.3");
+
+    std::string alone = kCatalogEntry;
+    alone.replace(alone.find("\"storage\""), 9, "\"audio.future\"");
+    alone.insert(alone.size() - 1, R"(, "minAmpify": "9.0.0")");
+    CHECK(ampify::ParseCatalog(CatalogWith(alone), false, errors, "1.3.0").has_value());
+    CHECK(errors.empty());
+
+    // A version this Ampify takes is still checked in full.
+    CHECK(!ampify::ParseCatalog(CatalogWithNewer(later), false, errors, "9.0.0").has_value());
+    CHECK(MentionsField(errors, "extensions[0].newer[0].permissions"));
 }
 
 TEST_CASE(Catalog_RefusesANewerVersionOfAnotherElement) {

@@ -21,8 +21,9 @@ to know git.
    again. A maintainer then reads the code and merges it.
 
 After the merge, the element shows in the Marketplace as soon as the bot has packed it. The bot writes it to
-`catalog-1.3.json`, the catalog that Ampify 1.3.0 and later read, and to `catalog.json`, read by Ampify 1.2.1 and
-older, only when those can install it. Your pull request touches neither file. To send a new version later, raise `version`
+`catalog-1.5.json`, the catalog that Ampify 1.5.0 and later read, and to the older files only when their releases can
+install it: `catalog-1.3.json`, read by Ampify 1.3.0 to 1.4.1, and `catalog.json`, read by Ampify 1.2.1 and older.
+Your pull request touches none of them. To send a new version later, raise `version`
 in the manifest and publish again: everyone who installed it gets it on their own within a day (see
 [Updates](#updates)).
 
@@ -125,6 +126,9 @@ pins its address and SHA-256, and `ampify versions update` reads it. Schema:
   out; the archive's manifest keeps them. Once no build before 1.0.0 is in use, the entries can carry them.
 - An Ampify release reads one catalog address and cannot be told apart from another by it, so a version that only a
   newer release understands goes to `newer`, never into the entry itself.
+- Before 1.5.0, a release refuses the whole catalog over one version it cannot read, a new permission for instance,
+  even when that version's `minAmpify` is above it. Those releases read files that hold only what they can install
+  (see above). Ampify 1.5.0 and later pass over what a version for a later release asks for.
 - `ampify build` prints the fields every entry needs. The bot, through `tools/pack.py`, also writes `homepage`,
   `license`, `preview` and the real address.
 - Both tools write the same archive: files sorted by name, hidden files and `node_modules` left out, every file stored

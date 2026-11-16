@@ -31,6 +31,9 @@ the beat.
   page no longer reads through the lines.
 - Album colors 1.2.3: with a light scheme, the moving background's glass and the wash under an album's header are
   light, so their dark text reads (the page went dark under dark text).
+- The Marketplace reads `catalog-1.5.json`, and passes over an element meant for a later Ampify instead of refusing
+  the whole catalog: Ampify 1.4.1 would have shown none over Sing's new permission, so it keeps reading a catalog of
+  what it can install.
 - Play history, a new example app: every song played on this PC once it has played for 10 seconds, newest first and
   grouped by day, stations such as Discovery included, which Apple Music keeps no history for.
 

@@ -108,10 +108,23 @@ CatalogEntry ReadCatalogEntry(const Json& item, const std::string& where, bool l
     return entry;
 }
 
+// A version meant for a later Ampify (a minAmpify this one does not reach) may use what this one does not know yet,
+// such as a new permission: its problems are left aside, and NewestUsable passes it over. Before 1.5.0, one such
+// version refused the whole catalog.
+CatalogEntry ReadVersion(const Json& item, const std::string& where, bool localCatalog, std::string_view ampifyVersion,
+                         std::vector<std::string>& errors) {
+    std::vector<std::string> own;
+    CatalogEntry entry = ReadCatalogEntry(item, where, localCatalog, own);
+    const bool forLaterAmpify =
+        !entry.minAmpify.empty() && CompareDottedVersions(ampifyVersion, entry.minAmpify) < 0;
+    if (!forLaterAmpify) errors.insert(errors.end(), own.begin(), own.end());
+    return entry;
+}
+
 // The entry followed by the versions of its `newer` list, which must be the same element by the same author.
 std::vector<CatalogEntry> ReadVersions(const Json& item, const std::string& where, bool localCatalog,
-                                       std::vector<std::string>& errors) {
-    std::vector<CatalogEntry> versions{ReadCatalogEntry(item, where, localCatalog, errors)};
+                                       std::string_view ampifyVersion, std::vector<std::string>& errors) {
+    std::vector<CatalogEntry> versions{ReadVersion(item, where, localCatalog, ampifyVersion, errors)};
     const Json* newer = item.Find("newer");
     if (newer == nullptr) return versions;
     if (!newer->IsArray()) {
@@ -127,7 +140,7 @@ std::vector<CatalogEntry> ReadVersions(const Json& item, const std::string& wher
             continue;
         }
         if (later.Find("newer") != nullptr) errors.push_back(at + ".newer: only the entry itself lists newer versions");
-        CatalogEntry version = ReadCatalogEntry(later, at, localCatalog, errors);
+        CatalogEntry version = ReadVersion(later, at, localCatalog, ampifyVersion, errors);
         if (version.id != first.id) errors.push_back(at + ".id: must be the entry's id, " + first.id);
         if (version.kind != first.kind) errors.push_back(at + ".kind: must be the entry's kind");
         if (version.author != first.author) errors.push_back(at + ".author: must be the entry's author, " + first.author);
@@ -210,7 +223,7 @@ std::optional<Catalog> ParseCatalog(std::string_view text, bool localCatalog, st
             }
 
             size_t entryBefore = errors.size();
-            std::vector<CatalogEntry> versions = ReadVersions(item, where, localCatalog, errors);
+            std::vector<CatalogEntry> versions = ReadVersions(item, where, localCatalog, ampifyVersion, errors);
             const std::string& id = versions.front().id;
             if (!id.empty() && !ids.insert(id).second) {
                 errors.push_back(where + ".id: id already in the catalog: " + id);

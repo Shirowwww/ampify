@@ -39,7 +39,7 @@
     "repository": "Shirowwww/ampify",
     "catalogRepository": "Shirowwww/ampify-catalog",
     "releaseApi": "https://api.github.com/repos/Shirowwww/ampify/releases",
-    "catalogUrl": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog-1.3.json",
+    "catalogUrl": "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog-1.5.json",
     "site": "https://shirowwww.github.io/ampify"
   }
 }

@@ -5,8 +5,9 @@
   "use strict";
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  // The 1.3 catalog first; catalog.json stays frozen for Ampify 1.2.1 and is the fallback while the other is missing.
+  // The newest catalog first, which lists every version; the older ones are the fallback while it is missing.
   const CATALOGS = [
+    "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog-1.5.json",
     "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog-1.3.json",
     "https://raw.githubusercontent.com/Shirowwww/ampify-catalog/main/catalog.json",
   ];
