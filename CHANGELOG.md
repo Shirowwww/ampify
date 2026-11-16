@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Atmos leveler: turning it off and on again kept only the songs measured in between, and forgot every other level.
 - Sing: the singer's voice turned down, as Apple Music Sing does on the iPhone. A microphone button in the playback
   bar opens a switch, a slider for how much of the voice stays, and two qualities. Light takes the centre of the
   stereo image out in the voice's band, at once. Studio separates the voice on the graphics card with UVR's MDX-Net

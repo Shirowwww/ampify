@@ -180,14 +180,14 @@ void SaveLevels(const std::string& text) {
     }
 }
 
-// A new leveler on the current settings, the levels read back when asked.
-void RenewLeveler(bool loadLevels) {
+// A new leveler on the current settings, with the levels read back.
+void RenewLeveler() {
     {
         std::lock_guard<std::mutex> guard(g_levelerLock);
         g_leveler = std::make_unique<AtmosLeveler>(g_config, ampify::audio::kStartSampleRate,
                                                    ampify::audio::kStartSampleRate);
     }
-    if (loadLevels) LoadLevels();
+    LoadLevels();
 }
 
 void UseConfig(const LevelerConfig& config) {
@@ -386,7 +386,7 @@ public:
         if (!ResolveApi()) return false;
         // One meter per path: the stereo stream (for example 96 kHz) and the Atmos objects (48 kHz). Each takes its
         // stream's rate once the stream is seen.
-        RenewLeveler(true);
+        RenewLeveler();
         return true;
     }
 
@@ -442,7 +442,7 @@ bool StartLeveler(ampify::Journal& journal, const LevelerConfig& config) {
         return true;
     case platform::StartResult::AlreadyPlaced:
         // The hooks went in for the sound alone: the leveler takes them over with its settings.
-        RenewLeveler(true);
+        RenewLeveler();
         Note("leveler started on the hooks already in place");
         return true;
     case platform::StartResult::Failed:
@@ -457,7 +457,9 @@ bool StartLeveler(ampify::Journal& journal, const LevelerConfig& config) {
 void StopLeveler() {
     UseConfig(NeutralConfig());
     if (!platform::Placed()) return;
-    RenewLeveler(false);
+    // Its levels come along: it still measures and saves them, and an empty leveler wrote over every level learnt
+    // before (seen on 16/11/2026, 62 songs lost to an off and on).
+    RenewLeveler();
     Note("leveler stopped: the sound goes through untouched");
 }
 
