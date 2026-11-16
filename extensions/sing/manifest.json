@@ -18,7 +18,8 @@
     "ko": {"name": "노래하기", "description": "노래방 모드입니다. 재생 막대의 마이크 버튼으로 음악은 그대로 두고 가수의 목소리를 줄이거나 없앱니다. 라이트 품질과 그래픽 카드를 쓰는 스튜디오 품질이 있습니다."}
   },
   "kitApi": "1.0",
-  "minAmpify": "1.4.2",
+  "minAmpify": "1.5.0",
+  "preview": "preview.jpg",
   "main": "main.js",
   "processes": ["ui"],
   "permissions": ["audio.sing", "storage", "ui.playbar", "ui.popup"]

@@ -1,15 +1,19 @@
 # Changelog
 
-## Unreleased
+## 1.5.0 (2026-11-16)
 
-- Sing: the singer's voice turned down, as Apple Music Sing does on the iPhone. A microphone button in the playback
-  bar opens a switch, a slider for how much of the voice stays, and two qualities. Light takes the centre of the
-  stereo image out in the voice's band, at once. Studio separates the voice on the graphics card with UVR's MDX-Net
-  Voc_FT model, whose files (about 92 MB) download the first time: the sound is held back 1.3 s and Apple's position,
-  lyrics included, is moved back as much, so both stay on what is heard. The music stops for that long when Studio
-  starts, after a move in the song and when playback resumes; a pause is silent at once. A song playing in Dolby Atmos
-  is switched to its stereo version while Sing is on and back to Dolby Atmos after (Apple Music reloads it each time).
-  Elements get the same through `Ampify.audio.sing`, and `ampify sing` installs, checks or removes the files.
+Sing turns the singer's voice down, Apple Music's own lyrics are word by word again, and AutoMix's beat mixes stay on
+the beat.
+
+- Sing, in the Marketplace: the singer's voice turned down, as Apple Music Sing does on the iPhone. A microphone
+  button in the playback bar opens a switch, a slider for how much of the voice stays, and two qualities. Light takes
+  the centre of the stereo image out in the voice's band, at once. Studio separates the voice on the graphics card
+  with UVR's MDX-Net Voc_FT model, whose files (about 92 MB) download the first time: the sound is held back 1.3 s and
+  Apple's position, lyrics included, is moved back as much, so both stay on what is heard. The music stops for that
+  long when Studio starts, after a move in the song and when playback resumes; a pause is silent at once. A song
+  playing in Dolby Atmos is switched to its stereo version while Sing is on and back to Dolby Atmos after (Apple Music
+  reloads it each time). Elements get the same through `Ampify.audio.sing`, and `ampify sing` installs, checks or
+  removes the files.
 - Atmos leveler: turning it off and on again kept only the songs measured in between, and forgot every other level.
 - AutoMix tells a song playing in Dolby Atmos again: the description of its format ran past what Ampify read.
 - Playback guard 1.0.2: leaves a song alone for 10 s after Sing changes, while Apple Music reloads it.
@@ -27,6 +31,8 @@
   page no longer reads through the lines.
 - Album colors 1.2.3: with a light scheme, the moving background's glass and the wash under an album's header are
   light, so their dark text reads (the page went dark under dark text).
+- Play history, a new example app: every song played on this PC once it has played for 10 seconds, newest first and
+  grouped by day, stations such as Discovery included, which Apple Music keeps no history for.
 
 ## 1.4.1 (2026-11-13)
 
