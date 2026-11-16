@@ -70,6 +70,12 @@
 
 @import "ampify:floating-panels";
 
+/* Apple lays the lyrics and Up Next panel over the page's right side, so the faint layer let the page read through
+   the lines. It is frosted as Windows draws what floats over content, with the bar's tint: the page blurs away. */
+.lyrics-panel {
+    backdrop: acrylic($bar, 0.86);
+}
+
 /* Where the bar goes is Ampify's own setting (apple.playbar), read here as bar-position; the manifest's "playbar"
    starts Fluent on Centred, the floating bar of a Windows player. Bottom: the same bar with the buttons by the song.
    Top: Apple's own place, in the title bar. */

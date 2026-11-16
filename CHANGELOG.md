@@ -10,6 +10,10 @@
   tempo near the end of one song and the start of the other: over 2,337 mixes planned between chart songs, the beats
   drifted up to 34 ms apart in half of them and past 227 ms in one in ten. A pair that cannot keep together swaps on
   a bar instead.
+- Fluent 2.0.4: the lyrics and Up Next panel, which Apple lays over the page, is frosted with the bar's tint, so the
+  page no longer reads through the lines.
+- Album colors 1.2.3: with a light scheme, the moving background's glass and the wash under an album's header are
+  light, so their dark text reads (the page went dark under dark text).
 
 ## 1.4.1 (2026-11-13)
 

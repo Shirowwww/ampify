@@ -31,6 +31,32 @@
     }
 }
 
+/* A light scheme keeps Apple's dark text in the header, whatever color-scheme asks there: the wash is a light tint of
+   the artwork's main colour, which dark text reads on, fainter with each strength. After the dark strengths. */
+@setting reach = Fade {
+    @media (prefers-color-scheme: light) {
+        .album-header {
+            color-scheme: normal;
+        }
+
+        .list-page {
+            background: linear-gradient(to bottom, #73var(--page-art-2-hex, FFFFFF) 0%, #3Bvar(--page-art-2-hex, FFFFFF) 35%, #00var(--page-art-2-hex, FFFFFF) 75%);
+        }
+
+        @setting strength = Medium {
+            .list-page {
+                background: linear-gradient(to bottom, #59var(--page-art-2-hex, FFFFFF) 0%, #2Evar(--page-art-2-hex, FFFFFF) 35%, #00var(--page-art-2-hex, FFFFFF) 75%);
+            }
+        }
+
+        @setting strength = Soft {
+            .list-page {
+                background: linear-gradient(to bottom, #40var(--page-art-2-hex, FFFFFF) 0%, #21var(--page-art-2-hex, FFFFFF) 35%, #00var(--page-art-2-hex, FFFFFF) 75%);
+            }
+        }
+    }
+}
+
 @setting reach = Page {
     .list-page {
         color-scheme: dark;
@@ -146,6 +172,13 @@
        contrast. A theme's own glass keeps its tint (--glass-light, then --glass, as Artwork and Glass name it). */
     .content {
         backdrop: var(--glass-light, var(--glass, acrylic(#FF101014, 0.55)));
+    }
+
+    /* A light scheme writes dark text: its glass is light, or the page was dark under dark text (Fluent, light). */
+    @media (prefers-color-scheme: light) {
+        .content {
+            backdrop: var(--glass-light, var(--glass, acrylic(#FFF3F3F5, 0.6)));
+        }
     }
 
     /* The bar's glow, when it spreads over the bar, stays on top of the moving background. */
