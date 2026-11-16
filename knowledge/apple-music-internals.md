@@ -95,6 +95,14 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   background vocals and translations), Apple's pane stays word by word, and Ampify has the word times at the song's
   start, before any pane opens. The earlier findings "Apple Music on Windows has no word timing" (05/11 and 12/11)
   came from this wrong value. Check a change here against Apple's pane with Ampify off (`ampify restore`) and on.
+- **How Apple fills a word (1.1792.39942, issue #5, read 2026-11-16, not yet traced live).** Each word of a line is an
+  `IKaraokeLyricsWord` (`{291C0608-078A-5CA2-BF99-7BA6EB1548EB}`): `Begin` and `End` in ms (Int32, slots 14 and 16),
+  `WordId` (slot 18) and `Position`, a float with a setter (slots 8 and 9), most likely the fill the view draws. The
+  line (`IKaraokeLyricsLine`) gives `Words` (slot 19) and `ActiveWordId` (slot 28), the model `CurrentTime` (slot 7).
+  A user's 60 fps recording shows the fill moving in steps (still for 2 to 4 frames, then 3 to 7 px further) and a
+  word left half lit until the next one starts, which then lights the rest at once. A smoother fill would set
+  `Position` of the active word from a steady clock at each frame and keep Apple's own writes from fighting it: first
+  confirm on screen that `Position` is what the view draws, and how often Apple writes it.
 - **The full-screen lyrics scroll before the line lights (1.1792, traced 2026-11-12).** At each new line Apple calls
   `ChangeView` without animation (`ViewChanging`, then `ViewChanged` not intermediate within 16 ms; the glide seen
   is Apple's own animation), then puts the line in its `Current` state 0 to 31 ms later. Code that follows both
