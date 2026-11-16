@@ -1,13 +1,13 @@
 AMP.Services.AMPMediaAppClient
   methods: .ctor, KillAgent, get_AgentIsHung, get_AgentPhase, get_AgentStatus, get_MediaAppQuitting, get_Name, get_AutoStart, get_IsStarted, get_CanStop, TryEnsureStartedAsync, TryEnsureStoppedAsync, PrepareToQuitAsync, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.ASAllDownloadsAction
-  fields: eNone, ePauseAll, eResumeAll
+  fields: eNone = 0, ePauseAll = 1, eResumeAll = 2
 AMP.Services.AccountViewModel
   methods: .ctor, get_Dsid, get_FullName, get_UserName, get_PictureURL, get_CreditBalance, get_SignedIn, get_IsEnrolledInAppleMusic, get_AccessibilityLabel, get_AccessKey, get_IsOnboardedToSocial, SignInAsync, SignOutAsync, AuthorizeMachineAsync, DeauthorizeMachineAsync, FetchSocialProfile, get_SettingsSegue, get_SocialProfileSegue, get_ShowAccountPageAction, get_FindFriendsSettingsAction, get_ShowNotificationsSettingsAction, get_AccountFlyoutItems, get_Name, get_AutoStart, get_IsStarted, get_CanStop, TryEnsureStartedAsync, TryEnsureStoppedAsync, PrepareToQuitAsync, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.ActivityService
   methods: .ctor, get_ActivityState, get_AllDownloadsAction, get_ActiveCount, get_TotalCount, get_Label, get_SecondaryLabel, get_BlockingActivities, CloseActivityAsync, CancelActivityAsync, PauseActivityAsync, ResumeActivityAsync, RetryActivityAsync, PauseAllDownloadsAsync, ResumeAllDownloadsAsync, get_Name, get_AutoStart, get_IsStarted, get_CanStop, TryEnsureStartedAsync, TryEnsureStoppedAsync, PrepareToQuitAsync, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.ActivityState
-  fields: eIdle, eActive, ePending, eError
+  fields: eIdle = 0, eActive = 1, ePending = 2, eError = 3
 AMP.Services.AgentDebugService
   methods: .ctor, AgentTestDuJourAsync, LibraryTestDuJourAsync, CloudLibraryTestDuJourAsync, TestPlaylistCommandAsync, TestFetchAsync, TestScopedFetchAsync, TestPlaylistScopedFetchAsync, TestFilteredFetchAsync, ClearLiveFetchesAsync, TestPlayCommand, TestDownloadCommand, TestPreflightRemoveDownloadCommand, TestRemoveDownloadCommand, TestGetInfoCommand, TestNewPlaylistCommand, TestNewPlaylistFolderCommand, TestDeletePlaylistCommand, DoLibraryCommandAsync, DoCloudLibraryCommandAsync, get_Name, get_AutoStart, get_IsStarted, get_CanStop, TryEnsureStartedAsync, TryEnsureStoppedAsync, PrepareToQuitAsync
 AMP.Services.AppSettings
@@ -17,15 +17,15 @@ AMP.Services.ArtworkService
 AMP.Services.AuthDialog
   fields: title, message, explanation, initialUsername, initialPassword, showCreateAccount
 AMP.Services.AuthResult
-  fields: Ok, Canceled, CreateAccount
+  fields: Ok = 0, Canceled = 1, CreateAccount = 2
 AMP.Services.AutoplayPlayQueueSection
   methods: .ctor, get_SectionKind, put_SectionKind, get_SectionVirtualIndex, put_SectionVirtualIndex, get_SectionName, put_SectionName, get_ViewModel, put_ViewModel, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_Items, put_Items, GetCustomProperty, GetIndexedProperty, GetStringRepresentation, get_Type
 AMP.Services.AvailabilityState
-  fields: NotAvailable, Disabled, Enabled
+  fields: NotAvailable = 0, Disabled = 1, Enabled = 2
 AMP.Services.BlockingActivity
   methods: .ctor, get_ActivityID, put_ActivityID, get_Reason, put_Reason, get_CanCancel, put_CanCancel
 AMP.Services.BlockingReason
-  fields: eUnknown, eConverting, eCDBurning, eCloudLibraryUploading, eCopyingFiles
+  fields: eUnknown = 0, eConverting = 1, eCDBurning = 2, eCloudLibraryUploading = 3, eCopyingFiles = 4
 AMP.Services.CandidateTracksResult
   fields: status, count
 AMP.Services.CloudCommandResponse
@@ -39,11 +39,11 @@ AMP.Services.CommandResponse
 AMP.Services.CommonModels.AccessoryBadge
   methods: .ctor, get_Color, get_Text
 AMP.Services.CommonModels.AccessoryBadgeColor
-  fields: KeyColor, SystemMaterial
+  fields: KeyColor = 0, SystemMaterial = 1
 AMP.Services.CommonModels.AccessoryButton
   methods: .ctor, get_Glyph, get_Kind, get_Tooltip, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString
 AMP.Services.CommonModels.AccessoryItemKind
-  fields: Context, Default, Hyperlink, Popover, Round, Share, ViewOptions
+  fields: Context = 0, Default = 1, Hyperlink = 2, Popover = 3, Round = 4, Share = 5, ViewOptions = 6
 AMP.Services.CommonModels.AccountAccessoryButton
   methods: .ctor, get_Segue, get_PendingFollowersCount, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.AccountUniqueIdentifierChangeEvent
@@ -51,7 +51,7 @@ AMP.Services.CommonModels.AccountUniqueIdentifierChangeEvent
 AMP.Services.CommonModels.ActionHelper
   methods: SetActionMetadata, GetModalPresentationDescriptor, UpdateAddToAction, ActionIsDroppable, UpdateMovePinAction, CreateOpenURLAction, CreateAddFilesAction, CreateAddToLibraryAction, CreateAddToPlaylistAction, CreateDownloadAction, CreateFavoriteOrSuggestLessAction, CreatePlayerAction, CreateShowRemoveDownloadDialogAction, IsConcertsGetTicketActionMultipleTicketLinks
 AMP.Services.CommonModels.ActivityListItemStatus
-  fields: None, Waiting, InProgress, Completed, Paused, Error, ErrorCanRetry
+  fields: None = 0, Waiting = 1, InProgress = 2, Completed = 3, Paused = 4, Error = 5, ErrorCanRetry = 6
 AMP.Services.CommonModels.ActivityWindowViewGroupItem
   methods: .ctor, get_Items, put_Items, get_IsDownloadsGroup, put_IsDownloadsGroup
 AMP.Services.CommonModels.ActivityWindowViewItem
@@ -67,7 +67,7 @@ AMP.Services.CommonModels.AlbumDetailHeaderLockup
 AMP.Services.CommonModels.AlbumTrackLockup
   methods: get_Composer, get_DiskNumber, get_ExpectedReleaseDate, get_HasTrackNumber, get_IsPreviewMode, get_IsSectionGrouped, get_RecoID, get_ShowPopularityIndicator, get_SocialProfileContentDescriptor, get_TrackNumber, get_WorkName, get_Duration, get_HasDuration, get_Columns, put_Columns, get_HasVideo, get_IsDisabled, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_PlayAction, UpdateFrom, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, FormatExpectedReleaseDateBadgeText
 AMP.Services.CommonModels.AlternateTrackCaptionsState
-  fields: None, Off, Auto, On
+  fields: None = 0, Off = 1, Auto = 2, On = 3
 AMP.Services.CommonModels.AlternateTrackInfo
   methods: .ctor, get_Title, put_Title, get_AlternateTrackID, put_AlternateTrackID, get_Locale, put_Locale, get_CaptionsState, put_CaptionsState, get_SubtitlesAutomationTrigger, put_SubtitlesAutomationTrigger, get_IsSignLanguage, put_IsSignLanguage, get_IsAudioDescription, put_IsAudioDescription, IsEqualTo, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.AlternateTrackMenuItem
@@ -109,23 +109,23 @@ AMP.Services.CommonModels.ArtistPageBackgroundProvider
 AMP.Services.CommonModels.Artwork
   methods: .ctor, get_BGColor, put_BGColor, get_CropStyle, put_CropStyle, get_Format, put_Format, get_Height, put_Height, get_Width, put_Width, get_Uri, GetCropCode, ToString
 AMP.Services.CommonModels.ArtworkCropStyle
-  fields: BoundedBox, BoundedFill, ConstrainedWidth, ConstrainedHeight, SourceSize, SpecificRectangle, SquareCenterCrop, HeroGalleryCrop, FixedArtworkCropCode, AlbumFallbackArt, ReplayPosterAlbumFallbackArt, FcCrop270, FcCrop44, GB, TB, TC, TA, ET, EU, EV, TVChannelBanner, SportsTV, SportsIPAD, SportsIPP, SportsIPL, SportsD22P, SportsD22L, SportsIPSE, SportsFTVIOS, SportsSTL, SportsSTM, SportsSTS, SportsArtIPP, SportsArtIPAD, FlipAndBlur, Default
+  fields: BoundedBox = 0, BoundedFill = 1, ConstrainedWidth = 2, ConstrainedHeight = 3, SourceSize = 4, SpecificRectangle = 5, SquareCenterCrop = 6, HeroGalleryCrop = 7, FixedArtworkCropCode = 8, AlbumFallbackArt = 9, ReplayPosterAlbumFallbackArt = 10, FcCrop270 = 11, FcCrop44 = 12, GB = 13, TB = 14, TC = 15, TA = 16, ET = 17, EU = 18, EV = 19, TVChannelBanner = 20, SportsTV = 21, SportsIPAD = 22, SportsIPP = 23, SportsIPL = 24, SportsD22P = 25, SportsD22L = 26, SportsIPSE = 27, SportsFTVIOS = 28, SportsSTL = 29, SportsSTM = 30, SportsSTS = 31, SportsArtIPP = 32, SportsArtIPAD = 33, FlipAndBlur = 34, Default = 35
 AMP.Services.CommonModels.ArtworkShape
-  fields: Square, Circle, Brick
+  fields: Square = 0, Circle = 1, Brick = 2
 AMP.Services.CommonModels.AttributedLinkList
   methods: get_Links, get_Separator
 AMP.Services.CommonModels.AudioFormat
-  fields: Other, Lossless, HiResLossless, DolbyAtmos, Spatial, Surround
+  fields: Other = 0, Lossless = 1, HiResLossless = 2, DolbyAtmos = 3, Spatial = 4, Surround = 5
 AMP.Services.CommonModels.AuxiliaryItem
   methods: .ctor, get_Item, get_Title
 AMP.Services.CommonModels.BackgroundTreatment
-  fields: None, Alternate
+  fields: None = 0, Alternate = 1
 AMP.Services.CommonModels.BrickLockup
   methods: .ctor, get_DisplayStyle, get_HeadlineStyle, get_Environment, put_Environment, get_ShowFavoriteSuggestLessButton, get_ShowSubtitleInDestructiveAccent, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, UpdateFrom, get_PlayAction
 AMP.Services.CommonModels.BrickLockupStyle
-  fields: Small, Regular, Large
+  fields: Small = 0, Regular = 1, Large = 2
 AMP.Services.CommonModels.BrickLockupTextStyle
-  fields: Regular, Bold
+  fields: Regular = 0, Bold = 1
 AMP.Services.CommonModels.BubbleTipLockupSection
   methods: .ctor, get_Title, get_Subtitle, get_Link, get_Artwork, get_CloseButtonAction, get_Identifier, get_BackgroundTreatment, put_BackgroundTreatment, get_DisplaySeparator, get_Header, put_Header, get_InvalidationTriggers, put_InvalidationTriggers, get_IsGrouped, get_Margin, put_Margin, get_PinnedLeadingItem, get_PlayAllActionSupport, get_TypeAheadProvider, put_TypeAheadProvider, get_ScrollState, put_ScrollState, get_ScrollStateItemKey, put_ScrollStateItemKey, get_ScrollStateItemSize, put_ScrollStateItemSize, get_Items, put_Items, get_ContentDescriptor, get_ContainerContentDescriptor, get_NeedsLibraryStatusUpdates, get_NeedsPlaybackStatusUpdates, get_ContainerItem, put_ContainerItem, GetExtraItem, get_AccessibilityLabel, get_AccessKey, add_PropertyChanged, remove_PropertyChanged, ToString
 AMP.Services.CommonModels.CalendarArtwork
@@ -143,11 +143,11 @@ AMP.Services.CommonModels.CheckSocialHandleResponse
 AMP.Services.CommonModels.CircleLockup
   methods: .ctor, get_Subtitle, get_DisplayStyle, get_Environment, put_Environment, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic
 AMP.Services.CommonModels.CircleLockupStyle
-  fields: Regular, Large
+  fields: Regular = 0, Large = 1
 AMP.Services.CommonModels.ClipRequestedHudState
-  fields: None, Show, Hide
+  fields: None = 0, Show = 1, Hide = 2
 AMP.Services.CommonModels.ClipSequenceState
-  fields: None, ShowControl, ShowImage, ShowMetadata, HideMetadata, NewClipStarting, AutoAdvanceDisabled
+  fields: None = 0, ShowControl = 1, ShowImage = 2, ShowMetadata = 3, HideMetadata = 4, NewClipStarting = 5, AutoAdvanceDisabled = 6
 AMP.Services.CommonModels.ClipSequenceViewModel
   methods: .ctor, .ctor, TryInitializeCutlSeekTimes, ShouldPlayNextCutlClip, Reset, GetRequestedHudState, CycleMetadataVisibility, get_Type, get_IsClipLoadInProgress, put_IsClipLoadInProgress, get_ShowControl, get_ShowImage, get_ShowMetadata, put_ShowMetadata, get_ShowGradient, get_ControlState, put_ControlState, get_IsAnimationInProgress, put_IsAnimationInProgress, get_CanTransitionToHUD, put_CanTransitionToHUD, get_IsPipModeEnabled, put_IsPipModeEnabled, get_IsAutoAdvanceEnabled, get_MetadataTimeoutSeconds, get_WindowSize, put_WindowSize, get_Items, get_HasItems, get_HasNext, get_NextItem, get_CurrentIndex, put_CurrentIndex, get_CurrentItem, add_CurrentItemChanged, remove_CurrentItemChanged, get_ShelfScrollAutomationEnabled, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.ClosedEventArgs
@@ -185,7 +185,7 @@ AMP.Services.CommonModels.CollaborationManagementShareRow
 AMP.Services.CommonModels.CollaborationManagementViewModel
   methods: get_Playlist, get_Sections, put_Sections, get_PlaylistName, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.CollaborationResponseStatus
-  fields: None, CollaborationAuthenticationError, CollaborationExceededMaxCollaborators, CollaborationExceededMaxPendingCollaborators, CollaborationJoined, CollaborationLinkExpired, CollaborationPendingApproval, CollaborationUnavaliable, CollaborationUnknownError
+  fields: None = 0, CollaborationAuthenticationError = 1, CollaborationExceededMaxCollaborators = 2, CollaborationExceededMaxPendingCollaborators = 3, CollaborationJoined = 4, CollaborationLinkExpired = 5, CollaborationPendingApproval = 6, CollaborationUnavaliable = 7, CollaborationUnknownError = 8
 AMP.Services.CommonModels.CollaborationReturnValue
   methods: get_Items, put_Items, get_Name, put_Name
 AMP.Services.CommonModels.Collaborator
@@ -211,11 +211,11 @@ AMP.Services.CommonModels.ComboBoxSeparatorItem
 AMP.Services.CommonModels.CommandMenuItemWithGlyph
   methods: .ctor, get_Title, get_Glyph, get_Command
 AMP.Services.CommonModels.ComponentModelFlags
-  fields: None, IsContainer, IsUpdatable
+  fields: None = 0, IsContainer = 1, IsUpdatable = 2
 AMP.Services.CommonModels.ComposerSectionHeader
   methods: get_Duration, get_FirstRowText, get_GroupingIdentifier, get_PlayAction, get_Kind, get_ArtistLinks, get_ComposerLinks
 AMP.Services.CommonModels.ConcertDateType
-  fields: None, Today, Tomorrow, ThisWeekend, NextWeekend, ThisMonth, Custom
+  fields: None = 0, Today = 1, Tomorrow = 2, ThisWeekend = 3, NextWeekend = 4, ThisMonth = 5, Custom = 6
 AMP.Services.CommonModels.ConcertDetailButtonModel
   methods: get_Link, get_Image
 AMP.Services.CommonModels.ConcertDetailButtonSection
@@ -238,13 +238,13 @@ AMP.Services.CommonModels.ConcertInfo
 AMP.Services.CommonModels.ConcertLocationInfo
   methods: get_Latitude, put_Latitude, get_Longitude, put_Longitude
 AMP.Services.CommonModels.ConcertsContainerKind
-  fields: ConcertsThisWeek, ConcertsNextWeek, PopularConcerts, FavoriteArtistsConcerts, AllUpcomingConcerts, MoreUpcomingConcerts
+  fields: ConcertsThisWeek = 0, ConcertsNextWeek = 1, PopularConcerts = 2, FavoriteArtistsConcerts = 3, AllUpcomingConcerts = 4, MoreUpcomingConcerts = 5
 AMP.Services.CommonModels.ConcertsGetTicketViewModel
   methods: .ctor, get_Title, get_TicketLinks, get_FooterText, get_CloseAction
 AMP.Services.CommonModels.ConcertsHubFacetItem
   methods: get_Item, get_SymbolArtwork, get_Kind, get_DisplayName, put_DisplayName, get_HasSelection, put_HasSelection, get_ShouldShowLocationPopover, put_ShouldShowLocationPopover, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.ConcertsHubFacetItemKind
-  fields: Location, Date, Genre
+  fields: Location = 0, Date = 1, Genre = 2
 AMP.Services.CommonModels.ConcertsHubLocationPopoverItem
   methods: get_SuppressPopover, get_DistanceInMeters
 AMP.Services.CommonModels.ConcertsHubPage
@@ -264,7 +264,7 @@ AMP.Services.CommonModels.ContainerDetailEmptyState
 AMP.Services.CommonModels.ContainerDetailHeaderLockup
   methods: .ctor, get_TertiaryTitleLinks, get_QuaternaryTitle, get_CanStartPlaylistCollaboration, get_CanManagePlaylistCollaboration, get_DisplayStyle, get_ExpectedReleaseDate, get_HasPendingPlaylistCollaborationApproval, get_IsTitleEditable, get_IsPublished, get_IsPrerelease, get_IsVideoDetailHeader, get_PlaylistType, get_ShowAddDescriptionButton, get_ShowShareButton, get_VideoArtwork, get_AddDescriptionAction, get_EditRulesAction, get_EditPlaylistAction, get_PublishAction, get_ShuffleAction, get_CopyToPlayOrderAction, get_CollaboratePlaylistAction, get_CollaboratorArtworks, put_CollaboratorArtworks, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, UpdateFrom, get_DolbyAtmos, put_DolbyAtmos, get_DolbyAtmosMovie, put_DolbyAtmosMovie, get_DolbyAudio, put_DolbyAudio, get_HiResLossless, put_HiResLossless, get_Lossless, put_Lossless, get_DigitalMaster, put_DigitalMaster, get_HasBadge, get_HasBadgeAfterDolbyAtmos, get_HasBadgeAfterDolbyAtmosMovie, get_HasBadgeAfterDolbyAudio, get_HasBadgeAfterHiResLossless, get_HasBadgeAfterLossless, GetEditItemAction, get_ModalPresentationDescriptor, get_UserRating, put_UserRating, GetRatingAction, get_PlayAction
 AMP.Services.CommonModels.ContainerDetailHeaderLockupStyle
-  fields: Regular, Tall
+  fields: Regular = 0, Tall = 1
 AMP.Services.CommonModels.ContainerDetailTracklistFooterLockup
   methods: .ctor, get_Description, get_LinkSection, get_SocialBadgingListeningString, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_DolbyAtmos, put_DolbyAtmos, get_DolbyAtmosMovie, put_DolbyAtmosMovie, get_DolbyAudio, put_DolbyAudio, get_HiResLossless, put_HiResLossless, get_Lossless, put_Lossless, get_DigitalMaster, put_DigitalMaster, get_HasBadge, get_HasBadgeAfterDolbyAtmos, get_HasBadgeAfterDolbyAtmosMovie, get_HasBadgeAfterDolbyAudio, get_HasBadgeAfterHiResLossless, get_HasBadgeAfterLossless, get_NumberOfSocialBadges, get_SocialBadgingInfos, put_SocialBadgingInfos, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.ContentDescriptor
@@ -272,7 +272,7 @@ AMP.Services.CommonModels.ContentDescriptor
 AMP.Services.CommonModels.ContextAccessoryButton
   methods: .ctor, get_ContentDescriptor, get_MenuItems, put_MenuItems, get_Kind, get_Tooltip, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString
 AMP.Services.CommonModels.CoreMediaAlternateTrackIDs
-  fields: kTrackID_Off, kTrackID_Auto, kTrackID_AC3Passthrough, kTrackID_Invalid
+  fields: kTrackID_Off = -1, kTrackID_Auto = -2, kTrackID_AC3Passthrough = -3, kTrackID_Invalid = 0
 AMP.Services.CommonModels.CreatePostPlayViewModelArgs
   methods: .ctor, get_Json, put_Json, get_AutoPlaySettings, put_AutoPlaySettings, get_ConsecutivePlayCount, put_ConsecutivePlayCount, get_AccumulatedWatchTimeSeconds, put_AccumulatedWatchTimeSeconds, get_PostPlayBridge, put_PostPlayBridge
 AMP.Services.CommonModels.CreateVideoAdvisoryControlViewModelArgs
@@ -282,7 +282,7 @@ AMP.Services.CommonModels.CuratorDetailHeaderComponentModel
 AMP.Services.CommonModels.CustomPageDestination
   methods: CreateViewModel, get_Kind, get_IsFeaturePage, get_GrabFocus, put_GrabFocus, get_SidebarIdentifier, get_IsPinnedItem
 AMP.Services.CommonModels.CustomPageViewModelKind
-  fields: DeviceAudiobooksPageViewModel, DeviceDebugPageViewModel, DeviceEULAPageViewModel, DeviceFilesPageViewModel, DeviceGeneralPageViewModel, DeviceInfoPageViewModel, DeviceMusicPageViewModel, DeviceMoviesPageViewModel, DevicePairingPageViewModel, DevicePhotosPageViewModel, DevicePodcastsPageViewModel, DeviceSetupPageViewModel, DeviceTVShowsPageViewModel, DeviceWarrantyPageViewModel, JsonPageViewModel, SearchPageViewModel, SettingsPageViewModel, StartPageViewModel, StorePageViewModel
+  fields: DeviceAudiobooksPageViewModel = 0, DeviceDebugPageViewModel = 1, DeviceEULAPageViewModel = 2, DeviceFilesPageViewModel = 3, DeviceGeneralPageViewModel = 4, DeviceInfoPageViewModel = 5, DeviceMusicPageViewModel = 6, DeviceMoviesPageViewModel = 7, DevicePairingPageViewModel = 8, DevicePhotosPageViewModel = 9, DevicePodcastsPageViewModel = 10, DeviceSetupPageViewModel = 11, DeviceTVShowsPageViewModel = 12, DeviceWarrantyPageViewModel = 13, JsonPageViewModel = 14, SearchPageViewModel = 15, SettingsPageViewModel = 16, StartPageViewModel = 17, StorePageViewModel = 18
 AMP.Services.CommonModels.CutlClipItem
   methods: .ctor, get_Title, get_GoToLiveButtonText, get_CutInPosition, get_CutOutPosition, get_LogoUrl, get_LogoAspectRatio, get_LogoColor, get_KeyframeImageUrl, get_KeyframeImageWidth, get_KeyframeImageHeight, get_KeyframePlaceholderColor, get_CutlGoLive, get_ClipItem
 AMP.Services.CommonModels.CutlClipLoader
@@ -308,7 +308,7 @@ AMP.Services.CommonModels.DataGridEqualizerCell
 AMP.Services.CommonModels.DataGridFavoriteCell
   methods: .ctor, get_ColumnInfo, put_ColumnInfo, get_Row, put_Row, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.DataGridHeaderColumnKind
-  fields: FirstColumn, PhysicalOrderColumn, Text, Icon
+  fields: FirstColumn = 0, PhysicalOrderColumn = 1, Text = 2, Icon = 3
 AMP.Services.CommonModels.DataGridHeadingsViewModel
   methods: .ctor, get_Items, put_Items
 AMP.Services.CommonModels.DataGridPhysicalOrderStatusCell
@@ -330,9 +330,9 @@ AMP.Services.CommonModels.DateInterval
 AMP.Services.CommonModels.DefaultSectionHeader
   methods: .ctor, get_AccessoryItems, get_Artwork, get_HeadlineLink, get_Subtitles, get_TitleLink, get_TitleLinkWhenCapped, get_UseCappedTitle, put_UseCappedTitle, get_HeaderPadding, get_Kind, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.DeferredEventKind
-  fields: None, NextPageAppearance, NextPageDisappearance, NextApplicationDidBecomeActive
+  fields: None = 0, NextPageAppearance = 1, NextPageDisappearance = 2, NextApplicationDidBecomeActive = 3
 AMP.Services.CommonModels.DestinationKind
-  fields: ArtistBioPage, ArtistDetailPage, CatalogItemDetailPage, CatalogPage, ConcertDetailPage, ConcertsHubPage, CustomPage, DeviceContentPage, LibraryPage, NavigationControllerRootPage, OnboardingPage, SearchLibraryPage, SearchLibrarySeeAllPage, SearchPage, SearchResultsPage
+  fields: ArtistBioPage = 0, ArtistDetailPage = 1, CatalogItemDetailPage = 2, CatalogPage = 3, ConcertDetailPage = 4, ConcertsHubPage = 5, CustomPage = 6, DeviceContentPage = 7, LibraryPage = 8, NavigationControllerRootPage = 9, OnboardingPage = 10, SearchLibraryPage = 11, SearchLibrarySeeAllPage = 12, SearchPage = 13, SearchResultsPage = 14
 AMP.Services.CommonModels.DevicesChangedEvent
   methods: get_Kind, get_Delay
 AMP.Services.CommonModels.DevicesMediaItemsEvent
@@ -358,7 +358,7 @@ AMP.Services.CommonModels.EmptyState
 AMP.Services.CommonModels.EmptyStateLockup
   methods: get_Label, get_Description, get_Image, get_SystemType, get_Artwork, get_ActionTitle, put_ActionTitle, get_Action, put_Action, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString
 AMP.Services.CommonModels.EmptyStateSystemType
-  fields: Search, Image
+  fields: Search = 0, Image = 1
 AMP.Services.CommonModels.EnvironmentValues
   methods: get_IsBackgroundColored
 AMP.Services.CommonModels.EqualizerViewModel
@@ -368,23 +368,23 @@ AMP.Services.CommonModels.ExpirationDateEvent
 AMP.Services.CommonModels.ExpirationDateTime
   methods: get_Text, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.ExpirationFormatKind
-  fields: Badge, Label
+  fields: Badge = 0, Label = 1
 AMP.Services.CommonModels.ExplicitBadge
   methods: .ctor, get_Glyph, GetCustomProperty, GetIndexedProperty, GetStringRepresentation, get_Type
 AMP.Services.CommonModels.ExplicitState
-  fields: None, Explicit, Clean
+  fields: None = 0, Explicit = 1, Clean = 2
 AMP.Services.CommonModels.FetchInvalidatedEvent
   methods: get_FetchId, get_LibraryId, get_Kind, get_Delay
 AMP.Services.CommonModels.FieldCloudStatus
-  fields: Matched, Purchased, Uploaded, Ineligible, Removed, Error, Duplicate, AppleMusic, NoLongerAvailable, NotUploaded
+  fields: Matched = 0, Purchased = 1, Uploaded = 2, Ineligible = 3, Removed = 4, Error = 5, Duplicate = 6, AppleMusic = 7, NoLongerAvailable = 8, NotUploaded = 9
 AMP.Services.CommonModels.FieldDataType
-  fields: None, FieldString, FieldBoolean, FieldNumeric, FieldDate, FieldTime, FieldSet, FieldRating
+  fields: None = -1, FieldString = 0, FieldBoolean = 1, FieldNumeric = 2, FieldDate = 3, FieldTime = 4, FieldSet = 5, FieldRating = 6
 AMP.Services.CommonModels.FieldFavoriteStatus
-  fields: Favorited, SuggestLess, None
+  fields: Favorited = 0, SuggestLess = 1, None = 2
 AMP.Services.CommonModels.FieldLocation
-  fields: OnThisComputer, iCloud
+  fields: OnThisComputer = 0, iCloud = 1
 AMP.Services.CommonModels.FieldType
-  fields: None, Album, AlbumArtist, AlbumArtwork, AlbumFavorite, AlbumRating, Artist, BitRate, BPM, Category, Checked, CloudStatus, Comments, Compilation, Composer, DateAdded, DateModified, Description, Director, DiscNumber, Favorite, Genre, Grouping, HasHDR, Is4K, Kind, LastPlayed, LastSkipped, Location, MediaKind, MovementName, MovementNumber, Playlist, Plays, Purchased, Rating, SampleRate, Season, Show, Size, Skips, SortAlbum, SortAlbumArtist, SortArtist, SortComposer, SortDirector, SortShow, SortTitle, Time, Title, TrackNumber, VideoQuality, VideoRating, Work, Year
+  fields: None = -1, Album = 0, AlbumArtist = 1, AlbumArtwork = 2, AlbumFavorite = 3, AlbumRating = 4, Artist = 5, BitRate = 6, BPM = 7, Category = 8, Checked = 9, CloudStatus = 10, Comments = 11, Compilation = 12, Composer = 13, DateAdded = 14, DateModified = 15, Description = 16, Director = 17, DiscNumber = 18, Favorite = 19, Genre = 20, Grouping = 21, HasHDR = 22, Is4K = 23, Kind = 24, LastPlayed = 25, LastSkipped = 26, Location = 27, MediaKind = 28, MovementName = 29, MovementNumber = 30, Playlist = 31, Plays = 32, Purchased = 33, Rating = 34, SampleRate = 35, Season = 36, Show = 37, Size = 38, Skips = 39, SortAlbum = 40, SortAlbumArtist = 41, SortArtist = 42, SortComposer = 43, SortDirector = 44, SortShow = 45, SortTitle = 46, Time = 47, Title = 48, TrackNumber = 49, VideoQuality = 50, VideoRating = 51, Work = 52, Year = 53
 AMP.Services.CommonModels.FilterAccessoryButton
   methods: .ctor, get_FilterText, put_FilterText, get_IsExpanded, put_IsExpanded, get_FilterAction, get_Kind, get_Tooltip, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString
 AMP.Services.CommonModels.FilterResultsAccessoryItem
@@ -398,13 +398,13 @@ AMP.Services.CommonModels.FixedListSection
 AMP.Services.CommonModels.FlowcaseLockup
   methods: .ctor, get_Heading, get_Subtitle, get_Description, get_CoverArtwork, get_CoverArtworkTreatment, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_PlayAction
 AMP.Services.CommonModels.FollowState
-  fields: None, Following, NotFollowing, Requested, Blocked, BlockedBy, Self
+  fields: None = 0, Following = 1, NotFollowing = 2, Requested = 3, Blocked = 4, BlockedBy = 5, Self = 6
 AMP.Services.CommonModels.FollowStateMapResponse
   methods: .ctor, get_FollowStateMap
 AMP.Services.CommonModels.FormatFunction
   methods: .ctor, Invoke
 AMP.Services.CommonModels.FriendFollowState
-  fields: Requested, Follow
+  fields: Requested = 0, Follow = 1
 AMP.Services.CommonModels.FullScreenPlayerViewModel
   methods: get_ArtworkImageLocation, put_ArtworkImageLocation, get_IsAirPlayAvailable, get_IsLyricsOpen, put_IsLyricsOpen, get_ShowLyricsPane, get_HaveLyrics, get_ViewIsVisible, put_ViewIsVisible, get_ShowImmersion, put_ShowImmersion, get_AnimateImmersion, put_AnimateImmersion, get_GeneralSettings, get_NowPlaying, put_NowPlaying, get_Transport, put_Transport, get_Volume, put_Volume, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.GDPRWelcomeDialogViewModel
@@ -412,7 +412,7 @@ AMP.Services.CommonModels.GDPRWelcomeDialogViewModel
 AMP.Services.CommonModels.GridSection
   methods: .ctor, get_Kind, put_Kind, get_HasLineSeparators, put_HasLineSeparators, get_GridType, put_GridType, get_Identifier, get_BackgroundTreatment, put_BackgroundTreatment, get_DisplaySeparator, get_Header, put_Header, get_InvalidationTriggers, put_InvalidationTriggers, get_IsGrouped, get_Margin, put_Margin, get_PinnedLeadingItem, get_PlayAllActionSupport, get_TypeAheadProvider, put_TypeAheadProvider, get_ScrollState, put_ScrollState, get_ScrollStateItemKey, put_ScrollStateItemKey, get_ScrollStateItemSize, put_ScrollStateItemSize, get_Items, put_Items, get_ContentDescriptor, get_ContainerContentDescriptor, get_NeedsLibraryStatusUpdates, get_NeedsPlaybackStatusUpdates, get_ContainerItem, put_ContainerItem, GetExtraItem, get_AccessibilityLabel, get_AccessKey, add_PropertyChanged, remove_PropertyChanged, ToString, get_NeedsHydration, put_NeedsHydration, get_SupportsMultipleSelection, put_SupportsMultipleSelection, get_SelectedItems, put_SelectedItems
 AMP.Services.CommonModels.GridSectionKind
-  fields: StackedGrid, FixedGrid, FixedGroupedGrid
+  fields: StackedGrid = 0, FixedGrid = 1, FixedGroupedGrid = 2
 AMP.Services.CommonModels.GroupTextListItem
   methods: .ctor, get_Title, get_Content, get_RenderTitleAsBadge
 AMP.Services.CommonModels.GroupTextListLockup
@@ -424,7 +424,7 @@ AMP.Services.CommonModels.GroupedListSection
 AMP.Services.CommonModels.GroupedTextLinkSection
   methods: .ctor, get_Title, get_Links
 AMP.Services.CommonModels.HTTPCachePolicy
-  fields: Default, ForceCache, NoCache
+  fields: Default = 0, ForceCache = 1, NoCache = 2
 AMP.Services.CommonModels.HeaderComponentModel
   methods: .ctor, get_HideContextMenuButton, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_Title
 AMP.Services.CommonModels.HomePageDestination
@@ -1390,13 +1390,13 @@ AMP.Services.CommonModels.IWhatsNewFeatureViewModel
 AMP.Services.CommonModels.ImageArtwork
   methods: get_Type, get_SystemName, get_Name
 AMP.Services.CommonModels.ImageArtworkType
-  fields: Symbol, Asset
+  fields: Symbol = 0, Asset = 1
 AMP.Services.CommonModels.InTheLastUnit
-  fields: Days, Weeks, Months
+  fields: Days = 0, Weeks = 1, Months = 2
 AMP.Services.CommonModels.InfoPanelArtwork
   methods: .ctor, get_Image, put_Image, get_Data, put_Data, get_ImageType, put_ImageType, get_ArtworkTokenArtwork, put_ArtworkTokenArtwork, get_ArtworkTokenFileSystemUri, put_ArtworkTokenFileSystemUri, add_PropertyChanged, remove_PropertyChanged, CreateAsync
 AMP.Services.CommonModels.InfoPanelFieldChangeEventType
-  fields: None, TitleChangedEvent, AlternativeTitleChangedEvent, SubtitleChangedEvent, AlternativeSubtitleChangedEvent, Subtitle2ChangedEvent, AdditionalFieldChangedEvent, SeasonNumberFieldChangedEvent, EpisodeNumberFieldChangedEvent, TitleResetEvent, AlternativeTitleResetEvent, SubtitleResetEvent, AlternativeSubtitleResetEvent, Subtitle2ResetEvent, AdditionalFieldResetEvent, SeasonNumberFieldResetEvent, EpisodeNumberFieldResetEvent
+  fields: None = 0, TitleChangedEvent = 1, AlternativeTitleChangedEvent = 2, SubtitleChangedEvent = 3, AlternativeSubtitleChangedEvent = 4, Subtitle2ChangedEvent = 5, AdditionalFieldChangedEvent = 6, SeasonNumberFieldChangedEvent = 7, EpisodeNumberFieldChangedEvent = 8, TitleResetEvent = 9, AlternativeTitleResetEvent = 10, SubtitleResetEvent = 11, AlternativeSubtitleResetEvent = 12, Subtitle2ResetEvent = 13, AdditionalFieldResetEvent = 14, SeasonNumberFieldResetEvent = 15, EpisodeNumberFieldResetEvent = 16
 AMP.Services.CommonModels.InfoPanelFieldChangedEventHandler
   methods: .ctor, Invoke
 AMP.Services.CommonModels.InfoPanelFooterViewModel
@@ -1441,7 +1441,7 @@ AMP.Services.CommonModels.InfoPanelTabViewModel
 AMP.Services.CommonModels.InfoPanelViewModel
   methods: get_SingleInfo, put_SingleInfo, get_Header, get_ViewModelItems, get_SelectedTabIndex, put_SelectedTabIndex, get_Footer, Save, IsModified, add_PropertyChanged, remove_PropertyChanged, add_FieldChangedEvent, remove_FieldChangedEvent, FireInfoPanelFieldChangedEvent
 AMP.Services.CommonModels.InlineEditField
-  fields: None, Title, SubTitle, TertiaryTitle
+  fields: None = 0, Title = 1, SubTitle = 2, TertiaryTitle = 3
 AMP.Services.CommonModels.InlineEditParameter
   methods: .ctor, get_EditField, put_EditField, get_Text, put_Text
 AMP.Services.CommonModels.InlineUpsell
@@ -1451,13 +1451,13 @@ AMP.Services.CommonModels.IntentOutcome
 AMP.Services.CommonModels.InvalidationActionEvent
   methods: get_Scope, get_InvalidationKind, get_ViewInstanceIdentifier, get_Kind, get_Delay
 AMP.Services.CommonModels.InvalidationActionEventScope
-  fields: Global, Page
+  fields: Global = 0, Page = 1
 AMP.Services.CommonModels.InvalidationTriggersChangeKind
-  fields: None, Add, Replace
+  fields: None = 0, Add = 1, Replace = 2
 AMP.Services.CommonModels.ItemKind
-  fields: AlbumDetailHeaderLockup, AlbumTrackLockup, AppsWithAccessComponentModel, ArtistBioHeader, ArtistBioInfo, ArtistDetailHeader, ArtistDetailHeaderLockup, ArtistFeaturedContent, ArtistFeaturedContentAndTracks, ArtistLatestReleaseLockup, BrickLockup, CalendarEventLockup, CircleLockup, ConcertDetailHeaderLockup, ContainerDetailTracklistFooterLockup, ContainerDetailHeaderLockup, CuratorDetailHeaderComponentModel, EmptyStateLockup, FlowcaseLockup, GroupedTextLinkSection, GroupTextListLockup, HeaderComponentModel, HorizontalLockup, HorizontalPosterLockup, InlineUpsell, LegacyPosterLockup, LinkComponentModel, LiveRadioGridLockup, ParagraphComponentModel, PlainTextBlock, PlaylistDetailHeaderLockup, PlaylistTrackLockup, PosterLockup, SearchHintsLockup, SearchLandingBrickLockup, SearchQueryContextLockup, SelectableSquareLockup, SocialCardLockup, SocialOnboardingWelcomePageLockup, SocialOnboardingUserNameHandlePageLockup, SocialOnboardingFindFriendsPageLockup, SocialOnboardingPrivacySettingsPageLockup, SocialOnboardingSharedPlaylistLockup, SocialOnboardingNotificationSettingsPageLockup, SocialProfileDetailHeaderLockup, SocialProfileEditorHeaderLockup, SocialProfileFindFriendsButton, SocialProfileViewFollowRequestsHeader, SquareLockup, SuperHeroLockup, TallVideoLockup, TextListComponentModel, TopSearchLockup, TrackLockup, TVDetailHeaderLockup, TVMovieDescription, Spacer
+  fields: AlbumDetailHeaderLockup = 0, AlbumTrackLockup = 1, AppsWithAccessComponentModel = 2, ArtistBioHeader = 3, ArtistBioInfo = 4, ArtistDetailHeader = 5, ArtistDetailHeaderLockup = 6, ArtistFeaturedContent = 7, ArtistFeaturedContentAndTracks = 8, ArtistLatestReleaseLockup = 9, BrickLockup = 10, CalendarEventLockup = 11, CircleLockup = 12, ConcertDetailHeaderLockup = 13, ContainerDetailTracklistFooterLockup = 14, ContainerDetailHeaderLockup = 15, CuratorDetailHeaderComponentModel = 16, EmptyStateLockup = 17, FlowcaseLockup = 18, GroupedTextLinkSection = 19, GroupTextListLockup = 20, HeaderComponentModel = 21, HorizontalLockup = 22, HorizontalPosterLockup = 23, InlineUpsell = 24, LegacyPosterLockup = 25, LinkComponentModel = 26, LiveRadioGridLockup = 27, ParagraphComponentModel = 28, PlainTextBlock = 29, PlaylistDetailHeaderLockup = 30, PlaylistTrackLockup = 31, PosterLockup = 32, SearchHintsLockup = 33, SearchLandingBrickLockup = 34, SearchQueryContextLockup = 35, SelectableSquareLockup = 36, SocialCardLockup = 37, SocialOnboardingWelcomePageLockup = 38, SocialOnboardingUserNameHandlePageLockup = 39, SocialOnboardingFindFriendsPageLockup = 40, SocialOnboardingPrivacySettingsPageLockup = 41, SocialOnboardingSharedPlaylistLockup = 42, SocialOnboardingNotificationSettingsPageLockup = 43, SocialProfileDetailHeaderLockup = 44, SocialProfileEditorHeaderLockup = 45, SocialProfileFindFriendsButton = 46, SocialProfileViewFollowRequestsHeader = 47, SquareLockup = 48, SuperHeroLockup = 49, TallVideoLockup = 50, TextListComponentModel = 51, TopSearchLockup = 52, TrackLockup = 53, TVDetailHeaderLockup = 54, TVMovieDescription = 55, Spacer = 56
 AMP.Services.CommonModels.ItemStatus
-  fields: None, AddableToLibrary, AddingToLibrary, Downloadable, Downloading, Downloaded, Paused, Playing, RemovableFromLibrary, AddItems, Copiable, RemoveItems, Duplicatable, Subscription, CanEditRules, Favorited, SuggestLess, CanFavorite, Rental, Watched, CanEdit, DontAllowProperties, DontAllowShowInAppleMusic
+  fields: None = 0, AddableToLibrary = 1, AddingToLibrary = 2, Downloadable = 4, Downloading = 8, Downloaded = 16, Paused = 32, Playing = 64, RemovableFromLibrary = 128, AddItems = 256, Copiable = 512, RemoveItems = 1024, Duplicatable = 2048, Subscription = 4096, CanEditRules = 8192, Favorited = 16384, SuggestLess = 32768, CanFavorite = 65536, Rental = 131072, Watched = 262144, CanEdit = 524288, DontAllowProperties = 1048576, DontAllowShowInAppleMusic = 2097152
 AMP.Services.CommonModels.JoinedCollaborationPlaylistStatus
   fields: CanJoin, ApprovalNeeded, PlaylistName, Status, Error
 AMP.Services.CommonModels.KaraokeLyricsLine
@@ -1465,7 +1465,7 @@ AMP.Services.CommonModels.KaraokeLyricsLine
 AMP.Services.CommonModels.KaraokeLyricsSongInfo
   methods: .ctor, get_ContentDescriptor, put_ContentDescriptor, get_Duration, get_StaticLines, get_Lines, get_Writers, put_Writers, get_Language, put_Language, get_Timing, put_Timing, get_HasPronunciation, put_HasPronunciation, get_HasTranslation, put_HasTranslation, ReportMetricsAsync, RestartMetricsVisibilityTimer, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.KaraokeLyricsTiming
-  fields: None, Line, Word
+  fields: None = 0, Line = 1, Word = 2
 AMP.Services.CommonModels.KaraokeLyricsViewModel
   methods: .ctor, get_CurrentLine, get_CurrentTime, get_IsLoading, get_IsStaticLyrics, get_IsTimedLyrics, get_IsFinishedLoading, get_Lines, get_KaraokeLyricsSongInfo, get_NoSong, get_NoLyrics, get_ViewIsVisible, put_ViewIsVisible, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.KaraokeLyricsWord
@@ -1479,7 +1479,7 @@ AMP.Services.CommonModels.LanguageListViewModel
 AMP.Services.CommonModels.LibraryPageDestination
   methods: get_Intent, put_Intent, get_Kind, get_IsFeaturePage, get_GrabFocus, put_GrabFocus, get_SidebarIdentifier, get_IsPinnedItem
 AMP.Services.CommonModels.LimitItemType
-  fields: None, Minutes, Hours, Megabyte, Gigabyte, Items
+  fields: None = -1, Minutes = 0, Hours = 1, Megabyte = 2, Gigabyte = 3, Items = 4
 AMP.Services.CommonModels.Link
   methods: .ctor, get_AccessibilityLabel, get_Id, get_Title, get_Segue, put_Segue
 AMP.Services.CommonModels.LinkComponentModel
@@ -1487,13 +1487,13 @@ AMP.Services.CommonModels.LinkComponentModel
 AMP.Services.CommonModels.ListSection
   methods: .ctor, get_AllowReorder, get_AllowSelection, put_AllowSelection, get_Kind, put_Kind, get_Identifier, get_BackgroundTreatment, put_BackgroundTreatment, get_DisplaySeparator, get_Header, put_Header, get_InvalidationTriggers, put_InvalidationTriggers, get_IsGrouped, get_Margin, put_Margin, get_PinnedLeadingItem, get_PlayAllActionSupport, get_TypeAheadProvider, put_TypeAheadProvider, get_ScrollState, put_ScrollState, get_ScrollStateItemKey, put_ScrollStateItemKey, get_ScrollStateItemSize, put_ScrollStateItemSize, get_Items, put_Items, get_ContentDescriptor, get_ContainerContentDescriptor, get_NeedsLibraryStatusUpdates, get_NeedsPlaybackStatusUpdates, get_ContainerItem, put_ContainerItem, GetExtraItem, get_AccessibilityLabel, get_AccessKey, add_PropertyChanged, remove_PropertyChanged, ToString, get_NeedsHydration, put_NeedsHydration, get_SupportsMultipleSelection, put_SupportsMultipleSelection, get_SelectedItems, put_SelectedItems
 AMP.Services.CommonModels.ListSectionKind
-  fields: List, Tracklist
+  fields: List = 0, Tracklist = 1
 AMP.Services.CommonModels.LiveMode
-  fields: NotLive, LiveNotSeekable, LiveSeekable, LiveSeekableAtLiveEdge
+  fields: NotLive = 0, LiveNotSeekable = 1, LiveSeekable = 2, LiveSeekableAtLiveEdge = 3
 AMP.Services.CommonModels.LiveRadioGridLockup
   methods: .ctor, get_SecondaryAction, get_RecoId, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, get_PlayAction
 AMP.Services.CommonModels.LyricsDisplayType
-  fields: None, Static, LineByLine, WordByWord
+  fields: None = 0, Static = 1, LineByLine = 2, WordByWord = 3
 AMP.Services.CommonModels.LyricsInfo
   methods: .ctor, get_LyricsState, get_LyricsSource, get_ContentDescriptor, get_IsEditable, get_RequiresReporting, get_MetricsJSON, HaveLyrics, GetStaticLyrics, GetTTML, GetLanguage, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.LyricsKeyframe
@@ -1501,23 +1501,23 @@ AMP.Services.CommonModels.LyricsKeyframe
 AMP.Services.CommonModels.LyricsLine
   methods: get_EndTime, get_Id, get_Index, get_IsCurrent, get_IsFadingTemporaryDisabled, put_IsFadingTemporaryDisabled, get_IsInstrumental, get_StartTime, get_State, get_Text, ContainsTimeSpan, IsSameAs, UpdateState, OtherLineBecomingCurrent, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.LyricsLineState
-  fields: Past, Past_Faded, Current, Future1, Future1_Faded, Future2, Future2_Faded, Future3, Future3_Faded, FutureN, FutureN_Faded
+  fields: Past = 0, Past_Faded = 1, Current = 2, Future1 = 3, Future1_Faded = 4, Future2 = 5, Future2_Faded = 6, Future3 = 7, Future3_Faded = 8, FutureN = 9, FutureN_Faded = 10
 AMP.Services.CommonModels.LyricsSongInfo
   methods: .ctor, get_IsLoaded, get_IsTSL, get_Keyframes, get_KeyframeCount, get_SongDuration, get_StaticLines, get_UniqueLines, get_Writers, LinesAtTime, KeyframeAtTime, ReportMetricsAsync, RestartMetricsVisibilityTimer, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.LyricsSongPart
-  fields: Unclassified, Verse, Chorus, PreChorus, Bridge, Intro, Outro, Refrain, Instrumental
+  fields: Unclassified = 0, Verse = 1, Chorus = 2, PreChorus = 3, Bridge = 4, Intro = 5, Outro = 6, Refrain = 7, Instrumental = 8
 AMP.Services.CommonModels.LyricsSource
-  fields: Any, None, UserCustom, Store, StoreSyllable
+  fields: Any = 0, None = 0, UserCustom = 1, Store = 2, StoreSyllable = 3
 AMP.Services.CommonModels.LyricsState
-  fields: Unknown, NoLyrics, StaticLyrics, TTML, Error, NoLyricsPlaceholderTrack
+  fields: Unknown = 0, NoLyrics = 1, StaticLyrics = 2, TTML = 3, Error = 4, NoLyricsPlaceholderTrack = 5
 AMP.Services.CommonModels.LyricsViewModel
   methods: .ctor, get_CurrentKeyframe, get_CurrentLine, get_CurrentTime, get_IsLoading, get_Lines, get_LyricsSongInfo, get_NoSong, get_NoLyrics, get_ViewIsVisible, put_ViewIsVisible, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.MainPageViewModel
   methods: get_ContentViewModel, put_ContentViewModel, get_EqualizerModel, get_FullScreenPlayer, get_HelpSegue, get_IsNowPlayingOpen, put_IsNowPlayingOpen, get_IsLyricsOpen, put_IsLyricsOpen, get_IsPlayQueueOpen, put_IsPlayQueueOpen, get_IsUpdateCloudLibraryMenuVisible, get_IsUpdateGeniusMenuVisible, get_MiniPlayer, get_NowPlaying, get_ServiceProvider, get_SettingsSegue, get_ShowActivityWindowAction, get_Sidebar, get_Transport, get_UpdateCloudLibraryAction, get_UpdateGeniusAction, get_Volume, ImportFiles, NavigatedTo, ProcessDeeplinkAsync, get_LastUsedSidebarIdentifier, put_LastUsedSidebarIdentifier, add_PropertyChanged, remove_PropertyChanged, TryLoadAsync
 AMP.Services.CommonModels.MatchMediaKind
-  fields: Separator, None, Music, MusicVideo, Movie, TVShow, Podcast, Audiobook, VoiceMemo, iTunesExtra, HomeVideo, AllMedia
+  fields: Separator = -2, None = -1, Music = 0, MusicVideo = 1, Movie = 2, TVShow = 3, Podcast = 4, Audiobook = 5, VoiceMemo = 6, iTunesExtra = 7, HomeVideo = 8, AllMedia = 9
 AMP.Services.CommonModels.MatchOperator
-  fields: None, All, Any
+  fields: None = -1, All = 0, Any = 1
 AMP.Services.CommonModels.MenuItem
   methods: .ctor, get_Id, get_IsEnabled, put_IsEnabled, get_Title, get_KeyboardAccelerator, get_Segue, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.MenuItemSeparator
@@ -1525,7 +1525,7 @@ AMP.Services.CommonModels.MenuItemSeparator
 AMP.Services.CommonModels.MenuItemWithIcon
   methods: .ctor, get_Glyph, get_Id, get_IsEnabled, put_IsEnabled, get_Title, get_KeyboardAccelerator, get_Segue, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.MiniPlayerViewMode
-  fields: Default, AlbumView, Expanded
+  fields: Default = 0, AlbumView = 1, Expanded = 2
 AMP.Services.CommonModels.MiniPlayerViewModel
   methods: .ctor, .ctor, get_ViewMode, get_IsAirPlayAvailable, get_IsLyricsOpen, put_IsLyricsOpen, get_IsPlayQueueOpen, put_IsPlayQueueOpen, get_IsInAlbumView, put_IsInAlbumView, get_NowPlaying, put_NowPlaying, get_Transport, put_Transport, get_Volume, put_Volume, get_PlayQueue, put_PlayQueue, get_KeepMiniplayerOnTop, get_GeneralSettings, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.ModalPresentationDescriptor
@@ -1567,17 +1567,17 @@ AMP.Services.CommonModels.PageHeader
 AMP.Services.CommonModels.PageHeaderBanner
   methods: get_Text, get_ActionLink
 AMP.Services.CommonModels.PageInstructionKind
-  fields: AddItemsToSection, NoOperation, ReplaceAccessoryItems, ReplacePage, UpdateItems
+  fields: AddItemsToSection = 0, NoOperation = 1, ReplaceAccessoryItems = 2, ReplacePage = 3, UpdateItems = 4
 AMP.Services.CommonModels.PageKind
-  fields: DataGrid, FixedList, FixedGrid, FixedGridWithoutHeaderBar, SideBySide, SingleSection, Stacked, Tracklist
+  fields: DataGrid = 0, FixedList = 1, FixedGrid = 2, FixedGridWithoutHeaderBar = 3, SideBySide = 4, SingleSection = 5, Stacked = 6, Tracklist = 7
 AMP.Services.CommonModels.PageType
-  fields: Album, Artist, Concerts, ConcertDetails, Curator, Grouping, Genre, Home, Movie, MusicVideo, Onboarding, Playlist, RecordLabel, Room, Schedule, Search, SeeAll, SocialProfile, TopCharts, TVEpisode, TVShow, Upsell, SocialOnboardingDashChooseWhoCanFollowYou, SocialOnboardingDashFindAndFollowFriends, SocialOnboardingDashGetUpdatesYouCareAbout, SocialOnboardingMusicFriends, SocialOnboardingHelpOthersFindYou, SocialOnboardingSharedPlaylist, SocialOnboardingPicker
+  fields: Album = 0, Artist = 1, Concerts = 2, ConcertDetails = 3, Curator = 4, Grouping = 5, Genre = 6, Home = 7, Movie = 8, MusicVideo = 9, Onboarding = 10, Playlist = 11, RecordLabel = 12, Room = 13, Schedule = 14, Search = 15, SeeAll = 16, SocialProfile = 17, TopCharts = 18, TVEpisode = 19, TVShow = 20, Upsell = 21, SocialOnboardingDashChooseWhoCanFollowYou = 22, SocialOnboardingDashFindAndFollowFriends = 23, SocialOnboardingDashGetUpdatesYouCareAbout = 24, SocialOnboardingMusicFriends = 25, SocialOnboardingHelpOthersFindYou = 26, SocialOnboardingSharedPlaylist = 27, SocialOnboardingPicker = 28
 AMP.Services.CommonModels.PaginationResult
   methods: .ctor, get_PageChangeInstructions, get_NextIntent
 AMP.Services.CommonModels.ParagraphComponentModel
   methods: .ctor, get_Text, get_TextAlignment, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString
 AMP.Services.CommonModels.PersistenceScope
-  fields: User, Device
+  fields: User = 0, Device = 1
 AMP.Services.CommonModels.PlainTextBlock
   methods: .ctor, get_Text, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString
 AMP.Services.CommonModels.PlayActivityEvent
@@ -1585,7 +1585,7 @@ AMP.Services.CommonModels.PlayActivityEvent
 AMP.Services.CommonModels.PlayActivityPushNotificationEvent
   methods: get_Kind, get_Delay
 AMP.Services.CommonModels.PlayAllActionSupport
-  fields: None, Level1, Level2
+  fields: None = 0, Level1 = 1, Level2 = 2
 AMP.Services.CommonModels.PlayQueueItem
   methods: .ctor, get_PlayQueueItemID, get_Subtitle, get_PlayQueueSectionKind, put_PlayQueueSectionKind, get_Duration, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_PlayAction
 AMP.Services.CommonModels.PlayQueueViewModel
@@ -1595,23 +1595,23 @@ AMP.Services.CommonModels.Playable
 AMP.Services.CommonModels.PlayableUpsellInfo
   methods: .ctor, .ctor, get_DocumentJson, get_SelectEventJson
 AMP.Services.CommonModels.PlaybackMediaType
-  fields: Unknown, Other, Movie, TVEpisode, Trailer, LiveService, SportingEvent, HomeVideo, Song, MusicVideo, Radio
+  fields: Unknown = 0, Other = 1, Movie = 2, TVEpisode = 3, Trailer = 4, LiveService = 5, SportingEvent = 6, HomeVideo = 7, Song = 8, MusicVideo = 9, Radio = 10
 AMP.Services.CommonModels.PlaybackWindowVisibilityChangedArgs
   fields: Visibility
 AMP.Services.CommonModels.PlayerActionKind
-  fields: Play, Pause, Stop, Clear, GoBack, SkipPrevious, SkipNext, SetTargetPlayRate, SetShuffleMode, SetRepeatMode, SetVolume, SetMute, IncreaseVolume, DecreaseVolume, ScrubForward, ScrubBackward
+  fields: Play = 0, Pause = 1, Stop = 2, Clear = 3, GoBack = 4, SkipPrevious = 5, SkipNext = 6, SetTargetPlayRate = 7, SetShuffleMode = 8, SetRepeatMode = 9, SetVolume = 10, SetMute = 11, IncreaseVolume = 12, DecreaseVolume = 13, ScrubForward = 14, ScrubBackward = 15
 AMP.Services.CommonModels.PlayerState
   methods: .ctor, get_CanPlay, get_CanPause, get_CanStop, get_CanRewind, get_CanFF, get_CanGoBack, get_CanSkipPrevious, get_CanSkipNext, get_PreferMusicControls, get_CanShuffle, get_ShuffleMode, get_CanRepeat, get_RepeatMode, get_TargetPlayRate, get_CanSetVolume, get_Volume, get_CanMute, get_IsMuted, get_IsPaused, get_IsPlaying, get_VideoSwapChainHandle, get_OverlaySwapChainHandle, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.PlaylistCollaborationRequest
   methods: get_Kind, put_Kind, get_Url, put_Url
 AMP.Services.CommonModels.PlaylistCollaborationRequestKind
-  fields: Join, Pending
+  fields: Join = 0, Pending = 1
 AMP.Services.CommonModels.PlaylistCollaboratorsDidChangeEvent
   methods: get_Kind, get_Delay
 AMP.Services.CommonModels.PlaylistDetailHeaderLockup
   methods: get_CuratorLinks, get_LastModifiedText, get_NumberOfSocialBadges, get_PlayButton, get_ShuffleButton, get_VideoArtwork, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, UpdateFrom, get_DolbyAtmos, put_DolbyAtmos, get_DolbyAtmosMovie, put_DolbyAtmosMovie, get_DolbyAudio, put_DolbyAudio, get_HiResLossless, put_HiResLossless, get_Lossless, put_Lossless, get_DigitalMaster, put_DigitalMaster, get_HasBadge, get_HasBadgeAfterDolbyAtmos, get_HasBadgeAfterDolbyAtmosMovie, get_HasBadgeAfterDolbyAudio, get_HasBadgeAfterHiResLossless, get_HasBadgeAfterLossless, get_ModalPresentationDescriptor, get_PlayAction
 AMP.Services.CommonModels.PlaylistItemKey
-  fields: ImageCropCode, ImageFormat, ImagePlaceholderColor, ImageSource, MetadataTimeoutSeconds, Playlist, Subtitle, ShelfTitle, Title
+  fields: ImageCropCode = 0, ImageFormat = 1, ImagePlaceholderColor = 2, ImageSource = 3, MetadataTimeoutSeconds = 4, Playlist = 5, Subtitle = 6, ShelfTitle = 7, Title = 8
 AMP.Services.CommonModels.PlaylistItemKeyFactory
   methods: ValueForKey
 AMP.Services.CommonModels.PlaylistSidebarMenuItem
@@ -1641,7 +1641,7 @@ AMP.Services.CommonModels.RelayCommandRequestArgs
 AMP.Services.CommonModels.RemoveOrLeaveMenu
   methods: get_Title, get_ActionLink, get_WarningMessage, get_ExplanationMessage, get_CloseParent, StopInvalidation
 AMP.Services.CommonModels.RepeatMode
-  fields: Off, All, One
+  fields: Off = 0, All = 1, One = 2
 AMP.Services.CommonModels.ReplaceAccessoryItemsInstruction
   methods: .ctor, get_Items, get_Banner, get_Kind
 AMP.Services.CommonModels.ReplaceColumnBrowserInstruction
@@ -1669,19 +1669,19 @@ AMP.Services.CommonModels.ReplaceSuggestedSongsSectionInstruction
 AMP.Services.CommonModels.ReportAConcernViewModel
   methods: .ctor, SendRequest, get_Message, get_ConcernsList, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.ReportType
-  fields: kNone, kArtistPost, kUserComment, kArtistComment, kPublicPlaylist, kAMFSharedPlaylist, kSocialProfile, kPlaylistEdit, kSearchQueryContext
+  fields: kNone = 0, kArtistPost = 1, kUserComment = 2, kArtistComment = 3, kPublicPlaylist = 4, kAMFSharedPlaylist = 5, kSocialProfile = 6, kPlaylistEdit = 7, kSearchQueryContext = 8
 AMP.Services.CommonModels.RestrictionsDidChangeEvent
   methods: get_Kind, get_Delay
 AMP.Services.CommonModels.Rule
   methods: .ctor, get_Parent, put_Parent, get_Field, put_Field, get_Condition, put_Condition, get_StringValue, put_StringValue, get_StringValue2, put_StringValue2, get_Value, put_Value, get_Value2, put_Value2, get_DateValue, put_DateValue, get_DateValue2, put_DateValue2, get_DataLabel, get_Rules, get_HaveMultipleRules, get_PlaylistId, put_PlaylistId, get_FavoritedStatus, put_FavoritedStatus, get_Location, put_Location, get_CloudStatus, put_CloudStatus, get_InTheLast, put_InTheLast, get_MediaKind, put_MediaKind, get_FieldTypeSelectedItem, put_FieldTypeSelectedItem, get_FieldTypes, get_RuleConditions, get_RuleConditionSelectedItem, put_RuleConditionSelectedItem, get_HasText, get_HasSuggestText, get_HasNumeric, get_HasRating, get_HasDate, get_HasSet, get_HasTwoValues, get_HasSecondText, get_HasSecondNumericValue, get_HasTwoDates, get_HasTwoRating, get_HasDataLabel, get_CanRemove, get_IsRuleGroup, get_FieldSet, get_FieldSetSelectedItem, put_FieldSetSelectedItem, get_SuggestionList, get_OtherPlaylists, get_ArtistList, get_SortArtistList, get_AlbumList, get_SortAlbumList, get_GenreList, get_GroupingList, get_SeriesNameList, get_SortSeriesNameList, get_MatchOperators, get_MatchOperatorSelectedItem, put_MatchOperatorSelectedItem, get_MatchType, put_MatchType, get_IsMatchTypeAll, get_IsMatchTypeAny, ParentRulesChanged, CreateNewRuleBelow, RemoveRule, CreateSubRuleBelow, CopyRuleLists, add_PropertyChanged, remove_PropertyChanged, GetFieldDataType
 AMP.Services.CommonModels.RuleCondition
-  fields: None, BeginWith, Contains, DoesNotContain, EndsWith, Is, IsNot, IsTrue, IsFalse, IsGreaterThan, IsInTheRange, IsLessThan, IsAfter, IsBefore, InTheLast, NotInTheLast
+  fields: None = -1, BeginWith = 0, Contains = 1, DoesNotContain = 2, EndsWith = 3, Is = 4, IsNot = 5, IsTrue = 6, IsFalse = 7, IsGreaterThan = 8, IsInTheRange = 9, IsLessThan = 10, IsAfter = 11, IsBefore = 12, InTheLast = 13, NotInTheLast = 14
 AMP.Services.CommonModels.ScrubberMode
-  fields: Disabled, Indeterminate, InfiniteDuration, FixedDuration
+  fields: Disabled = 0, Indeterminate = 1, InfiniteDuration = 2, FixedDuration = 3
 AMP.Services.CommonModels.SearchHintsLockup
   methods: .ctor, get_Title, get_Subtitle, get_Lyrics, get_Artwork, get_ExplicitBadge, get_Style, get_Kind, get_IsTerm, get_Artist, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString
 AMP.Services.CommonModels.SearchHintsLockupStyle
-  fields: NoArtwork, RoundArtwork, SquareArtwork, Video16_9Artwork
+  fields: NoArtwork = 0, RoundArtwork = 1, SquareArtwork = 2, Video16_9Artwork = 3
 AMP.Services.CommonModels.SearchLandingBrickLockup
   methods: .ctor, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.SearchLandingPageDestination
@@ -1701,19 +1701,19 @@ AMP.Services.CommonModels.SectionChangeInstruction
 AMP.Services.CommonModels.SectionEventTrigger
   methods: .ctor, get_Events, get_Intent, get_DeferIntentUntilEvent
 AMP.Services.CommonModels.SectionHeaderKind
-  fields: Default, Column, Composer, FixedDetailList, Sidebar
+  fields: Default = 0, Column = 1, Composer = 2, FixedDetailList = 3, Sidebar = 4
 AMP.Services.CommonModels.SectionInstructionKind
-  fields: DiscardSection, NoOperation, ReplaceColumnBrowser, ReplaceDataGridColumnsInfo, ReplaceDataGridColumnSort, ReplaceEmptyState, ReplaceHeader, ReplaceItems, ReplaceSection, ReplaceSortAndFilterParams, ReplaceSuggestedSongsSection, UpdateItems
+  fields: DiscardSection = 0, NoOperation = 1, ReplaceColumnBrowser = 2, ReplaceDataGridColumnsInfo = 3, ReplaceDataGridColumnSort = 4, ReplaceEmptyState = 5, ReplaceHeader = 6, ReplaceItems = 7, ReplaceSection = 8, ReplaceSortAndFilterParams = 9, ReplaceSuggestedSongsSection = 10, UpdateItems = 11
 AMP.Services.CommonModels.SectionInvalidationTriggersChange
   methods: get_Kind, get_NewTriggers
 AMP.Services.CommonModels.SelectByType
-  fields: Separator, None, Random, Album, Artist, Genre, Title, HighestRating, LowestRating, MostRecentlyFavorited, LeastRecentlyFavorited, MostRecentlyPlayed, LeastRecentlyPlayed, MostOftenPlayed, LeastOftenPlayed, MostRecentlyAdded, LeastRecentlyAdded
+  fields: Separator = -2, None = -1, Random = 0, Album = 1, Artist = 2, Genre = 3, Title = 4, HighestRating = 5, LowestRating = 6, MostRecentlyFavorited = 7, LeastRecentlyFavorited = 8, MostRecentlyPlayed = 9, LeastRecentlyPlayed = 10, MostOftenPlayed = 11, LeastOftenPlayed = 12, MostRecentlyAdded = 13, LeastRecentlyAdded = 14
 AMP.Services.CommonModels.SelectableSquareLockup
   methods: .ctor, get_DisplayStyle, get_EditingScopeIdentifier, get_Environment, put_Environment, get_ShowFavoriteSuggestLessButton, get_ShowSubtitleInDestructiveAccent, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, UpdateFrom, get_NeedsHydration, put_NeedsHydration, Hydrate, get_PlayAction, get_NumberOfSocialBadges, get_SocialBadgingInfos, put_SocialBadgingInfos
 AMP.Services.CommonModels.Separator
-  fields: CommasOnly, CommasWithAnd, CommasWithAmpersand
+  fields: CommasOnly = 0, CommasWithAnd = 1, CommasWithAmpersand = 2
 AMP.Services.CommonModels.SettingsPageType
-  fields: Main, Advanced, Files, General, Playback, Restrictions
+  fields: Main = 0, Advanced = 1, Files = 2, General = 3, Playback = 4, Restrictions = 5
 AMP.Services.CommonModels.ShareAccessoryButton
   methods: .ctor, get_ShareAction, get_MenuItems, put_MenuItems, get_Kind, get_Tooltip, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString
 AMP.Services.CommonModels.SharedWithYouDidChangeEvent
@@ -1723,7 +1723,7 @@ AMP.Services.CommonModels.ShelfSection
 AMP.Services.CommonModels.ShowOnlyDownloadedItemsEvent
   methods: get_Kind, get_Delay
 AMP.Services.CommonModels.ShuffleMode
-  fields: Off, Tracks, Albums, ForceOff
+  fields: Off = 0, Tracks = 1, Albums = 2, ForceOff = 3
 AMP.Services.CommonModels.SideListItemLockup
   methods: .ctor, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, UpdateFrom, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic
 AMP.Services.CommonModels.SidebarItem
@@ -1731,9 +1731,9 @@ AMP.Services.CommonModels.SidebarItem
 AMP.Services.CommonModels.SidebarItemAccessoryButton
   methods: .ctor, get_Icon, get_MenuItems, get_FlyoutItems, put_FlyoutItems, get_Kind, get_Tooltip, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, UpdateFrom, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.SidebarItemGroupType
-  fields: None, LibraryItems, LibraryPins
+  fields: None = 0, LibraryItems = 1, LibraryPins = 2
 AMP.Services.CommonModels.SidebarItemKind
-  fields: Regular, RegularWithArtworkOrIcon, RegularWithImageIcon, RegularWithUrlImageIcon, RegularWithSvgAssetIcon, RegularWithEncodedSvgIcon, Header
+  fields: Regular = 0, RegularWithArtworkOrIcon = 1, RegularWithImageIcon = 2, RegularWithUrlImageIcon = 3, RegularWithSvgAssetIcon = 4, RegularWithEncodedSvgIcon = 5, Header = 6
 AMP.Services.CommonModels.SidebarLibraryEditItem
   methods: .ctor, get_Title, get_Shown, put_Shown, get_PrefKey, get_Enabled, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, UpdateFrom, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.SidebarSection
@@ -1783,7 +1783,7 @@ AMP.Services.CommonModels.SocialProfileViewFollowRequestsHeader
 AMP.Services.CommonModels.SocialUpdateResponse
   methods: .ctor, get_ResponseCode
 AMP.Services.CommonModels.SocialUpdateResponseCode
-  fields: Unknown, Success, IncorrectAuthenticationHeader, IncorrectAuthentication, Conflict, ServerError
+  fields: Unknown = 0, Success = 202, IncorrectAuthenticationHeader = 401, IncorrectAuthentication = 403, Conflict = 409, ServerError = 500
 AMP.Services.CommonModels.SocialViewFollowRequestsViewModel
   methods: .ctor, get_PendingFollowerLockups, put_PendingFollowerLockups, get_Done, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.Spacer
@@ -1795,7 +1795,7 @@ AMP.Services.CommonModels.SquareArtworkPosterLockupOld
 AMP.Services.CommonModels.SquareLockup
   methods: .ctor, get_DisplayStyle, get_CalendarBadge, get_Environment, put_Environment, get_ShowFavoriteSuggestLessButton, get_ShowSubtitleInDestructiveAccent, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, UpdateFrom, get_NeedsHydration, put_NeedsHydration, Hydrate, get_PlayAction, get_NumberOfSocialBadges, get_SocialBadgingInfos, put_SocialBadgingInfos
 AMP.Services.CommonModels.SquareLockupStyle
-  fields: Small, Regular, Medium, Large
+  fields: Small = 0, Regular = 1, Medium = 2, Large = 3
 AMP.Services.CommonModels.StoreBagChangedEvent
   methods: get_Kind, get_Delay
 AMP.Services.CommonModels.SubMenuItem
@@ -1809,7 +1809,7 @@ AMP.Services.CommonModels.SubscriptionStatusChangeEvent
 AMP.Services.CommonModels.SubtitleStylePresetMenuItem
   methods: .ctor, get_Title, get_PresetId, get_IsSelected, put_IsSelected, get_SelectCommand, get_PreviewCommand, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.SubtitlesAutomationTriggerReason
-  fields: None, Muted, Skipback, LanguageMismatch
+  fields: None = 0, Muted = 1, Skipback = 2, LanguageMismatch = 3
 AMP.Services.CommonModels.SuggestedSongLockup
   methods: get_CanPlay, get_CanPause, get_Duration, get_IsAddingToPlaylist, get_Position, get_IsEnabled, put_IsEnabled, AddToPlaylist, PlayPause, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.SuggestedSongsSection
@@ -1823,7 +1823,7 @@ AMP.Services.CommonModels.SyncPageFooter
 AMP.Services.CommonModels.TVDetailHeaderLockup
   methods: .ctor, get_Subtitle, get_TertiaryTitle, get_TrailingTertiaryBadges, get_ExpirationLabel, get_DisplayStyle, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, get_PlayAction, get_ShowSDVideoBadge, get_ShowHDVideoBadge, get_ShowHDRVideoBadge, get_ShowClosedCaptioningBadge, get_Show4kVideoBadge, get_ShowVideoBadge, get_ShowDolbyVisionBadge, get_ShowiTunesExtrasBadge, get_ShowExtrasBadge, get_DolbyAtmos, put_DolbyAtmos, get_DolbyAtmosMovie, put_DolbyAtmosMovie, get_DolbyAudio, put_DolbyAudio, get_HiResLossless, put_HiResLossless, get_Lossless, put_Lossless, get_DigitalMaster, put_DigitalMaster, get_HasBadge, get_HasBadgeAfterDolbyAtmos, get_HasBadgeAfterDolbyAtmosMovie, get_HasBadgeAfterDolbyAudio, get_HasBadgeAfterHiResLossless, get_HasBadgeAfterLossless, get_ModalPresentationDescriptor
 AMP.Services.CommonModels.TVDetailHeaderLockupStyle
-  fields: Wide, Large, Tall
+  fields: Wide = 0, Large = 1, Tall = 2
 AMP.Services.CommonModels.TVMovieDescription
   methods: .ctor, get_Heading, get_HeadingTrailingBadges, get_HideContextMenuButton, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_PlayAction, get_Title
 AMP.Services.CommonModels.TVSidebarItemsChangedEvent
@@ -1841,19 +1841,19 @@ AMP.Services.CommonModels.TallArtworkTop
 AMP.Services.CommonModels.TallVideoLockup
   methods: .ctor, get_ChinColor, get_ChinTitle, get_ExpirationBadge, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, UpdateFrom, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, get_PlayAction
 AMP.Services.CommonModels.TextAlignment
-  fields: Leading, Trailing, Centered
+  fields: Leading = 0, Trailing = 1, Centered = 2
 AMP.Services.CommonModels.TextListComponentModel
   methods: .ctor, get_Subsections, get_Title, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString
 AMP.Services.CommonModels.ToggleMenuItem
   methods: .ctor, get_IsChecked, put_IsChecked, SetDataGridColumnInsertIndex, get_Id, get_IsEnabled, put_IsEnabled, get_Title, get_KeyboardAccelerator, get_Segue
 AMP.Services.CommonModels.TomatometerFreshness
-  fields: None, CertifiedFresh, Fresh, Rotten
+  fields: None = 0, CertifiedFresh = 1, Fresh = 2, Rotten = 3
 AMP.Services.CommonModels.TopSearchLockup
   methods: .ctor, get_Subtitle, get_ThumbnailArtworkTreatment, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, get_PlayAction
 AMP.Services.CommonModels.TrackLockup
   methods: .ctor, get_AddedBy, get_ContentRatingLabel, get_ExpectedReleaseDate, get_HasBadging, get_HasTrackNumber, get_IsDimmed, get_IsRanked, get_IsTitleEditable, get_LayoutStyle, get_RankingText, get_Reactions, get_SecondaryTitle, get_TertiaryLinks, get_TrackNumber, get_Environment, put_Environment, get_Duration, get_HasDuration, get_Columns, put_Columns, get_HasVideo, get_IsDisabled, get_Artwork, put_Artwork, get_Headline, get_ExplicitBadge, get_SubtitleLinks, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_ContentDescriptor, get_ContainerContentDescriptor, get_IsSelected, put_IsSelected, get_SelectionManager, get_Title, add_PropertyChanged, remove_PropertyChanged, get_PlayAction, UpdateFrom, get_ItemStatus, SetItemStatus, get_IsAddableToLibrary, get_IsAddingToLibrary, get_IsDownloadable, get_IsDownloading, get_IsDownloaded, get_IsPaused, get_IsPlaying, get_IsNowPlayingItem, get_IsRemovableFromLibrary, get_CanAddItems, get_IsCopiable, get_CanRemoveItems, get_IsDuplicatable, get_IsSubscription, get_IsFavorited, get_IsSuggestLess, get_CanFavorite, get_CanEditRules, get_CanEdit, get_IsRental, get_HasBeenWatched, get_DontAllowProperties, get_DontAllowShowInAppleMusic, GetEditItemAction, get_UserRating, put_UserRating, GetRatingAction
 AMP.Services.CommonModels.TrackLockupLayoutStyle
-  fields: SongsList, AlbumTracklist, AlbumWithComposerTracklist, MusicPlaylistTracklist, TVPlaylistTracklist, CompilationTracklist, CompilationWithComposerTracklist, ShelfTracklist, GridTracklist, SeasonsList
+  fields: SongsList = 0, AlbumTracklist = 1, AlbumWithComposerTracklist = 2, MusicPlaylistTracklist = 3, TVPlaylistTracklist = 4, CompilationTracklist = 5, CompilationWithComposerTracklist = 6, ShelfTracklist = 7, GridTracklist = 8, SeasonsList = 9
 AMP.Services.CommonModels.TracklistColumns
   methods: get_Title, get_Subtitle, get_Tertiary, get_HasContributors, get_HasReactions
 AMP.Services.CommonModels.TracklistLockup
@@ -1879,7 +1879,7 @@ AMP.Services.CommonModels.UserSocialProfileGraph
 AMP.Services.CommonModels.VideoArtwork
   methods: get_CropStyle, get_Dictionary, GetCropCode
 AMP.Services.CommonModels.VideoArtworkCropStyle
-  fields: BoundedBox, SpecificRectangle, SquareCenterCrop
+  fields: BoundedBox = 0, SpecificRectangle = 1, SquareCenterCrop = 2
 AMP.Services.CommonModels.VideoArtworkDictionary
   methods: get_MotionArtistFullscreen16x9, get_MotionArtistSingular16x9, get_MotionArtistWide16x9, get_MotionDetailSquare, get_MotionDetailTall, get_MotionMediumVideo16x9, get_MotionSquareVideo1x1, get_MotionTallVideo3x4, get_MotionWideVideo21x9, GetDictionaryItem
 AMP.Services.CommonModels.VideoArtworkDictionaryItem
@@ -1889,9 +1889,9 @@ AMP.Services.CommonModels.VideoClipSequence
 AMP.Services.CommonModels.VideoClipSequenceParameters
   methods: .ctor, get_Playlist, get_StartingIndex, get_AppendContextDataRef, get_PlayablePassThrough, get_NextToken, get_CutlGoLive, get_ServiceBridge
 AMP.Services.CommonModels.VideoClipSequenceType
-  fields: None, VodClipsSequence, CutlClipsSequence, CutlTabClipsSequence
+  fields: None = 0, VodClipsSequence = 1, CutlClipsSequence = 2, CutlTabClipsSequence = 3
 AMP.Services.CommonModels.VideoColorCapability
-  fields: Unknown, HDR, DolbyVision
+  fields: Unknown = 0, HDR = 1, DolbyVision = 2
 AMP.Services.CommonModels.VideoDisplayFrameInfo
   methods: .ctor, .ctor, get_VideoDisplayScreenRect, put_VideoDisplayScreenRect, get_VideoDisplayDIPSize, put_VideoDisplayDIPSize
 AMP.Services.CommonModels.VideoFile
@@ -1911,7 +1911,7 @@ AMP.Services.CommonModels.VideoItemRollInfo
 AMP.Services.CommonModels.VideoItemSkipInfo
   methods: .ctor, .ctor, get_Start, get_Duration, get_Target, get_Label, get_Action, get_SkipInfoReportingType
 AMP.Services.CommonModels.VideoItemSkipInfoAction
-  fields: SkipToTargetTime, SkipToNextVideo, SkipPreroll
+  fields: SkipToTargetTime = 0, SkipToNextVideo = 1, SkipPreroll = 2
 AMP.Services.CommonModels.VideoPlaybackViewModel
   methods: .ctor, get_CurrentPlayable, get_CurrentDateMilliseconds, StartPlayback, StartOrQueueLibraryPlaybackAsync, PausePlaybackAsync, PrepareToPauseAndForegroundMainWindow, InitiateCutlWithViewModel, ChangeAudioLanguage, ShowPrerollUICompleted, get_ClipSequenceViewModel, put_ClipSequenceViewModel, PrepareToPlayClipSequenceAsync, SeekToBeginning, SeekToEnd, SeekToCutlClipAsync, SkipSegment, get_PostPlayViewModel, put_PostPlayViewModel, get_AdvisoryViewModel, OnUpNextUpdated, get_IsNetworkReachable, put_IsNetworkReachable, ShouldPlaybackPageBeTabStop, get_ShouldShowAdvisoryWarning, ShowDialog, HideDialog, add_ShowDialogEvent, remove_ShowDialogEvent, add_NonRetryablePlaybackError, remove_NonRetryablePlaybackError, get_VideoDisplayFrameInfo, put_VideoDisplayFrameInfo, get_VisualState, get_WindowPresenterState, put_WindowPresenterState, get_IsFullscreenModeEnabled, ExitFullscreen, CloseVideoPlayer, get_WindowInteractionState, get_WindowSizeClass, get_WindowFocusRequest, put_WindowFocusRequest, get_HUDVisibilityState, put_HUDVisibilityState, get_MoreSummaryPanelState, put_MoreSummaryPanelState, get_IsVisualStateManagerReady, put_IsVisualStateManagerReady, get_IsCurrentPositionSliderScrubbing, put_IsCurrentPositionSliderScrubbing, get_IsTrackingCurrentPositionThumb, put_IsTrackingCurrentPositionThumb, StringResource, MuteButtonHelpText, PlayButtonHelpText, ForwardButtonAutomationName, BackwardButtonAutomationName, PipButtonAutomationName, get_ScreenScale, get_InfoPanelTitle, get_InfoPanelDescription, get_InfoPanelGenre, get_InfoPanelDate, get_InfoPanelDuration, PrerollDuration, get_TomatoPercentage, CommonSenseFormatAge, get_InfoContentRatingImageSource, ContentRatingImageSource, get_ContentRatingVisibility, get_ContentRatingAutomationName, get_InfoAdvisoryPictograms, get_InfoAdvisoryPictogramsVisibility, get_AudioFormatVisibility, get_AudioFormatAutomationName, get_VideoResolutionImageSource, get_VideoResolutionVisibility, get_VideoResolutionAutomationName, get_VideoColorCapabilityImageSource, get_VideoColorCapabilityVisibility, get_VideoColorCapabilityAutomationName, get_ClosedCaptionVisibility, get_SDHVisibility, get_ADVisibility, get_SLVisibility, get_InfoPanelAutomationHelpText, get_InfoPanelActionButton1Text, get_IsInfoPanelActionButton1Visible, get_InfoPanelActionButton1AutomationName, get_InfoPanelActionButton2Text, get_IsInfoPanelActionButton2Visible, get_InfoPanelActionButton2AutomationName, get_IsSportingEvent, get_SetWindowPresenterState, get_SetWindowInteractionState, get_MoreSummaryPanelStateChange, get_AddToUpNext, get_InfoPanelActionButton1, get_InfoPanelActionButton2, get_SetPlayState, get_Clear, get_SetMuteState, get_GoLive, get_CutlGoLive, get_ExitCutlCommand, ForwardButtonCommand, BackwardButtonCommand, get_PlayerState, get_VideoSwapChainHandle, get_VideoSwapChainHandleChangeResult, put_VideoSwapChainHandleChangeResult, get_OverlaySwapChainHandle, SetPlayStateFromUI, get_CurrentPosition, put_CurrentPosition, SetCurrentPositionFromUIAction, get_CurrentPositionAsTimeSpan, get_CurrentPositionMaximum, get_CurrentPositionMinimum, get_CurrentPositionString, get_TimeRemainingString, get_LiveTime, get_Volume, put_Volume, get_VolumeMaximum, get_VolumeMinimum, get_VideoTitle, get_VideoSubtitle, get_VideoItemMetadata, get_VideoPresentationSize, get_VideoColorCapability, get_SkipInfo, get_HasSkipTitleOrSubtitle, get_PrerollGradientSource, get_PromoInfo, get_PromoAdvisoryInfo, get_MetadataDisplayVisibility, get_CurrentPositionScrubberVisibility, get_IsGoLiveButtonEnabled, get_IsCaptionsButtonVisible, get_CaptionsMenuItems, HideSubtitleStylePreview, get_IsVisualTrackButtonVisible, get_VisualTrackMenuItems, get_IsAudioLanguageButtonVisible, get_AudioLanguageMenuItems, DynamicTabsVisibility, get_AudioFormat, get_VideoResolution, get_IsLiveBadgeVisible, get_IsAtLiveEdge, get_PauseCurrentPositionUpdates, put_PauseCurrentPositionUpdates, get_IsPlayerWindowOpen, get_IsShowingPromoInfo, get_ShouldCloseFlyout, get_PreferMusicControls, get_PlaybackPageHasFocus, put_PlaybackPageHasFocus, get_ShowPostPlay, put_ShowPostPlay, get_DynamicPlayerTabsViewModel, get_CurrentCanonicalId, get_CurrentShowCanonicalId, get_CurrentAdamId, get_CurrentPlayablePassThrough, get_CurrentUtsEntityType, get_CanShowInfoTab, SetPostPlayScaleAsync, ExitPostPlayAsync, AdvisoryAnimationCompleted, add_PropertyChanged, remove_PropertyChanged, AMPPlayLogEntry
 AMP.Services.CommonModels.VideoPlaybackWindowEventBusFactory
@@ -1927,7 +1927,7 @@ AMP.Services.CommonModels.VideoPlaybackWindowKeyPressedHandler
 AMP.Services.CommonModels.VideoPlaybackWindowShowCursorEventHandler
   methods: .ctor, Invoke
 AMP.Services.CommonModels.VideoResolution
-  fields: Unknown, SD_480, HD_720, FullHD_1080, QuadHD_1440, Video_2K, UltraHD_4K, FullUltraHD_8K
+  fields: Unknown = 0, SD_480 = 1, HD_720 = 2, FullHD_1080 = 3, QuadHD_1440 = 4, Video_2K = 5, UltraHD_4K = 6, FullUltraHD_8K = 7
 AMP.Services.CommonModels.VideosPlayable
   methods: .ctor, .ctor, GetStringifiedPlayable, GetStringifiedContentMetadata, get_AdamId, get_CanonicalId, get_ChannelId, get_ExternalId, get_LiveStreamServiceId, get_MediaType, get_PlayablePassThrough, put_PlayablePassThrough, get_ReferenceId, get_Url, get_UtsEntityType, get_SynchronizationId, get_RequiresAuthentication, get_PlayRequiresAccount, get_RecommendedAge, get_SeasonNumber, get_TomatometerPercentage, get_ContentType, get_LeagueName, get_RatingDomain, get_RatingValue, get_ShowCanonicalId, get_SportName, get_ScheduleStartTime, get_ScheduleEndTime, get_VenueAddress, get_VenueName, get_TomatometerFreshness, get_Title, get_ShowTitle, get_HasContentMetadata, get_HasLsppShelfFetchPolicy, GetLsppShelfFetchPolicyObject, IsAdultContent, IsRental, get_UpsellInfo, get_NextToken, put_NextToken, get_Index, put_Index, get_FeatureName, put_FeatureName, HasInitiator, get_Initiator, put_Initiator, DecorateHlsUrlWithPostPlayType, get_PreferredAudioTrackName, put_PreferredAudioTrackName, SetPlaybackStartDate, get_NextPlayable, Equals, FromCombinedPlayableJson, FromContentMetadataAndPlayableJson
 AMP.Services.CommonModels.ViewOptionsAccessoryButton
@@ -1939,7 +1939,7 @@ AMP.Services.CommonModels.VodClipLoader
 AMP.Services.CommonModels.VolumeViewModel
   methods: .ctor, get_IncreaseVolumeAction, get_DecreaseVolumeAction, get_ToggleMuteAction, get_CanSetVolume, get_IsOpen, put_IsOpen, get_Level, put_Level, get_Muted, put_Muted, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.WebDialogPageKind
-  fields: Unknown, AccountPage
+  fields: Unknown = 0, AccountPage = 1
 AMP.Services.CommonModels.WebDialogViewModel
   methods: .ctor, get_PageKind, get_Title, get_Url, get_Id, get_RequestedWidth, put_RequestedWidth, get_RequestedHeight, put_RequestedHeight, add_PropertyChanged, remove_PropertyChanged
 AMP.Services.CommonModels.WhatsNewDialogViewModel
@@ -1947,17 +1947,17 @@ AMP.Services.CommonModels.WhatsNewDialogViewModel
 AMP.Services.CommonModels.WhatsNewFeatureViewModel
   methods: get_SymbolName, get_Title, get_Description
 AMP.Services.CommonModels.WindowHudUpdateState
-  fields: CursorOutsideWindow, CursorInWindow, InfoPanelClosed, CursorOnControl, FlyoutOpen
+  fields: CursorOutsideWindow = 0, CursorInWindow = 1, InfoPanelClosed = 2, CursorOnControl = 3, FlyoutOpen = 4
 AMP.Services.DefaultArtwork
   methods: .ctor, GetIdentifier, GetURIForIdentifier, GetURIForKind
 AMP.Services.DefaultArtworkKind
-  fields: MissingMusic, MissingMusicTall, MissingMovie, MissingMovieTall, MissingTV, MissingTVTall, MissingMusicVideo, MissingMusicVideoTall, MissingArtist, MissingArtistTall, AudioCD, PlaylistFolder, PlaylistFolderTall, VideoPlaylistFolder, UserPlaylist, UserPlaylistTall, GeniusPlaylist, GeniusPlaylistTall, SmartPlaylist, SmartPlaylistTall
+  fields: MissingMusic = 0, MissingMusicTall = 1, MissingMovie = 2, MissingMovieTall = 3, MissingTV = 4, MissingTVTall = 5, MissingMusicVideo = 6, MissingMusicVideoTall = 7, MissingArtist = 8, MissingArtistTall = 9, AudioCD = 10, PlaylistFolder = 11, PlaylistFolderTall = 12, VideoPlaylistFolder = 13, UserPlaylist = 14, UserPlaylistTall = 15, GeniusPlaylist = 16, GeniusPlaylistTall = 17, SmartPlaylist = 18, SmartPlaylistTall = 19
 AMP.Services.DiagnosticInfoFlags
-  fields: None, IncludeSystemProfile
+  fields: None = 0, IncludeSystemProfile = 1
 AMP.Services.Dialog
   fields: message, explanation, primaryButton, secondaryButton, otherButton, checkboxText, defaultButton, checkboxInitialValue
 AMP.Services.DialogButton
-  fields: None, Primary, Secondary, Other
+  fields: None = 0, Primary = 1, Secondary = 2, Other = 3
 AMP.Services.DialogResult
   fields: button, checkbox
 AMP.Services.DialogService
@@ -1969,7 +1969,7 @@ AMP.Services.DownloadSettings
 AMP.Services.EQPreset
   methods: .ctor, get_Name, get_PersistentID, get_IsBuiltIn, get_IsManual, get_Levels, put_Levels, GetManualPresetName
 AMP.Services.EQPresetLevelIndex
-  fields: kPreamp, k32Hz, k64Hz, k125Hz, k250Hz, k500Hz, k1kHz, k2kHz, k4kHz, k8kHz, k16kHz
+  fields: kPreamp = 0, k32Hz = 1, k64Hz = 2, k125Hz = 3, k250Hz = 4, k500Hz = 5, k1kHz = 6, k2kHz = 7, k4kHz = 8, k8kHz = 9, k16kHz = 10
 AMP.Services.FetchInvalidatedEventArgs
   methods: .ctor, get_FetchId, get_LibraryId
 AMP.Services.Format
@@ -2137,7 +2137,7 @@ AMP.Services.LoggingService
 AMP.Services.LsppEvent
   fields: Type, StartDateMs, EndDateMs
 AMP.Services.LsppEventType
-  fields: Mid, End, Cancel
+  fields: Mid = 0, End = 1, Cancel = 2
 AMP.Services.MAPIInfo
   methods: .ctor, get_Url, put_Url, get_Name, put_Name
 AMP.Services.MenuPresenterService
@@ -2159,33 +2159,33 @@ AMP.Services.OtherPlayQueueSection
 AMP.Services.OutputDeviceCoordinator
   methods: .ctor, get_OutputDevicesState, put_OutputDevicesState, get_OutputDeviceList, StartListeningToChangesAsync, StopListeningToChangesAsync, SetDeviceVolumeAsync, ChangeDeviceSelectionAsync, CommitPasswordAsync, add_PropertyChanged, remove_PropertyChanged, get_Current
 AMP.Services.OutputDevicesState
-  fields: Unavailable, Available, InUse, Error
+  fields: Unavailable = 0, Available = 1, InUse = 2, Error = 3
 AMP.Services.PSAudioQuality
-  fields: Unknown, HighQualityAAC256kbps, LosslessALACUpTo48kHz, HighResolutionLosslessALACUpTo192kHz
+  fields: Unknown = 0, HighQualityAAC256kbps = 1, LosslessALACUpTo48kHz = 2, HighResolutionLosslessALACUpTo192kHz = 3
 AMP.Services.PSDolbyAtmosSetting
-  fields: Unknown, Automatic, AlwaysOn, Off
+  fields: Unknown = 0, Automatic = 1, AlwaysOn = 2, Off = 3
 AMP.Services.PSDownloadSignLanguagePreference
-  fields: None, ASL, BSL
+  fields: None = 0, ASL = 1, BSL = 2
 AMP.Services.PSDownloadVideoQuality
-  fields: Unknown, MostCompatible, UpToSD, UpToHD
+  fields: Unknown = 0, MostCompatible = 1, UpToSD = 2, UpToHD = 3
 AMP.Services.PSOptimizedDownloadVideoQuality
-  fields: Unknown, MostCompatibleHD_Syncing, MostCompatibleSD_Syncing, FastDownloadsSmallerFiles, HighQuality_UpTo1080p
+  fields: Unknown = 0, MostCompatibleHD_Syncing = 1, MostCompatibleSD_Syncing = 2, FastDownloadsSmallerFiles = 3, HighQuality_UpTo1080p = 4
 AMP.Services.PSOptimizedStreamedVideoQuality
-  fields: Unknown, DataSaver, HighQuality
+  fields: Unknown = 0, DataSaver = 1, HighQuality = 2
 AMP.Services.PSSignLanguagePreference
-  fields: Off, ASL, BSL
+  fields: Off = 0, ASL = 1, BSL = 2
 AMP.Services.PSStreamedVideoQuality
-  fields: Unknown, Good, Better, Highest
+  fields: Unknown = 0, Good = 1, Better = 2, Highest = 3
 AMP.Services.PageNotificationCenter
   methods: .ctor, PostAsync, add_Notification, remove_Notification, get_Name, get_AutoStart, get_IsStarted, get_CanStop, TryEnsureStartedAsync, TryEnsureStoppedAsync, PrepareToQuitAsync
 AMP.Services.PlayOrQueueCommand
-  fields: StartPlayback, QueueNext, QueueLater, QueueAfterItem, CreateAndPlayStation
+  fields: StartPlayback = 0, QueueNext = 1, QueueLater = 2, QueueAfterItem = 3, CreateAndPlayStation = 4
 AMP.Services.PlayQueue
   methods: .ctor, get_AutoPlaySupported, get_AutoPlayEnabled, get_AutoPlayActive, get_Sections, add_EnginePlayQueueChanged, remove_EnginePlayQueueChanged, SetAutoPlayEnabledAsync, PlayPlayQueueItemAsync, MovePlayQueueItemsAsync, DeletePlayQueueItemsAsync, ClearPlayQueueSectionAsync, add_PropertyChanged, remove_PropertyChanged, get_Current
 AMP.Services.PlayQueueSectionKind
-  fields: Unknown, History, CurrentlyPlaying, NextManuallyAdded, NextMain, NextAutoPlay
+  fields: Unknown = 0, History = 1, CurrentlyPlaying = 2, NextManuallyAdded = 3, NextMain = 4, NextAutoPlay = 5
 AMP.Services.PlayQueueSectionVirtualIndex
-  fields: History, CurrentlyPlaying, NextStart
+  fields: History = -1, CurrentlyPlaying = 0, NextStart = 1
 AMP.Services.PlaybackErrorEventArgs
   fields: ErrorCode, HasSuggestedRestartTime, SuggestedRestartTime
 AMP.Services.PlaybackService
@@ -2201,11 +2201,11 @@ AMP.Services.RestrictionsSettings
 AMP.Services.ServiceProvider
   methods: .ctor, Initialize, Uninitialize, Die, KillAgent, SetMediaAppQuitting, AutoStartAsync, StopAllAsync, PrepareToQuitAsync, get_LifeCycleState, get_CustomPageViewModelFactory, get_AgentPhase, get_AgentStatus, get_AgentIsHung, get_MediaAppQuitting, get_ActivityService, get_AgentDebugService, get_ArtworkService, get_CloudLibraryService, get_LibraryService, get_PlaybackService, get_VideoPlaybackService, get_AppSettings, get_DialogService, get_LoggingService, get_MenuPresenter, get_NavigationService, get_NotificationCenter, get_PageNotificationCenter, get_AccountViewModel, add_PropertyChanged, remove_PropertyChanged, InitializeAppContext, UninitializeAppContext
 AMP.Services.ServiceProviderLifeCycleState
-  fields: Stopped, Stopping, Started, Starting
+  fields: Stopped = 0, Stopping = 1, Started = 2, Starting = 3
 AMP.Services.SignInHandler
   methods: .ctor, Invoke
 AMP.Services.SignInStatus
-  fields: Success, Failure, SilentFailure
+  fields: Success = 0, Failure = 1, SilentFailure = 2
 AMP.Services.StartOrQueuePlaybackArgs
   methods: .ctor, get_Action, put_Action, get_Items, put_Items, get_StartItem, put_StartItem, get_QueueAfterPlayQueueItemID, put_QueueAfterPlayQueueItemID, get_MetricsJSON, put_MetricsJSON, get_ShuffleMode, put_ShuffleMode
 AMP.Services.StoreCoreWebView2Service
@@ -2219,12 +2219,12 @@ AMP.Services.UTSPlaybackReportingCallback
 AMP.Services.UTSPlaybackReportingParams
   fields: bundleID, accountID, accountIDAsNumber, isComplete, reportingType, timestamp, currentPlaybackDate, title, channelID, contentID, serviceID, externalID, externalProfileID, playablePassthrough, playbackRate, duration, elapsedTime, featureDuration, featureElapsedTime
 AMP.Services.UTSPlaybackReportingType
-  fields: Unknown, LiveService, EBS, VOD
+  fields: Unknown = 0, LiveService = 1, EBS = 2, VOD = 3
 AMP.Services.UpNextPlayQueueSection
   methods: .ctor, get_SectionKind, put_SectionKind, get_SectionVirtualIndex, put_SectionVirtualIndex, get_SectionName, put_SectionName, get_ViewModel, put_ViewModel, get_Id, get_Segue, put_Segue, get_Revision, put_Revision, IsContainer, IsUpdatable, get_AccessibilityLabel, get_AccessKey, ToString, get_Items, put_Items, GetCustomProperty, GetIndexedProperty, GetStringRepresentation, get_Type
 AMP.Services.UserLibraryLoadState
-  fields: eUnknown, eLoading, eLoaded, eChooseAlternate, eExistingFailed, eOpenFailed, eUnloaded
+  fields: eUnknown = 0, eLoading = 1, eLoaded = 2, eChooseAlternate = 3, eExistingFailed = 4, eOpenFailed = 5, eUnloaded = 6
 AMP.Services.UserLibraryPromptResult
-  fields: eQuit, eCreateNew, eChooseExisting
+  fields: eQuit = 0, eCreateNew = 1, eChooseExisting = 2
 AMP.Services.VideoPlaybackService
   methods: .ctor, RegisterClient, GetClient, Placeholder, get_Name, get_AutoStart, get_IsStarted, get_CanStop, TryEnsureStartedAsync, TryEnsureStoppedAsync, PrepareToQuitAsync

@@ -164,19 +164,20 @@ TEST_CASE(AmpAbi_TheVolumeMuteAndEqMethodsAreNeverInTheTable) {
 TEST_CASE(AmpAbi_TheAudioFormatEnumHasTheFieldsTheMappingAssumes) {
     std::ifstream file(fs::path(AMPIFY_SOURCE_DIR) / "knowledge" / "winmd" / "AMP.Services.txt");
     std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    CHECK(text.find("AMP.Services.CommonModels.AudioFormat\n  fields: Other, Lossless, HiResLossless, DolbyAtmos, "
-                    "Spatial, Surround") != std::string::npos ||
-          text.find("AMP.Services.CommonModels.AudioFormat\r\n  fields: Other, Lossless, HiResLossless, DolbyAtmos, "
-                    "Spatial, Surround") != std::string::npos);
+    const std::string fields =
+        "fields: Other = 0, Lossless = 1, HiResLossless = 2, DolbyAtmos = 3, Spatial = 4, Surround = 5";
+    CHECK(text.find("AMP.Services.CommonModels.AudioFormat\n  " + fields) != std::string::npos ||
+          text.find("AMP.Services.CommonModels.AudioFormat\r\n  " + fields) != std::string::npos);
 }
 
+// The value comes from the winmd's constant, not from the field's place: Any and None are both 0 (issue #5).
 TEST_CASE(AmpAbi_TheLyricsSourceEnumPutsStoreSyllableWhereTheKernelAsks) {
     std::ifstream file(fs::path(AMPIFY_SOURCE_DIR) / "knowledge" / "winmd" / "AMP.Services.txt");
     std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    const std::string fields = "fields: Any, None, UserCustom, Store, StoreSyllable";
+    const std::string fields = "fields: Any = 0, None = 0, UserCustom = 1, Store = 2, StoreSyllable = " +
+                               std::to_string(ampify::amp::slot::kLyricsSourceStoreSyllable);
     CHECK(text.find("AMP.Services.CommonModels.LyricsSource\n  " + fields) != std::string::npos ||
           text.find("AMP.Services.CommonModels.LyricsSource\r\n  " + fields) != std::string::npos);
-    CHECK(ampify::amp::slot::kLyricsSourceStoreSyllable == 4);  // the fifth field
 }
 
 TEST_CASE(PlayerModel_TheTimeUnitComesFromTheSmtcLengthWhenThereIsOne) {

@@ -165,8 +165,9 @@ inline constexpr int kPlayerNowPlayingLyricsAsync = 49;
 // GetLyricsAsync(ContentDescriptor, LyricsSource) -> IAsyncOperation<LyricsInfo>: with StoreSyllable, the lyrics
 // timed word by word that Apple's karaoke view shows, when the song has them (the item's own are often by line).
 inline constexpr int kPlayerLyricsAsync = 50;
-// AMP.Services.CommonModels.LyricsSource: Any, None, UserCustom, Store, StoreSyllable (timed word by word).
-inline constexpr int32_t kLyricsSourceStoreSyllable = 4;
+// AMP.Services.CommonModels.LyricsSource: Any = 0, None = 0, UserCustom = 1, Store = 2, StoreSyllable = 3 (timed word
+// by word). A value past the enum, such as 4, gets the lyrics by line, and Apple keeps them for its own pane.
+inline constexpr int32_t kLyricsSourceStoreSyllable = 3;
 
 // AMP.Services.CommonModels.IPlayerState.
 inline constexpr int kStateIsPaused = 24;

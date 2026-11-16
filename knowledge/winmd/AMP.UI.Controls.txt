@@ -5,9 +5,9 @@ AMP.UI.Controls.AskUserDialog
 AMP.UI.Controls.AspectRatioGrid
   methods: .ctor, get_AspectRatio, put_AspectRatio, get_AdditionalSize, put_AdditionalSize, get_IsRound, put_IsRound, get_MeasureAlgorithm, put_MeasureAlgorithm, get_AspectRatioProperty, get_AdditionalSizeProperty, get_IsRoundProperty, get_MeasureAlgorithmProperty
 AMP.UI.Controls.AspectRatioGridMeasureAlgorithm
-  fields: Fit, AdjustHeight, AdjustWidth
+  fields: Fit = 0, AdjustHeight = 1, AdjustWidth = 2
 AMP.UI.Controls.AspectRatioPreservationType
-  fields: None, Sizing
+  fields: None = 0, Sizing = 1
 AMP.UI.Controls.AttachableUtilities
   methods: SetHandlesTappedEvent, GetHandlesTappedEvent, SetImageIconCornerRadius, GetImageIconCornerRadius
 AMP.UI.Controls.BackDrop
@@ -75,11 +75,11 @@ AMP.UI.Controls.FilterToggleButton
 AMP.UI.Controls.FirstColumnAdjustableGrid
   methods: .ctor
 AMP.UI.Controls.FontType
-  fields: Unset, None, Normal, Light, SemiLight, SemiBold
+  fields: Unset = 0, None = 1, Normal = 2, Light = 3, SemiLight = 4, SemiBold = 5
 AMP.UI.Controls.GlowEffect
   methods: .ctor, get_CastingElement, put_CastingElement, get_EffectType, put_EffectType, get_CastingElementProperty, get_EffectTypeProperty
 AMP.UI.Controls.GlowEffectType
-  fields: None, Shadow, Radiosity
+  fields: None = 0, Shadow = 1, Radiosity = 2
 AMP.UI.Controls.GreaterThanToVisibilityConverter
   methods: .ctor, get_Threshold, put_Threshold, Convert, ConvertBack
 AMP.UI.Controls.GridPresentation
@@ -95,7 +95,7 @@ AMP.UI.Controls.HoverGrid
 AMP.UI.Controls.Hyperlink
   methods: .ctor, get_ChevronBrush, put_ChevronBrush, get_ChevronFontSize, put_ChevronFontSize, get_Command, put_Command, get_CommandParameter, put_CommandParameter, get_Text, put_Text, get_TextStyle, put_TextStyle, get_MaxLines, put_MaxLines, get_ShowChevron, put_ShowChevron, get_TextTrimming, put_TextTrimming, get_TextWrapping, put_TextWrapping, get_UnderlineStyle, put_UnderlineStyle, get_ChevronBrushProperty, get_ChevronFontSizeProperty, get_CommandProperty, get_CommandParameterProperty, get_TextProperty, get_TextStyleProperty, get_MaxLinesProperty, get_ShowChevronProperty, get_TextTrimmingProperty, get_TextWrappingProperty, get_UnderlineStyleProperty
 AMP.UI.Controls.HyperlinkUnderlineStyle
-  fields: None, Always, Hover
+  fields: None = 0, Always = 1, Hover = 2
 AMP.UI.Controls.IAskUserDialog
   methods: ShowAsWarning, get_CheckboxText, put_CheckboxText, get_Explanation, put_Explanation, get_IsCheckboxChecked, put_IsCheckboxChecked
 AMP.UI.Controls.IAspectRatioGrid
@@ -557,7 +557,7 @@ AMP.UI.Controls.SplitDigitControl
 AMP.UI.Controls.StickyHeader
   methods: .ctor, get_AssociatedScrollViewer, put_AssociatedScrollViewer, get_IsInsideItemsControl, put_IsInsideItemsControl, get_IsInsideAssociatedScrollViewer, put_IsInsideAssociatedScrollViewer, get_OffBranchParent, put_OffBranchParent, get_OffsetY, put_OffsetY, get_StickyBackground, put_StickyBackground, get_AssociatedScrollViewerProperty, get_IsInsideItemsControlProperty, get_IsInsideAssociatedScrollViewerProperty, get_OffBranchParentProperty, get_OffsetYProperty, get_StickyBackgroundProperty
 AMP.UI.Controls.StickyHeaderAssociatedScrollViewer
-  fields: Grandparent, OffBranch, Parent
+  fields: Grandparent = 0, OffBranch = 1, Parent = 2
 AMP.UI.Controls.StringToBooleanConverter
   methods: .ctor, Convert, ConvertBack
 AMP.UI.Controls.StringToInverseVisConverter
@@ -573,7 +573,7 @@ AMP.UI.Controls.SystemPowerStateChangedEventArgs
 AMP.UI.Controls.TaskbarButtonMessageEventArgs
   methods: .ctor, get_Message, get_Type
 AMP.UI.Controls.TaskbarButtonMessageType
-  fields: TaskbarButtonCreated, UserMessage
+  fields: TaskbarButtonCreated = 0, UserMessage = 1
 AMP.UI.Controls.TemplateSelector
   methods: .ctor, get_Templates, put_Templates
 AMP.UI.Controls.TemplateSelectorItem
@@ -643,7 +643,7 @@ AMP.UI.Controls.WindowSizeContentControl
 AMP.UI.Controls.WindowSizeMoveModeChangedEventArgs
   methods: .ctor, get_Handled, put_Handled, get_IsActive
 AMP.UI.Controls.WindowState
-  fields: WindowStateNormal, WindowStateMaximized, WindowStateMinimized, WindowStateDisabled
+  fields: WindowStateNormal = 0, WindowStateMaximized = 1, WindowStateMinimized = 2, WindowStateDisabled = 3
 AMP.UI.Controls.WindowStateChangedEventArgs
   methods: .ctor, get_Handled, put_Handled, get_State
 AMP.UI.Controls.XMDPAttachableUI

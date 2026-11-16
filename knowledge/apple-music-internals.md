@@ -82,17 +82,19 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
 
 - **Lyrics without the pane (1.1792, slot read from the winmd).** Apple loads a song's lyrics only when its lyrics
   pane opens: until then `ILyricsInfo.HaveLyrics` is false. Its pane calls `IPlayer.GetNowPlayingLyricsAsync(LyricsSource)`
-  (slot 49, an `IAsyncAction`; `LyricsSource` is Any, None, UserCustom, Store, StoreSyllable = 4). Ampify called it with
-  StoreSyllable at each new item and every 3 s after until 09/11/2026, from its own thread, while Apple's panes make
-  the same call on the interface thread: the likely cause of a full-screen lyrics pane left empty until the next song,
-  and of a freeze at a song change with the side pane open. It is now left to Apple's panes; Ampify asks only
-  `GetLyricsAsync(descriptor, StoreSyllable)` (slot 50, three times at most, `src/win/amp_player.cpp`). That call
-  completes, but on 1.1792 it gave `timing="Line"` TTML for every library song tried (05/11/2026): Apple Music on
-  Windows had no word timing for them. The karaoke then lights such a line at once when it starts, as Apple's
-  own pane does (`KaraokeAt`, `src/core/lyrics.cpp`; until 12/11/2026 it spread the line's span over its words by
-  length), the parsed lyrics keep only what Apple gave.
-  Checked again on 2026-11-12: Apple's own lyrics pane lights whole lines on a song that has word timing on iPhone,
-  and `lyrics()` gave no word times for six songs. Word-timed lyrics would have to come from Apple's web API.
+  (slot 49, an `IAsyncAction`). `LyricsSource` is Any = 0, None = 0, UserCustom = 1, Store = 2, StoreSyllable = 3:
+  read the values from the winmd's constants (`tools/dump-winmd.ps1` writes them), never from the order of the names.
+  Ampify called slot 49 at each new item and every 3 s after until 09/11/2026, from its own thread, while Apple's
+  panes make the same call on the interface thread: the likely cause of a full-screen lyrics pane left empty until the
+  next song, and of a freeze at a song change with the side pane open. It is now left to Apple's panes; Ampify asks
+  only `GetLyricsAsync(descriptor, StoreSyllable)` (slot 50, three times at most, `src/win/amp_player.cpp`).
+- **A wrong lyrics source spoils Apple's own pane (1.1792.39942, issue #5, 2026-11-16).** Until 16/11/2026 Ampify
+  passed 4 for StoreSyllable, a value past the enum. Apple answered with the `timing="Line"` TTML (8 kB for "The Fate
+  of Ophelia") and kept it for the song: its pane, opened later, showed whole lines instead of words, until a song
+  changed with the pane open (the pane then asked first). With 3 the answer is the `timing="Word"` TTML (39 kB, with
+  background vocals and translations), Apple's pane stays word by word, and Ampify has the word times at the song's
+  start, before any pane opens. The earlier findings "Apple Music on Windows has no word timing" (05/11 and 12/11)
+  came from this wrong value. Check a change here against Apple's pane with Ampify off (`ampify restore`) and on.
 - **The full-screen lyrics scroll before the line lights (1.1792, traced 2026-11-12).** At each new line Apple calls
   `ChangeView` without animation (`ViewChanging`, then `ViewChanged` not intermediate within 16 ms; the glide seen
   is Apple's own animation), then puts the line in its `Current` state 0 to 31 ms later. Code that follows both

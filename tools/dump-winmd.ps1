@@ -10,7 +10,16 @@ $entries = foreach ($h in $md.TypeDefinitions) {
     if ($name -eq '<Module>') { continue }
     $full = $md.GetString($t.Namespace) + '.' + $name
     $methods = @($t.GetMethods() | ForEach-Object { $md.GetString($md.GetMethodDefinition($_).Name) })
-    $fields = @($t.GetFields() | ForEach-Object { $md.GetString($md.GetFieldDefinition($_).Name) } | Where-Object { $_ -ne 'value__' })
+    # An enum field carries its value: the values need not follow the order of the names (LyricsSource has two zeros).
+    $fields = @($t.GetFields() | ForEach-Object {
+            $field = $md.GetFieldDefinition($_)
+            $fieldName = $md.GetString($field.Name)
+            if ($fieldName -eq 'value__') { return }
+            $constant = $field.GetDefaultValue()
+            if ($constant.IsNil) { return $fieldName }
+            $blob = $md.GetBlobReader($md.GetConstant($constant).Value)
+            $fieldName + ' = ' + $blob.ReadConstant($md.GetConstant($constant).TypeCode)
+        })
     $lines = @($full)
     if ($methods.Count) { $lines += '  methods: ' + ($methods -join ', ') }
     if ($fields.Count) { $lines += '  fields: ' + ($fields -join ', ') }

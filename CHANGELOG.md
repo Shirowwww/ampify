@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Apple Music's own lyrics are word by word again with Ampify on: Ampify asked Apple's player for a lyrics source that
+  does not exist, and Apple then kept the line-by-line lyrics for its own panel (#5). Ampify's lyrics, the Song
+  panel's karaoke and `player.lyrics()` now get the word times too, from the song's start.
+
 ## 1.4.1 (2026-11-13)
 
 The accent colour you pick now reaches every button, and the Song panel's lyrics stop catching the wheel by accident.

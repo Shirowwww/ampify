@@ -504,7 +504,7 @@ KaraokeFrame KaraokeAt(const Lyrics& lyrics, int64_t positionMs) {
     const LyricLine& line = *(after - 1);
     frame.line = static_cast<int>(after - lyrics.lines.begin()) - 1;
     frame.between = line.endMs > line.startMs && positionMs >= line.endMs;
-    // Timed only as a whole, a line lights at once when it starts, as in Apple's own view (no word timing on Windows).
+    // Timed only as a whole, a line lights at once when it starts, as in Apple's own view of such lyrics.
     if (line.timing != LyricTiming::ByWord) {
         frame.words = {1.0};
         return frame;
