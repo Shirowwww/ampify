@@ -733,7 +733,9 @@ void UiService::Run() {
         auto due = std::min(nextDiscovery, nextTweaks);
         const bool pending = modelChanged && m_model.Version() != tracker.Version();
         if (pending) due = std::min(due, lastReading + kModelPoll);
-        auto wait = std::chrono::duration_cast<std::chrono::milliseconds>(due - now).count();
+        // Rounded up: rounded down, the last millisecond before each due time was waited as 0 ms, over and over (a few
+        // hundred wakes a second, 1 % of a core with Apple Music paused, 17/11/2026).
+        auto wait = std::chrono::ceil<std::chrono::milliseconds>(due - now).count();
         DWORD waitMs = static_cast<DWORD>(std::clamp<long long>(wait, 0, kDiscoveryPoll.count() * 1000));
         if (modelChanged && !pending) {
             MsgWaitForMultipleObjects(1, &modelChanged, FALSE, waitMs, QS_ALLINPUT);
