@@ -2,7 +2,8 @@
 
 ## 1.5.1 (2026-11-17)
 
-Sing keeps up with pauses and skips, runs on far less of the processor, and AutoMix mixes with it on.
+Sing's Studio gains a precise voice model, keeps up with pauses and skips, runs on far less of the processor, and
+AutoMix mixes with it on.
 
 - Sing and AutoMix see Apple's player again after Apple Music starts. When it opens, Apple Music restores the last
   session and often makes its player before Ampify is in: pauses and skips then went unseen, so Sing played the end of
