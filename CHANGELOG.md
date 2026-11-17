@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.5.1 (2026-11-17)
+
+Sing keeps up with pauses and skips, runs on far less of the processor, and AutoMix mixes with it on.
+
+- Sing and AutoMix see Apple's player again after Apple Music starts. When it opens, Apple Music restores the last
+  session and often makes its player before Ampify is in: pauses and skips then went unseen, so Sing played the end of
+  the previous song after a skip and AutoMix planned nothing. Ampify now finds the player by the first command Apple
+  sends it.
+- Sing's Studio quality works out only the part of each window that is new, which takes about a sixth of the processor
+  time it took (20 ms instead of 125 ms per pass on a recent PC), and the model now gets 0.5 s of margin instead of
+  0.3 s. It runs the model once when it loads it, so the first song does not wait for it.
+- Studio and pauses: playing again goes on from where the sound stopped, at once, with no second of silence and no jump
+  back of the position. A skip, a move in the song, or a song at another sample rate no longer lets a moment of an
+  older song through, and the last second of a song is heard when nothing follows it.
+- AutoMix mixes with Studio on. Both songs of a mix are held back alike, and the second player plays on until the end
+  of the old song's fade has been heard. Before, AutoMix stood aside, or Sing dropped to Light mid-mix and gave the old
+  song its voice back.
+- Sing's Light quality takes away what both channels share between 150 Hz and 12 kHz. Measured on two songs split by
+  Studio, about 5 dB less of the voice is left and the music changes less; a sound on one side alone keeps half its
+  level in that band.
+- Studio leaves the graphics card when it has not been used for two minutes, and the journal says when the model ran
+  late and let the voice through.
+- Sing 1.0.1 saves its slider once it rests, not at each step.
+- The lyrics blur keeps the songwriter credits at the end of a song sharp.
+- The tempo the analysis reports is worked out twice a second instead of twenty times, and the Dolby Atmos check no
+  longer allocates 64 KB each time it runs.
+
 ## 1.5.0 (2026-11-16)
 
 Sing turns the singer's voice down, Apple Music's own lyrics are word by word again, and AutoMix's beat mixes stay on
