@@ -81,7 +81,8 @@ Diagnostics
   doctor                       state of Ampify: elements, settings, safe mode, log, tools
   logs [count] [--follow]      last lines of the kernel and launcher logs
   report [file.zip] [--tree] [--dir]   writes an anonymised zip of the state and the logs, to attach to an issue
-  sing install|status|remove   the files of Sing's studio mode (about 92 MB, fetched on first use anyway)
+  sing install|status [model]  the files of Sing's studio mode, standard or precise (fetched on first use anyway)
+  sing remove                  removes them
 
 Profiles and transfers
   profile list                 lists the settings profiles

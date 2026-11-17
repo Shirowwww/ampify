@@ -24,9 +24,11 @@ const char kAudioSing[] = R"AMPIFYJS(
   const sing = {
     set(options) {
       const asked = options === null || typeof options !== "object" ? {} : options;
-      const voice = asked.voice === undefined ? singState().voice : Number(asked.voice);
-      if (typeof asked.mode !== "string") throw new TypeError("sing.set expects { mode: \"off\" | \"light\" | \"studio\", voice: 0..1 }");
-      return native.singSet(asked.mode, voice);
+      const now = asked.voice === undefined || asked.model === undefined ? singState() : null;
+      const voice = asked.voice === undefined ? now.voice : Number(asked.voice);
+      const model = asked.model === undefined ? now.model : String(asked.model);
+      if (typeof asked.mode !== "string") throw new TypeError("sing.set expects { mode: \"off\" | \"light\" | \"studio\", voice: 0..1, model: \"standard\" | \"precise\" }");
+      return native.singSet(asked.mode, voice, model);
     },
     state() {
       return singState();

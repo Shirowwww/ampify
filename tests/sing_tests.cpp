@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -8,6 +9,7 @@
 #include <vector>
 
 #include "../src/core/sing/light_filter.hpp"
+#include "../src/core/sing/real_fft.hpp"
 #include "../src/core/sing/resampler.hpp"
 #include "../src/core/sing/studio_stream.hpp"
 #include "../src/core/sing/vocal_splitter.hpp"
@@ -24,8 +26,9 @@ constexpr double kHalfOut = 1 - kCompensate * 0.5;  // what stays of a song whos
 
 // The vocals of every song are half of it.
 struct HalfModel : VocalModel {
+    explicit HalfModel(const ModelSpec& modelSpec = kStandard) : VocalModel(modelSpec) {}
     bool Run(const float* spectrum, float* vocals) override {
-        for (size_t i = 0; i < kSpectrumSize; i++) vocals[i] = 0.5f * spectrum[i];
+        for (size_t i = 0; i < spec.SpectrumSize(); i++) vocals[i] = 0.5f * spectrum[i];
         return true;
     }
 };
@@ -168,6 +171,34 @@ double RoundTripErrorDb(int rate) {
 
 // ---- the model's STFT
 
+// The transform against a direct DFT, at the bins its two stages treat apart (the edges, the middle, the Nyquist
+// bin carried in bin 0), then back to the samples.
+TEST_CASE(Sing_RealFftMatchesADirectDftAndComesBack) {
+    constexpr size_t n = RealFft7680::kSize;
+    std::vector<float> x(n), back(n);
+    for (size_t i = 0; i < n; i++) x[i] = static_cast<float>(std::sin(0.37 * i) + 0.5 * std::cos(0.011 * i * i));
+    std::vector<std::complex<float>> spectrum(RealFft7680::kHalf);
+    RealFft7680 fft;
+
+    fft.Forward(x.data(), spectrum.data());
+
+    auto dft = [&](size_t bin) {
+        std::complex<double> sum;
+        for (size_t i = 0; i < n; i++) sum += double(x[i]) * std::polar(1.0, -2 * std::numbers::pi * bin * i / n);
+        return sum;
+    };
+    for (size_t bin : {size_t{1}, size_t{2}, size_t{1279}, size_t{1280}, size_t{1920}, size_t{2561}, size_t{3839}}) {
+        CHECK_NEAR(spectrum[bin].real(), dft(bin).real(), 2e-2);
+        CHECK_NEAR(spectrum[bin].imag(), dft(bin).imag(), 2e-2);
+    }
+    CHECK_NEAR(spectrum[0].real(), dft(0).real(), 2e-2);
+    CHECK_NEAR(spectrum[0].imag(), dft(n / 2).real(), 2e-2);
+    fft.Inverse(spectrum.data(), back.data());
+    double worst = 0;
+    for (size_t i = 0; i < n; i++) worst = std::max(worst, double(std::fabs(back[i] / n - x[i])));
+    CHECK(worst < 1e-5);
+}
+
 TEST_CASE(Sing_AnalyseGivesNumpysStftOfTheSameNoise) {
     std::vector<float> left, right, spectrum(kSpectrumSize);
     ReferenceNoise(left, right);
@@ -218,6 +249,30 @@ TEST_CASE(Sing_StftRoundTripGivesBackNoiseInsideTheModelsBins) {
 
     double worst = 0;
     for (size_t i = kFftSize / 2; i < kChunk - kFftSize / 2; i++) {
+        worst = std::max({worst, double(std::fabs(outLeft[i] - left[i])), double(std::fabs(outRight[i] - right[i]))});
+    }
+    CHECK(worst < 1e-4);
+}
+
+// The precise model's STFT keeps every bin up to Nyquist, which rides bin 0 of the real FFT: white noise comes back.
+TEST_CASE(Sing_PreciseStftRoundTripGivesBackFullBandNoise) {
+    std::vector<float> left(kPrecise.Chunk()), right(kPrecise.Chunk());
+    std::uint32_t state = 777;
+    for (size_t i = 0; i < left.size(); i++) {
+        for (std::vector<float>* channel : {&left, &right}) {
+            state = state * 1664525u + 1013904223u;
+            (*channel)[i] = static_cast<float>(((state >> 8) / 8388608.0 - 1.0) * 0.5);
+        }
+    }
+    std::vector<float> spectrum(kPrecise.SpectrumSize()), outLeft(left.size()), outRight(left.size());
+    HalfModel model(kPrecise);
+    VocalSplitter splitter(model);
+
+    splitter.Analyse(left.data(), right.data(), spectrum.data());
+    splitter.Synthesise(spectrum.data(), outLeft.data(), outRight.data());
+
+    double worst = 0;
+    for (size_t i = kPrecise.fftSize / 2; i < left.size() - kPrecise.fftSize / 2; i++) {
         worst = std::max({worst, double(std::fabs(outLeft[i] - left[i])), double(std::fabs(outRight[i] - right[i]))});
     }
     CHECK(worst < 1e-4);
@@ -319,6 +374,31 @@ TEST_CASE(Sing_StudioStreamTakesTheVocalsAwayExactlyTheDelayLate) {
     CHECK_NEAR(stream.Delay(), 1.3, 1e-9);
     CHECK(WorstGap(out, song, 0, delay, delay + kRate / 5, song.size() / 2, kHalfOut) < 1e-3);
     CHECK(stream.Misses() == 0);
+}
+
+TEST_CASE(Sing_StudioStreamRunsThePreciseModelAtItsOwnDelay) {
+    constexpr int kRate = 48000;
+    HalfModel model(kPrecise);
+    VocalSplitter splitter(model);
+    StudioStream stream(kRate, kPrecise);
+    const std::vector<float> song = Song(kRate, 9.0);
+    const size_t delay = Frames(stream, kRate);
+
+    const std::vector<float> out = Play(stream, splitter, song, 0, song.size() / 2, kRate, 0.0);
+
+    CHECK_NEAR(stream.Delay(), kPrecise.delaySeconds, 1e-4);
+    CHECK(WorstGap(out, song, 0, delay, delay + kRate / 5, song.size() / 2, 1 - kPrecise.compensate * 0.5) < 2e-3);
+    CHECK(stream.Misses() == 0);
+}
+
+TEST_CASE(Sing_StudioStreamRefusesASplitterOfAnotherModel) {
+    HalfModel model(kPrecise);
+    VocalSplitter splitter(model);
+    StudioStream stream(44100);
+    std::vector<float> block(882, 0.1f);
+    stream.Process(block.data(), block.size() / 2, 1.0);
+
+    CHECK(!stream.Work(splitter));
 }
 
 TEST_CASE(Sing_StudioStreamIsSilentWhileBuffering) {
@@ -601,28 +681,43 @@ namespace {
 
 void WriteText(const std::filesystem::path& file, std::string_view text) { std::ofstream(file) << text << "\n"; }
 
-// A pack as ampify sing install leaves it, with every file present.
+namespace pack = ampify::sing_pack;
+
+// The runtime and the standard model as ampify sing install leaves them, every file present.
 void FillPack(const std::filesystem::path& folder) {
-    for (std::string_view entry : ampify::sing_pack::kRuntimeEntries) {
+    for (std::string_view entry : pack::kRuntimeEntries) {
         WriteText(folder / std::filesystem::path(std::string(entry)).filename(), "dll");
     }
-    WriteText(folder / std::string(ampify::sing_pack::kModelFile), "model");
-    WriteText(folder / std::string(ampify::sing_pack::kReadyFile), ampify::sing_pack::kReadyText);
+    WriteText(folder / std::string(pack::kRuntimeMarker), pack::kRuntime.sha256);
+    WriteText(folder / std::string(pack::kStandard.file), "model");
+    WriteText(folder / std::string(pack::kStandard.marker), pack::kStandard.download.sha256);
 }
 
 }  // namespace
 
-TEST_CASE(Sing_PackIsReadyOnlyWithItsReadyFileAndEveryFile) {
+TEST_CASE(Sing_PackIsReadyOnlyWithItsMarkersAndEveryFile) {
     ampify::test::ScratchDir whole("sing-pack"), missing("sing-pack"), stale("sing-pack");
     FillPack(whole.path());
     FillPack(missing.path());
-    std::filesystem::remove(missing.path() / std::string(ampify::sing_pack::kDirectMlLibrary));
+    std::filesystem::remove(missing.path() / std::string(pack::kDirectMlLibrary));
     FillPack(stale.path());
-    WriteText(stale.path() / std::string(ampify::sing_pack::kReadyFile), "sing pack 0");
+    WriteText(stale.path() / std::string(pack::kStandard.marker), "an older model's sha-256");
 
-    CHECK(ampify::sing_pack::Ready(whole.path()));
-    CHECK(!ampify::sing_pack::Ready(missing.path()));
-    CHECK(!ampify::sing_pack::Ready(stale.path()));
+    CHECK(pack::Ready(whole.path(), pack::kStandard));
+    CHECK(!pack::Ready(whole.path(), pack::kPrecise));
+    CHECK(!pack::Ready(missing.path(), pack::kStandard));
+    CHECK(!pack::Ready(stale.path(), pack::kStandard));
+}
+
+TEST_CASE(Sing_PackDownloadsOnlyWhatAModelStillLacks) {
+    ampify::test::ScratchDir empty("sing-pack"), standard("sing-pack");
+    FillPack(standard.path());
+
+    CHECK(pack::DownloadSize(empty.path(), pack::kStandard) == pack::kRuntime.size + pack::kStandard.download.size);
+    CHECK(pack::DownloadSize(standard.path(), pack::kStandard) == 0);
+    CHECK(pack::DownloadSize(standard.path(), pack::kPrecise) == pack::kPrecise.download.size);
+    CHECK(pack::FindModel("precise") == &pack::kPrecise);
+    CHECK(pack::FindModel("loud") == nullptr);
 }
 
 TEST_CASE(Sing_StudioStreamHoldsTheDelayAndLessWhileItFillsAgain) {

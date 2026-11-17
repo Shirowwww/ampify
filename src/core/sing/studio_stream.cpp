@@ -16,13 +16,20 @@ constexpr double kChunkSeconds = 0.1;    // the audio thread hands blocks to the
 constexpr double kTailSeconds = 0.25;    // the most of the player's last sound a paused stream takes in
 constexpr float kMinWeight = 1e-6f;      // where no take weighs anything yet, the vocals are 0
 constexpr float kSilent = 1e-7f;         // a paused player's block below this everywhere is not its sound
-constexpr size_t kMostHops = kFrames / 4;
 
 int ValidRate(int rate) { return rate > 0 ? rate : kModelRate; }
 
-size_t HopHops(double hopSeconds) {
-    const double hops = std::isfinite(hopSeconds) ? hopSeconds * kModelRate / static_cast<double>(kFftHop) : 0.0;
-    return std::clamp<size_t>(static_cast<size_t>(std::max(0.0, std::round(hops))), 1, kMostHops);
+// Whole STFT hops of the model, from one to half its window: the two hops taken must fit in it.
+size_t HopHops(double hopSeconds, const ModelSpec& spec) {
+    const double hops = std::isfinite(hopSeconds) ? hopSeconds * kModelRate / static_cast<double>(spec.fftHop) : 0.0;
+    return std::clamp<size_t>(static_cast<size_t>(std::max(0.0, std::round(hops))), 1, (spec.frames - 1) / 2);
+}
+
+// Whole STFT hops the vocals are taken before the window's end, leaving the two hops taken inside the window.
+size_t AheadHops(const ModelSpec& spec, size_t hopHops) {
+    const double hops = spec.aheadSeconds * kModelRate / static_cast<double>(spec.fftHop);
+    const size_t most = spec.frames - 1 - std::min(spec.frames - 1, 2 * hopHops);
+    return std::min(static_cast<size_t>(std::max(0.0, std::round(hops))), most);
 }
 
 bool Silent(const float* interleaved, size_t frames) {
@@ -31,10 +38,15 @@ bool Silent(const float* interleaved, size_t frames) {
 
 }  // namespace
 
-StudioStream::StudioStream(int rate, double delaySeconds, double hopSeconds)
-    : m_rate(ValidRate(rate)),
-      m_hopHops(HopHops(hopSeconds)),
-      m_hop44(m_hopHops * kFftHop),
+StudioStream::StudioStream(int rate, const ModelSpec& spec)
+    : StudioStream(rate, spec.delaySeconds, spec.hopSeconds, spec) {}
+
+StudioStream::StudioStream(int rate, double delaySeconds, double hopSeconds, const ModelSpec& spec)
+    : m_spec(spec),
+      m_rate(ValidRate(rate)),
+      m_hopHops(HopHops(hopSeconds, spec)),
+      m_hop44(m_hopHops * spec.fftHop),
+      m_ahead44(AheadHops(spec, m_hopHops) * spec.fftHop),
       m_down(m_rate, kModelRate),
       m_up(kModelRate, m_rate) {
     const std::int64_t hop44 = static_cast<std::int64_t>(m_hop44);
@@ -43,7 +55,8 @@ StudioStream::StudioStream(int rate, double delaySeconds, double hopSeconds)
     m_fade = std::max<std::int64_t>(1, std::llround(kFadeSeconds * m_rate));
     m_chunk = std::max<std::int64_t>(1, std::llround(kChunkSeconds * m_rate));
     m_tail = std::llround(kTailSeconds * m_rate);
-    const std::int64_t shortest = 2 * m_hop + m_latency + m_fade + 2;
+    const std::int64_t ahead = (static_cast<std::int64_t>(m_ahead44) * m_rate + kModelRate - 1) / kModelRate;
+    const std::int64_t shortest = 2 * m_hop + ahead + m_latency + m_fade + 2;
     const double asked = std::isfinite(delaySeconds) ? delaySeconds * m_rate : 0.0;
     m_delay = std::max<std::int64_t>(std::llround(std::max(0.0, asked)), shortest);
     m_voiceStep = 1.0 / (kVoiceSeconds * m_rate);
@@ -55,12 +68,12 @@ StudioStream::StudioStream(int rate, double delaySeconds, double hopSeconds)
 
     m_in.assign(static_cast<size_t>(m_hop) * 2, 0.0f);
     m_in44.assign(m_down.MaxOutput(static_cast<size_t>(m_hop)) * 2, 0.0f);
-    const size_t history = kChunk + m_hop44 + m_down.MaxOutput(static_cast<size_t>(m_hop));
+    const size_t history = m_spec.Chunk() + m_hop44 + m_down.MaxOutput(static_cast<size_t>(m_hop));
     m_left.assign(history, 0.0f);
     m_right.assign(history, 0.0f);
-    m_fill = kChunk;
-    m_windowLeft.assign(kChunk, 0.0f);
-    m_windowRight.assign(kChunk, 0.0f);
+    m_fill = m_spec.Chunk() - m_ahead44;
+    m_windowLeft.assign(m_spec.Chunk(), 0.0f);
+    m_windowRight.assign(m_spec.Chunk(), 0.0f);
     m_sum.assign(m_hop44 * 4, 0.0f);
     m_weight.assign(m_hop44 * 2, 0.0f);
     m_fadeIn.resize(m_hop44 * 2);
@@ -176,7 +189,7 @@ void StudioStream::Read(float* interleaved, size_t frames, std::int64_t live, do
     for (; i < frames; i++) {
         if (paused && m_gain <= 0) break;  // faded out: the reading waits here until the player plays
         const std::int64_t at = m_readAt++;
-        const double gain = (1 - NextVoice(voice)) * kCompensate;
+        const double gain = (1 - NextVoice(voice)) * m_spec.compensate;
         double left = 0, right = 0;
         if (at < m_start) {
             // Silent from a flush on, after a fade of the song as it was heard: a cut mid-wave clicks.
@@ -219,9 +232,11 @@ bool StudioStream::Work(VocalSplitter& splitter) {
     }
     const std::int64_t written = m_written.load(std::memory_order_acquire);
     if (written + m_chunk > m_read + m_capacity) Restart(written);  // so late its sound was written over
-    if (m_fill >= kChunk + m_hop44) return RunWindow(splitter);
+    if (splitter.Spec().id != m_spec.id) return false;  // a stream of another model: never fed that one
+    const size_t full = m_spec.Chunk() + m_hop44;
+    if (m_fill >= full) return RunWindow(splitter);
     if (!ReadSong()) return false;
-    if (m_fill >= kChunk + m_hop44) RunWindow(splitter);
+    if (m_fill >= full) RunWindow(splitter);
     return true;
 }
 
@@ -232,7 +247,7 @@ void StudioStream::Restart(std::int64_t origin) {
     m_up.Reset();
     std::fill(m_left.begin(), m_left.end(), 0.0f);
     std::fill(m_right.begin(), m_right.end(), 0.0f);
-    m_fill = kChunk;  // a window of silence before the song
+    m_fill = m_spec.Chunk() - m_ahead44;  // a window of silence before the song, less the ahead
     std::fill(m_sum.begin(), m_sum.end(), 0.0f);
     std::fill(m_weight.begin(), m_weight.end(), 0.0f);
     m_read = m_origin = origin;
@@ -267,8 +282,9 @@ bool StudioStream::ReadSong() {
     return true;
 }
 
-// One model window, a hop later than the last. Its last two hops are taken with a Hann fade over both: the older one,
-// now faded in on top of the previous window's fade out, is finished; the newer waits for the next window.
+// One model window, a hop later than the last. Its last two hops before the ahead are taken with a Hann fade over both:
+// the older one, now faded in on top of the previous window's fade out, is finished; the newer waits for the next
+// window. The silence before the song is shorter by the ahead, so the first window still finishes the hop before it.
 bool StudioStream::RunWindow(VocalSplitter& splitter) {
     // The vocals this hop finishes end below here; their slots must hold nothing the audio thread may still read.
     const std::int64_t publishEnd = m_origin + m_upCount - m_latency + m_hop + 1;
@@ -278,7 +294,7 @@ bool StudioStream::RunWindow(VocalSplitter& splitter) {
     std::copy(m_left.begin() + hop, m_left.begin() + filled, m_left.begin());
     std::copy(m_right.begin() + hop, m_right.begin() + filled, m_right.begin());
     m_fill -= m_hop44;
-    const size_t from = kChunk - 2 * m_hop44;
+    const size_t from = m_spec.Chunk() - m_ahead44 - 2 * m_hop44;
     const size_t shift = m_windows == 0 ? VocalSplitter::kNewWindow : m_hopHops;
     if (!splitter.Vocals(m_left.data(), m_right.data(), m_spectrum, shift, from, m_windowLeft.data(),
                          m_windowRight.data())) {

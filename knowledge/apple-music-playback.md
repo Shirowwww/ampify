@@ -108,11 +108,22 @@ by recording the default output (WASAPI loopback) while a song was mixed into it
   `AVCFPlayerItemSetVariantPreferences` (4, then 7) do not decide it: with 0 or 3 for the first, or 0 for the second
   (which only took the lossless version away), the song still played in Atmos.
 - What does decide it (2026-11-16): `AVCFPlayerSetMultichannelAudioStrategy` on Apple's queue player. Apple sets
-  `AVCFPlayerMultichannelAudioStrategy_MatchMultichannelTrackPreferenceToAudioDevice` as a song plays;
-  `..._PreferStereo`, then a seek of the item to where it is, makes the song playing take its stereo version within
-  0.3 s (a new stereo stream, another variant id), and Apple's strategy plus a seek brings Dolby Atmos back the same
-  way. A seek alone changes nothing. Apple's position then stands still for 3 to 4 s while the song reloads. Sing
-  uses it (`HoldStereo`, `src/win/audio/automix.cpp`). A song sometimes starts in stereo with Apple's own strategy.
+  `AVCFPlayerMultichannelAudioStrategy_MatchMultichannelTrackPreferenceToAudioDevice` as a song plays.
+  `..._PreferStereo` set on a queue Apple just made, before its first song plays, makes every song take its stereo
+  version from its start (Billie Eilish, HIT ME HARD AND SOFT, 17/11/2026: a stream at 96 kHz fed about 100 times a
+  second, sound and position as usual).
+- Never change it to stereo under a song that plays or loads in Dolby Atmos (17/11/2026, Apple Music 1.1792.39942.0).
+  Apple's player then takes the stereo version on a stream it feeds about 10 times a second, then only with silence
+  after 3 to 4 s, while its position runs three to four times too fast (1:50 to 2:06 in 4 s); with the following
+  song's stream it may stall at 0:00 instead. It does so with or without a seek after the change, paused or playing,
+  set just before or just after a skip, and without any of Ampify's audio hooks: it is Apple Music's. Pause and play
+  do not cure it; the next song does, once the change is older than the song. Apple's own Dolby Atmos setting
+  (Settings > Playback) leaves the song playing and the one already queued in Atmos. Sing therefore asks for stereo
+  only on a new queue, or while the song there is known to be in stereo (`WantStereo`, `src/win/audio/automix.cpp`),
+  and AutoMix's second player gets the same strategy when it is made.
+- Back to Apple's strategy under a stereo version of an Atmos song, without a seek: the song goes on in Atmos within
+  0.3 s, position as usual.
+- A song sometimes starts in stereo with Apple's own strategy.
 - An item made without variant preferences (0) plays the stream's first, lossy version. The second player's item so
   takes those of Apple's item (`AVCFPlayerItemGetVariantPreferences`, then `Set`): measured, Apple's item on variant
   `ek6n0nusx` with preferences 7, the second player's on `j2lqjiv2c` with 0 before, both on `ek6n0nusx` with 7 after

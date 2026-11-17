@@ -3450,10 +3450,10 @@ function fakeSing({ storage = new Map(), language = "en", sing = {} } = {}) {
     audio: {
       sing: {
         state: () => (need("audio.sing"), structuredClone(world.state)),
-        set: ({ mode, voice }) => {
+        set: ({ mode, voice, model }) => {
           need("audio.sing");
-          world.sets.push({ mode, voice });
-          world.state = { ...world.state, mode, voice };
+          world.sets.push({ mode, voice, model });
+          world.state = { ...world.state, mode, voice, model };
           return true;
         },
         onChange: (fn) => (need("audio.sing"), world.listeners.push(fn), () => world.listeners.splice(world.listeners.indexOf(fn), 1)),
@@ -3464,7 +3464,10 @@ function fakeSing({ storage = new Map(), language = "en", sing = {} } = {}) {
       setActive: (id, on) => (need("ui.playbar"), world.active.push(on)),
     },
     React: react.React,
-    components: Object.fromEntries(["Toggle", "Slider", "Tabs", "Text"].map((name) => [name, node(name.toLowerCase())])),
+    components: {
+      ...Object.fromEntries(["Toggle", "Slider", "Tabs", "Text", "Spinner", "Divider"].map((name) => [name, node(name.toLowerCase())])),
+      ProgressBar: node("progress"),
+    },
     ReactDOM: { createRoot: (target) => (need("ui.popup"), {
       render: (tree) => (world.popups.push(target), react.mount(() => tree)),
       unmount: () => react.mount(() => null),
@@ -3496,21 +3499,21 @@ test("sing writes the voice as the slider moves and remembers it", () => {
   fake.open();
   assert.deepEqual(fake.world.popups, ["popup:sing"]);
   fake.find("toggle").onChange(true);
-  assert.deepEqual(fake.world.sets.at(-1), { mode: "studio", voice: 0.1 }, "default: Studio at a tenth of the voice");
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "studio", voice: 0.1, model: "standard" }, "default: Studio at a tenth of the voice");
   fake.rest();
   const writes = fake.world.writes;
   fake.find("slider").onChange(55);
   fake.find("slider").onChange(58);
   fake.find("slider").onChange(60);
-  assert.deepEqual(fake.world.sets.slice(-2), [{ mode: "studio", voice: 0.58 }, { mode: "studio", voice: 0.6 }]);
+  assert.deepEqual(fake.world.sets.slice(-2), [{ mode: "studio", voice: 0.58, model: "standard" }, { mode: "studio", voice: 0.6, model: "standard" }]);
   assert.equal(fake.world.writes, writes, "nothing written while the slider moves");
   fake.rest();
   assert.equal(fake.world.writes, writes + 1, "written once it rests");
-  assert.deepEqual(fake.storage.get("sing"), { enabled: true, mode: null, voice: 0.6 });
+  assert.deepEqual(fake.storage.get("sing"), { enabled: true, mode: null, model: "standard", voice: 0.6 });
   fake.find("tabs").onChange("light");
-  assert.deepEqual(fake.world.sets.at(-1), { mode: "light", voice: 0.6 });
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "light", voice: 0.6, model: "standard" });
   fake.find("toggle").onChange(false);
-  assert.deepEqual(fake.world.sets.at(-1), { mode: "off", voice: 0.6 });
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "off", voice: 0.6, model: "standard" });
   fake.rest();
   assert.equal(fake.storage.get("sing").mode, "light", "the quality chosen stays for the next time");
 });
@@ -3519,35 +3522,55 @@ test("sing picks Light by default when the graphics card cannot run Studio", () 
   const fake = fakeSing({ sing: { available: false } });
   fake.open();
   fake.find("toggle").onChange(true);
-  assert.deepEqual(fake.world.sets.at(-1), { mode: "light", voice: 0.1 });
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "light", voice: 0.1, model: "standard" });
 });
 
 test("sing applies what it remembered when it starts, and nothing when it was off", () => {
   const remembered = fakeSing({ storage: new Map([["sing", { enabled: true, mode: "light", voice: 0.7 }]]) });
-  assert.deepEqual(remembered.world.sets, [{ mode: "light", voice: 0.7 }]);
+  assert.deepEqual(remembered.world.sets, [{ mode: "light", voice: 0.7, model: "standard" }]);
   const off = fakeSing({ storage: new Map([["sing", { enabled: false, mode: "studio", voice: 0.7 }]]) });
   assert.deepEqual(off.world.sets, []);
   const broken = fakeSing({ storage: new Map([["sing", { enabled: true, mode: "loud", voice: "x" }]]) });
-  assert.deepEqual(broken.world.sets, [{ mode: "studio", voice: 0.1 }], "a bad saved value falls back to the defaults");
+  assert.deepEqual(broken.world.sets, [{ mode: "studio", voice: 0.1, model: "standard" }], "a bad saved value falls back to the defaults");
 });
 
 test("sing says in plain words how far it is", () => {
   const fake = fakeSing();
   fake.open();
-  const line = () => textsOf(fake.react.page.tree)[0];
-  assert.equal(line(), "Off");
+  const status = () => allNodes(fake.react.page.tree).find((node) => node.type === "text" && node.key === "status");
+  const has = (type) => Boolean(fake.find(type));
+  assert.equal(status(), undefined, "off: the switch says it, no second line");
   fake.emit({ mode: "studio", phase: "downloading", progress: 0.42 });
-  assert.equal(line(), "Downloading 42 %");
+  assert.equal(status().text, "Downloading 42 %");
+  assert.equal(fake.find("progress").value, 42, "a bar fills as the files come in");
   fake.emit({ phase: "loading", progress: 0 });
-  assert.equal(line(), "Getting ready");
+  assert.equal(status().text, "Getting ready");
+  assert.ok(has("spinner") && !has("progress"), "a ring turns while it gets ready");
   fake.emit({ phase: "on" });
-  assert.equal(line(), "On");
-  fake.emit({ phase: "off", reason: "no-graphics-card" });
-  assert.equal(line(), "Studio needs a graphics card");
+  assert.equal(status().text, "On · Studio");
+  assert.ok(!has("spinner"));
+  fake.emit({ mode: "light" });
+  assert.equal(status().text, "On · Light");
+  fake.emit({ mode: "studio", phase: "off", reason: "no-graphics-card" });
+  assert.equal(status().text, "Studio needs a graphics card");
+  assert.ok(status().color, "a reason stands out in colour");
   fake.emit({ phase: "failed", reason: "download-failed" });
-  assert.equal(line(), "The download failed");
+  assert.equal(status().text, "The download failed");
   fake.emit({ phase: "off", reason: "dolby-atmos" });
-  assert.equal(line(), "Not available for Dolby Atmos songs");
+  assert.equal(status().text, "Not available for Dolby Atmos songs");
+});
+
+test("sing shows the voice in per cent and says what each quality does, and the download it needs", () => {
+  const fake = fakeSing({ sing: { installed: false, downloadSize: 58_400_000 } });
+  fake.open();
+  assert.equal(fake.find("slider").label, "Singer's voice");
+  assert.equal(fake.find("slider").unit, " %");
+  const texts = () => textsOf(fake.react.page.tree);
+  assert.ok(texts().includes("First use downloads 58 MB."), texts().join(" | "));
+  fake.emit({ installed: true });
+  assert.ok(!texts().some((text) => text.includes("downloads")), "nothing to download once the files are there");
+  fake.find("tabs").onChange("light");
+  assert.ok(texts().some((text) => text.includes("processor")), "Light says it runs on the processor");
 });
 
 test("sing turns itself off when it stops, keeps the choice, declares exactly the permissions it uses, and speaks French", () => {
@@ -3560,6 +3583,24 @@ test("sing turns itself off when it stops, keeps the choice, declares exactly th
   assert.equal(fake.storage.get("sing").enabled, true, "stopping does not forget that it was on");
   assert.equal(fake.world.buttons[0].label, "Chanter");
   assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+});
+
+test("sing offers Studio's two models, says what the precise one asks of the PC, and remembers the choice", () => {
+  const fake = fakeSing();
+  fake.open();
+  fake.find("toggle").onChange(true);
+  const models = () => allNodes(fake.react.page.tree).find((node) => node.type === "tabs" && node.key === "model");
+  const texts = () => textsOf(fake.react.page.tree);
+  assert.equal(models().value, "standard", "the standard model by default");
+  models().onChange("precise");
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "studio", voice: 0.1, model: "precise" });
+  assert.ok(texts().some((text) => text.includes("RTX 2060")), texts().join(" | "));
+  fake.rest();
+  assert.equal(fake.storage.get("sing").model, "precise");
+  fake.find("tabs").onChange("light");
+  assert.equal(models(), undefined, "Light has no model to choose");
+  const again = fakeSing({ storage: new Map([["sing", { enabled: true, mode: "studio", model: "precise", voice: 0.2 }]]) });
+  assert.deepEqual(again.world.sets, [{ mode: "studio", voice: 0.2, model: "precise" }]);
 });
 
 test("sing has every string in all ten languages, with a name and a description each", () => {

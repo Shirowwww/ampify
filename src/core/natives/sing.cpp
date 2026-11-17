@@ -11,6 +11,7 @@
 #include "../api/module.hpp"
 #include "../audio/sing_host.hpp"
 #include "../json.hpp"
+#include "../sing_pack.hpp"
 
 namespace ampify::natives {
 
@@ -48,6 +49,18 @@ const char* ReasonName(audio::SingReason reason) {
     }
 }
 
+const char* ModelName(audio::SingModel model) { return model == audio::SingModel::Precise ? "precise" : "standard"; }
+
+std::optional<audio::SingModel> ParseModel(const std::string& name) {
+    if (name == "standard") return audio::SingModel::Standard;
+    if (name == "precise") return audio::SingModel::Precise;
+    return std::nullopt;
+}
+
+const sing_pack::Model& PackModel(audio::SingModel model) {
+    return model == audio::SingModel::Precise ? sing_pack::kPrecise : sing_pack::kStandard;
+}
+
 std::optional<audio::SingMode> ParseMode(const std::string& name) {
     if (name == "off") return audio::SingMode::Off;
     if (name == "light") return audio::SingMode::Light;
@@ -65,17 +78,24 @@ Json AvailableJson(audio::SingStudio studio) {
     return Json();
 }
 
-std::string StateJson(const std::optional<audio::SingRequest>& request, const std::optional<audio::SingStatus>& status) {
+// `pack`: what the host knows of the asked model's files; without it, nothing is known to be installed and the
+// download is the whole of it.
+std::string StateJson(const std::optional<audio::SingRequest>& request, const std::optional<audio::SingStatus>& status,
+                      const std::optional<SingHost::Pack>& pack) {
     audio::SingRequest asked = request.value_or(audio::SingRequest{});
+    const std::uint64_t whole = sing_pack::kRuntime.size + PackModel(asked.model).download.size;
     audio::SingStatus seen = status.value_or(audio::SingStatus{});
     Json::Object members;
     members.emplace_back("available", AvailableJson(seen.studio));
     members.emplace_back("mode", Json(ModeName(asked.mode)));
     members.emplace_back("voice", Rounded(asked.voice));
+    members.emplace_back("model", Json(ModelName(asked.model)));
     members.emplace_back("phase", Json(PhaseName(seen.phase)));
     members.emplace_back("progress", Rounded(seen.progress));
     members.emplace_back("delay", Rounded(seen.delaySeconds));
     members.emplace_back("reason", Json(ReasonName(seen.reason)));
+    members.emplace_back("installed", pack ? Json(pack->installed) : Json());
+    members.emplace_back("downloadSize", Json(static_cast<double>(pack ? pack->downloadSize : whole)));
     return Json(std::move(members)).Dump();
 }
 
@@ -89,11 +109,13 @@ struct SingNatives : ScriptBridge {
         std::optional<audio::SingMode> mode = ParseMode(String(ctx, argc, argv, 0).value_or(""));
         double voice = Number(ctx, argc, argv, 1);
         if (!mode) return Throw(ctx, "RangeError", "sing.set expects a mode: \"off\", \"light\" or \"studio\"");
+        std::optional<audio::SingModel> model = ParseModel(String(ctx, argc, argv, 2).value_or(""));
+        if (!model) return Throw(ctx, "RangeError", "sing.set expects a model: \"standard\" or \"precise\"");
         if (!std::isfinite(voice) || voice < 0 || voice > 1) {
             return Throw(ctx, "RangeError", "sing.set expects a voice from 0 to 1");
         }
         SingHost* singer = Singer(ext);
-        return JS_NewBool(ctx, singer && singer->Set(*mode, voice));
+        return JS_NewBool(ctx, singer && singer->Set(*mode, voice, *model));
     }
 
     AMPIFY_NATIVE(ReadState) {
@@ -101,7 +123,12 @@ struct SingNatives : ScriptBridge {
         JSValue failure = JS_UNDEFINED;
         if (!Require(ctx, ext, kPermission, &failure)) return failure;
         SingHost* singer = Singer(ext);
-        std::string json = singer ? StateJson(singer->Request(), singer->Status()) : StateJson(std::nullopt, std::nullopt);
+        std::string json = StateJson(std::nullopt, std::nullopt, std::nullopt);
+        if (singer) {
+            const std::optional<audio::SingRequest> request = singer->Request();
+            const audio::SingModel model = request ? request->model : audio::SingModel::Standard;
+            json = StateJson(request, singer->Status(), singer->PackFor(model));
+        }
         return JS_NewStringLen(ctx, json.data(), json.size());
     }
 };
@@ -109,7 +136,7 @@ struct SingNatives : ScriptBridge {
 }  // namespace
 
 void DefineAudioSing(api::NativeScope& scope) {
-    scope.Function("singSet", SingNatives::Set, 2);
+    scope.Function("singSet", SingNatives::Set, 3);
     scope.Function("singState", SingNatives::ReadState, 0);
 }
 

@@ -109,15 +109,21 @@ type AudioAnalysis = {
   frequencies: number[];
 };
 type SingMode = "off" | "light" | "studio";
-// available: whether Studio can run on this PC, null until known. mode and voice: what was asked last.
+// Studio's voice model: standard (UVR's Voc_FT), or precise (Kim's Mel-Band RoFormer: better, heavier)
+type SingModel = "standard" | "precise";
+// available: whether Studio can run on this PC, null until known. mode, voice and model: what was asked last.
+// installed and downloadSize: of the model asked.
 type SingState = {
   available: boolean | null;
   mode: SingMode;
   voice: number;
+  model: SingModel;
   phase: "off" | "downloading" | "loading" | "buffering" | "on" | "failed";
   progress: number;
   delay: number;
   reason: "none" | "no-graphics-card" | "download-failed" | "model-failed" | "dolby-atmos" | "automix-mixing";
+  installed: boolean | null;
+  downloadSize: number;
 };
 type EqBand = { frequency: number; gainDb: number; q: number; type: "peaking" | "lowshelf" | "highshelf" };
 // name: the song's stream address without its query, what a plan's `next` gives
@@ -176,7 +182,7 @@ type CreateElement = (type: string | symbol | object | AmpifyComponent<never>, p
                       ...children: AmpifyNode[]) => AmpifyElement;
 type ButtonProps = TooltipProps & PlaceProps & { label?: string; icon?: string; disabled?: boolean; variant?: "primary" | "secondary" | "tertiary"; onClick?: (event: ClickEvent) => void };
 type ToggleProps = TooltipProps & { label?: string; value?: boolean; checked?: boolean; disabled?: boolean; onChange?: (checked: boolean, event: ChangeEvent) => void };
-type SliderProps = TooltipProps & { label?: string; min?: number; max?: number; step?: number; value?: number; disabled?: boolean; onChange?: (value: number, event: ChangeEvent) => void };
+type SliderProps = TooltipProps & { label?: string; min?: number; max?: number; step?: number; value?: number; unit?: string; disabled?: boolean; onChange?: (value: number, event: ChangeEvent) => void };
 type TextFieldProps = TooltipProps & { label?: string; value?: string; placeholder?: string; disabled?: boolean; onChange?: (text: string, event: ChangeEvent) => void };
 type DropdownProps = TooltipProps & { label?: string; value?: string; options?: (string | { value: string; label?: string })[]; disabled?: boolean; onChange?: (value: string, event: ChangeEvent) => void };
 type GridProps = TooltipProps & { columns?: number; gap?: number };
@@ -287,7 +293,7 @@ declare const Ampify: {
     volume(): number | null;
     // permission audio.sing; voice is the share of the singer's voice kept, 0 to 1
     sing: {
-      set(options: { mode: SingMode; voice?: number }): boolean;
+      set(options: { mode: SingMode; voice?: number; model?: SingModel }): boolean;
       state(): SingState;
       onChange(fn: (state: SingState) => void): () => void;
     };

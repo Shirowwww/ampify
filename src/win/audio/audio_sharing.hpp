@@ -7,6 +7,8 @@
 // interface asks for them. In AppleMusic.exe, InterfaceAudio() reads them: it is the AudioHost of that process, so the
 // extensions of the interface and the themes' `content: bars(n)` see the sound too. The equalizer stays in the engine.
 
+#include <array>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -58,9 +60,18 @@ SharedAudioHost& InterfaceAudio();
 // engine's own side (reading the request, writing the status) uses audio::ReadSingRequest and WriteSingStatus.
 class SharedSingHost final : public SingHost {
 public:
-    bool Set(audio::SingMode mode, double voice) override;
+    bool Set(audio::SingMode mode, double voice, audio::SingModel model) override;
     std::optional<audio::SingRequest> Request() override;
     std::optional<audio::SingStatus> Status() override;
+    std::optional<Pack> PackFor(audio::SingModel model) override;
+
+private:
+    struct PackSeen {
+        std::chrono::steady_clock::time_point at;
+        Pack pack;
+    };
+    std::mutex m_packLock;
+    std::array<PackSeen, 2> m_packs{};  // standard, precise
 };
 
 SharedSingHost& SharedSing();

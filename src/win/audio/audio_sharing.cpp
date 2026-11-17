@@ -6,6 +6,9 @@
 #include <string>
 #include <thread>
 
+#include "../../core/sing_pack.hpp"
+#include "../win_common.hpp"
+
 namespace ampify::win {
 
 namespace {
@@ -155,9 +158,9 @@ SharedAudioHost& InterfaceAudio() {
     return *host;
 }
 
-bool SharedSingHost::Set(audio::SingMode mode, double voice) {
+bool SharedSingHost::Set(audio::SingMode mode, double voice, audio::SingModel model) {
     audio::SharedAudio* block = SharedAudioBlock();
-    return block && audio::WriteSingRequest(*block, mode, voice);
+    return block && audio::WriteSingRequest(*block, mode, voice, model);
 }
 
 std::optional<audio::SingRequest> SharedSingHost::Request() {
@@ -172,6 +175,22 @@ std::optional<audio::SingStatus> SharedSingHost::Status() {
     audio::SingStatus status;
     if (!block || !audio::ReadSingStatus(*block, status)) return std::nullopt;
     return status;
+}
+
+// Looked at again every two seconds at most: the interface reads the state four times a second.
+std::optional<SingHost::Pack> SharedSingHost::PackFor(audio::SingModel model) {
+    constexpr auto kLookAgain = std::chrono::seconds(2);
+    const sing_pack::Model& files = model == audio::SingModel::Precise ? sing_pack::kPrecise : sing_pack::kStandard;
+    const size_t index = model == audio::SingModel::Precise ? 1 : 0;
+    std::lock_guard lock(m_packLock);
+    const auto now = std::chrono::steady_clock::now();
+    PackSeen& seen = m_packs[index];
+    if (seen.at == std::chrono::steady_clock::time_point{} || now - seen.at >= kLookAgain) {
+        const std::filesystem::path folder = KitDirectory() / L"sing";
+        seen.pack = {sing_pack::Ready(folder, files), sing_pack::DownloadSize(folder, files)};
+        seen.at = now;
+    }
+    return seen.pack;
 }
 
 SharedSingHost& SharedSing() {

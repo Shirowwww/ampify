@@ -20,6 +20,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <utility>
 
 #include "../../../extensions/atmos-leveler/format_detection.hpp"
 #include "../../core/automix/mix_deck.hpp"
@@ -179,6 +180,18 @@ std::atomic<void*> g_queue{nullptr};
 std::atomic<void*> g_options{nullptr};
 std::atomic<void*> g_notify{nullptr};
 
+// Sing's wish for the songs' stereo versions (WantStereo), and whether Apple's queue player was asked for them through
+// its multichannel strategy, changed under g_strategyLock.
+std::atomic<bool> g_stereoWanted{false};
+std::mutex g_strategyLock;
+const void* g_appleStrategy = nullptr;  // retained; what the player had before stereo was held, or Apple's since
+bool g_stereoHeld = false;
+
+bool StereoHeld() {
+    std::lock_guard lock(g_strategyLock);
+    return g_stereoHeld;
+}
+
 // The song a queue item plays, named by its stream address without the query (which carries per-session values).
 std::string NameOf(void* item) {
     if (!item) return {};
@@ -298,6 +311,53 @@ std::optional<bool> InAtmos(void* item) {
     return kind == atmos::TrackKind::Atmos;
 }
 
+// The answer for the song playing, kept a second: Sing asks ten times a second, and each answer copies every format
+// description through CoreFoundation (a sixth of Sing's thread on 17/11/2026). The item is retained so its address
+// cannot come back as another song's. A change of strategy forgets it, and Apple then loads the new tracks a moment
+// later, which the second's limit catches; an answer worked out across the change is not kept (the generation).
+struct AtmosMemo {
+    std::mutex lock;
+    const void* item = nullptr;
+    bool atmos = false;
+    std::chrono::steady_clock::time_point at;
+    unsigned long long generation = 0;
+};
+AtmosMemo g_atmosMemo;
+constexpr auto kAtmosMemoLasts = std::chrono::seconds(1);
+
+void ForgetAtmos() {
+    const void* drop = nullptr;
+    {
+        std::lock_guard lock(g_atmosMemo.lock);
+        drop = std::exchange(g_atmosMemo.item, nullptr);
+        g_atmosMemo.generation++;
+    }
+    if (drop) A().release(drop);
+}
+
+std::optional<bool> InAtmosRemembered(void* item) {
+    unsigned long long generation = 0;
+    {
+        std::lock_guard lock(g_atmosMemo.lock);
+        const bool fresh = std::chrono::steady_clock::now() - g_atmosMemo.at < kAtmosMemoLasts;
+        if (g_atmosMemo.item == item && fresh) return g_atmosMemo.atmos;
+        generation = g_atmosMemo.generation;
+    }
+    const std::optional<bool> atmos = InAtmos(item);
+    if (!atmos) return atmos;  // tracks not loaded yet: asked again next time
+    const void* drop = A().retain(item);
+    {
+        std::lock_guard lock(g_atmosMemo.lock);
+        if (g_atmosMemo.generation == generation) {
+            std::swap(drop, g_atmosMemo.item);
+            g_atmosMemo.atmos = *atmos;
+            g_atmosMemo.at = std::chrono::steady_clock::now();
+        }
+    }
+    if (drop) A().release(drop);  // the one held before, or this one when a change came meanwhile
+    return atmos;
+}
+
 double SteadySeconds() {
     using namespace std::chrono;
     return duration<double>(steady_clock::now().time_since_epoch()).count();
@@ -395,6 +455,8 @@ public:
         // the deck's (SeekGhost): from then on only what the deck writes there is heard.
         Ref uid(A().makeString(nullptr, endpoint.c_str(), static_cast<long long>(endpoint.size())));
         A().setDevice(m_ghost, uid.get());
+        // Made fresh, it takes the stereo versions Sing asked Apple's player for, so that its sound is a stereo stream.
+        if (StereoHeld() && A().setStrategy && A().preferStereo) A().setStrategy(m_ghost, A().preferStereo);
         A().setVolume(m_ghost, 0.0f);
         g_deck.Open(rate, automix::HoldFor(plan));
         if (automix::Stretches(plan)) g_deck.SetStretch(automix::CarryFrom(plan), plan.keys.front().at, plan.rate);
@@ -505,7 +567,9 @@ public:
         if (count >= 2) {
             void* next = const_cast<void*>(A().arrayAt(items.get(), 1));
             SongIdentity who = IdentityOf(next);
-            state.next = AutoMixSong{NameOf(next), who.catalogId, who.storefront, 0, DurationOf(next), InAtmos(next)};
+            // Asked for stereo versions (Sing), the next song starts in stereo whatever versions it has.
+            const std::optional<bool> atmos = StereoHeld() ? std::optional<bool>(false) : InAtmos(next);
+            state.next = AutoMixSong{NameOf(next), who.catalogId, who.storefront, 0, DurationOf(next), atmos};
         }
         return state;
     }
@@ -625,6 +689,8 @@ using Generic_t = void*(__cdecl*)(void*, void*, void*, void*, void*, void*, void
 using SetRate_t = void(__cdecl*)(void*, float);
 using Seek_t = void(__cdecl*)(void*, CMTime);
 
+void StereoForNewQueue(void* player);
+
 Generic_t g_createQueue = nullptr;
 void* __cdecl CreateQueue_Hook(void* a, void* b, void* options, void* notify, void* e, void* f, void* g, void* h) {
     void* player = g_createQueue(a, b, options, notify, e, f, g, h);
@@ -639,6 +705,7 @@ void* __cdecl CreateQueue_Hook(void* a, void* b, void* options, void* notify, vo
         g_options = options;
         g_notify = notify;
         g_queue = player;
+        StereoForNewQueue(player);
     }
     return player;
 }
@@ -666,13 +733,12 @@ void __cdecl SetRate_Hook(void* player, float rate) {
     }
 }
 
-// Sing on a Dolby Atmos song: Apple's player is asked to prefer stereo, which its studio mode needs, and Apple's own
-// choice comes back when Sing lets go. A choice Apple makes meanwhile is kept for then.
+// Sing works on Apple's stereo stream, which a Dolby Atmos song lacks: while Sing is on, Apple's player is asked to
+// prefer stereo, and gets its own choice back (or the one it made meanwhile) when Sing lets go. The choice only changes
+// where no song plays yet: under a song playing or loading in Dolby Atmos, even paused, Apple's player goes silent
+// with its clock three to four times too fast, song after song (knowledge/apple-music-playback.md).
 using SetStrategy_t = void(__cdecl*)(void*, const void*);
 SetStrategy_t g_setStrategy = nullptr;
-std::mutex g_strategyLock;
-const void* g_appleStrategy = nullptr;  // retained; what the player had before stereo was held, or Apple's since
-bool g_stereoHeld = false;
 
 void __cdecl SetStrategy_Hook(void* player, const void* strategy) {
     if (player == g_queue.load()) {
@@ -685,6 +751,64 @@ void __cdecl SetStrategy_Hook(void* player, const void* strategy) {
         }
     }
     g_setStrategy(player, strategy);
+    ForgetAtmos();
+}
+
+bool StrategyUsable() {
+    // Without the hook Apple would set its own choice again at the next song.
+    return A().ready && g_setStrategy && A().setStrategy && A().copyStrategy && A().preferStereo;
+}
+
+// Apple's queue player asked for stereo versions, or given its own choice back; true when that changed.
+bool ApplyStereo(bool hold) {
+    void* queue = g_queue.load();
+    if (!queue || !StrategyUsable()) return false;
+    {
+        std::lock_guard lock(g_strategyLock);
+        if (g_stereoHeld == hold) return false;
+    }
+    // Apple's player is only called outside the lock, which its own thread takes in SetStrategy_Hook.
+    const void* current = hold ? A().copyStrategy(queue) : nullptr;  // a copy: already retained
+    const void* apply = nullptr;
+    const void* drop = current;
+    {
+        std::lock_guard lock(g_strategyLock);
+        if (g_stereoHeld != hold) {
+            g_stereoHeld = hold;
+            drop = g_appleStrategy;
+            if (hold) {
+                g_appleStrategy = current;
+                apply = A().preferStereo;
+            } else {
+                // Apple's own, or the one it sets as a song starts (seen on 16/11/2026) when it had none.
+                apply = g_appleStrategy ? g_appleStrategy : A().matchDevice;
+                g_appleStrategy = nullptr;
+            }
+        }
+    }
+    if (apply) A().setStrategy(queue, apply);
+    if (drop) A().release(drop);  // after the call: `apply` may be it
+    ForgetAtmos();
+    if (!apply) return false;
+    Note(hold ? "Sing: Apple's player asked for the songs' stereo versions"
+              : "Sing: Apple's player back on its own choice, Dolby Atmos included");
+    return true;
+}
+
+// A queue Apple just made has nothing playing yet: it starts with Sing's wish, and none of Apple's choice is held.
+void StereoForNewQueue(void* player) {
+    if (!StrategyUsable()) return;
+    const bool want = g_stereoWanted.load();
+    const void* drop = nullptr;
+    {
+        std::lock_guard lock(g_strategyLock);
+        if (!want && !g_stereoHeld) return;
+        g_stereoHeld = want;
+        drop = g_appleStrategy;
+        g_appleStrategy = nullptr;
+    }
+    if (drop) A().release(drop);
+    if (want) A().setStrategy(player, A().preferStereo);
 }
 
 Seek_t g_seekPlayer = nullptr;
@@ -871,7 +995,7 @@ bool InAtmosNow() {
     void* queue = g_queue.load();
     if (!A().ready || !queue) return false;
     Ref item(A().copyCurrentItem(queue));
-    return item && InAtmos(item.item()).value_or(false);
+    return item && InAtmosRemembered(item.item()).value_or(false);
 }
 
 const void* CurrentSong() {
@@ -881,32 +1005,24 @@ const void* CurrentSong() {
     return item.get();  // released here: only its address is kept, to compare
 }
 
-bool HoldStereo(bool hold) {
-    void* queue = g_queue.load();
-    // Without the hook Apple would set its own choice again at the next song.
-    if (!A().ready || !queue || !g_setStrategy || !A().setStrategy || !A().copyStrategy || !A().preferStereo) return false;
-    // Apple's player is only called outside the lock, which its own thread takes in SetStrategy_Hook.
-    const void* current = hold ? A().copyStrategy(queue) : nullptr;  // a copy: already retained
-    const void* apply = nullptr;
-    const void* drop = current;
+void WantStereo(bool want) {
+    g_stereoWanted = want;
+    if (!want) ForgetAtmos();  // Sing no longer asks: the song is not kept alive for it
     {
         std::lock_guard lock(g_strategyLock);
-        if (g_stereoHeld != hold) {
-            g_stereoHeld = hold;
-            drop = g_appleStrategy;
-            if (hold) {
-                g_appleStrategy = current;
-                apply = A().preferStereo;
-            } else {
-                // Apple's own, or the one it sets as a song starts (seen on 16/11/2026) when it had none.
-                apply = g_appleStrategy ? g_appleStrategy : A().matchDevice;
-                g_appleStrategy = nullptr;
-            }
-        }
+        if (g_stereoHeld == want) return;
     }
-    if (apply) A().setStrategy(queue, apply);
-    if (drop) A().release(drop);  // after the call: `apply` may be it
-    return true;
+    void* queue = g_queue.load();
+    if (!queue || !A().ready) return;  // StereoForNewQueue
+    // Apple's own choice back at once: a song going from stereo to Dolby Atmos under way does it well (17/11/2026).
+    if (!want) {
+        ApplyStereo(false);
+        return;
+    }
+    // Asked for at once only while the song there is known to be in stereo, or there is none.
+    Ref item(A().copyCurrentItem(queue));
+    if (item && InAtmosRemembered(item.item()) != std::optional<bool>(false)) return;
+    ApplyStereo(true);
 }
 
 }  // namespace detail

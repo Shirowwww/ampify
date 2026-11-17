@@ -64,8 +64,9 @@ void HoldClockBack(double seconds);  // 0: Apple's own time again
 bool JumpInPlace(double back);       // to `back` seconds before where it is; false when the player is not known yet
 bool InAtmosNow();                   // the song playing goes out as Dolby Atmos objects
 const void* CurrentSong();           // the item Apple's queue plays, only to compare; null when not known
-// Apple's player asked to prefer stereo (Sing), or given back its own choice; false when it cannot be asked.
-bool HoldStereo(bool hold);
+// Sing on: Apple's player is to prefer the songs' stereo versions. Asked at once while the song there is known to be in
+// stereo or there is none, otherwise once one is or when Apple makes its next queue; Apple's choice comes back at once.
+void WantStereo(bool want);
 // Sing (sing.cpp), called from the hooks: one block of Apple's stereo stream, in place, on its audio thread; and a
 // seek or a skip, after which what is held back belongs to another moment of the song.
 void StartSing();  // once the hooks are in: Sing's thread follows what the interface asks

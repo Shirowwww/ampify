@@ -22,11 +22,13 @@ namespace ampify::sing {
 
 class StudioStream {
 public:
-    // `rate` 44100 to 192000, stereo. `hopSeconds` is rounded to whole STFT hops of the model (23 ms). Vocals are
-    // ready up to two hops plus the resamplers' latency after their sound came in: a shorter delay could never be
-    // met and is raised to that (Delay() tells). The rest of the delay is the model's time; when it runs late, the
-    // song plays as it is (a miss) until the worker catches up.
-    explicit StudioStream(int rate, double delaySeconds = 1.3, double hopSeconds = 0.4);
+    // `rate` 44100 to 192000, stereo, for the model `spec` (Work refuses a splitter of another). `hopSeconds` is
+    // rounded to whole STFT hops of the model. Vocals are ready up to two hops, the model's ahead and the resamplers'
+    // latency after their sound came in: a shorter delay could never be met and is raised to that (Delay() tells). The
+    // rest of the delay is the model's time; when it runs late, the song plays as it is (a miss) until the worker
+    // catches up.
+    explicit StudioStream(int rate, const ModelSpec& spec = kStandard);
+    StudioStream(int rate, double delaySeconds, double hopSeconds, const ModelSpec& spec = kStandard);
     ~StudioStream();
     StudioStream(const StudioStream&) = delete;
     StudioStream& operator=(const StudioStream&) = delete;
@@ -41,7 +43,7 @@ public:
 
     // Some of the song read, or one model window. False when there was nothing to do.
     bool Work(VocalSplitter& splitter);
-    // Frees the last window's spectrum (12 MB) while studio mode rests; the next window is analysed whole.
+    // Frees the last window's spectrum (megabytes) while studio mode rests; the next window is analysed whole.
     void Rest();
 
     // ---- any thread
@@ -70,10 +72,12 @@ private:
     bool RunWindow(VocalSplitter& splitter);
     void Publish(size_t frames);
 
+    const ModelSpec& m_spec;
     int m_rate;
     std::int64_t m_delay;    // frames
     size_t m_hopHops;        // STFT hops in one model hop
     size_t m_hop44;          // the model hop at the model's rate
+    size_t m_ahead44;        // the vocals are taken this long before the window's end, at the model's rate
     std::int64_t m_hop;      // the same at m_rate, rounded up
     std::int64_t m_latency;  // of the resamplers' round trip, frames at m_rate
     std::int64_t m_fade;     // between the song as it is and processed, frames

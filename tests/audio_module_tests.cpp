@@ -16,6 +16,7 @@
 #include "../src/core/audio/audio_engine.hpp"
 #include "../src/core/manifest.hpp"
 #include "../src/core/script_extension.hpp"
+#include "../src/core/sing_pack.hpp"
 #include "fake_host.hpp"
 #include "pump.hpp"
 #include "support.hpp"
@@ -196,7 +197,9 @@ namespace {
 struct BlockSing : ampify::SingHost {
     ampify::audio::SharedAudio block{};
     BlockSing() { ampify::audio::ClaimShared(block); }
-    bool Set(ampify::audio::SingMode mode, double voice) override { return ampify::audio::WriteSingRequest(block, mode, voice); }
+    bool Set(ampify::audio::SingMode mode, double voice, ampify::audio::SingModel model) override {
+        return ampify::audio::WriteSingRequest(block, mode, voice, model);
+    }
     std::optional<ampify::audio::SingRequest> Request() override {
         ampify::audio::SingRequest request;
         return ampify::audio::ReadSingRequest(block, request) ? std::optional(request) : std::nullopt;
@@ -205,7 +208,16 @@ struct BlockSing : ampify::SingHost {
         ampify::audio::SingStatus status;
         return ampify::audio::ReadSingStatus(block, status) ? std::optional(status) : std::nullopt;
     }
+    std::optional<Pack> pack;
+    std::optional<Pack> PackFor(ampify::audio::SingModel) override { return pack; }
 };
+
+// What the state ends with: whether the asked model's files are in place, and how much their download weighs (the
+// runtime and the model when the host cannot tell).
+std::string PackPart(const char* installed, std::uint64_t size = ampify::sing_pack::kRuntime.size +
+                                                                   ampify::sing_pack::kStandard.download.size) {
+    return std::string(R"(,"installed":)") + installed + R"(,"downloadSize":)" + std::to_string(size) + "}";
+}
 
 }  // namespace
 
@@ -221,16 +233,20 @@ TEST_CASE(AudioSing_SetWritesTheRequestAndStateReadsItBackWithTheEngineStatus) {
         Ampify.log("voice only " + Ampify.audio.sing.set({ mode: "light" }) + " " + Ampify.audio.sing.state().voice);
     )", R"("audio.sing")");
     CHECK(element->Start());
-    CHECK(f.Logged(R"([singer] first {"available":null,"mode":"off","voice":0,"phase":"off","progress":0,"delay":0,"reason":"none"})"));
+    CHECK(f.Logged(R"([singer] first {"available":null,"mode":"off","voice":0,"model":"standard","phase":"off","progress":0,"delay":0,"reason":"none")" +
+                   PackPart("null")));
     CHECK(f.Logged("[singer] set true"));
-    CHECK(f.Logged(R"([singer] then {"available":null,"mode":"studio","voice":0.2,"phase":"off","progress":0,"delay":0,"reason":"none"})"));
+    CHECK(f.Logged(R"([singer] then {"available":null,"mode":"studio","voice":0.2,"model":"standard","phase":"off","progress":0,"delay":0,"reason":"none")" +
+                   PackPart("null")));
     CHECK(f.Logged("[singer] voice only true 0.2"));
 
     ampify::audio::WriteSingStatus(sing.block, {ampify::audio::SingMode::Light, ampify::audio::SingPhase::Downloading, 0.42, 0,
                                                  ampify::audio::SingStudio::No, ampify::audio::SingReason::NoGraphicsCard});
+    sing.pack = ampify::SingHost::Pack{false, 1234};
     auto reader = f.Make("reader", R"(Ampify.log("status " + JSON.stringify(Ampify.audio.sing.state()));)", R"("audio.sing")");
     CHECK(reader->Start());
-    CHECK(f.Logged(R"([reader] status {"available":false,"mode":"light","voice":0.2,"phase":"downloading","progress":0.42,"delay":0,"reason":"no-graphics-card"})"));
+    CHECK(f.Logged(R"([reader] status {"available":false,"mode":"light","voice":0.2,"model":"standard","phase":"downloading","progress":0.42,"delay":0,"reason":"no-graphics-card")" +
+                   PackPart("false", 1234)));
     element->Stop();
     reader->Stop();
 }
@@ -240,14 +256,31 @@ TEST_CASE(AudioSing_SetRefusesAnUnknownModeOrAVoiceOutOfRange) {
     BlockSing sing;
     f.host.sing = &sing;
     auto element = f.Make("strict", R"(
-        for (const options of [{ mode: "loud", voice: 0.5 }, { mode: "light", voice: 2 }, { mode: "light", voice: "x" }, {}, null]) {
+        for (const options of [{ mode: "loud", voice: 0.5 }, { mode: "light", voice: 2 }, { mode: "light", voice: "x" },
+                               { mode: "studio", voice: 1, model: "best" }, {}, null]) {
             try { Ampify.audio.sing.set(options); Ampify.log("accepted"); } catch (e) { Ampify.log(e.name); }
         }
     )", R"("audio.sing")");
     CHECK(element->Start());
-    CHECK(f.Count("[strict] RangeError") == 3);
+    CHECK(f.Count("[strict] RangeError") == 4);
     CHECK(f.Count("[strict] TypeError") == 2);
     CHECK(!f.Logged("[strict] accepted"));
+    element->Stop();
+}
+
+TEST_CASE(AudioSing_SetChoosesTheModelAndKeepsItWhenNotGiven) {
+    Fixture f(false);
+    BlockSing sing;
+    f.host.sing = &sing;
+    auto element = f.Make("chooser", R"(
+        Ampify.audio.sing.set({ mode: "studio", voice: 0.3, model: "precise" });
+        Ampify.audio.sing.set({ mode: "light" });
+        const state = Ampify.audio.sing.state();
+        Ampify.log("model " + state.model + " " + state.mode + " " + state.voice + " " + state.downloadSize);
+    )", R"("audio.sing")");
+    CHECK(element->Start());
+    CHECK(f.Logged("[chooser] model precise light 0.3 " +
+                   std::to_string(ampify::sing_pack::kRuntime.size + ampify::sing_pack::kPrecise.download.size)));
     element->Stop();
 }
 

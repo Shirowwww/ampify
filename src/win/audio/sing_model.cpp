@@ -13,8 +13,6 @@ namespace ampify::win::sing {
 
 namespace {
 
-constexpr std::int64_t kShape[] = {1, 4, static_cast<std::int64_t>(ampify::sing::kBins), static_cast<std::int64_t>(ampify::sing::kFrames)};
-constexpr size_t kValues = ampify::sing::kSpectrumSize;
 
 using GetApiBase_t = const OrtApiBase*(ORT_API_CALL*)();
 using AppendDml_t = OrtStatus*(ORT_API_CALL*)(OrtSessionOptions*, int);
@@ -36,6 +34,7 @@ struct OrtVocalModel::Handles {
     OrtValue* output = nullptr;
     const float* boundInput = nullptr;
     float* boundOutput = nullptr;
+    std::int64_t shape[4] = {};  // [1, 4, bins, frames], the model's spec
 
     // Empty when the call succeeded, else ONNX Runtime's message. The status is released either way.
     std::string Check(OrtStatus* status) const {
@@ -92,10 +91,16 @@ std::string AppendDirectMl(const OrtApi* api, OrtSessionOptions* options, HMODUL
 
 }  // namespace
 
-std::unique_ptr<OrtVocalModel> OrtVocalModel::Load(const std::filesystem::path& folder, std::string& why) {
-    std::unique_ptr<OrtVocalModel> model(new OrtVocalModel());
+std::unique_ptr<OrtVocalModel> OrtVocalModel::Load(const std::filesystem::path& folder,
+                                                   const ampify::sing::ModelSpec& spec, std::string_view file,
+                                                   std::string& why) {
+    std::unique_ptr<OrtVocalModel> model(new OrtVocalModel(spec));
     model->m_handles = std::make_unique<Handles>();
     Handles& h = *model->m_handles;
+    h.shape[0] = 1;
+    h.shape[1] = 4;
+    h.shape[2] = static_cast<std::int64_t>(spec.bins);
+    h.shape[3] = static_cast<std::int64_t>(spec.frames);
     why = LoadLibraries(folder, h.directMl, h.runtime);
     if (!why.empty()) return nullptr;
     auto getApiBase = reinterpret_cast<GetApiBase_t>(GetProcAddress(h.runtime, "OrtGetApiBase"));
@@ -110,17 +115,19 @@ std::unique_ptr<OrtVocalModel> OrtVocalModel::Load(const std::filesystem::path& 
     if (why.empty()) why = h.Check(h.api->DisableMemPattern(h.options));
     if (why.empty()) why = h.Check(h.api->SetSessionExecutionMode(h.options, ORT_SEQUENTIAL));
     if (why.empty()) why = h.Check(h.api->SetSessionGraphOptimizationLevel(h.options, ORT_ENABLE_ALL));
+    // A model whose time axis is free (named "frames") gets the window's length now: DirectML compiles static shapes.
+    if (why.empty()) why = h.Check(h.api->AddFreeDimensionOverrideByName(h.options, "frames", h.shape[3]));
     if (why.empty()) why = AppendDirectMl(h.api, h.options, h.runtime);
     if (why.empty()) {
-        const std::filesystem::path file = folder / std::string(sing_pack::kModelFile);
-        why = h.Check(h.api->CreateSession(h.env, file.c_str(), h.options, &h.session));
+        const std::filesystem::path path = folder / std::string(file);
+        why = h.Check(h.api->CreateSession(h.env, path.c_str(), h.options, &h.session));
     }
     if (why.empty()) why = h.Check(h.api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &h.memory));
     if (why.empty()) why = h.Check(h.api->CreateRunOptions(&h.runOptions));
     if (why.empty()) why = h.Check(h.api->CreateIoBinding(h.session, &h.binding));
     if (!why.empty()) return nullptr;
     // The first run compiles the graph on the card (hundreds of ms): done now, not on the first song's time.
-    std::vector<float> silence(kValues, 0.0f), vocals(kValues);
+    std::vector<float> silence(spec.SpectrumSize(), 0.0f), vocals(spec.SpectrumSize());
     if (!model->Run(silence.data(), vocals.data())) {
         why = model->LastError();
         return nullptr;
@@ -129,6 +136,8 @@ std::unique_ptr<OrtVocalModel> OrtVocalModel::Load(const std::filesystem::path& 
     return model;
 }
 
+OrtVocalModel::OrtVocalModel(const ampify::sing::ModelSpec& modelSpec) : VocalModel(modelSpec) {}
+
 OrtVocalModel::~OrtVocalModel() = default;
 
 // A CPU tensor of the model's shape around `data`, which ONNX Runtime reads or writes in place.
@@ -136,8 +145,8 @@ std::string OrtVocalModel::Wrap(float* data, OrtValue*& value) {
     Handles& h = *m_handles;
     if (value) h.api->ReleaseValue(value);
     value = nullptr;
-    return h.Check(h.api->CreateTensorWithDataAsOrtValue(h.memory, data, kValues * sizeof(float), kShape,
-                                                         std::size(kShape), ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
+    return h.Check(h.api->CreateTensorWithDataAsOrtValue(h.memory, data, spec.SpectrumSize() * sizeof(float), h.shape,
+                                                         std::size(h.shape), ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
                                                          &value));
 }
 
