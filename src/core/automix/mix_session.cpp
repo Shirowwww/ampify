@@ -98,6 +98,12 @@ void MixSession::Tick(double now) {
 void MixSession::Enter(Phase phase, double now) {
     m_status.phase = phase;
     m_phaseSince = now;
+    m_endSince = -1;
+}
+
+bool MixSession::HeldBackPlayed(double now) {
+    if (m_endSince < 0) m_endSince = now;
+    return now - m_endSince >= m_decks.SoundHeldBack();
 }
 
 void MixSession::Gain(const DeckGains& gains) {
@@ -198,8 +204,11 @@ void MixSession::TickAligning(double now, double aTime) {
 }
 
 void MixSession::TickReady(double now, double aTime) {
-    if (m_decks.NextItem() != m_plan.next) return Fail("the queue changed", now);
     const double takeAt = TakeAt();
+    // A look at the queue copies its items: four times a second, not at each of the fifty ticks.
+    if (now - m_lastCheck >= kRetry || aTime >= takeAt) {
+        if (m_decks.NextItem() != m_plan.next) return Fail("the queue changed", now);
+    }
     if (now - m_lastCheck >= kRetry) {
         m_lastCheck = now;
         m_status.copyErrorDb = m_decks.CopyErrorDb();
@@ -228,14 +237,14 @@ void MixSession::TickLocked(double now) {
         double p = std::clamp((now - m_phaseSince) / m_recoverSeconds, 0.0, 1.0);
         Gain({Lerp(m_recoverFrom.main, 1, p), m_recoverFrom.tail * (1 - p), Lerp(m_recoverFrom.mainLow, 1, p),
               m_recoverFrom.tailLow});
-        if (p < 1) return;
+        if (p < 1 || !HeldBackPlayed(now)) return;
         LetGo();
         Gain(kApplesAlone);
         return Enter(Phase::Failed, now);
     }
     // While it is heard, the deck carries A: starved of the second player's sound, A falls silent and its time
-    // stands still.
-    if (Audible(phase)) {
+    // stands still. Once all of it was given, A may end while what is held back plays out.
+    if (Audible(phase) && m_endSince < 0) {
         std::optional<double> heard = m_decks.HeardTime();
         if (!heard) return Fail("the second player stopped", now, true);
         if (m_lastHeardMoved < 0 || *heard != m_lastHeard) {
@@ -300,12 +309,15 @@ void MixSession::TickLocked(double now) {
         }
         case Phase::Mixing: {
             if (!m_decks.MainOnNext()) return Fail("Apple's player left the next song", now);
-            std::optional<double> heard = m_decks.HeardTime();  // A's time, carried by the deck
-            if (!heard) return;
-            if (!m_lagMeasured) LearnSwitchDelay();
-            Gains gains = GainsAt(m_plan.keys, *heard);
-            Gain({gains.b, gains.a, gains.bLow, gains.aLow});
-            if (*heard < m_plan.keys.back().at) return;
+            if (m_endSince < 0) {
+                std::optional<double> heard = m_decks.HeardTime();  // A's time, carried by the deck
+                if (!heard) return;
+                if (!m_lagMeasured) LearnSwitchDelay();
+                Gains gains = GainsAt(m_plan.keys, *heard);
+                Gain({gains.b, gains.a, gains.bLow, gains.aLow});
+                if (*heard < m_plan.keys.back().at) return;
+            }
+            if (!HeldBackPlayed(now)) return;
             LetGo();
             Gain(kApplesAlone);
             return Enter(Phase::Done, now);

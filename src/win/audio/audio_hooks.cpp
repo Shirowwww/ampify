@@ -191,7 +191,9 @@ struct SpatialPass {
     UINT32 frames = 0;
     std::vector<audio::ObjectBuffer> objects;
 };
-SpatialPass g_pass;
+// One per thread: a pass begins, gathers and ends on its stream's thread, and Apple starts a new spatial stream at
+// each seek while the old one may still be in a pass of its own.
+thread_local SpatialPass g_pass;
 
 // Ampify.audio: the equalizer, live loudness and analysis on these same buffers. It only adds steps to the paths
 // below; with a flat equalizer and no element listening, the samples are untouched by it.
@@ -421,8 +423,9 @@ DWORD ProcessTailStream(IAudioRenderClient* self, TailStream& tail, UINT32 frame
     auto* samples = reinterpret_cast<float*>(data);
     const int rate = tail.rate.load(std::memory_order_relaxed);
     const bool silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0;
-    const bool heard = detail::AutoMixTail(samples, frames, rate, silent, tail.number.load(std::memory_order_relaxed),
-                                           QueuedFrames(tail.client.load()));
+    bool heard = detail::AutoMixTail(samples, frames, rate, silent, tail.number.load(std::memory_order_relaxed),
+                                     QueuedFrames(tail.client.load()));
+    if (samples) heard = detail::SingTail(samples, frames, rate, heard);
     if (!heard) {
         g_tailGain = AppliedGain();
         g_tailRamp.Curve(frames, g_tailGain, g_tailCurve);
@@ -438,9 +441,10 @@ HRESULT STDMETHODCALLTYPE ReleaseBuffer_Hook(IAudioRenderClient* self, UINT32 fr
         BYTE* data = g_meteredBuffer.exchange(nullptr, std::memory_order_relaxed);
         UINT32 count = std::min(frames, g_meteredBufferFrames.load(std::memory_order_relaxed));
         bool silent = (flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0;
-        if (silent && data && count == frames && g_meteredChannels.load() == 2 && detail::AutoMixOpen()) {
+        if (silent && data && count == frames && g_meteredChannels.load() == 2 &&
+            (detail::AutoMixOpen() || detail::SingHoldsSound())) {
             // Apple's player says nothing: during a mix its silence is counted like any other block, so that the
-            // deck keeps knowing where this stream is.
+            // deck keeps knowing where this stream is; in Sing's studio mode, what it holds back plays on in it.
             std::fill_n(reinterpret_cast<float*>(data), static_cast<size_t>(count) * 2, 0.0f);
             flags &= ~static_cast<DWORD>(AUDCLNT_BUFFERFLAGS_SILENT);
             silent = false;

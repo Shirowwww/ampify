@@ -3,8 +3,8 @@
 #include <windows.h>
 
 #include <array>
-#include <cstring>
 #include <cstdint>
+#include <vector>
 
 #include "../../core/sing_pack.hpp"
 #include "onnxruntime_c_api.h"
@@ -29,6 +29,13 @@ struct OrtVocalModel::Handles {
     OrtSessionOptions* options = nullptr;
     OrtSession* session = nullptr;
     OrtMemoryInfo* memory = nullptr;
+    OrtRunOptions* runOptions = nullptr;
+    OrtIoBinding* binding = nullptr;
+    // The tensors bound, around the caller's buffers: made again only when those move.
+    OrtValue* input = nullptr;
+    OrtValue* output = nullptr;
+    const float* boundInput = nullptr;
+    float* boundOutput = nullptr;
 
     // Empty when the call succeeded, else ONNX Runtime's message. The status is released either way.
     std::string Check(OrtStatus* status) const {
@@ -40,6 +47,10 @@ struct OrtVocalModel::Handles {
 
     ~Handles() {
         if (api) {
+            if (binding) api->ReleaseIoBinding(binding);
+            if (input) api->ReleaseValue(input);
+            if (output) api->ReleaseValue(output);
+            if (runOptions) api->ReleaseRunOptions(runOptions);
             if (memory) api->ReleaseMemoryInfo(memory);
             if (session) api->ReleaseSession(session);
             if (options) api->ReleaseSessionOptions(options);
@@ -105,31 +116,61 @@ std::unique_ptr<OrtVocalModel> OrtVocalModel::Load(const std::filesystem::path& 
         why = h.Check(h.api->CreateSession(h.env, file.c_str(), h.options, &h.session));
     }
     if (why.empty()) why = h.Check(h.api->CreateCpuMemoryInfo(OrtArenaAllocator, OrtMemTypeDefault, &h.memory));
+    if (why.empty()) why = h.Check(h.api->CreateRunOptions(&h.runOptions));
+    if (why.empty()) why = h.Check(h.api->CreateIoBinding(h.session, &h.binding));
     if (!why.empty()) return nullptr;
+    // The first run compiles the graph on the card (hundreds of ms): done now, not on the first song's time.
+    std::vector<float> silence(kValues, 0.0f), vocals(kValues);
+    if (!model->Run(silence.data(), vocals.data())) {
+        why = model->LastError();
+        return nullptr;
+    }
+    model->Unbind();
     return model;
 }
 
 OrtVocalModel::~OrtVocalModel() = default;
 
+// A CPU tensor of the model's shape around `data`, which ONNX Runtime reads or writes in place.
+std::string OrtVocalModel::Wrap(float* data, OrtValue*& value) {
+    Handles& h = *m_handles;
+    if (value) h.api->ReleaseValue(value);
+    value = nullptr;
+    return h.Check(h.api->CreateTensorWithDataAsOrtValue(h.memory, data, kValues * sizeof(float), kShape,
+                                                         std::size(kShape), ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT,
+                                                         &value));
+}
+
+void OrtVocalModel::Unbind() {
+    Handles& h = *m_handles;
+    h.api->ClearBoundInputs(h.binding);
+    h.api->ClearBoundOutputs(h.binding);
+    for (OrtValue** value : {&h.input, &h.output}) {
+        if (*value) h.api->ReleaseValue(*value);
+        *value = nullptr;
+    }
+    h.boundInput = nullptr;
+    h.boundOutput = nullptr;
+}
+
+// Bound to the caller's buffers: the card's answer is copied straight into `vocals`, with no tensor made or freed
+// per run. The input is bound again each run: binding is when ONNX Runtime copies it to the card.
 bool OrtVocalModel::Run(const float* spectrum, float* vocals) {
     Handles& h = *m_handles;
-    OrtValue* input = nullptr;
-    OrtValue* output = nullptr;
-    // ONNX Runtime reads the input in place: the cast does not let it write there.
-    m_lastError = h.Check(h.api->CreateTensorWithDataAsOrtValue(
-        h.memory, const_cast<float*>(spectrum), kValues * sizeof(float), kShape, std::size(kShape),
-        ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT, &input));
-    const char* inputNames[] = {"input"};
-    const char* outputNames[] = {"output"};
-    if (m_lastError.empty()) {
-        m_lastError = h.Check(h.api->Run(h.session, nullptr, inputNames, &input, 1, outputNames, 1, &output));
+    m_lastError.clear();
+    if (spectrum != h.boundInput) {
+        // ONNX Runtime reads an input in place: the cast does not let it write there.
+        m_lastError = Wrap(const_cast<float*>(spectrum), h.input);
+        h.boundInput = m_lastError.empty() ? spectrum : nullptr;
     }
-    float* data = nullptr;
-    if (m_lastError.empty()) m_lastError = h.Check(h.api->GetTensorMutableData(output, reinterpret_cast<void**>(&data)));
-    if (m_lastError.empty() && data) std::memcpy(vocals, data, kValues * sizeof(float));
-    if (output) h.api->ReleaseValue(output);
-    if (input) h.api->ReleaseValue(input);
-    return m_lastError.empty() && data;
+    if (m_lastError.empty()) m_lastError = h.Check(h.api->BindInput(h.binding, "input", h.input));
+    if (m_lastError.empty() && vocals != h.boundOutput) {
+        m_lastError = Wrap(vocals, h.output);
+        if (m_lastError.empty()) m_lastError = h.Check(h.api->BindOutput(h.binding, "output", h.output));
+        h.boundOutput = m_lastError.empty() ? vocals : nullptr;
+    }
+    if (m_lastError.empty()) m_lastError = h.Check(h.api->RunWithBinding(h.session, h.runOptions, h.binding));
+    return m_lastError.empty();
 }
 
 }  // namespace ampify::win::sing

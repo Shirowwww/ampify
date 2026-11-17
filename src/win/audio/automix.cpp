@@ -92,6 +92,9 @@ struct Api {
     const void*(__cdecl* copyStrategy)(void*) = nullptr;
     const void* preferStereo = nullptr;  // AVCFPlayerMultichannelAudioStrategy_PreferStereo, a CFString
     const void* matchDevice = nullptr;   // ..._MatchMultichannelTrackPreferenceToAudioDevice, Apple's at each play
+    // Optional: tell Apple's queue player apart when it was made before the hooks (Adopt).
+    unsigned long(__cdecl* typeOf)(const void*) = nullptr;
+    unsigned long(__cdecl* queueType)() = nullptr;
     bool ready = false;
 };
 
@@ -142,6 +145,8 @@ const Api& A() {
         };
         a.preferStereo = constant("AVCFPlayerMultichannelAudioStrategy_PreferStereo");
         a.matchDevice = constant("AVCFPlayerMultichannelAudioStrategy_MatchMultichannelTrackPreferenceToAudioDevice");
+        a.typeOf = FromAddress<decltype(a.typeOf)>(get(cf, "CFGetTypeID"));
+        a.queueType = FromAddress<decltype(a.queueType)>(get(av, "AVCFQueuePlayerGetTypeID"));
         a.ready = a.copyTracks && a.copyTrackAsset && a.copyFormats && a.copyDescription && a.copyCurrentItem &&
                   a.copyItems && a.itemAsset && a.itemTime && a.itemDuration && a.seekItem &&
                   a.endTime && a.createItem && a.createPlayer && a.seekPlayer && a.play && a.pause && a.rate &&
@@ -274,8 +279,9 @@ std::optional<bool> InAtmos(void* item) {
     if (!tracks) return std::nullopt;
     std::vector<std::string> descriptions;
     // CFStringGetCString gives nothing when the text does not fit: a Dolby Atmos format runs past 1024 bytes
-    // (found on 16/11/2026, the song then counted as neither), so the room is large.
-    std::vector<char> buffer(64 * 1024);
+    // (found on 16/11/2026, the song then counted as neither), so the room is large. Asked several times a second
+    // while Sing is on: made once per thread.
+    thread_local std::vector<char> buffer(64 * 1024);
     for (long long i = 0; i < A().arrayCount(tracks.get()); i++) {
         Ref asset(A().copyTrackAsset(A().arrayAt(tracks.get(), i)));
         if (!asset) continue;
@@ -365,12 +371,15 @@ public:
         return item.get() == m_target;
     }
 
+    double SoundHeldBack() override { return detail::SingLag(); }
+
     bool StartGhost(const automix::MixPlan& plan) override {
         StopGhost();
         const int rate = detail::MainStreamRate();
         void* asset = m_source ? A().itemAsset(m_source) : nullptr;
         const std::wstring endpoint = DefaultEndpoint();
-        if (!asset || rate == 0 || endpoint.empty()) return false;
+        // Apple's player found by its controls (Adopt) brings no options nor notification queue to make one like it.
+        if (!asset || rate == 0 || endpoint.empty() || !g_notify.load()) return false;
         m_ghostItem = A().createItem(nullptr, asset, g_notify.load());
         if (!m_ghostItem) return false;
         // The version of the song Apple's player plays, lossless when it does: left to itself the item plays the
@@ -509,7 +518,6 @@ public:
         void* current = const_cast<void*>(A().arrayAt(items.get(), 0));
         void* next = const_cast<void*>(A().arrayAt(items.get(), 1));
         if (NameOf(next) != plan.next) return "the next song changed";
-        if (detail::SingHoldsSound()) return "Sing's studio mode holds the sound back";
         // Dolby Atmos goes out as objects, not as a stereo stream the deck could mix into.
         if (detail::MainStreamRate() == 0) return "the sound does not go out as a stereo stream";
         std::string refused;
@@ -635,8 +643,20 @@ void* __cdecl CreateQueue_Hook(void* a, void* b, void* options, void* notify, vo
     return player;
 }
 
+// Apple restores its last session when the agent starts, sometimes before the kernel is in: its queue player is then
+// made unseen, and found by the first control Apple sends it. Without the options it was made with, it serves
+// everything but AutoMix's second player.
+void Adopt(void* player) {
+    if (!player || player == g_queue.load() || !A().typeOf || !A().queueType) return;
+    if (A().typeOf(player) != A().queueType()) return;
+    A().retain(player);  // kept like one seen made, for the life of the process
+    g_queue = player;
+    Note("AutoMix: Apple's queue player found by its controls (made before the hooks)");
+}
+
 SetRate_t g_setRate = nullptr;
 void __cdecl SetRate_Hook(void* player, float rate) {
+    Adopt(player);
     const bool apples = player == g_queue.load();
     if (apples && rate != 0.0f) detail::SingPlays();
     g_setRate(player, rate);
@@ -674,6 +694,7 @@ void AppleSeeks() {
 }
 
 void __cdecl SeekPlayer_Hook(void* player, CMTime time) {
+    Adopt(player);
     if (player == g_queue.load()) AppleSeeks();
     g_seekPlayer(player, time);
     if (player == g_queue.load()) {
@@ -740,6 +761,7 @@ CMTime __cdecl ItemTime_Hook(void* item) {
 
 Generic_t g_advance = nullptr;
 void* __cdecl Advance_Hook(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h) {
+    Adopt(a);  // `a` is the queue player
     AppleSeeks();
     void* result = g_advance(a, b, c, d, e, f, g, h);
     Instance().Interrupt("skipped");
@@ -747,17 +769,23 @@ void* __cdecl Advance_Hook(void* a, void* b, void* c, void* d, void* e, void* f,
     return result;
 }
 
+// Removing the song that plays moves the queue to another one, as a skip does: what Sing holds is of the old song.
 Generic_t g_remove = nullptr;
 void* __cdecl Remove_Hook(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h) {
+    Adopt(a);  // `a` is the queue player
+    const bool playing = b && detail::CurrentSong() == b;  // `b` is the item
     void* result = g_remove(a, b, c, d, e, f, g, h);
     Instance().Interrupt("the queue changed");
+    if (playing) detail::SingSeeked();
     return result;
 }
 
 Generic_t g_removeAll = nullptr;
 void* __cdecl RemoveAll_Hook(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h) {
+    Adopt(a);  // `a` is the queue player
     void* result = g_removeAll(a, b, c, d, e, f, g, h);
     Instance().Interrupt("the queue changed");
+    detail::SingSeeked();
     return result;
 }
 
@@ -844,6 +872,13 @@ bool InAtmosNow() {
     if (!A().ready || !queue) return false;
     Ref item(A().copyCurrentItem(queue));
     return item && InAtmos(item.item()).value_or(false);
+}
+
+const void* CurrentSong() {
+    void* queue = g_queue.load();
+    if (!A().ready || !queue) return nullptr;
+    Ref item(A().copyCurrentItem(queue));
+    return item.get();  // released here: only its address is kept, to compare
 }
 
 bool HoldStereo(bool hold) {

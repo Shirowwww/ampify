@@ -63,16 +63,21 @@ int MainStreamRate();                   // the rate of Apple's stereo stream, 0 
 void HoldClockBack(double seconds);  // 0: Apple's own time again
 bool JumpInPlace(double back);       // to `back` seconds before where it is; false when the player is not known yet
 bool InAtmosNow();                   // the song playing goes out as Dolby Atmos objects
+const void* CurrentSong();           // the item Apple's queue plays, only to compare; null when not known
 // Apple's player asked to prefer stereo (Sing), or given back its own choice; false when it cannot be asked.
 bool HoldStereo(bool hold);
 // Sing (sing.cpp), called from the hooks: one block of Apple's stereo stream, in place, on its audio thread; and a
 // seek or a skip, after which what is held back belongs to another moment of the song.
 void StartSing();  // once the hooks are in: Sing's thread follows what the interface asks
 void SingMain(float* samples, unsigned frames, int rate);
+// One block of the deck's stream (AutoMix's old song), in place, `heard` false when the deck gave silence (then
+// `samples` is written over). True when sound goes out: in studio mode, what it holds plays on after the deck.
+bool SingTail(float* samples, unsigned frames, int rate, bool heard);
 void SingSeeked();
 void SingPaused();  // after Apple's player paused
 void SingPlays();   // before Apple's player plays
-bool SingHoldsSound();  // studio mode on: AutoMix stands aside
+bool SingHoldsSound();  // studio mode on: Apple's silent blocks are played through it, so what it holds is heard
+double SingLag();       // seconds studio mode holds the sound back, 0 when off: a mix waits that long to end
 
 // Diagnostic (output_record.cpp): while record.on exists in the kit, what the stereo stream sends goes to a WAV file.
 void RecordOutput(const float* samples, unsigned frames, int rate);  // audio thread, after Ampify's steps

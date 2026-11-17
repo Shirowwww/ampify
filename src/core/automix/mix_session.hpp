@@ -46,6 +46,9 @@ public:
     // Undoes ArmSwitch: A gets its own end back. With rewindNext, B goes back to its start, even if it already plays
     // (the user skipped to it before the switch).
     virtual void Disarm(bool rewindNext) = 0;
+    // Seconds the sound is held back after the deck (Sing's studio mode): the second player plays on that long after
+    // the mix, so that the end of A's fade it carried is heard.
+    virtual double SoundHeldBack() { return 0; }
 };
 
 enum class Phase { Idle, Waiting, Preparing, Aligning, Ready, TakingOver, Mixing, Recovering, Done, Failed };
@@ -107,6 +110,7 @@ private:
     void LearnSwitchDelay();
     bool SwitchedOnPlan();  // Apple's player moved to B at the plan's point, not before (a skip)
     void LetGo();           // the second player stops and Apple's player is left as it plays
+    bool HeldBackPlayed(double now);  // the mix's sound is all given: true once what is held back was heard too
 
     MixDecks& m_decks;
     mutable std::mutex m_lock;
@@ -130,6 +134,7 @@ private:
     double m_lastGhost = NAN;      // the second player's clock at the last tick, while it starts
     double m_lastHeard = NAN;
     double m_lastHeardMoved = -1;  // while the deck's copy is heard, when its time last moved
+    double m_endSince = -1;        // when the mix's sound was all given, while what is held back plays out
     DeckGains m_gains;             // last gains set
     DeckGains m_recoverFrom;
     double m_recoverSeconds = kRecoverSeconds;

@@ -10,6 +10,8 @@
 
 #include "../../core/sing/vocal_model.hpp"
 
+struct OrtValue;  // ONNX Runtime's, at global scope as its C header declares it
+
 namespace ampify::win::sing {
 
 class OrtVocalModel final : public ampify::sing::VocalModel {
@@ -23,9 +25,10 @@ public:
     bool Run(const float* spectrum, float* vocals) override;
     // The last run's failure, for the journal.
     const std::string& LastError() const { return m_lastError; }
-
 private:
     OrtVocalModel() = default;
+    std::string Wrap(float* data, ::OrtValue*& value);
+    void Unbind();
     struct Handles;
     std::unique_ptr<Handles> m_handles;
     std::string m_lastError;

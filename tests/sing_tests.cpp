@@ -456,6 +456,99 @@ TEST_CASE(Sing_StudioStreamRaisesADelayItCouldNeverMeet) {
     CHECK(delay < 1.05);
 }
 
+// The next window a few STFT hops later: what both share is taken over, and the model sees the same spectrum as
+// with a whole analysis, while the vocals are made only where they are wanted.
+TEST_CASE(Sing_ALaterWindowGivesTheSameSpectrumAsAWholeAnalysis) {
+    constexpr size_t kShift = 17;
+    const std::vector<float> left = BandNoise(7), right = BandNoise(8);
+    std::vector<float> laterLeft(left.begin() + kShift * kFftHop, left.end()), laterRight(right.begin() + kShift * kFftHop, right.end());
+    const std::vector<float> fresh = BandNoise(9);
+    laterLeft.insert(laterLeft.end(), fresh.begin(), fresh.begin() + kShift * kFftHop);
+    laterRight.insert(laterRight.end(), fresh.begin(), fresh.begin() + kShift * kFftHop);
+    std::vector<float> outLeft(kChunk), outRight(kChunk), wholeLeft(kChunk), wholeRight(kChunk);
+    CapturingModel incremental, whole;
+    VocalSplitter splitter(incremental), reference(whole);
+    VocalSplitter::Spectrum last;
+    const size_t from = kChunk - 40000;
+    REQUIRE(splitter.Vocals(left.data(), right.data(), last, VocalSplitter::kNewWindow, 0, outLeft.data(), outRight.data()));
+
+    REQUIRE(splitter.Vocals(laterLeft.data(), laterRight.data(), last, kShift, from, outLeft.data(), outRight.data()));
+    REQUIRE(reference.Vocals(laterLeft.data(), laterRight.data(), wholeLeft.data(), wholeRight.data()));
+
+    CHECK(incremental.seen == whole.seen);
+    double worst = 0;
+    for (size_t i = from; i < kChunk; i++) {
+        worst = std::max({worst, double(std::fabs(outLeft[i] - wholeLeft[i])), double(std::fabs(outRight[i] - wholeRight[i]))});
+    }
+    CHECK(worst < 1e-6);
+}
+
+// A pause keeps what the stream holds: playing again goes on from there at once, with no silence and nothing lost.
+TEST_CASE(Sing_StudioStreamPlaysOnFromWhereItPausedWithNoSilence) {
+    constexpr int kRate = 44100;
+    HalfModel model;
+    VocalSplitter splitter(model);
+    StudioStream stream(kRate);
+    const std::vector<float> song = Song(kRate, 6.0);
+    const std::vector<float> silence(kRate * 2, 0.0f);
+    const size_t delay = Frames(stream, kRate);
+    const size_t pause = 3 * kRate;
+    const size_t fade = kRate / 100;
+    Play(stream, splitter, song, 0, pause, kRate, 1.0);
+
+    std::vector<float> paused = silence;
+    for (size_t at = 0; at < paused.size() / 2; at += kRate / 100) {
+        stream.Process(paused.data() + at * 2, kRate / 100, 1.0, true);  // the player's stream says nothing
+    }
+    const double lag = stream.Lag();
+    const std::vector<float> after = Play(stream, splitter, song, pause, pause + kRate / 2, kRate, 1.0);
+
+    CHECK(Rms(paused, 0, fade, paused.size() / 2) == 0.0);
+    CHECK_NEAR(lag, stream.Delay() - static_cast<double>(fade) / kRate, 1e-9);  // the fade out was heard
+    // Faded back in over 10 ms, from just after the 10 ms faded out when it paused.
+    CHECK(WorstGap(after, song, pause + fade, delay, fade, kRate / 2, 1.0) < 1e-6);
+}
+
+// The player hands over a little more once paused: taken in, it is heard after the pause, and Lag() counts it.
+TEST_CASE(Sing_PausedStudioStreamTakesThePlayersLastSoundButNotItsSilence) {
+    constexpr int kRate = 44100;
+    HalfModel model;
+    VocalSplitter splitter(model);
+    StudioStream stream(kRate);
+    const std::vector<float> song = Song(kRate, 6.0);
+    const size_t delay = Frames(stream, kRate);
+    const size_t pause = 3 * kRate;
+    const size_t last = kRate / 20;  // 50 ms of sound after the pause
+    const size_t fade = kRate / 100;
+    Play(stream, splitter, song, 0, pause, kRate, 1.0);
+
+    std::vector<float> tail(song.begin() + pause * 2, song.begin() + (pause + last) * 2);
+    stream.Process(tail.data(), last, 1.0, true);
+    std::vector<float> quiet(kRate / 10 * 2, 0.0f);
+    stream.Process(quiet.data(), kRate / 10, 1.0, true);
+    const double lag = stream.Lag();
+    const std::vector<float> after = Play(stream, splitter, song, pause + last, pause + last + kRate / 2, kRate, 1.0);
+
+    CHECK_NEAR(lag, stream.Delay() + static_cast<double>(last - fade) / kRate, 1e-9);
+    CHECK(WorstGap(after, song, pause + last + fade, delay + last, fade, kRate / 2, 1.0) < 1e-6);
+}
+
+// The deck's stream starts in step with Apple's, which a pause may have made lag more than the delay.
+TEST_CASE(Sing_StudioStreamFlushedWithALagHoldsThatLong) {
+    constexpr int kRate = 44100;
+    HalfModel model;
+    VocalSplitter splitter(model);
+    StudioStream stream(kRate);
+    const std::vector<float> song = Song(kRate, 5.0);
+    const size_t lag = Frames(stream, kRate) + kRate / 10;
+
+    stream.Flush(StudioStream::Fade::None, static_cast<double>(lag) / kRate);
+    const std::vector<float> out = Play(stream, splitter, song, 0, song.size() / 2, kRate, 0.0);
+
+    CHECK(Rms(out, 0, 0, lag) == 0.0);
+    CHECK(WorstGap(out, song, 0, lag, lag + kRate / 5, out.size() / 2, kHalfOut) < 1e-3);
+}
+
 // ---- the light filter
 
 TEST_CASE(Sing_LightFilterRemovesACentredVoiceTone) {
@@ -561,7 +654,7 @@ TEST_CASE(Sing_StudioStreamFadesTheSongComingInWhenItWasNotPlaying) {
     const size_t fade = kRate / 100;
     Play(stream, splitter, song, 0, 2 * kRate, kRate, 1.0);
 
-    stream.Flush(false);
+    stream.Flush(StudioStream::Fade::Live);
     const std::vector<float> out = Play(stream, splitter, song, back, back + kRate / 10, kRate, 1.0);
 
     double worst = 0;

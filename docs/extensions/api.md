@@ -271,12 +271,14 @@ Ampify.audio.sing.onChange(fn)           // fn(state) when the state moves (poll
 ```
 
 - `Light` is the lighter quality; `Studio` is the studio quality, run on the graphics card, which holds the sound back
-  for `delay` seconds so that the lyrics stay in step.
+  for `delay` seconds so that the lyrics stay in step. A pause keeps what Studio holds, so playing again goes on at
+  once; a move in the song, another song or Studio turned on starts it again silent for `delay`. AutoMix mixes with
+  either quality on: in Studio, both songs of a mix are held back alike.
 - `mode` and `voice` are what was asked last (`voice` stays when `set` is called without one). The rest is what the
   audio process says: `phase` is `off`, `downloading`, `loading`, `buffering`, `on` or `failed`; `progress` is 0 to 1
   while downloading or loading; `available` is whether Studio can run on this PC (`null` until known).
-- `reason` says why Sing is not fully on: `none`, `no-graphics-card`, `download-failed`, `model-failed`,
-  `dolby-atmos` or `automix-mixing`.
+- `reason` says why Sing is not fully on: `none`, `no-graphics-card`, `download-failed`, `model-failed` or
+  `dolby-atmos`. `automix-mixing` is no longer given: Ampify 1.5.0 alone gave it, while AutoMix mixed.
 - Sing works on Apple's stereo stream. While any mode is on, a song playing in Dolby Atmos is switched to its stereo
   version, and back when Sing goes off; Apple Music reloads the song each time, and its position stands still for 3 to
   4 s. `dolby-atmos` is left for an Apple Music that cannot be asked.

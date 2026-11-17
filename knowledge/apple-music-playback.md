@@ -12,6 +12,14 @@ answers. AutoMix (`src/win/audio/automix.cpp`, `src/core/automix/`) is built on 
     keys): `CFRetain` it to make another player with it later; a freed copy crashed the agent in `objc.dll`.
   - `notificationQueue` is a libdispatch queue (`com.apple.iTunes.ITAVCF`), not a CoreFoundation object: `CFRetain` on
     it crashes the agent in `objc.dll` too.
+  - When Apple Music starts, the agent restores the last session and often makes this player before the kernel is in
+    (seen on most starts on 2026-11-17): the hook on its creation never fires. The player is then found by the first
+    control Apple sends it (`AVCFPlayerSetRate`, a seek, `AVCFQueuePlayerRemoveItem`...), `CFGetTypeID` against
+    `AVCFQueuePlayerGetTypeID`. Its options and notification queue stay unknown, so no second player can be made like
+    it in that session.
+- The next button removes the song that plays (`AVCFQueuePlayerRemoveItem`), then calls
+  `AVCFQueuePlayerRemoveAllItems` and inserts the queue again; it never calls `AVCFQueuePlayerAdvanceToNextItem`
+  (2026-11-17). The previous button, a few seconds into a song, seeks it to 0.
 - A few seconds after a song starts, Apple inserts the next one (`AVCFQueuePlayerInsertItem` after the current item),
   then calls `AVCFPlayerSetRate(player, 1)`. When a song ends it calls `AVCFPlayerItemSetAudioTapProcessor(item, NULL)`
   twice on it. It never calls the audio mix or volume ramp functions.
@@ -44,7 +52,9 @@ answers. AutoMix (`src/win/audio/automix.cpp`, `src/core/automix/`) is built on 
   sound heard, inside the noise of the SMTC readings). A seek of the item to where it is makes Apple read it again.
   That time runs about 150 ms behind the samples Apple writes to WASAPI at that moment, so a seek to it plays the last
   150 ms again.
-- While paused, Apple's stream keeps running: a delay line in the audio hook would play on after the pause.
+- While paused, Apple's stream keeps running: a delay line in the audio hook would play on after the pause. Its
+  blocks are then flagged silent; Sing's studio mode (2026-11-17) takes them as zeros and stops reading its delay
+  line, so playing again goes on from where the sound stopped, at once.
 - **Overlapped playback**: `AVCFPlayerItemSetAdvanceTimeForOverlappedPlayback(current, t)` starts the next item at
   `t` while the current one goes on to its end (or its forward end time). Both play at full volume, in exact step.
 - **A second player** on Apple's own asset: `AVCFPlayerItemCreateWithAsset(NULL, asset, queue)` and

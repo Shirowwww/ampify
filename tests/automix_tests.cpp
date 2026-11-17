@@ -39,6 +39,8 @@ public:
     int aligns = 0;
     std::vector<DeckGains> gains;  // every SetGains
     int stops = 0;
+    double stoppedAt = -1;  // the test's clock at the last StopGhost
+    double heldBack = 0;    // what Sing holds back after the deck
 
     double ATime() const { return aOrigin + t; }
 
@@ -79,7 +81,9 @@ public:
     void StopGhost() override {
         ghostOn = aligned = false;
         stops++;
+        stoppedAt = t;
     }
+    double SoundHeldBack() override { return heldBack; }
     std::optional<DeckStep> Align() override {
         aligns++;
         if (foundAgainLead >= 0) {
@@ -304,6 +308,24 @@ TEST_CASE(AutoMix_ThePlanReadsFromTheScriptsObject) {
     CHECK(plan->keys[1].aLow == 0);
     CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0,1]]})"), &error));
     CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"rate":"fast","keys":[]})"), &error));
+}
+
+// Sing's studio mode plays everything 1.3 s late: the second player carries A that much longer after the last key,
+// or the end of A's fade, still held back, would be cut.
+TEST_CASE(AutoMix_ASessionLetsTheSoundHeldBackPlayOutBeforeTheSecondPlayerStops) {
+    FakeDecks plain, held;
+    held.heldBack = 1.3;
+    MixSession plainSession(plain), heldSession(held);
+    REQUIRE(plainSession.Start(Plan(), 200, 200).empty());
+    REQUIRE(heldSession.Start(Plan(), 200, 200).empty());
+
+    Run(plainSession, plain, 60);
+    Run(heldSession, held, 60);
+
+    CHECK(plainSession.GetStatus().phase == Phase::Done);
+    CHECK(heldSession.GetStatus().phase == Phase::Done);
+    CHECK_NEAR(held.stoppedAt - plain.stoppedAt, 1.3, 0.02);
+    CHECK(held.ApplesAlone());
 }
 
 TEST_CASE(AutoMix_ASessionCarriesTheEndOfTheSongWhileApplesPlayerMovesOn) {
