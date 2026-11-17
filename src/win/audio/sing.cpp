@@ -71,6 +71,9 @@ core_sing::LightFilter g_light;      // Apple's audio thread only
 core_sing::LightFilter g_tailLight;  // the deck's audio thread only
 // The rate of Apple's last block in studio mode; StartStudio sets it too, for the stream it flushed itself.
 std::atomic<int> g_lastRate{0};
+// Light mode ran on the last block: else its filter still holds a few ms of another moment, which it forgets first.
+bool g_lightOn = false;              // Apple's audio thread only
+bool g_tailLightOn = false;          // the deck's audio thread only
 bool g_tailOn = false;               // the deck's audio thread only: its studio stream holds the old song
 std::int64_t g_tailQuiet = 0;        // the deck's audio thread only: frames fed since the deck fell silent
 
@@ -127,6 +130,8 @@ namespace detail {
 
 void SingMain(float* samples, unsigned frames, int rate) {
     const auto mode = static_cast<Mode>(g_mode.load(std::memory_order_relaxed));
+    if (mode == Mode::Light && !g_lightOn) g_light.Reset();
+    g_lightOn = mode == Mode::Light;
     if (mode == Mode::Off) return;
     const double voice = g_voice.load(std::memory_order_relaxed);
     if (mode == Mode::Light) {
@@ -150,7 +155,10 @@ bool SingTail(float* samples, unsigned frames, int rate, bool heard) {
     const auto mode = static_cast<Mode>(g_mode.load(std::memory_order_relaxed));
     if (mode != Mode::Studio) {
         g_tailOn = false;
-        if (mode == Mode::Light && heard) g_tailLight.Process(samples, frames, rate, g_voice.load());
+        const bool light = mode == Mode::Light && heard;
+        if (light && !g_tailLightOn) g_tailLight.Reset();
+        g_tailLightOn = light;
+        if (light) g_tailLight.Process(samples, frames, rate, g_voice.load());
         return heard;
     }
     if (RateIndex(rate) < 0) return heard;

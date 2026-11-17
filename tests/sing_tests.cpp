@@ -631,48 +631,157 @@ TEST_CASE(Sing_StudioStreamFlushedWithALagHoldsThatLong) {
 
 // ---- the light filter
 
-TEST_CASE(Sing_LightFilterRemovesACentredVoiceTone) {
-    LightFilter filter;
-    std::vector<float> tone = Sine(44100, 1.0, 1000, 0.5, 0.5);
-    const double before = Rms(tone, 0, 22050, 44100);
+namespace {
 
-    filter.Process(tone.data(), tone.size() / 2, 44100, 0.0);
-
-    CHECK(Db(Rms(tone, 0, 22050, 44100) / before) < -30);
-    CHECK(Db(Rms(tone, 1, 22050, 44100) / before) < -30);
+// A tone's amplitude in one channel over frames [first, last), by projection on it.
+double ToneLevel(const std::vector<float>& stereo, size_t channel, size_t first, size_t last, double hz, int rate) {
+    double sine = 0, cosine = 0;
+    for (size_t i = first; i < last; i++) {
+        const double angle = 2 * kPi * hz * static_cast<double>(i) / rate;
+        sine += stereo[i * 2 + channel] * std::sin(angle);
+        cosine += stereo[i * 2 + channel] * std::cos(angle);
+    }
+    return 2 * std::hypot(sine, cosine) / static_cast<double>(last - first);
 }
 
-// What differs between the sides stays, at half its level: a tone on the left alone is half on each side.
-TEST_CASE(Sing_LightFilterKeepsHalfOfAToneOnOneSide) {
+// What the mixes around a voice have: a sound on each side of its own (here a tone left at 5 kHz, right at 7 kHz).
+void AddSides(std::vector<float>& stereo, int rate) {
+    for (size_t i = 0; i < stereo.size() / 2; i++) {
+        const double t = static_cast<double>(i) / rate;
+        stereo[i * 2] += static_cast<float>(0.1 * std::sin(2 * kPi * 5000 * t));
+        stereo[i * 2 + 1] += static_cast<float>(0.1 * std::sin(2 * kPi * 7000 * t));
+    }
+}
+
+void Light(LightFilter& filter, std::vector<float>& stereo, int rate, double voice, size_t block) {
+    for (size_t at = 0; at < stereo.size() / 2; at += block) {
+        filter.Process(stereo.data() + at * 2, std::min(block, stereo.size() / 2 - at), rate, voice);
+    }
+}
+
+}  // namespace
+
+TEST_CASE(Sing_LightFilterRemovesACentredVoiceTone) {
+    constexpr int kRate = 44100;
     LightFilter filter;
-    std::vector<float> tone = Sine(44100, 1.0, 1000, 0.5, 0.0);
-    const double before = Rms(tone, 0, 22050, 44100);
+    std::vector<float> song = Sine(kRate, 1.0, 1000, 0.5, 0.5);
+    AddSides(song, kRate);
 
-    filter.Process(tone.data(), tone.size() / 2, 44100, 0.0);
+    Light(filter, song, kRate, 0.0, 441);
 
-    CHECK(std::fabs(Db(Rms(tone, 0, 22050, 44100) / before) + 6.02) < 1);
-    CHECK(std::fabs(Db(Rms(tone, 1, 22050, 44100) / before) + 6.02) < 1);
+    for (size_t channel = 0; channel < 2; channel++) {
+        CHECK(Db(ToneLevel(song, channel, 22050, 44100, 1000, kRate) / 0.5) < -40);
+    }
+    CHECK(std::fabs(Db(ToneLevel(song, 0, 22050, 44100, 5000, kRate) / 0.1)) < 0.5);
+    CHECK(std::fabs(Db(ToneLevel(song, 1, 22050, 44100, 7000, kRate) / 0.1)) < 0.5);
+}
+
+// A sound on one side alone stays as it is, where the older filter halved it and put it on both sides.
+TEST_CASE(Sing_LightFilterLeavesAToneOnOneSideAsItIs) {
+    constexpr int kRate = 48000;
+    LightFilter filter;
+    std::vector<float> tone = Sine(kRate, 1.0, 1000, 0.5, 0.0);
+
+    Light(filter, tone, kRate, 0.0, 480);
+
+    CHECK(std::fabs(Db(ToneLevel(tone, 0, 24000, 48000, 1000, kRate) / 0.5)) < 0.1);
+    CHECK(Rms(tone, 1, 24000, 48000) < 1e-5);
 }
 
 TEST_CASE(Sing_LightFilterKeepsACentredBassTone) {
+    constexpr int kRate = 192000;
     LightFilter filter;
-    std::vector<float> tone = Sine(192000, 1.0, 60, 0.5, 0.5);
-    const double before = Rms(tone, 0, 96000, 192000);
+    std::vector<float> song = Sine(kRate, 1.0, 60, 0.5, 0.5);
+    AddSides(song, kRate);
 
-    filter.Process(tone.data(), tone.size() / 2, 192000, 0.0);
+    Light(filter, song, kRate, 0.0, 1920);
 
-    CHECK(std::fabs(Db(Rms(tone, 0, 96000, 192000) / before)) < 1);
-    CHECK(std::fabs(Db(Rms(tone, 1, 96000, 192000) / before)) < 1);
+    CHECK(std::fabs(Db(ToneLevel(song, 0, 96000, 192000, 60, kRate) / 0.5)) < 0.5);
+    CHECK(std::fabs(Db(ToneLevel(song, 1, 96000, 192000, 60, kRate) / 0.5)) < 0.5);
 }
 
-TEST_CASE(Sing_LightFilterAtFullVoiceLeavesTheSongAlone) {
+// About 5.5 ms at every rate Apple plays.
+TEST_CASE(Sing_LightFilterLagsTheSameTimeAtEveryRate) {
+    for (const int rate : {44100, 48000, 88200, 96000, 176400, 192000}) {
+        const double ms = 1000.0 * static_cast<double>(LightFilter::DelayFrames(rate)) / rate;
+        CHECK(ms > 5.0 && ms < 6.0);
+    }
+}
+
+TEST_CASE(Sing_LightFilterAtFullVoiceOnlyDelaysTheSong) {
+    constexpr int kRate = 48000;
     LightFilter filter;
-    const std::vector<float> song = Song(48000, 0.5);
+    const std::vector<float> song = Song(kRate, 0.5);
     std::vector<float> out = song;
+    const size_t delay = LightFilter::DelayFrames(kRate);
 
-    filter.Process(out.data(), out.size() / 2, 48000, 1.0);
+    Light(filter, out, kRate, 1.0, 480);
 
-    CHECK(out == song);
+    float worst = 0;
+    for (size_t i = 2 * delay; i < out.size() / 2; i++) {
+        for (size_t channel = 0; channel < 2; channel++) {
+            worst = std::max(worst, std::fabs(out[i * 2 + channel] - song[(i - delay) * 2 + channel]));
+        }
+    }
+    CHECK(worst < 1e-5f);
+}
+
+// Nothing has come through the filter at first: the song goes on as it is, then crossfades, never a gap.
+TEST_CASE(Sing_LightFilterStartsWithoutAGap) {
+    constexpr int kRate = 44100;
+    LightFilter filter;
+    std::vector<float> song(kRate / 5 * 2);
+    std::uint32_t seed = 1;
+    for (float& sample : song) {
+        seed = seed * 1664525u + 1013904223u;
+        sample = static_cast<float>(seed >> 8) / static_cast<float>(1u << 24) - 0.5f;  // noise: every frequency
+    }
+    std::vector<float> out = song;
+    const size_t delay = LightFilter::DelayFrames(kRate);
+
+    Light(filter, out, kRate, 1.0, 441);
+
+    CHECK(std::equal(out.begin(), out.begin() + static_cast<std::ptrdiff_t>(delay * 2), song.begin()));
+    for (size_t at = 0; at + 128 <= 3 * delay; at += 64) {
+        CHECK(std::fabs(Db(Rms(out, 0, at, at + 128) / Rms(song, 0, at, at + 128))) < 2);
+    }
+}
+
+TEST_CASE(Sing_LightFilterGivesTheSameWhateverTheBlocks) {
+    constexpr int kRate = 44100;
+    LightFilter whole, single;
+    std::vector<float> one = Song(kRate, 0.3);
+    AddSides(one, kRate);
+    std::vector<float> other = one;
+
+    Light(whole, one, kRate, 0.2, 4096);
+    Light(single, other, kRate, 0.2, 1);
+
+    CHECK(one == other);
+}
+
+// A mono song cannot be told from its voice this way: past its first frame, the filter leaves it alone.
+TEST_CASE(Sing_LightFilterStandsAsideOnAMonoSong) {
+    constexpr int kRate = 44100;
+    LightFilter filter;
+    std::vector<float> song = Sine(kRate, 0.5, 1000, 0.5, 0.5);
+
+    Light(filter, song, kRate, 0.0, 441);
+
+    CHECK(std::fabs(Db(ToneLevel(song, 0, 4410, 22050, 1000, kRate) / 0.5)) < 0.1);
+}
+
+TEST_CASE(Sing_LightFilterResetForgetsTheLastSong) {
+    constexpr int kRate = 44100;
+    LightFilter filter;
+    std::vector<float> song = Song(kRate, 0.2);
+    std::vector<float> quiet(kRate / 10 * 2, 0.0f);
+    Light(filter, song, kRate, 0.0, 441);
+
+    filter.Reset();
+    Light(filter, quiet, kRate, 0.0, 441);
+
+    CHECK(std::all_of(quiet.begin(), quiet.end(), [](float sample) { return sample == 0.0f; }));
 }
 
 // ---- the studio files
