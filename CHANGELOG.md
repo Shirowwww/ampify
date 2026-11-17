@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.5.2 (2026-11-17)
+
+Sing works on your own song files, its Light quality is rebuilt, and AutoMix can mix songs that have a Dolby Atmos
+version.
+
+- Sing on local files. Apple Music plays the songs of your library files with a player of its own, not the one it
+  uses for streaming, so Sing did not see a skip or a pause there: Studio could go silent, or play the last seconds of
+  the previous song over the next one. Ampify now follows that player too. A skip drops what Studio held, and playing
+  again after a pause goes on from the same spot. The time Apple Music shows for a local song is not yet held back by
+  Studio's delay, as it is for streaming.
+- Sing's Light quality is rebuilt. It used to keep each channel minus their middle, which put the two sides out of
+  phase and left the music hollow. It now turns each frequency down by how alike the two channels are, with a delay
+  of 5.8 ms, and leaves mono songs alone. On 46 clips of the MUSDB18 test set, the voice left drops from -9.4 to
+  -15.8 dB and the music comes out much cleaner (its SDR goes from 1.0 to 6.3 dB).
+- AutoMix 1.1.0 can mix songs that have a Dolby Atmos version: its new "Mix Dolby Atmos songs in stereo" setting, off
+  by default, asks Apple Music for their stereo version while AutoMix is on. A song already playing in Dolby Atmos is
+  never switched under way. Extensions get the same through `Ampify.automix.preferStereo(want)`.
+
 ## 1.5.1 (2026-11-17)
 
 Sing's Studio gains a precise voice model, keeps up with pauses and skips, runs on far less of the processor, and

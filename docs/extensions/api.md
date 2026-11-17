@@ -342,7 +342,7 @@ Ampify.automix.preferStereo(want) // -> true once the wish reached Apple's playe
   Atmos version can be mixed: at once while a stereo song plays or none does, otherwise from the next time Apple
   Music starts playing (a song already in Dolby Atmos is never switched under way). `preferStereo(false)` gives
   Apple's own choice back, unless Sing still asks. Stopping the element gives it back too. The `automix` extension
-  asks while its "Mix Dolby Atmos songs in stereo" setting is on (the default). Added after Ampify 1.5.1: test
+  asks while its "Mix Dolby Atmos songs in stereo" setting is on (it is off by default). Added in Ampify 1.5.2: test
   `typeof Ampify.automix.preferStereo === "function"` first.
 
 ### 5.5 Interface [stable]
