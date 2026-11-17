@@ -469,14 +469,16 @@ TEST_CASE(Sing_LightFilterRemovesACentredVoiceTone) {
     CHECK(Db(Rms(tone, 1, 22050, 44100) / before) < -30);
 }
 
-TEST_CASE(Sing_LightFilterKeepsAToneOnOneSide) {
+// What differs between the sides stays, at half its level: a tone on the left alone is half on each side.
+TEST_CASE(Sing_LightFilterKeepsHalfOfAToneOnOneSide) {
     LightFilter filter;
     std::vector<float> tone = Sine(44100, 1.0, 1000, 0.5, 0.0);
     const double before = Rms(tone, 0, 22050, 44100);
 
     filter.Process(tone.data(), tone.size() / 2, 44100, 0.0);
 
-    CHECK(std::fabs(Db(Rms(tone, 0, 22050, 44100) / before)) < 1);
+    CHECK(std::fabs(Db(Rms(tone, 0, 22050, 44100) / before) + 6.02) < 1);
+    CHECK(std::fabs(Db(Rms(tone, 1, 22050, 44100) / before) + 6.02) < 1);
 }
 
 TEST_CASE(Sing_LightFilterKeepsACentredBassTone) {
