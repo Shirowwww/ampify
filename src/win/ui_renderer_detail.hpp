@@ -91,13 +91,23 @@ inline void SetVisible(const xaml::UIElement& element, bool visible) {
     if (element.Visibility() != wanted) element.Visibility(wanted);
 }
 
-// A slider's header: its label (kept in Tag) and the value it is on, which WinUI shows only while dragging.
+// A slider's header: its label and unit (kept in Tag as two strings) and the value it is on, which WinUI shows only
+// while dragging.
 inline void ShowSliderValue(const controls::Slider& slider) {
-    std::wstring label(winrt::unbox_value_or<winrt::hstring>(slider.Tag(), L""));
+    winrt::com_array<winrt::hstring> parts;
+    using winrt::Windows::Foundation::IPropertyValue;
+    using winrt::Windows::Foundation::PropertyType;
+    if (auto tag = slider.Tag()) {
+        auto kept = tag.try_as<IPropertyValue>();
+        if (kept && kept.Type() == PropertyType::StringArray) kept.GetStringArray(parts);
+    }
+    std::wstring label = parts.size() > 0 ? std::wstring(parts[0]) : L"";
+    std::wstring unit = parts.size() > 1 ? std::wstring(parts[1]) : L"";
     double value = std::round(slider.Value() * 100) / 100;
     wchar_t number[32];
     std::swprintf(number, 32, L"%g", value);
-    std::wstring text = label.empty() ? number : label + L" · " + number;
+    std::wstring shown = number + unit;
+    std::wstring text = label.empty() ? shown : label + L" · " + shown;
     slider.Header(winrt::box_value(winrt::hstring(text)));
 }
 

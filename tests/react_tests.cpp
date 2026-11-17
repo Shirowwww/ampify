@@ -134,7 +134,7 @@ TEST_CASE(React_ChangeEventsReachTheComponents) {
           const [name, setName] = useState("");
           return h("stack", null,
             h(Toggle, { label: "Actif", value: on, onChange: setOn }),
-            h(Slider, { label: "Niveau", min: 0, max: 100, value: level, onChange: setLevel }),
+            h(Slider, { label: "Niveau", min: 0, max: 100, value: level, unit: " %", onChange: setLevel }),
             h(Dropdown, { label: "Mode", value: mode, options: ["a", { value: "b", label: "Bee" }], onChange: setMode }),
             h(TextField, { label: "Name", value: name, placeholder: "Your name", onChange: setName }));
         }
@@ -143,7 +143,7 @@ TEST_CASE(React_ChangeEventsReachTheComponents) {
     CHECK(element->Start());
     CHECK(f.Panel("settings", "reglages") ==
           R"({"type":"stack","children":[{"type":"toggle","label":"Actif","checked":false,"onChange":1},)"
-          R"({"type":"slider","label":"Niveau","min":0,"max":100,"value":10,"onChange":2},)"
+          R"({"type":"slider","label":"Niveau","min":0,"max":100,"value":10,"unit":" %","onChange":2},)"
           R"({"type":"dropdown","label":"Mode","value":"a","onChange":3,"children":[{"type":"option","value":"a","label":"a","key":"a"},)"
           R"({"type":"option","value":"b","label":"Bee","key":"b"}]},)"
           R"({"type":"textfield","label":"Name","value":"","placeholder":"Your name","onChange":4}]})");
@@ -155,7 +155,7 @@ TEST_CASE(React_ChangeEventsReachTheComponents) {
     element->Pump();
     CHECK(f.Panel("settings", "reglages") ==
           R"({"type":"stack","children":[{"type":"toggle","label":"Actif","checked":true,"onChange":1},)"
-          R"({"type":"slider","label":"Niveau","min":0,"max":100,"value":42,"onChange":2},)"
+          R"({"type":"slider","label":"Niveau","min":0,"max":100,"value":42,"unit":" %","onChange":2},)"
           R"({"type":"dropdown","label":"Mode","value":"b","onChange":3,"children":[{"type":"option","value":"a","label":"a","key":"a"},)"
           R"({"type":"option","value":"b","label":"Bee","key":"b"}]},)"
           R"({"type":"textfield","label":"Name","value":"Alex","placeholder":"Your name","onChange":4}]})");

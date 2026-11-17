@@ -657,7 +657,7 @@ const char kReact[] = R"AMPIFYJS(
   const Spinner = (props) => h("spinner", pick(props, ["size", "label", ...TIP, ...PLACE]));
 
   function Slider(props) {
-    const attributes = pick(props, ["label", "min", "max", "step", "value", "disabled", ...TIP]);
+    const attributes = pick(props, ["label", "min", "max", "step", "value", "unit", "disabled", ...TIP]);
     return h("slider", relay(attributes, props.onChange, Number));
   }
 

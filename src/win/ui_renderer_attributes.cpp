@@ -298,7 +298,8 @@ void XamlRenderer::Setters::Slider(Mounted& mounted, const RenderNode& node, con
         mounted.callbacks->echo = Json(value).Dump();
         slider.Value(value);
     }
-    slider.Tag(winrt::box_value(Wide(node.Text("label"))));
+    const winrt::hstring parts[] = {Wide(node.Text("label")), Wide(node.Text("unit"))};
+    slider.Tag(winrt::Windows::Foundation::PropertyValue::CreateStringArray(parts));
     ShowSliderValue(slider);
 }
 
