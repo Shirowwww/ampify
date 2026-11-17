@@ -18,14 +18,16 @@ namespace {
 
 constexpr auto kMemoryEvery = std::chrono::minutes(1);
 
-uint64_t PrivateBytes() {
-    PROCESS_MEMORY_COUNTERS_EX counters{};
+// The private bytes, and the part of them in RAM: the working set would count shared DLL pages too. A Windows older
+// than 10 2004 does not know the larger form, which leaves the RAM part out.
+PROCESS_MEMORY_COUNTERS_EX2 Counters() {
+    PROCESS_MEMORY_COUNTERS_EX2 counters{};
     counters.cb = sizeof(counters);
-    if (!GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters),
-                              sizeof(counters))) {
-        return 0;
-    }
-    return counters.PrivateUsage;
+    auto* asked = reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&counters);
+    if (GetProcessMemoryInfo(GetCurrentProcess(), asked, sizeof(counters))) return counters;
+    counters = {};
+    if (!GetProcessMemoryInfo(GetCurrentProcess(), asked, sizeof(PROCESS_MEMORY_COUNTERS_EX))) return {};
+    return counters;  // PrivateWorkingSetSize stays 0: the older form has no such field
 }
 
 }  // namespace
@@ -44,7 +46,8 @@ void StartMemoryWatch(Journal& journal, std::string process) {
     std::thread([&journal, process = std::move(process)] {
         MemoryWatch watch(process);
         while (true) {
-            std::string line = watch.Check(PrivateBytes());
+            const PROCESS_MEMORY_COUNTERS_EX2 counters = Counters();
+            std::string line = watch.Check(counters.PrivateUsage, counters.PrivateWorkingSetSize);
             if (!line.empty()) journal.Write(line);
             std::this_thread::sleep_for(kMemoryEvery);
         }

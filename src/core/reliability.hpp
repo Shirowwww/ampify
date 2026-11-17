@@ -37,8 +37,9 @@ class MemoryWatch {
 public:
     explicit MemoryWatch(std::string process);
 
-    // The line to write for this reading, or empty. 0 is a reading that failed.
-    std::string Check(uint64_t privateBytes);
+    // The line to write for this reading, or empty. 0 is a reading that failed. `inRam`, when known, is the part in
+    // physical memory: the graphics card's memory a process uses counts in its private bytes, never in its RAM.
+    std::string Check(uint64_t privateBytes, uint64_t inRam = 0);
 
 private:
     std::string m_process;

@@ -56,12 +56,13 @@ std::string SlowCallLog::Record(std::string_view what, int64_t ms, bool onInterf
 
 MemoryWatch::MemoryWatch(std::string process) : m_process(std::move(process)) {}
 
-std::string MemoryWatch::Check(uint64_t privateBytes) {
+std::string MemoryWatch::Check(uint64_t privateBytes, uint64_t inRam) {
     if (privateBytes == 0) return {};
     bool first = m_nextStep == 0;
     if (!first && privateBytes < m_nextStep) return {};
     m_nextStep = (privateBytes / kMemoryStepBytes + 1) * kMemoryStepBytes;
     std::string size = std::to_string(privateBytes / kMegabyte) + " MB";
+    if (inRam > 0) size += ", " + std::to_string(inRam / kMegabyte) + " MB of it in RAM";
     return "Memory: " + m_process + (first ? " uses " : " grew to ") + size;
 }
 

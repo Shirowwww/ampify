@@ -50,6 +50,13 @@ TEST_CASE(Reliability_MemoryIsLoggedFirstThenAtEachNewStep) {
     CHECK(watch.Check(5100 * mb).empty());
 }
 
+// A graphics card's memory counts in a process's private bytes and not in its RAM: the line says both.
+TEST_CASE(Reliability_MemorySaysHowMuchIsInRam) {
+    constexpr uint64_t mb = 1024 * 1024;
+    MemoryWatch watch("AMPLibraryAgent.exe");
+    CHECK(watch.Check(2346 * mb, 560 * mb) == "Memory: AMPLibraryAgent.exe uses 2346 MB, 560 MB of it in RAM");
+}
+
 TEST_CASE(Reliability_AnUnreadMemoryIsNotLogged) {
     MemoryWatch watch("AppleMusic.exe");
     CHECK(watch.Check(0).empty());
