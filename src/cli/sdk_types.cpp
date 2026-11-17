@@ -311,6 +311,8 @@ declare const Ampify: {
     state(): AutoMixState;
     schedule(plan: AutoMixPlan): { ok: true } | { ok: false; reason: string };
     cancel(reason?: string): void;
+    // stereo versions asked for, so that songs with a Dolby Atmos version mix too; false where there is no player
+    preferStereo(want: boolean): boolean;
   };
 
   // 5.5 Interface [preview]

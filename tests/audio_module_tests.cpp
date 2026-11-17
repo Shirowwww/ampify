@@ -526,3 +526,52 @@ TEST_CASE(ColorModule_PlayingReadsTheCoverOfTheSongNow) {
     cover->Stop();
     broken->Stop();
 }
+
+namespace {
+
+// Apple's queue as the mixer sees it, recording what it is asked.
+struct RecordingMixer : ampify::AutoMixHost {
+    std::vector<bool> stereo;
+    std::vector<std::string> cancels;
+    ampify::AutoMixState State() override { return {}; }
+    std::string Schedule(const ampify::automix::MixPlan&) override { return "not in this test"; }
+    void Cancel(const std::string& reason) override { cancels.push_back(reason); }
+    std::uint64_t Plans() override { return 0; }
+    void PreferStereo(bool want) override { stereo.push_back(want); }
+};
+
+}  // namespace
+
+// AutoMix asks for the songs' stereo versions to mix songs that have a Dolby Atmos version; stopped, it gives Apple's
+// choice back, as it does with a plan.
+TEST_CASE(AutoMixModule_PreferStereoReachesTheMixerAndEndsWithTheElement) {
+    Fixture f(false);
+    RecordingMixer mixer;
+    f.host.automix = &mixer;
+    auto element = f.Make("mixer", R"(
+        Ampify.log("asked " + Ampify.automix.preferStereo(true));
+    )", R"("audio.mix")");
+    CHECK(element->Start());
+    CHECK(f.Logged("[mixer] asked true"));
+    CHECK(mixer.stereo == std::vector<bool>{true});
+
+    element->Stop();
+
+    CHECK((mixer.stereo == std::vector<bool>{true, false}));
+    CHECK(mixer.cancels.empty());  // no plan of its own to cancel
+}
+
+TEST_CASE(AutoMixModule_PreferStereoNeedsItsPermissionAndAnAudioProcess) {
+    Fixture f(false);
+    auto denied = f.Make("no-mix", R"(
+        try { Ampify.automix.preferStereo(true); Ampify.log("allowed"); } catch (e) { Ampify.log(e.name); }
+    )", R"("storage")");
+    auto elsewhere =
+        f.Make("elsewhere", R"(Ampify.log("asked " + Ampify.automix.preferStereo(true));)", R"("audio.mix")");
+    CHECK(denied->Start());
+    CHECK(elsewhere->Start());
+    CHECK(f.Logged("[no-mix] PermissionDenied"));
+    CHECK(f.Logged("[elsewhere] asked false"));
+    denied->Stop();
+    elsewhere->Stop();
+}

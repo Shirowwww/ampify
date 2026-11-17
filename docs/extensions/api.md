@@ -309,13 +309,14 @@ Apple's analysis of the two songs (beats, bars, phrases, key, fades, loudness).
 Ampify.automix.state()            // -> { available, playing, current, next, mix }
 Ampify.automix.schedule(plan)     // -> { ok: true } or { ok: false, reason }
 Ampify.automix.cancel(reason)
+Ampify.automix.preferStereo(want) // -> true once the wish reached Apple's player, false in another process
 ```
 
 - `current` and `next`: `{ name, id, storefront, time, duration, atmos }` or `null`. `name` is the song's stream
   address without its query, the name a plan gives; `id` is its catalog id and `storefront` its store's number (143442
   for France), `null` when Apple's player does not say; `time` and `duration` in seconds, 0 while unknown. `atmos`
   says whether the song plays in Dolby Atmos, `null` until Apple's player has loaded it: always `null` for `next`,
-  except `false` while Sing has Apple's player take stereo versions.
+  except `false` while Apple's player takes stereo versions (asked by Sing or by `preferStereo`).
 - `mix`: `{ phase, next, reason, stepErrorDb, seeks }`. `phase` is `idle`, `waiting`, `preparing`, `aligning`,
   `ready`, `taking over`, `mixing`, `recovering`, `done` or `failed` (then `reason` says why); `stepErrorDb` is what
   is left when the second player's copy is taken from Apple's sound, in dB below it, `null` until measured.
@@ -337,6 +338,12 @@ Ampify.automix.cancel(reason)
 - Dolby Atmos goes out as spatial objects, which a mix cannot take: a plan is refused while the current song plays
   in it, and a next song that turns out to play in it comes in late and at full volume. Read `audioTraits` in the
   catalog and leave such songs alone, as the `automix` extension does.
+- `preferStereo(true)` asks Apple's player for the songs' stereo versions, as Sing does, so that songs with a Dolby
+  Atmos version can be mixed: at once while a stereo song plays or none does, otherwise from the next time Apple
+  Music starts playing (a song already in Dolby Atmos is never switched under way). `preferStereo(false)` gives
+  Apple's own choice back, unless Sing still asks. Stopping the element gives it back too. The `automix` extension
+  asks while its "Mix Dolby Atmos songs in stereo" setting is on (the default). Added after Ampify 1.5.1: test
+  `typeof Ampify.automix.preferStereo === "function"` first.
 
 ### 5.5 Interface [stable]
 

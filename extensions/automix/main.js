@@ -477,14 +477,30 @@ function speedNote(rate) {
 // and kept, since the answer only changes with a setting of Apple Music or of Windows.
 const atmosVersions = new Map();  // song name -> its catalog entry has a Dolby Atmos version
 let atmosPlays;                   // true, false, or null while no such song was seen; undefined until read
+let stereoAsked = false;          // Apple's player is asked for the songs' stereo versions
+
+// Songs with a Dolby Atmos version are asked for in stereo, so that they mix too (the "stereo" setting). Asked at
+// every look: the kernel acts only on a change, and on a song playing in Dolby Atmos only once a stereo one plays or
+// Apple Music starts playing again (a song is never switched under way). An Ampify without it leaves Atmos as it is.
+function askStereo() {
+  if (typeof Ampify.automix.preferStereo !== "function") return;
+  const want = Ampify.config.get("style") !== "Off" && Ampify.config.get("stereo") === true;
+  Ampify.automix.preferStereo(want);
+  if (want === stereoAsked) return;
+  stereoAsked = want;
+  Ampify.log(want ? "Songs with a Dolby Atmos version are asked for in stereo, to mix them"
+                  : "Dolby Atmos left to Apple Music's choice");
+}
 
 function knownAtmosPlays() {
   if (atmosPlays === undefined) atmosPlays = Ampify.storage.get("atmosPlays", null);
   return atmosPlays;
 }
 
-// True when the song taught something new.
+// True when the song taught something new. Nothing is learnt while the stereo versions are asked for: what they play
+// in then says nothing of what they play in without it.
 function learnAtmos(song) {
+  if (stereoAsked) return false;
   if (typeof song.atmos !== "boolean" || !atmosVersions.get(song.name) || song.atmos === knownAtmosPlays()) return false;
   atmosPlays = song.atmos;
   Ampify.storage.set("atmosPlays", atmosPlays);
@@ -549,6 +565,7 @@ async function decide(state, key) {
 }
 
 function check() {
+  askStereo();
   const state = Ampify.automix.state();
   if (!state.available || !state.current || !state.next || !state.playing) return;
   if (learnAtmos(state.current)) decidedFor = "";  // what was decided for the next song may no longer hold

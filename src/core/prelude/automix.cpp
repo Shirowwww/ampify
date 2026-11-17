@@ -17,6 +17,9 @@ const char kAutoMix[] = R"AMPIFYJS(
     cancel(reason) {
       native.automixCancel(reason === undefined ? "" : String(reason));
     },
+    preferStereo(want) {
+      return native.automixPreferStereo(Boolean(want));
+    },
   };
 )AMPIFYJS";
 

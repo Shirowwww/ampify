@@ -15,6 +15,7 @@
 
 #include "../src/core/audio/audio_host.hpp"
 #include "../src/core/audio/sing_host.hpp"
+#include "../src/core/automix/automix_host.hpp"
 #include "../src/core/host.hpp"
 #include "../src/core/image_host.hpp"
 
@@ -139,6 +140,8 @@ struct FakeHost : Host, KeyUnbindHost {
     ArtworkHost* artwork = nullptr;
     // Optional runner of the kit's commands, for Ampify.kit.run (the Marketplace).
     KitCommandHost* kit = nullptr;
+    // Optional mixer of Apple's queue, for Ampify.automix.
+    AutoMixHost* automix = nullptr;
 
     void* QueryCapability(std::string_view name) override {
         if (audio && name == AudioHost::kCapabilityName) return audio;
@@ -146,6 +149,7 @@ struct FakeHost : Host, KeyUnbindHost {
         if (images && name == ImageHost::kCapabilityName) return images;
         if (artwork && name == ArtworkHost::kCapabilityName) return artwork;
         if (kit && name == KitCommandHost::kCapabilityName) return kit;
+        if (automix && name == AutoMixHost::kCapabilityName) return automix;
         if (void* found = Offer<KeyUnbindHost>(name, this)) return found;
         return Host::QueryCapability(name);
     }

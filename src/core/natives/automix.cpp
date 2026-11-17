@@ -58,6 +58,7 @@ std::string StateJson(const AutoMixState& state) {
 // still the plan at work (another element may have given one since).
 struct AutoMixUse {
     std::uint64_t plan = 0;
+    bool stereo = false;  // this element asks for stereo versions: given back when it stops
 };
 
 struct AutoMixNatives : ScriptBridge {
@@ -102,6 +103,19 @@ struct AutoMixNatives : ScriptBridge {
         if (AutoMixHost* mixer = Mixer(ext)) mixer->Cancel(reason && !reason->empty() ? *reason : "cancelled");
         return JS_UNDEFINED;
     }
+
+    // True when the wish reached Apple's player (the audio process), false where there is none.
+    AMPIFY_NATIVE(PreferStereo) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, kPermission, &failure)) return failure;
+        const bool want = argc > 0 && JS_ToBool(ctx, argv[0]) == 1;
+        AutoMixHost* mixer = Mixer(ext);
+        if (!mixer) return JS_FALSE;
+        mixer->PreferStereo(want);
+        State<AutoMixUse>(ext).stereo = want;
+        return JS_TRUE;
+    }
 };
 
 }  // namespace
@@ -110,13 +124,16 @@ void DefineAutoMix(api::NativeScope& scope) {
     scope.Function("automixState", AutoMixNatives::ReadState, 0);
     scope.Function("automixSchedule", AutoMixNatives::Schedule, 1);
     scope.Function("automixCancel", AutoMixNatives::Cancel, 1);
+    scope.Function("automixPreferStereo", AutoMixNatives::PreferStereo, 1);
 }
 
 void StopAutoMix(ScriptExtension& extension) {
-    const std::uint64_t plan = ScriptBridge::State<AutoMixUse>(&extension).plan;
-    if (plan == 0) return;
+    const AutoMixUse use = ScriptBridge::State<AutoMixUse>(&extension);
+    if (use.plan == 0 && !use.stereo) return;
     AutoMixHost* mixer = ScriptBridge::HostOf(&extension).Capability<AutoMixHost>();
-    if (mixer && mixer->Plans() == plan) mixer->Cancel("the extension stopped");
+    if (!mixer) return;
+    if (use.plan != 0 && mixer->Plans() == use.plan) mixer->Cancel("the extension stopped");
+    if (use.stereo) mixer->PreferStereo(false);
 }
 
 }  // namespace ampify::natives

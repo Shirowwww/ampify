@@ -107,7 +107,8 @@ const Expected kMembers[] = {
            "panel:object!{register:f2=register,remove:f1=remove,onClose:f2=onClose},"
            "page:object!{register:f2=register},title:object!{set:f1=set,get:f0=get,reset:f0=reset},"
            "setLabel:f2=setLabel,setActive:f2=setActive,setDisabled:f2=setDisabled,navigate:f1=navigate}"},
-    {"automix", "object!{state:f0=state,schedule:f1=schedule,cancel:f1=cancel}"},  // added in kitApi 1.x
+    // added in kitApi 1.x, preferStereo after Ampify 1.5.1
+    {"automix", "object!{state:f0=state,schedule:f1=schedule,cancel:f1=cancel,preferStereo:f1=preferStereo}"},
 };
 
 const Expected kGlobals[] = {

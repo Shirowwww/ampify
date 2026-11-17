@@ -43,6 +43,10 @@ struct AutoMixHost {
     virtual void Cancel(const std::string& reason) = 0;
     // How many plans were taken so far: right after Schedule, the number of that plan.
     virtual std::uint64_t Plans() = 0;
+    // While true, Apple's player is asked for the songs' stereo versions, as Sing does, so that songs with a Dolby
+    // Atmos version can be mixed too: at once while a stereo song plays or none does, else from the next time Apple
+    // Music starts playing. False gives Apple's own choice back, unless Sing still asks.
+    virtual void PreferStereo(bool want) = 0;
 };
 
 }  // namespace ampify

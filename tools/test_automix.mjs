@@ -437,24 +437,26 @@ test("a mix that would start before the song can prepare it is not planned", () 
 
 const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-function follower({ state, schedule, http, clock, stored = {} }) {
+function follower({ state, schedule, http, clock, stored = {}, config = {}, preferStereo, logs = [] }) {
   const kept = { token: { value: "token", at: clock?.() ?? Date.now() }, ...stored };
+  const settings = { style: "Auto", longest: 20, albums: true, stereo: false, ...config };
   const context = {
     Ampify: {
-      process: "test", locale: "en-US", log() {},
-      config: { get: (key) => ({ style: "Auto", longest: 20, albums: true })[key] },
+      process: "test", locale: "en-US", log: (text) => logs.push(text),
+      config: { get: (key) => settings[key] },
       storage: {
         get: (key, fallback) => (key in kept ? kept[key] : fallback),
         set: (key, value) => { kept[key] = stored[key] = value; },
         remove: (key) => { delete kept[key]; },
       },
       http: { get: http ?? (async () => ({ status: 404, text: "" })) },
-      automix: { state, schedule, cancel() {} },
+      automix: { state, schedule, cancel() {}, ...(preferStereo ? { preferStereo } : {}) },
     },
     setInterval() {}, clearInterval() {},
   };
   if (clock) context.Date = class extends Date { static now() { return clock(); } };
   vm.runInNewContext(source, context, { filename: "main.js" });
+  context.settings = settings;
   return context;
 }
 
@@ -569,6 +571,40 @@ test("what a song with a Dolby Atmos version plays in is remembered for the next
   const later = follower({ state, schedule: (plan) => (sent.push(plan), { ok: true }), http: catalog, stored });
   await looks(later, 3);
   assert.equal(sent.length, 2, "known from the start the next time");
+});
+
+test("songs with a Dolby Atmos version are asked for in stereo only with the setting and AutoMix on", async () => {
+  const asked = [];
+  const logs = [];
+  const preferStereo = (want) => asked.push(want);
+  const context = follower({ state: () => queue(100), schedule: () => ({ ok: true }), preferStereo, logs });
+  await looks(context, 1);
+  context.settings.stereo = true;
+  await looks(context, 2);
+  context.settings.style = "Off";
+  await looks(context, 1);
+  assert.deepEqual(asked, [false, true, true, false], "at every look: the kernel acts on a stereo song once one plays");
+  assert.deepEqual(logs.filter((text) => /stereo|Dolby Atmos left/.test(text)), [
+    "Songs with a Dolby Atmos version are asked for in stereo, to mix them",
+    "Dolby Atmos left to Apple Music's choice",
+  ]);
+});
+
+test("nothing is learnt of Dolby Atmos while the songs are asked for in stereo", async () => {
+  const stored = {};
+  const catalog = async () => ({ status: 200, text: JSON.stringify({ data: [{ attributes: { audioTraits: ["atmos"] } }] }) });
+  const state = () => ({ ...queue(160), current: { ...queue(160).current, atmos: false } });
+  const context = follower({ state, schedule: () => ({ ok: true }), http: catalog, stored, preferStereo() {},
+    config: { stereo: true } });
+  await looks(context, 4);
+  assert.equal(stored.atmosPlays, undefined, "in stereo because it was asked for, not because Dolby Atmos is off");
+});
+
+test("an Ampify without preferStereo leaves Dolby Atmos alone and still mixes", async () => {
+  const sent = [];
+  const context = follower({ state: () => queue(160), schedule: (plan) => (sent.push(plan), { ok: true }) });
+  await looks(context, 3);
+  assert.equal(sent.length, 1);
 });
 
 test("crossfade only and off are honoured", () => {

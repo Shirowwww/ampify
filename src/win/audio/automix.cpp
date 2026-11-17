@@ -180,9 +180,12 @@ std::atomic<void*> g_queue{nullptr};
 std::atomic<void*> g_options{nullptr};
 std::atomic<void*> g_notify{nullptr};
 
-// Sing's wish for the songs' stereo versions (WantStereo), and whether Apple's queue player was asked for them through
-// its multichannel strategy, changed under g_strategyLock.
-std::atomic<bool> g_stereoWanted{false};
+// The wish for the songs' stereo versions, Sing's (WantStereo) or AutoMix's (PreferStereo), and whether Apple's queue
+// player was asked for them through its multichannel strategy, changed under g_strategyLock.
+std::atomic<bool> g_singWantsStereo{false};
+std::atomic<bool> g_mixWantsStereo{false};
+std::atomic<bool> g_stereoWanted{false};  // either
+void HoldStereo();
 std::mutex g_strategyLock;
 const void* g_appleStrategy = nullptr;  // retained; what the player had before stereo was held, or Apple's since
 bool g_stereoHeld = false;
@@ -606,6 +609,11 @@ public:
 
     std::uint64_t Plans() override { return m_plans.load(); }
 
+    void PreferStereo(bool want) override {
+        g_mixWantsStereo = want;
+        HoldStereo();
+    }
+
     // Apple paused, sought, skipped or changed the queue: a mix in progress cannot stay in step. Called from Apple's
     // threads, inside its calls to AVFoundationCF: it takes no lock (the mix thread may be waiting on AVFoundationCF),
     // it only leaves a note the thread reads at its next tick.
@@ -790,8 +798,10 @@ bool ApplyStereo(bool hold) {
     if (drop) A().release(drop);  // after the call: `apply` may be it
     ForgetAtmos();
     if (!apply) return false;
-    Note(hold ? "Sing: Apple's player asked for the songs' stereo versions"
-              : "Sing: Apple's player back on its own choice, Dolby Atmos included");
+    const bool sing = g_singWantsStereo.load();
+    const std::string who = sing && g_mixWantsStereo.load() ? "Sing and AutoMix" : sing ? "Sing" : "AutoMix";
+    Note(hold ? who + ": Apple's player asked for the songs' stereo versions"
+              : std::string("Apple's player back on its own choice, Dolby Atmos included"));
     return true;
 }
 
@@ -809,6 +819,31 @@ void StereoForNewQueue(void* player) {
     }
     if (drop) A().release(drop);
     if (want) A().setStrategy(player, A().preferStereo);
+}
+
+// Sing's thread and AutoMix's script both ask: one at a time, so the last word is what both want now.
+std::mutex g_wishLock;
+
+void HoldStereo() {
+    std::lock_guard wish(g_wishLock);
+    const bool want = g_singWantsStereo.load() || g_mixWantsStereo.load();
+    g_stereoWanted = want;
+    if (!want) ForgetAtmos();  // nobody asks: the song is not kept alive for it
+    {
+        std::lock_guard lock(g_strategyLock);
+        if (g_stereoHeld == want) return;
+    }
+    void* queue = g_queue.load();
+    if (!queue || !A().ready) return;  // StereoForNewQueue
+    // Apple's own choice back at once: a song going from stereo to Dolby Atmos under way does it well (17/11/2026).
+    if (!want) {
+        ApplyStereo(false);
+        return;
+    }
+    // Asked for at once only while the song there is known to be in stereo, or there is none.
+    Ref item(A().copyCurrentItem(queue));
+    if (item && InAtmosRemembered(item.item()) != std::optional<bool>(false)) return;
+    ApplyStereo(true);
 }
 
 Seek_t g_seekPlayer = nullptr;
@@ -1006,23 +1041,8 @@ const void* CurrentSong() {
 }
 
 void WantStereo(bool want) {
-    g_stereoWanted = want;
-    if (!want) ForgetAtmos();  // Sing no longer asks: the song is not kept alive for it
-    {
-        std::lock_guard lock(g_strategyLock);
-        if (g_stereoHeld == want) return;
-    }
-    void* queue = g_queue.load();
-    if (!queue || !A().ready) return;  // StereoForNewQueue
-    // Apple's own choice back at once: a song going from stereo to Dolby Atmos under way does it well (17/11/2026).
-    if (!want) {
-        ApplyStereo(false);
-        return;
-    }
-    // Asked for at once only while the song there is known to be in stereo, or there is none.
-    Ref item(A().copyCurrentItem(queue));
-    if (item && InAtmosRemembered(item.item()) != std::optional<bool>(false)) return;
-    ApplyStereo(true);
+    g_singWantsStereo = want;
+    HoldStereo();
 }
 
 }  // namespace detail
