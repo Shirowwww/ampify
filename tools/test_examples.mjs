@@ -3425,8 +3425,19 @@ function fakeSing({ storage = new Map(), language = "en", sing = {} } = {}) {
   const react = fakeReact();
   const node = (type) => (props) => react.React.h(type, props);
   const world = {
-    sets: [], buttons: [], active: [], listeners: [], stops: [], popups: [],
+    sets: [], buttons: [], active: [], listeners: [], stops: [], popups: [], timeouts: new Map(), writes: 0,
     state: { available: null, mode: "off", voice: 0, phase: "off", progress: 0, delay: 0, reason: "none", ...sing },
+  };
+  let nextTimeout = 1;
+  const timers = {
+    setTimeout: (fn) => (world.timeouts.set(nextTimeout, fn), nextTimeout++),
+    clearTimeout: (id) => world.timeouts.delete(id),
+  };
+  // The timeouts due run now, as if the slider had rested.
+  const rest = () => {
+    const due = [...world.timeouts.values()];
+    world.timeouts.clear();
+    due.forEach((fn) => fn());
   };
   const Ampify = {
     log: () => {},
@@ -3434,7 +3445,7 @@ function fakeSing({ storage = new Map(), language = "en", sing = {} } = {}) {
     i18n: fakeI18n(language),
     storage: {
       get: (key, fallback) => (need("storage"), storage.has(key) ? structuredClone(storage.get(key)) : fallback),
-      set: (key, value) => (need("storage"), storage.set(key, structuredClone(value))),
+      set: (key, value) => (need("storage"), world.writes++, storage.set(key, structuredClone(value))),
     },
     audio: {
       sing: {
@@ -3459,14 +3470,14 @@ function fakeSing({ storage = new Map(), language = "en", sing = {} } = {}) {
       unmount: () => react.mount(() => null),
     }) },
   };
-  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify });
+  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify, ...timers });
   const emit = (next) => {
     world.state = { ...world.state, ...next };
     world.listeners.slice().forEach((fn) => fn(structuredClone(world.state)));
   };
   const open = () => world.buttons[0].onClick();
   const find = (type) => allNodes(react.page.tree).find((child) => child.type === type);
-  return { world, manifest, used, storage, react, emit, open, find, Ampify };
+  return { world, manifest, used, storage, react, emit, open, find, rest, Ampify };
 }
 
 test("sing offers a microphone on the playback bar that is lit while Sing is asked for", () => {
@@ -3486,14 +3497,21 @@ test("sing writes the voice as the slider moves and remembers it", () => {
   assert.deepEqual(fake.world.popups, ["popup:sing"]);
   fake.find("toggle").onChange(true);
   assert.deepEqual(fake.world.sets.at(-1), { mode: "studio", voice: 0.1 }, "default: Studio at a tenth of the voice");
+  fake.rest();
+  const writes = fake.world.writes;
   fake.find("slider").onChange(55);
+  fake.find("slider").onChange(58);
   fake.find("slider").onChange(60);
-  assert.deepEqual(fake.world.sets.slice(-2), [{ mode: "studio", voice: 0.55 }, { mode: "studio", voice: 0.6 }]);
+  assert.deepEqual(fake.world.sets.slice(-2), [{ mode: "studio", voice: 0.58 }, { mode: "studio", voice: 0.6 }]);
+  assert.equal(fake.world.writes, writes, "nothing written while the slider moves");
+  fake.rest();
+  assert.equal(fake.world.writes, writes + 1, "written once it rests");
   assert.deepEqual(fake.storage.get("sing"), { enabled: true, mode: null, voice: 0.6 });
   fake.find("tabs").onChange("light");
   assert.deepEqual(fake.world.sets.at(-1), { mode: "light", voice: 0.6 });
   fake.find("toggle").onChange(false);
   assert.deepEqual(fake.world.sets.at(-1), { mode: "off", voice: 0.6 });
+  fake.rest();
   assert.equal(fake.storage.get("sing").mode, "light", "the quality chosen stays for the next time");
 });
 

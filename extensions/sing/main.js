@@ -109,9 +109,20 @@ function qualityFor(state) {
   return state.available === false ? "light" : "studio";
 }
 
+// Saved once the slider rests: each of its steps would write the file again.
+const SAVE_AFTER_MS = 400;
+let saving = null;
+function save() {
+  if (saving !== null) clearTimeout(saving);
+  saving = setTimeout(() => {
+    saving = null;
+    Ampify.storage.set("sing", { enabled: choice.enabled, mode: choice.mode, voice: choice.voice });
+  }, SAVE_AFTER_MS);
+}
+
 function apply(state) {
   const mode = choice.enabled ? qualityFor(state) : "off";
-  Ampify.storage.set("sing", { enabled: choice.enabled, mode: choice.mode, voice: choice.voice });
+  save();
   Ampify.audio.sing.set({ mode, voice: choice.voice });
 }
 
@@ -168,6 +179,11 @@ const stopWatching = Ampify.audio.sing.onChange(light);
 if (choice.enabled) apply(Ampify.audio.sing.state());
 
 Ampify.onStop(() => {
+  if (saving !== null) {  // a change still waiting to be saved
+    clearTimeout(saving);
+    saving = null;
+    Ampify.storage.set("sing", { enabled: choice.enabled, mode: choice.mode, voice: choice.voice });
+  }
   stopWatching();
   root.unmount();
   if (choice.enabled) Ampify.audio.sing.set({ mode: "off", voice: choice.voice });  // only what this switch turned on
