@@ -143,17 +143,32 @@ void TempoEstimator::Push(float onset) {
     m_ring[m_next] = onset;
     m_next = (m_next + 1) % m_capacity;
     m_count = std::min(m_count + 1, m_capacity);
+    m_pushed++;
 }
 
 void TempoEstimator::Reset() {
     std::fill(m_ring.begin(), m_ring.end(), 0.0f);
     m_next = 0;
     m_count = 0;
+    m_pushed = 0;
+    m_estimated = false;
 }
 
 double TempoEstimator::Seconds() const { return static_cast<double>(m_count) / kEnvelopeRate; }
 
 TempoEstimate TempoEstimator::Current() const {
+    constexpr auto kAgain = static_cast<std::uint64_t>(kEnvelopeRate / 2);
+    const bool enoughNow = m_tooShort && Seconds() >= 3.0;  // the last try had too little envelope
+    if (!m_estimated || enoughNow || m_pushed - m_estimatedAt >= kAgain) {
+        m_estimate = Estimate();
+        m_estimatedAt = m_pushed;
+        m_estimated = true;
+        m_tooShort = Seconds() < 3.0;
+    }
+    return m_estimate;
+}
+
+TempoEstimate TempoEstimator::Estimate() const {
     TempoEstimate estimate;
     if (Seconds() < 3.0) return estimate;
 

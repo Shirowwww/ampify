@@ -81,14 +81,22 @@ public:
 
     double Seconds() const;
 
-    // Needs at least 3 s of envelope.
+    // Needs at least 3 s of envelope. Worked out again once half a second more of it came in: the analysis is read
+    // 20 times a second, under the lock its audio thread feeds through.
     TempoEstimate Current() const;
 
 private:
+    TempoEstimate Estimate() const;
+
     size_t m_capacity;
     std::vector<float> m_ring;
     size_t m_next = 0;
     size_t m_count = 0;
+    std::uint64_t m_pushed = 0;  // onset values since the last reset
+    mutable std::uint64_t m_estimatedAt = 0;
+    mutable bool m_estimated = false;
+    mutable bool m_tooShort = false;
+    mutable TempoEstimate m_estimate;
 };
 
 // What the analysis publishes about every 50 ms of audio.
