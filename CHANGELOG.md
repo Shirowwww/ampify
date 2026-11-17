@@ -14,16 +14,41 @@ Sing keeps up with pauses and skips, runs on far less of the processor, and Auto
 - Studio and pauses: playing again goes on from where the sound stopped, at once, with no second of silence and no jump
   back of the position. A skip, a move in the song, or a song at another sample rate no longer lets a moment of an
   older song through, and the last second of a song is heard when nothing follows it.
+- Sing no longer silences Apple Music on Dolby Atmos songs. To get a stereo stream it switched the song playing to its
+  stereo version, and Apple Music does that badly: the song went on in silence with its position running three to
+  four times too fast, song after song, until something else was played. Sing now asks for stereo versions only
+  where no Atmos song is under way: when Apple Music starts playing, or while a stereo song plays. A song already in
+  Dolby Atmos stays so, and Sing waits for the next stereo one. Turned off, Sing gives Dolby Atmos back at once.
 - AutoMix mixes with Studio on. Both songs of a mix are held back alike, and the second player plays on until the end
   of the old song's fade has been heard. Before, AutoMix stood aside, or Sing dropped to Light mid-mix and gave the old
-  song its voice back.
+  song its voice back. With Sing on, songs that have a Dolby Atmos version are mixed too, since they play in stereo.
 - Sing's Light quality takes away what both channels share between 150 Hz and 12 kHz. Measured on two songs split by
   Studio, about 5 dB less of the voice is left and the music changes less; a sound on one side alone keeps half its
   level in that band.
 - Studio leaves the graphics card when it has not been used for two minutes, and the journal says when the model ran
-  late and let the voice through.
+  late and let the voice through. The journal's memory lines say how much of a process is in RAM: the graphics
+  card's memory Studio uses counts in the private bytes Windows reports, never in RAM.
 - Sing 1.0.1 saves its slider once it rests, not at each step.
 - The lyrics blur keeps the songwriter credits at the end of a song sharp.
+- Studio's voice model is now the same Voc_FT with its weights in float16: it runs in 36 ms instead of 61 per pass on
+  the graphics card, its download weighs 33 MB instead of 67 (58 MB in all for Studio), and its output differs from
+  the original's by about -58 dB. Studio's files are fetched once more after the update.
+- Sing's popup is clearer: a karaoke switch, a status line with a dot (a ring while it gets ready, a bar while it
+  downloads, the reason in colour when Sing cannot run), the voice in per cent, a line saying what each quality does,
+  and the size of Studio's first download. Extensions get the same per cent: sliders take a `unit`, and
+  `Ampify.audio.sing.state()` says whether Studio's files are `installed` and their `downloadSize`.
+- Studio offers a second voice model, Precise: Kim's Mel-Band RoFormer, chosen under Studio in Sing's popup.
+  Measured on ten MUSDB18 songs as Sing streams them, it leaves about 0.9 dB less of the voice than the standard
+  model (11.1 dB against 10.3). It holds the sound back 2.8 s instead of 1.3, runs in about 57 ms per second of music
+  on a recent graphics card, uses about 1.6 GB of its memory and downloads 465 MB once. It was exported again for DirectML,
+  where the published export gave wrong vocals, and runs three times faster than it. The standard model stays the
+  default; `Ampify.audio.sing.set` takes a `model`, and `ampify sing install` and `status` take `standard` or
+  `precise`. Each part of Studio's files is now checked on its own, so a second model downloads only its model.
+- Studio's Fourier transforms run about three times faster (a transform of 7680 points made of three of 1280, where
+  the generic one went through a slow factor of 15), and Sing checks once a second whether the song is in Dolby
+  Atmos, where it read every track's format ten times a second. Sing's own thread now takes about 5 % of one core.
+- Apple Music's window thread no longer wakes in a loop while a step of Ampify is under a millisecond away, which
+  cost about 1 % of a core with the music paused.
 - The tempo the analysis reports is worked out twice a second instead of twenty times, and the Dolby Atmos check no
   longer allocates 64 KB each time it runs.
 

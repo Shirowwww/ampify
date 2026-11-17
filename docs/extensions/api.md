@@ -265,8 +265,9 @@ Permission `audio.sing`. Sing turns the singer's voice down, as Apple Music Sing
 and the audio process does the work, so `set` and `state` work from both processes, through the block they share.
 
 ```js
-Ampify.audio.sing.set({ mode, voice })   // mode "off" | "light" | "studio", voice 0 to 1; true once the request is written
-Ampify.audio.sing.state()                // -> { available, mode, voice, phase, progress, delay, reason }
+Ampify.audio.sing.set({ mode, voice, model })  // mode "off" | "light" | "studio", voice 0 to 1, model "standard" | "precise"
+                                               // true once the request is written
+Ampify.audio.sing.state()                // -> { available, mode, voice, model, phase, progress, delay, reason, installed, downloadSize }
 Ampify.audio.sing.onChange(fn)           // fn(state) when the state moves (polled every 250 ms); returns the function that stops
 ```
 
@@ -274,15 +275,25 @@ Ampify.audio.sing.onChange(fn)           // fn(state) when the state moves (poll
   for `delay` seconds so that the lyrics stay in step. A pause keeps what Studio holds, so playing again goes on at
   once; a move in the song, another song or Studio turned on starts it again silent for `delay`. AutoMix mixes with
   either quality on: in Studio, both songs of a mix are held back alike.
-- `mode` and `voice` are what was asked last (`voice` stays when `set` is called without one). The rest is what the
+- Studio runs one of two voice models. `standard` (the default) is UVR's MDX-Net Voc_FT: light, and its `delay` is
+  short. `precise` is Kim's Mel-Band RoFormer: it leaves less of the voice, but its download is far larger (465 MB),
+  its `delay` is 1.5 s longer and it wants a graphics card from the last few years (GeForce RTX 2060 or RTX 3050, Radeon RX 6600 or better;
+  about 1.6 GB of its memory). Changing the model while Studio is on stops Studio a moment, frees the
+  graphics card of the old model, then starts again with the new one.
+- `mode`, `voice` and `model` are what was asked last (`voice` and `model` stay when `set` is called without them). The rest is what the
   audio process says: `phase` is `off`, `downloading`, `loading`, `buffering`, `on` or `failed`; `progress` is 0 to 1
   while downloading or loading; `available` is whether Studio can run on this PC (`null` until known).
+- `installed` says whether the files Studio needs with the model asked are downloaded and checked (`null` where it
+  cannot be told), and `downloadSize` how many bytes are still to download for it (0 once installed), fetched the
+  first time Studio is asked for with that model.
 - `reason` says why Sing is not fully on: `none`, `no-graphics-card`, `download-failed`, `model-failed` or
   `dolby-atmos`. `automix-mixing` is no longer given: Ampify 1.5.0 alone gave it, while AutoMix mixed.
-- Sing works on Apple's stereo stream. While any mode is on, a song playing in Dolby Atmos is switched to its stereo
-  version, and back when Sing goes off; Apple Music reloads the song each time, and its position stands still for 3 to
-  4 s. `dolby-atmos` is left for an Apple Music that cannot be asked.
-- A mode other than the three, or a voice outside 0 to 1, throws `RangeError`. Where nothing shares the request (a host
+- Sing works on Apple's stereo stream. While any mode is on, Apple's player is asked for the songs' stereo versions:
+  at once while a stereo song plays or none does, otherwise from the next time Apple Music starts playing (its first
+  song after it opens). A song already playing in Dolby Atmos is never switched under way: Apple Music then plays it
+  silent with its position running several times too fast. Until then `reason` is `dolby-atmos`. Turned off, Sing
+  gives Apple's own choice back at once, and a song that can goes back to Dolby Atmos under way.
+- A mode other than the three, a voice outside 0 to 1, or a model other than the two, throws `RangeError`. Where nothing shares the request (a host
   without audio) `set` answers `false` and `state()` says `off` and `null`, without throwing.
 - Example: `extensions/sing/`.
 
@@ -303,7 +314,8 @@ Ampify.automix.cancel(reason)
 - `current` and `next`: `{ name, id, storefront, time, duration, atmos }` or `null`. `name` is the song's stream
   address without its query, the name a plan gives; `id` is its catalog id and `storefront` its store's number (143442
   for France), `null` when Apple's player does not say; `time` and `duration` in seconds, 0 while unknown. `atmos`
-  says whether the song plays in Dolby Atmos, `null` until Apple's player has loaded it: always `null` for `next`.
+  says whether the song plays in Dolby Atmos, `null` until Apple's player has loaded it: always `null` for `next`,
+  except `false` while Sing has Apple's player take stereo versions.
 - `mix`: `{ phase, next, reason, stepErrorDb, seeks }`. `phase` is `idle`, `waiting`, `preparing`, `aligning`,
   `ready`, `taking over`, `mixing`, `recovering`, `done` or `failed` (then `reason` says why); `stepErrorDb` is what
   is left when the second player's copy is taken from Apple's sound, in dB below it, `null` until measured.
@@ -348,7 +360,7 @@ written by hand as in a React one.
 | `button` | `label`, `icon` (SVG), `disabled`, `variant` (`primary`, `secondary`, `tertiary`), `onClick` |
 | `toggle` | `label`, `checked`, `disabled`, `onChange` |
 | `checkbox` | `label`, `checked`, `disabled`, `onChange` (`true` or `false`): Apple's check box |
-| `slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange` |
+| `slider` | `label`, `min`, `max`, `step`, `value`, `unit` (text after the value shown in the header, `" %"`), `disabled`, `onChange` |
 | `progress` | `value`, `max` (100 by default), `label`: a bar filled to `value`; without `value` it moves on its own |
 | `spinner` | `size` (16 to 128, 32 by default), `label`: the spinning ring, for a wait of unknown length |
 | `divider` | A thin line across its container, in Apple's divider colour |
@@ -632,7 +644,7 @@ Ampify.ready                                          // resolves once the eleme
 | `Button` (`ButtonPrimary`, `ButtonSecondary`, `ButtonTertiary`) | `label` or a text child, `icon`, `disabled`, `variant`, `onClick` |
 | `Toggle` | `label`, `value` or `checked`, `disabled`, `onChange(checked)` |
 | `Checkbox` | The props of `Toggle`, drawn as Apple's check box |
-| `Slider` | `label`, `min`, `max`, `step`, `value`, `disabled`, `onChange(number)` |
+| `Slider` | `label`, `min`, `max`, `step`, `value`, `unit`, `disabled`, `onChange(number)` |
 | `TextField` | `label`, `value`, `placeholder`, `disabled`, `onChange(text)` |
 | `Dropdown` | `label`, `value`, `options` (texts or `{ value, label }`), `disabled`, `onChange(value)` |
 | `ProgressBar` | `value`, `max` (100 by default), `label`: filled to `value`; without `value` it moves on its own |
