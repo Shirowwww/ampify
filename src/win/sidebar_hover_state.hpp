@@ -95,7 +95,7 @@ struct State {
     IInspectable dismissHit{nullptr};    // its local values before Ampify, or the unset value: put back as they were
     IInspectable dismissFill{nullptr};
     int64_t paneToken = 0;  // the IsPaneOpen callback, taken off by this token in Release
-    winrt::event_token closingToken{};  // PaneClosing, taken off by this token in Release
+    winrt::event_token closingToken{};  // PaneClosing (PaneClosed for Apple's own pane), taken off by this token
     winrt::event_token openingToken{};  // PaneOpening, likewise
     std::vector<xaml::UIElement> openHeader;  // what Apple's header shows in the open pane
     bool repinning = false;  // RepinForWidth closes the pinned pane on purpose

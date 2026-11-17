@@ -21,8 +21,9 @@ void KeepSidebarOnHover(Journal& journal) noexcept;
 // apple.sidebar: on hover or open, applied at the next KeepSidebarOnHover. Any thread.
 void SetSidebarOnHover(bool enabled) noexcept;
 
-// True while Ampify keeps the sidebar folded: the themes' folded rules (@media (max-width: 1324px)) then hold at
-// every width. False while the pin button keeps the pane open. Any thread.
+// True while Ampify keeps the sidebar folded, or while Apple's own pane is folded (the hover off): the themes' folded
+// rules (@media (max-width: 1324px)) then hold at every width. False while the pin button keeps the pane open. Any
+// thread.
 bool SidebarKeptFolded() noexcept;
 
 // True while the pane is open over the pages: under the pointer, or pinned in a window too narrow to push them. Any

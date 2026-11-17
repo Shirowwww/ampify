@@ -601,7 +601,8 @@ after the theme.
 
 `min-width`, `max-width`, `min-height` and `max-height`, joined by `and`, in the window's pixels (bounds included).
 Apple Music folds its sidebar at 1324 pixels wide and less. With `apple.sidebar = hover`, these bounds follow the
-sidebar instead of the window (folded: the 1324 rules hold at every width), until the sidebar is pinned open. No
+sidebar instead of the window (folded: the 1324 rules hold at every width), until the sidebar is pinned open; so they
+do when Apple's menu button folds the sidebar in a wider window. No
 variables and no nested `@media` inside.
 
 `(prefers-color-scheme: light)` or `(dark)` holds rules for the theme's scheme in use (dark or light from its

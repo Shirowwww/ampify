@@ -63,6 +63,7 @@ constexpr auto kRefocusFor = std::chrono::milliseconds(1500);  // a pane opened 
 
 std::atomic<bool> g_enabled{false};
 std::atomic<bool> g_folded{false};  // Take done, Release not yet, and not pinned open
+std::atomic<bool> g_appleFolded{false};  // the hover off, Apple's own pane folded (by its hamburger, at any width)
 std::atomic<bool> g_over{false};    // the pane is open over the pages (OverPages), as the theme last heard
 std::function<void()> g_changed;    // asks the theme for a pass now: the themes' folded rules follow a pin at once
 Journal* g_journal = nullptr;       // KeepSidebarOnHover's, for Trace
@@ -785,9 +786,26 @@ State& ApplesOwn() {
     return *state;
 }
 
+// The themes' folded rules follow Apple's own pane too: folded by its hamburger in a wide window, the bar and the
+// panels were still placed beside an open pane (Fluent's bar started 240 pixels left of the window).
+void TellAppleFolded(bool folded) {
+    if (g_appleFolded.exchange(folded) != folded && g_changed) g_changed();
+}
+
 void LetGoApplesOverlay() {
     State& own = ApplesOwn();
     RemoveFill(own);
+    if (auto navigation = own.navigation.get()) {
+        try {
+            if (own.openingToken.value != 0) navigation.PaneOpening(own.openingToken);
+            if (own.closingToken.value != 0) navigation.PaneClosed(own.closingToken);
+        } catch (...) {
+            // The element may be torn down already: nothing is left to take off.
+        }
+    }
+    own.openingToken = {};
+    own.closingToken = {};
+    TellAppleFolded(false);
     own.navigation = nullptr;
     own.pane = nullptr;
     own.column = nullptr;
@@ -795,7 +813,38 @@ void LetGoApplesOverlay() {
 
 // In a narrow window Apple's own pane opens over the pages (compact or minimal mode). Left as Apple draws it, or on the
 // window's material as Fluent sets it, the pages showed through its entries. It gets the same fill as the hovered
-// pane there, under every theme that does not paint it; laid beside the pages (expanded), it stays as the theme has it.
+// pane there, under every theme that does not paint it, while it is open: folded to its column of icons it covers
+// nothing, and the fill made that column opaque in a narrow window only (Fluent's rail turned black there, its
+// translucent layer in a wide one). Laid beside the pages (expanded), it stays as the theme has it.
+void DressApplesPane(State& own, const controls::NavigationView& navigation, bool open) {
+    TellAppleFolded(!open);
+    if (navigation.DisplayMode() == controls::NavigationViewDisplayMode::Expanded) {
+        RemoveFill(own);
+        return;
+    }
+    FillPane(own, navigation);
+    if (own.fill && !open) own.fill.Visibility(xaml::Visibility::Collapsed);
+}
+
+// The fill follows the pane: shown as it starts opening, gone once it has slid shut (not as it starts closing, when
+// it still lies over the pages).
+void WatchApplesPane(State& own, const controls::NavigationView& navigation) {
+    own.openingToken = navigation.PaneOpening([](controls::NavigationView const& sender, auto const&) noexcept {
+        try {
+            DressApplesPane(ApplesOwn(), sender, true);
+        } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
+        }
+    });
+    own.closingToken = navigation.PaneClosed([](controls::NavigationView const& sender, auto const&) noexcept {
+        try {
+            DressApplesPane(ApplesOwn(), sender, false);
+        } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
+        }
+    });
+}
+
 void FillApplesOverlay() {
     State& own = ApplesOwn();
     auto navigation = own.navigation.get();
@@ -808,12 +857,9 @@ void FillApplesOverlay() {
         if (!pane) return;
         own.navigation = winrt::make_weak(navigation);
         own.pane = winrt::make_weak(pane);
+        WatchApplesPane(own, navigation);
     }
-    if (navigation.DisplayMode() == controls::NavigationViewDisplayMode::Expanded) {
-        RemoveFill(own);
-    } else {
-        FillPane(own, navigation);
-    }
+    DressApplesPane(own, navigation, navigation.IsPaneOpen());
 }
 
 }  // namespace
@@ -877,7 +923,7 @@ void SetSidebarChangedListener(std::function<void()> changed) {
 }
 
 bool SidebarKeptFolded() noexcept {
-    return g_folded;
+    return g_folded || g_appleFolded;
 }
 
 bool SidebarOverPages() noexcept {
