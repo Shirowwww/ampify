@@ -5,7 +5,8 @@ list(APPEND AMPIFY_CORE_SOURCES src/core/sing/vocal_splitter.cpp src/core/sing/r
 list(APPEND AMPIFY_TESTS_SOURCES tests/sing_tests.cpp)
 # Windows: Sing in Apple's audio process, and the model on the graphics card through ONNX Runtime, loaded at run
 # time from the kit (its C header vendored unchanged, MIT, see vendor/onnxruntime/UPSTREAM.txt).
-list(APPEND AMPIFY_WIN_SOURCES src/win/audio/sing.cpp src/win/audio/sing_model.cpp)
+list(APPEND AMPIFY_WIN_SOURCES src/win/audio/sing.cpp src/win/audio/sing_model.cpp
+     src/win/audio/local_player.cpp)
 set_source_files_properties(src/win/audio/sing_model.cpp PROPERTIES
     INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/vendor/onnxruntime")
 

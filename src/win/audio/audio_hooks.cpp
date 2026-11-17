@@ -773,6 +773,7 @@ StartResult PlaceHooks(const char* why) {
     if (GainPolicy* policy = g_policy.load(); policy && !policy->Prepare()) g_policy = nullptr;
     if (!detail::HookPlayerVolume()) return StartResult::Failed;
     detail::StartAutoMixWatch();
+    detail::StartLocalPlayerWatch();
 
     int installed = InstallAudioHooks();
     if (installed == 0) return StartResult::Failed;

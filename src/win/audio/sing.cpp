@@ -10,9 +10,12 @@
 
 #include <windows.h>
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <mutex>
@@ -60,6 +63,13 @@ std::atomic<float> g_voice{1.0f};
 // thread in studio mode always meets the streams of the model being run.
 std::atomic<int> g_model{0};
 std::atomic<bool> g_paused{false};  // Apple's player paused, as seen through AVCFPlayerSetRate
+// Apple's local file player (local_player.cpp) dropped what it queued and was not stopped since: a pause, which a stop
+// follows, or a skip or a move in the song, after which it sounds again with no start. That sound is another place
+// in a song: the audio thread drops what studio mode held then.
+constexpr float kSilentSample = 1e-6f;
+std::atomic<bool> g_localMoved{false};
+std::atomic<bool> g_localMoveSeen{false};  // set by the audio thread, noted by Sing's thread
+const char kLocalSong = 0;                 // g_pausedOn while the local file player is paused: its address
 // A rate an audio thread met with no studio stream yet: Sing's thread builds one at its next tick.
 std::atomic<int> g_wantedRate{0};
 std::atomic<int> g_wantedTailRate{0};
@@ -124,6 +134,22 @@ double LagNow() {
 // A block in studio mode with no stream for its rate yet: silent, as the stream will be for its delay anyway.
 void Mute(float* samples, unsigned frames) { std::fill(samples, samples + static_cast<size_t>(frames) * 2, 0.0f); }
 
+bool Sounds(const float* samples, unsigned frames) {
+    return std::any_of(samples, samples + static_cast<size_t>(frames) * 2,
+                       [](float sample) { return std::fabs(sample) > kSilentSample; });
+}
+
+// The main audio thread only: true when the local file player sounds again from another place, what `studio` held
+// then dropped. Before the block is processed, so none of the new place is lost.
+bool LocalPlayerMoved(core_sing::StudioStream& studio, const float* samples, unsigned frames) {
+    if (!g_localMoved.load(std::memory_order_relaxed) || !Sounds(samples, frames)) return false;
+    if (!g_localMoved.exchange(false, std::memory_order_relaxed)) return false;
+    studio.Flush(Fade::None);
+    g_paused.store(false, std::memory_order_relaxed);
+    g_localMoveSeen.store(true, std::memory_order_relaxed);
+    return true;
+}
+
 }  // namespace
 
 namespace detail {
@@ -146,7 +172,9 @@ void SingMain(float* samples, unsigned frames, int rate) {
     }
     // A stream of another rate played meanwhile: what this one holds is of an older song.
     if (g_lastRate.exchange(rate, std::memory_order_relaxed) != rate) studio->Flush(Fade::None);
-    studio->Process(samples, frames, voice, g_paused.load(std::memory_order_relaxed));
+    bool paused = g_paused.load(std::memory_order_relaxed);
+    if (paused && LocalPlayerMoved(*studio, samples, frames)) paused = false;
+    studio->Process(samples, frames, voice, paused);
 }
 
 // The deck's copy of the old song gets what Apple's stream gets: in studio mode, the same lag, so the mix stays in
@@ -207,8 +235,30 @@ void SingPlays() {
     const bool sameSong = song == g_pausedOn;
     if (!sameSong) FlushAll(MainStudios(), Fade::None);
     if (g_holding) HoldClockBack(sameSong ? LagNow() : Spec().delaySeconds);
+    g_localMoved.store(false, std::memory_order_relaxed);  // the local file player is left
     g_paused.store(false, std::memory_order_relaxed);
 }
+
+// The local file player starts: after its own pause, with nothing moved since, it goes on from what studio mode held.
+void SingLocalPlays() {
+    std::lock_guard lock(g_transition);
+    const bool sameSpot = g_paused.load(std::memory_order_relaxed) && g_pausedOn == &kLocalSong &&
+                          !g_localMoved.load(std::memory_order_relaxed);
+    if (!sameSpot) FlushAll(MainStudios(), Fade::None);
+    if (g_holding) HoldClockBack(sameSpot ? LagNow() : Spec().delaySeconds);
+    g_localMoved.store(false, std::memory_order_relaxed);
+    g_paused.store(false, std::memory_order_relaxed);
+}
+
+// Studio mode stops reading its stream as Apple's sound stops, and keeps what it holds until it knows why.
+void SingLocalReset() {
+    std::lock_guard lock(g_transition);
+    g_localMoved.store(true, std::memory_order_relaxed);
+    if (!g_paused.exchange(true, std::memory_order_relaxed)) g_pausedOn = &kLocalSong;
+}
+
+// The reset before it was a pause.
+void SingLocalStopped() { g_localMoved.store(false, std::memory_order_relaxed); }
 
 bool SingHoldsSound() { return g_mode.load(std::memory_order_relaxed) == static_cast<int>(Mode::Studio); }
 
@@ -318,6 +368,9 @@ private:
     void Follow() {
         const SingWish wish = ReadWish();
         g_voice.store(static_cast<float>(wish.voice), std::memory_order_relaxed);
+        if (g_localMoveSeen.exchange(false, std::memory_order_relaxed)) {
+            Note("Sing: Apple's local file player moved, studio mode starts again from there");
+        }
         if (wish.mode == Mode::Studio && m_wished != Mode::Studio && m_studio.reason == kDownloadFailed) {
             m_studio.failed = false;  // asked again after a failed download: it is tried again
             m_studio.reason.clear();

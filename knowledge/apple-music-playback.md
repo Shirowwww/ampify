@@ -32,6 +32,24 @@ answers. AutoMix (`src/win/audio/automix.cpp`, `src/core/automix/`) is built on 
   (143442 is France).
 - The player supports overlapped playback (`AVCFPlayerGetSupportsAdvanceTimeForOverlappedPlayback` is true).
 
+## Local files: another player
+
+Local files (the « Fichiers locaux » playlist, files imported into the library) never reach AVFoundationCF (checked on
+2026-11-17): no item, player, rate, seek or time call goes through its imports, and Media Foundation's media engine
+is not used either. The agent decodes them itself (`AudioConverterNew`, `AudioCodec*`) and plays them through a
+CoreAudioToolbox output unit, all called from `AMPLibraryAgent.exe`:
+
+- play: `AudioConverterNew`, then `AudioOutputUnitStart(unit)`;
+- pause: `AudioUnitReset(unit, global, 0)` (the sound stops at once), then `AudioOutputUnitStop(unit)` a second later;
+- next, or a local song picked while one plays: `AudioUnitReset` and a new converter, with no stop and no start;
+- a catalog song after a local one: the same reset, the stop a second later, then the queue player.
+
+The sound goes out on the same stereo stream as the queue player's (CoreAudioToolbox's render thread). So Sing follows
+these three calls (`src/win/audio/local_player.cpp`): a reset holds studio mode, a stop says it was a pause, and sound
+with no start after a reset is another place in a song. The leveler's journal shows these songs as « variant none (a
+player the leveler does not follow) ». Apple's clock for them is not read through `AVCFPlayerItemGetCurrentTime`, so
+studio mode's delay is not taken off their position.
+
 ## Works
 
 - **A switch at an exact point**: `AVCFPlayerItemSetForwardPlaybackEndTime(current, tA)` and a seek of the next item

@@ -77,6 +77,12 @@ bool SingTail(float* samples, unsigned frames, int rate, bool heard);
 void SingSeeked();
 void SingPaused();  // after Apple's player paused
 void SingPlays();   // before Apple's player plays
+// Apple's local file player (local_player.cpp): its output unit started, reset (what it queued dropped: a pause, a
+// skip or a move in the song) and stopped (a second after a pause).
+void StartLocalPlayerWatch();
+void SingLocalPlays();    // before it starts
+void SingLocalReset();    // after it reset
+void SingLocalStopped();  // after it stopped
 bool SingHoldsSound();  // studio mode on: Apple's silent blocks are played through it, so what it holds is heard
 double SingLag();       // seconds studio mode holds the sound back, 0 when off: a mix waits that long to end
 
