@@ -185,12 +185,16 @@ bool IsPageHeader(const std::string& name) {
 
 // The system draws the caption buttons from the title bar's colours, not from the XAML tree, and Apple Music sets them
 // for the system's mode: black on the dark themes of a PC in light mode. They follow the theme's mode, with the
-// alphas Apple uses (0x33 under the pointer, 0x66 pressed), and get the app's own back when the theme goes.
+// alphas Apple uses (0x33 under the pointer, 0x66 pressed), and get the app's own back when the theme goes. Only on a
+// window whose content runs under the system's title bar: the others draw their own caption.
 void XamlTreeBackend::SetCaptionMode(std::optional<bool> dark) {
     try {
         xaml::Window window = m_window.get();
         if (!window || (!dark && !m_captionOriginal)) return;
         auto bar = window.AppWindow().TitleBar();
+        // A window that keeps the system's title bar and hides it itself (the mini player draws its own buttons): a
+        // colour written there brings the system's bar back over the window's top (issue #8).
+        if (!m_captionOriginal && !bar.ExtendsContentIntoTitleBar()) return;
         if (dark && !m_captionOriginal) {
             m_captionOriginal = CaptionColours{bar.ButtonForegroundColor(), bar.ButtonHoverForegroundColor(),
                                                bar.ButtonHoverBackgroundColor(), bar.ButtonPressedForegroundColor(),
