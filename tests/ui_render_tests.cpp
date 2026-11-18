@@ -893,6 +893,7 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     CHECK(none.textMarquee);                    // cut texts scroll under the pointer
     CHECK(!none.sidebarOnHover);                // the sidebar as Apple Music shows it
     CHECK(!none.topbarSearch);                  // the search field stays in the sidebar unless asked
+    CHECK(none.lyricsFill);                     // word-by-word lyrics lit smoothly (issue #5)
 
     settings.Set("apple.notifications", "Background");
     settings.Set("apple.fullscreen", "replace");
@@ -902,8 +903,10 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     settings.Set("apple.marquee", "off");
     settings.Set("apple.sidebar", "Hover");
     settings.Set("apple.topbar", "Search");
+    settings.Set("apple.lyricsFill", "Apple");
     AppleTweaks set = ReadAppleTweaks(settings);
     CHECK(set.topbarSearch);
+    CHECK(!set.lyricsFill);
     CHECK(!set.playerControls);
     CHECK(!set.sharpArtwork);
     CHECK(!set.textMarquee);
@@ -1076,7 +1079,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
                                                                   "apple.notifications"}));
     CHECK((keysOf(TweakGroup::Player) ==
            std::vector<std::string>{"apple.fullscreen", "apple.playerControls", "apple.lyricsBefore",
-                                    "apple.lyricsAfter", "apple.artwork"}));
+                                    "apple.lyricsAfter", "apple.lyricsFill", "apple.artwork"}));
     CHECK((keysOf(TweakGroup::Reliability) ==
            std::vector<std::string>{"apple.network", "apple.proxy", "apple.orphanAgent", "apple.watchdog"}));
     auto allChoices = [&kit] {
@@ -1100,6 +1103,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     // Every lyrics line by default, as Apple shows them, or 0 to 5 of them on each side of the sung one.
     CHECK(card("apple.lyricsBefore").value == "all" && card("apple.lyricsBefore").options.size() == 7);
     CHECK(card("apple.lyricsAfter").value == "all" && card("apple.lyricsAfter").options.size() == 7);
+    CHECK(card("apple.lyricsFill").value == "smooth" && card("apple.lyricsFill").options.size() == 2);
     CHECK(card("apple.artwork").value == "sharp");
     CHECK(card("apple.marquee").value == "hover");
     CHECK(SidebarChoice(kit).value == "open");  // on the Look tab, beside the playback bar
@@ -1120,6 +1124,8 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(SetAppleTweak(kit, "apple.lyricsBefore", "1", error));
     CHECK(SetAppleTweak(kit, "apple.lyricsAfter", "2", error));
     CHECK(!SetAppleTweak(kit, "apple.lyricsAfter", "6", error));
+    CHECK(SetAppleTweak(kit, "apple.lyricsFill", "apple", error));
+    CHECK(!SetAppleTweak(kit, "apple.lyricsFill", "fast", error));
     choices = allChoices();
     {
         ampify::Settings saved;
@@ -1132,6 +1138,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(card("apple.artwork").value == "apple" && card("apple.marquee").value == "off");
     CHECK(SidebarChoice(kit).value == "hover");
     CHECK(card("apple.topbar").value == "search");
+    CHECK(card("apple.lyricsFill").value == "apple");
 }
 
 TEST_CASE(UiRender_SvgIconKeepsViewBoxAndSafePaths) {

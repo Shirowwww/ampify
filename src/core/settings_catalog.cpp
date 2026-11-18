@@ -105,6 +105,8 @@ const std::vector<KitSetting>& Fixed() {
                     {{"off", "tweaks.topbar.off"}, {"search", "tweaks.topbar.search"}}),
         Choice(kLyricsBeforeKey, "tweaks.lyricsBefore", "tweaks.lyricsBeforeHelp", LyricLineOptions()),
         Choice(kLyricsAfterKey, "tweaks.lyricsAfter", "tweaks.lyricsAfterHelp", LyricLineOptions()),
+        Choice(kLyricsFillKey, "tweaks.lyricsFill", "tweaks.lyricsFillHelp",
+                    {{"smooth", "tweaks.lyricsFill.smooth"}, {"apple", "tweaks.lyricsFill.apple"}}),
         Choice(kEntryKey, "entry.title", "entry.help", {{"sidebar", "entry.sidebar"}, {"header", "entry.header"}}),
         Text("language", "the Windows language"),
     };

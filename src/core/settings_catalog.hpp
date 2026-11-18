@@ -77,6 +77,8 @@ inline constexpr char kSidebarEntriesOrderKey[] = "apple.order.sidebarEntries";
 // The full-screen player's lyrics lines kept above and below the sung one: "all", or 0 to 5 (win/lyrics_window.cpp).
 inline constexpr char kLyricsBeforeKey[] = "apple.lyricsBefore";
 inline constexpr char kLyricsAfterKey[] = "apple.lyricsAfter";
+// Word-by-word lyrics lit smoothly (smooth) or in Apple's own steps (apple) (win/lyrics_fill.cpp, issue #5).
+inline constexpr char kLyricsFillKey[] = "apple.lyricsFill";
 inline constexpr char kKitUpdateKey[] = "kit_update";
 inline constexpr char kEntryKey[] = "ampify.entry";
 inline constexpr char kGlassChoiceKey[] = "theme.glass";

@@ -95,6 +95,18 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   background vocals and translations), Apple's pane stays word by word, and Ampify has the word times at the song's
   start, before any pane opens. The earlier findings "Apple Music on Windows has no word timing" (05/11 and 12/11)
   came from this wrong value. Check a change here against Apple's pane with Ampify off (`ampify restore`) and on.
+- **How Apple draws the fill (1.1792.39942, issue #5, traced live 2026-11-18).** Under each `Border#WordByWordHost`
+  of the line being sung, every row of words becomes: a container at opacity 0 holding the word sprites (masks of
+  Win2D drawing surfaces over a colour brush), and a `SpriteVisual` over the row whose brush is a
+  `CompositionMaskBrush`: mask a `CompositionSurfaceBrush` of a `CompositionVisualSurface` (its `SourceVisual` is
+  that hidden container), source a `CompositionLinearGradientBrush`, relative, (0,0) to (1,0), four stops: sung colour
+  at 0 and at the edge, unsung colour at the edge and at 1. Apple writes the edge's static offset at each word's start
+  (the word's left edge, within 100 ms of the song's position) and moves it between with an animation of its own,
+  which a read never shows. When the line ends Apple draws it plainly again (the masked sprite goes). Background
+  vocals (`BackgroundWordByWordHost`) keep the masked structure all along, whatever line is sung. Lines are not
+  virtualized: a song's 90 hosts stand in the view at once. Opening the full-screen player or the mini player left a
+  single `KaraokeLyricsView` to follow, its height changing: Apple seems to move the same view between them. Ampify's `apple.lyricsFill` gives each row's mask a gradient of its own,
+  moved by a key-frame animation along the TTML word times (`src/win/lyrics_fill.cpp`, `src/core/lyrics_fill.cpp`).
 - **How Apple fills a word (1.1792.39942, issue #5, read 2026-11-16, not yet traced live).** Each word of a line is an
   `IKaraokeLyricsWord` (`{291C0608-078A-5CA2-BF99-7BA6EB1548EB}`): `Begin` and `End` in ms (Int32, slots 14 and 16),
   `WordId` (slot 18) and `Position`, a float with a setter (slots 8 and 9), most likely the fill the view draws. The

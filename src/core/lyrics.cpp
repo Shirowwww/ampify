@@ -222,6 +222,7 @@ struct Frame {
     std::string name;
     bool word = false;  // a span with its own begin time
     bool ignored = false;  // a translation or a transliteration: not part of the lyric line
+    bool background = false;  // a background vocal: part of the line, drawn apart by Apple
     Timing timing;
     std::string own;  // the text directly inside this span
 };
@@ -313,6 +314,7 @@ private:
             frame.word = frame.timing.begin.has_value();
             const std::string* role = tag.Find("role");
             frame.ignored = role && (*role == "x-translation" || *role == "x-roman");
+            frame.background = role && *role == "x-bg";
         }
         m_stack.push_back(std::move(frame));
     }
@@ -331,8 +333,11 @@ private:
             std::string text = Trimmed(frame.own);
             if (!text.empty()) {
                 const bool spaced = !m_text.empty() && m_text.back() == ' ';
+                const bool background =
+                    frame.background ||
+                    std::any_of(m_stack.begin(), m_stack.end(), [](const Frame& f) { return f.background; });
                 m_line.line.words.push_back(
-                    {*frame.timing.begin, frame.timing.end.value_or(*frame.timing.begin), text, spaced});
+                    {*frame.timing.begin, frame.timing.end.value_or(*frame.timing.begin), text, spaced, background});
                 m_line.wordEnds.push_back(frame.timing);
                 m_gapWord = static_cast<int>(m_line.line.words.size()) - 1;
             }

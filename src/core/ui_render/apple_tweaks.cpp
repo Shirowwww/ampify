@@ -16,8 +16,8 @@ namespace {
 // The playback bar's place and the sidebar's opening sit on the Look tab instead, under the theme they change
 // (PlaybarChoice, SongRoomChoice, SidebarChoice).
 constexpr const char* kWindowKeys[] = {kTopbarKey, kEntryKey, kMarqueeKey, kCloseKey, kNotificationsKey};
-constexpr const char* kPlayerKeys[] = {kPlayerModeKey, kPlayerControlsKey, kLyricsBeforeKey, kLyricsAfterKey,
-                                       kArtworkKey};
+constexpr const char* kPlayerKeys[] = {kPlayerModeKey,  kPlayerControlsKey, kLyricsBeforeKey, kLyricsAfterKey,
+                                       kLyricsFillKey, kArtworkKey};
 constexpr const char* kReliabilityKeys[] = {kNetworkKey, kProxyKey, kOrphanAgentKey, kFreezeLogKey};
 
 std::span<const char* const> KeysOf(TweakGroup group) {
@@ -66,6 +66,7 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.topbarSearch = ChoiceOf(settings, kTopbarKey) == "search";
     tweaks.lyricsBefore = LyricLinesOf(ChoiceOf(settings, kLyricsBeforeKey));
     tweaks.lyricsAfter = LyricLinesOf(ChoiceOf(settings, kLyricsAfterKey));
+    tweaks.lyricsFill = ChoiceOf(settings, kLyricsFillKey) == "smooth";
     tweaks.playbarOrder = ParseOrder(settings.Get(kPlaybarOrderKey).value_or(""));
     tweaks.sidebarEntriesOrder = ParseOrder(settings.Get(kSidebarEntriesOrderKey).value_or(""));
     return tweaks;

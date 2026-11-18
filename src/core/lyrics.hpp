@@ -20,6 +20,7 @@ struct LyricWord {
     int64_t endMs = 0;
     std::string text;
     bool spaceAfter = false;  // a space followed it in the line's text: "beau" "ti" "ful " "day"
+    bool background = false;  // a background vocal (ttm:role="x-bg"), which Apple draws on a row of its own
 };
 
 // How finely Apple timed a line: each word, the line as a whole, or not at all (plain text).
