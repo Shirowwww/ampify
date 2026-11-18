@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.5.3 (2026-11-18)
+
+Word-by-word lyrics now fill smoothly, a click on an album of your library can open its tracks right in the grid as
+iTunes did, and two bugs are fixed.
+
+- Smooth word-by-word lyrics (#5). Apple Music moves the fill of a word in small steps and leaves the end of a word
+  dark until the next one starts. Ampify now lights each word at the screen's pace as it is sung, whole by its end, in
+  the side panel, the full-screen player and the mini player. It is on by default; Ampify's settings, Player >
+  Word-by-word lyrics (`apple.lyricsFill`), give Apple's own fill back. A line Ampify cannot match to the song keeps
+  Apple's fill.
+- Album track lists in the library grid (#7). With Ampify's settings, Window > Click on an album > Shows its tracks
+  (`apple.albumClick`, off by default), a click on an album in Library > Albums or Library > Recently Added opens a
+  panel under its row and slides the rows below down: the cover, Play, Shuffle, Open album, and the tracks in one or
+  two columns, with a heading per disc for an album of several. A double-click on a track, or a click on its number,
+  plays the album from there. Escape or a second click closes it.
+- The mini player no longer shows a black bar with the window title once a theme is applied (#8).
+- Apple Music no longer crashes while it closes after it was minimized.
+- Extensions: `Ampify.library.tracks()` gives each track its `trackNumber`, `discNumber` and `albumId`.
+
 ## 1.5.2 (2026-11-17)
 
 Sing works on your own song files, its Light quality is rebuilt, and AutoMix can mix songs that have a Dolby Atmos
