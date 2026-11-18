@@ -41,6 +41,15 @@ inline double LyricsCentringShift(SungSpan sung, double area, int before, int af
     return area / 2 - (sung.top + sung.bottom) / 2;
 }
 
+// The top margin of the lines while some are hidden. Apple scrolls the sung line to the top of its lines and a margin
+// of its own puts it lower (412 in an area 1080 high, 1.1792); a quick run of "next" once left that margin at 0, and
+// since Ampify moves the scroller as a whole, the lines above the sung one stood outside it. Half the area leaves the
+// sung line room above it in the middle. Apple's own margin while a side shows all its lines.
+inline double LyricsTopRoom(double appleTop, double area, int before, int after) {
+    if (before == kAllLines || after == kAllLines || area <= 0) return appleTop;
+    return appleTop > area / 2 ? appleTop : area / 2;
+}
+
 // Whether a scroll that starts `sinceLineMs` after the sung lines changed is the one that brings them in place.
 // Apple scrolls to a line 15 to 30 ms before it lights it (1.1792, measured): such a scroll finds the line that is
 // ending still sung, and is not followed; one that comes just after its line is.

@@ -61,6 +61,20 @@ TEST_CASE(LyricsWindow_NothingMovesWhileASideShowsAllOrNothingIsSung) {
     CHECK_NEAR(LyricsCentringShift(SungSpan{300, 360}, 0, 1, 1, true), 0, 1e-9);
 }
 
+// Apple scrolls the sung line to the top of its lines, which a top margin then puts lower: 412 in an area 1080 high
+// (1.1792). A quick run of "next" left that margin at 0 and no line showed above the sung one.
+TEST_CASE(LyricsWindow_TheLinesKeepHalfTheAreaAboveThemForTheLinesBefore) {
+    CHECK_NEAR(ampify::LyricsTopRoom(0, 1080, 2, 2), 540, 1e-9);
+    CHECK_NEAR(ampify::LyricsTopRoom(412, 1080, 2, 2), 540, 1e-9);
+    CHECK_NEAR(ampify::LyricsTopRoom(700, 1080, 5, 0), 700, 1e-9);  // more than half: Apple's stays
+}
+
+TEST_CASE(LyricsWindow_AppleKeepsItsTopMarginWhileASideShowsAllLines) {
+    CHECK_NEAR(ampify::LyricsTopRoom(0, 1080, kAllLines, 2), 0, 1e-9);
+    CHECK_NEAR(ampify::LyricsTopRoom(412, 1080, 2, kAllLines), 412, 1e-9);
+    CHECK_NEAR(ampify::LyricsTopRoom(60, 0, 2, 2), 60, 1e-9);  // not laid out yet
+}
+
 TEST_CASE(LyricsWindow_AScrollBeforeItsLineLightsIsNotFollowed) {
     // Apple scrolls, then lights the line: the scroll comes seconds after the line before it.
     CHECK(!ampify::ScrollFollowsSungLine(2400));

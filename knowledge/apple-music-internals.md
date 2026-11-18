@@ -121,6 +121,13 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   events must not act on the scroll alone: the sung line is then still the one ending. `apple.lyricsBefore` centred
   that ending line at the scroll's end, a whole line down, and came back as the new line lit
   (`src/win/lyrics_window.cpp`, `ScrollFollowsSungLine`).
+- **Where the full-screen lyrics put the sung line (1.1792, traced 2026-11-18).** Apple's scroll always ends with the
+  sung line at the very top of its lines (`VerticalOffset` = the line's layout top in the scrolled content); what puts
+  it lower is the top margin of that content (the `StackPanel` in `ScrollContentPresenter`): 412 in a viewport 1080
+  high, the same for every song of a view, 60 in the side panel. Three quick "next" in a row once left it at 0: the
+  sung line then stood at the top for every song after, until the full-screen player was opened again, and nothing
+  of the lines before it showed. `apple.lyricsBefore` keeps that margin at half the viewport or more
+  (`LyricsTopRoom`), and follows any margin Apple writes since.
 - **A large cover.** The play bar's `Image#StaticArtwork` is a thumbnail. Apple's own loader is a static of
   `AMP.UI.Views.UIBroker` (`IUIBrokerStatics` AC46998B-…, slot 34 `GetImageSource(Artwork, Double scale, Double width,
   Double height) -> ImageSource`), given the item's `IArtwork`. Library covers sit on disk in

@@ -51,6 +51,8 @@ struct Window {
     controls::ScrollViewer::ViewChanging_revoker scrolling;
     controls::ScrollViewer::ViewChanged_revoker scrolled;
     std::optional<double> scrollEnd;  // where Apple's scroll in flight ends, while one is
+    std::optional<double> appleTop;   // Apple's own top margin on the lines, put back when Ampify lets go
+    std::optional<double> ownTop;     // the one Ampify wrote there (LyricsTopRoom)
     SungLines sung;
     std::chrono::steady_clock::time_point sungAt;  // when the sung lines last changed
     std::chrono::steady_clock::time_point waitsForLine;  // until then the block stays put: a scroll's line is to light
@@ -197,6 +199,19 @@ double CentringShift(const Window& state, const controls::ScrollViewer& scroller
     return LyricsCentringShift(span, scroller.ActualHeight(), before, after, true);
 }
 
+// The lines' top margin (LyricsTopRoom). A margin that is not Ampify's is Apple's, written since: it is followed.
+void KeepRoomAbove(Window& state, const controls::ScrollViewer& scroller, int before, int after) {
+    auto content = scroller.Content().try_as<xaml::FrameworkElement>();
+    if (!content) return;
+    xaml::Thickness margin = content.Margin();
+    if (!state.appleTop || !state.ownTop || margin.Top != *state.ownTop) state.appleTop = margin.Top;
+    const double top = LyricsTopRoom(*state.appleTop, scroller.ViewportHeight(), before, after);
+    state.ownTop = top;
+    if (margin.Top == top) return;
+    margin.Top = top;
+    content.Margin(margin);
+}
+
 void Recentre(Window& state) {
     controls::Panel lines = state.lines.get();
     controls::ScrollViewer scroller = state.scroller.get();
@@ -264,6 +279,7 @@ void Apply(Window& state) {
     }
     state.sung = sung;
     state.touched = !all;
+    if (controls::ScrollViewer scroller = state.scroller.get()) KeepRoomAbove(state, scroller, before, after);
     Recentre(state);
 }
 
@@ -288,6 +304,8 @@ void FollowLyricsWindow(const xaml::UIElement& root) noexcept {
             state.groups.clear();
             state.watches.clear();
             state.scrollEnd.reset();
+            state.appleTop.reset();
+            state.ownTop.reset();
             state.sung = {};
             state.touched = false;
             WatchScroll(state, scroller);
@@ -303,13 +321,18 @@ void ReleaseLyricsWindow() noexcept {
         if (controls::Panel lines = state.lines.get(); lines && state.touched) {
             for (const xaml::UIElement& line : lines.Children()) Fade(line, true);
             if (auto footer = state.footer.get()) Fade(footer, true);
-            if (auto scroller = state.scroller.get()) Move(scroller, 0);
+            if (auto scroller = state.scroller.get()) {
+                KeepRoomAbove(state, scroller, kAllLines, kAllLines);
+                Move(scroller, 0);
+            }
         }
         state.watches.clear();
         state.groups.clear();
         state.scrolling.revoke();
         state.scrolled.revoke();
         state.scrollEnd.reset();
+        state.appleTop.reset();
+        state.ownTop.reset();
         state.sung = {};
         state.lines = nullptr;
         state.scroller = nullptr;
