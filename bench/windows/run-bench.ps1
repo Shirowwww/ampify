@@ -119,6 +119,21 @@ if (Test-Path -LiteralPath $buildInfo) {
     Get-Content -LiteralPath $buildInfo | ForEach-Object { $preparation.Add($_) }
 }
 
+# On CI, Windows writes a small dump of each crash of Apple Music's two processes into the results, to read with the
+# kernel's symbols (artifact ampify-symbols-*). Never on a PC: it is a setting of the whole machine.
+if ($env:GITHUB_ACTIONS -eq 'true') {
+    $dumps = Join-Path $script:BenchOutputRoot 'dumps'
+    New-Item -ItemType Directory -Force -Path $dumps | Out-Null
+    foreach ($exe in 'AppleMusic.exe', 'AMPLibraryAgent.exe') {
+        $key = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\$exe"
+        New-Item -Path $key -Force | Out-Null
+        New-ItemProperty -Path $key -Name DumpFolder -Value $dumps -PropertyType ExpandString -Force | Out-Null
+        New-ItemProperty -Path $key -Name DumpType -Value 1 -PropertyType DWord -Force | Out-Null
+        New-ItemProperty -Path $key -Name DumpCount -Value 5 -PropertyType DWord -Force | Out-Null
+    }
+    $preparation.Add("Crash dumps: $dumps")
+}
+
 $script:KnownVersions = @(Get-KnownAppVersions -RepoRoot $script:RepoRoot)
 $preparation.Add("Tested versions (facts/apple.json): $($script:KnownVersions -join ', ')")
 

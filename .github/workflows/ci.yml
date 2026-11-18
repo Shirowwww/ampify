@@ -175,6 +175,14 @@ jobs:
           path: msvc-kit
           if-no-files-found: error
           retention-days: 14
+      # The kernel's symbols, apart from the kit so the bench jobs do not download them: with them, a crash dump of
+      # the bench (bench-results-*/dumps) reads as functions and lines.
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ampify-symbols-${{ matrix.variant }}
+          path: build/ampify_kernel.pdb
+          if-no-files-found: warn
+          retention-days: 14
 
   # The case ids are read from the case files (bench/windows/shards.sh), so a new case needs no edit here.
   bench-plan:
