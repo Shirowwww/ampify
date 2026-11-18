@@ -102,12 +102,12 @@ std::vector<float> Song(int rate, double seconds) {
 
 // Plays song frames [from, to) through the stream in 10 ms blocks, the worker running between blocks if `work`.
 std::vector<float> Play(StudioStream& stream, VocalSplitter& splitter, const std::vector<float>& song, size_t from,
-                        size_t to, int rate, double voice, bool work = true) {
+                        size_t to, int rate, double voice, bool work = true, double music = 1.0) {
     const size_t block = static_cast<size_t>(rate / 100);
     std::vector<float> out(song.begin() + static_cast<std::ptrdiff_t>(from * 2),
                            song.begin() + static_cast<std::ptrdiff_t>(to * 2));
     for (size_t at = 0; at < to - from; at += block) {
-        stream.Process(out.data() + at * 2, std::min(block, to - from - at), voice);
+        stream.Process(out.data() + at * 2, std::min(block, to - from - at), voice, false, music);
         while (work && stream.Work(splitter)) {
         }
     }
@@ -513,6 +513,63 @@ TEST_CASE(Sing_StudioStreamSpreadsAVoiceChangeOver50Ms) {
     CHECK(worst < 1e-3);
 }
 
+// The player's volume is in the sound that comes in: turned down, the change is heard at once, not a delay later.
+TEST_CASE(Sing_StudioStreamHearsAChangeOfVolumeAtOnce) {
+    constexpr int kRate = 44100;
+    HalfModel model;
+    VocalSplitter splitter(model);
+    StudioStream stream(kRate);
+    const std::vector<float> song = Song(kRate, 4.0);
+    const size_t delay = Frames(stream, kRate);
+    const size_t change = 3 * kRate, block = kRate / 100;
+    auto play = [&](size_t from, size_t to, double volume) {
+        std::vector<float> out(song.begin() + static_cast<std::ptrdiff_t>(from * 2),
+                               song.begin() + static_cast<std::ptrdiff_t>(to * 2));
+        for (float& sample : out) sample *= static_cast<float>(volume);  // as Apple's player gives it
+        for (size_t at = 0; at < to - from; at += block) {
+            stream.Process(out.data() + at * 2, std::min(block, to - from - at), 0.0, false, 1.0, volume);
+            while (stream.Work(splitter)) {
+            }
+        }
+        return out;
+    };
+    play(0, change, 0.5);
+
+    const std::vector<float> out = play(change, change + kRate / 5, 0.25);
+
+    // After its 10 ms ramp, the song from a delay ago, which came in at 0.5, is heard at 0.25.
+    CHECK(WorstGap(out, song, change, delay, kRate / 50, out.size() / 2, 0.25 * kHalfOut) < 1e-3);
+}
+
+// The singer alone: the music gone, the vocals the model found (half the song here, lifted by its compensation).
+TEST_CASE(Sing_StudioStreamKeepsTheSingerAloneWithTheMusicOff) {
+    constexpr int kRate = 44100;
+    HalfModel model;
+    VocalSplitter splitter(model);
+    StudioStream stream(kRate);
+    const std::vector<float> song = Song(kRate, 4.0);
+    const size_t delay = Frames(stream, kRate);
+
+    const std::vector<float> out = Play(stream, splitter, song, 0, song.size() / 2, kRate, 1.0, true, 0.0);
+
+    CHECK(WorstGap(out, song, 0, delay, delay + kRate / 5, song.size() / 2, 0.5 * kCompensate) < 1e-3);
+}
+
+// Part of the music back under the singer: a quarter of it here.
+TEST_CASE(Sing_StudioStreamKeepsPartOfTheMusicUnderTheSinger) {
+    constexpr int kRate = 44100;
+    HalfModel model;
+    VocalSplitter splitter(model);
+    StudioStream stream(kRate);
+    const std::vector<float> song = Song(kRate, 4.0);
+    const size_t delay = Frames(stream, kRate);
+
+    const std::vector<float> out = Play(stream, splitter, song, 0, song.size() / 2, kRate, 1.0, true, 0.25);
+
+    const double vocals = 0.5 * kCompensate;
+    CHECK(WorstGap(out, song, 0, delay, delay + kRate / 5, song.size() / 2, 0.25 * (1 - vocals) + vocals) < 1e-3);
+}
+
 TEST_CASE(Sing_StudioStreamWorksAt96k) {
     constexpr int kRate = 96000;
     HalfModel model;
@@ -653,9 +710,9 @@ void AddSides(std::vector<float>& stereo, int rate) {
     }
 }
 
-void Light(LightFilter& filter, std::vector<float>& stereo, int rate, double voice, size_t block) {
+void Light(LightFilter& filter, std::vector<float>& stereo, int rate, double voice, size_t block, double music = 1.0) {
     for (size_t at = 0; at < stereo.size() / 2; at += block) {
-        filter.Process(stereo.data() + at * 2, std::min(block, stereo.size() / 2 - at), rate, voice);
+        filter.Process(stereo.data() + at * 2, std::min(block, stereo.size() / 2 - at), rate, voice, music);
     }
 }
 
@@ -674,6 +731,22 @@ TEST_CASE(Sing_LightFilterRemovesACentredVoiceTone) {
     }
     CHECK(std::fabs(Db(ToneLevel(song, 0, 22050, 44100, 5000, kRate) / 0.1)) < 0.5);
     CHECK(std::fabs(Db(ToneLevel(song, 1, 22050, 44100, 7000, kRate) / 0.1)) < 0.5);
+}
+
+// The other way round: the centred voice tone stays, the sounds on each side go.
+TEST_CASE(Sing_LightFilterKeepsACentredVoiceToneWithTheMusicOff) {
+    constexpr int kRate = 44100;
+    LightFilter filter;
+    std::vector<float> song = Sine(kRate, 1.0, 1000, 0.5, 0.5);
+    AddSides(song, kRate);
+
+    Light(filter, song, kRate, 1.0, 441, 0.0);
+
+    for (size_t channel = 0; channel < 2; channel++) {
+        CHECK(std::fabs(Db(ToneLevel(song, channel, 22050, 44100, 1000, kRate) / 0.5)) < 0.5);
+    }
+    CHECK(Db(ToneLevel(song, 0, 22050, 44100, 5000, kRate) / 0.1) < -20);
+    CHECK(Db(ToneLevel(song, 1, 22050, 44100, 7000, kRate) / 0.1) < -20);
 }
 
 // A sound on one side alone stays as it is, where the older filter halved it and put it on both sides.

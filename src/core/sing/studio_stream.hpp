@@ -35,9 +35,12 @@ public:
 
     // ---- the audio thread
 
-    // In place, interleaved stereo. `voice` 0..1: how much of the vocals stays. `paused`: the player is paused, so
-    // the sound fades out and stays silent, and only blocks with sound in them are taken in (its last ones).
-    void Process(float* interleaved, size_t frames, double voice, bool paused = false);
+    // In place, interleaved stereo. `voice` 0..1: how much of the vocals stays; `music` 0..1: how much of the rest
+    // does (below 1, the singer stands out). `paused`: the player is paused, so the sound fades out and stays silent,
+    // and only blocks with sound in them are taken in (its last ones). `volume`: the player's, which the block
+    // carries; what is heard takes the volume of now, not of when it came in.
+    void Process(float* interleaved, size_t frames, double voice, bool paused = false, double music = 1.0,
+                 double volume = 1.0);
 
     // ---- the worker thread
 
@@ -64,9 +67,10 @@ public:
 
 private:
     void TakeFlush();
-    bool Write(const float* interleaved, size_t frames, bool paused);
-    void Read(float* interleaved, size_t frames, std::int64_t live, double voice, bool paused);
-    double NextVoice(double voice);
+    bool Write(const float* interleaved, size_t frames, bool paused, float unscale);
+    void Read(float* interleaved, size_t frames, std::int64_t live, double voice, double music, double volume,
+              bool paused);
+    static double Toward(double& smoothed, double target, double step);
     void Restart(std::int64_t origin);
     bool ReadSong();
     bool RunWindow(VocalSplitter& splitter);
@@ -84,6 +88,7 @@ private:
     std::int64_t m_chunk;    // the most the audio thread writes at once
     std::int64_t m_tail;     // the most a paused stream takes in
     double m_voiceStep;      // per frame
+    double m_volumeStep;     // per frame
     Resampler m_down;
     Resampler m_up;
 
@@ -112,6 +117,8 @@ private:
     std::int64_t m_fadeShift = 0;     // the old reading place against the new, for that fade
     bool m_fadeLive = false;          // that frame is the one coming in, not the held one
     double m_voice = -1;              // smoothed; below 0 until the first block
+    double m_music = -1;              // the same for the music
+    double m_volume = -1;             // the same for the player's volume
     double m_mix = 0;                 // 0 the song as it is, 1 processed
     double m_gain = 1;                // 0 while paused, faded in and out
 

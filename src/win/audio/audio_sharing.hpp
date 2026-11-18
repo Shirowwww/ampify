@@ -60,7 +60,7 @@ SharedAudioHost& InterfaceAudio();
 // engine's own side (reading the request, writing the status) uses audio::ReadSingRequest and WriteSingStatus.
 class SharedSingHost final : public SingHost {
 public:
-    bool Set(audio::SingMode mode, double voice, audio::SingModel model) override;
+    bool Set(audio::SingMode mode, double voice, audio::SingModel model, double music) override;
     std::optional<audio::SingRequest> Request() override;
     std::optional<audio::SingStatus> Status() override;
     std::optional<Pack> PackFor(audio::SingModel model) override;

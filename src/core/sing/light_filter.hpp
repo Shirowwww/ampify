@@ -33,9 +33,10 @@ public:
     LightFilter(const LightFilter&) = delete;
     LightFilter& operator=(const LightFilter&) = delete;
 
-    // In place, interleaved stereo. `voice` 0..1: how much of the centre stays. The output lags the input by
-    // DelayFrames(rate); the first block after Reset (or a rate change) crossfades from the input as it is.
-    void Process(float* interleaved, size_t frames, int rate, double voice);
+    // In place, interleaved stereo. `voice` 0..1: how much of the centre stays; `music` 0..1: how much of the rest
+    // does (below 1, the singer stands out). The output lags the input by DelayFrames(rate); the first block after
+    // Reset (or a rate change) crossfades from the input as it is.
+    void Process(float* interleaved, size_t frames, int rate, double voice, double music = 1.0);
     // Forgets the song: the next block starts again from the input as it is.
     void Reset();
 
@@ -63,6 +64,8 @@ private:
     size_t m_sinceReset = 0;                                  // frames since Reset, for the crossfade in
     double m_voice = -1;                                      // smoothed by frame; below 0 until the first block
     double m_voiceTarget = 1;
+    double m_music = -1;                                      // the same for the music
+    double m_musicTarget = 1;
     double m_sideShare = -1;  // smoothed side to middle power, the mono check; below 0 until a frame has sound
 };
 

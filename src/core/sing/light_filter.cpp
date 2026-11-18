@@ -58,6 +58,7 @@ void LightFilter::Reset() {
     m_readyAt = 0;
     m_sinceReset = 0;
     m_voice = -1;
+    m_music = -1;
     m_sideShare = -1;
 }
 
@@ -115,9 +116,12 @@ void LightFilter::RunFrame() {
     const double step = hopSeconds / kVoiceSeconds;
     m_voice = m_voiceTarget > m_voice ? std::min(m_voiceTarget, m_voice + step)
                                       : std::max(m_voiceTarget, m_voice - step);
+    m_music = m_musicTarget > m_music ? std::min(m_musicTarget, m_music + step)
+                                      : std::max(m_musicTarget, m_music - step);
     const double shareDb = m_sideShare < 0 ? 0 : 10 * std::log10(std::max(m_sideShare, 1e-12));
-    const double stereo = std::clamp((shareDb - kMonoDb) / (kStereoDb - kMonoDb), 0.0, 1.0);
-    const float removal = static_cast<float>((1 - m_voice) * stereo);
+    const auto stereo = static_cast<float>(std::clamp((shareDb - kMonoDb) / (kStereoDb - kMonoDb), 0.0, 1.0));
+    const auto voiceKept = static_cast<float>(m_voice);
+    const auto musicKept = static_cast<float>(m_music);
 
     double side = 0, middle = 0;
     std::complex<float>* left = m_spectrum[0].data();
@@ -136,7 +140,10 @@ void LightFilter::RunFrame() {
         // what is taken away, worked out from its square (no std::abs, which is a slow hypot).
         const float both = m_left[k] + m_right[k] + kTiny;
         const float alikeSquared = std::min(1.0f, 4 * std::norm(m_cross[k]) / (both * both));
-        const float gain = 1 - removal * weight * std::sqrt(std::sqrt(alikeSquared));
+        // The voice's part of the bin, kept at `voiceKept`, the rest at `musicKept`; a mono song is left as it is.
+        const float voiceShare = weight * std::sqrt(std::sqrt(alikeSquared));
+        const float kept = musicKept * (1 - voiceShare) + voiceKept * voiceShare;
+        const float gain = 1 - stereo * (1 - kept);
         left[k] = l * gain;
         right[k] = r * gain;
     }
@@ -160,11 +167,13 @@ void LightFilter::Synthesize() {
     }
 }
 
-void LightFilter::Process(float* interleaved, size_t frames, int rate, double voice) {
+void LightFilter::Process(float* interleaved, size_t frames, int rate, double voice, double music) {
     if (interleaved == nullptr || rate < 8000) return;
     if (rate != m_rate) Design(rate);  // allocates: once per rate, as Apple's stream starts
     m_voiceTarget = std::isfinite(voice) ? std::clamp(voice, 0.0, 1.0) : 1.0;
+    m_musicTarget = std::isfinite(music) ? std::clamp(music, 0.0, 1.0) : 1.0;
     if (m_voice < 0) m_voice = m_voiceTarget;
+    if (m_music < 0) m_music = m_musicTarget;
     const size_t n = m_size, m = m_hop;
     for (size_t i = 0; i < frames; i++) {
         float* sample = interleaved + i * 2;

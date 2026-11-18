@@ -3450,10 +3450,12 @@ function fakeSing({ storage = new Map(), language = "en", sing = {} } = {}) {
     audio: {
       sing: {
         state: () => (need("audio.sing"), structuredClone(world.state)),
-        set: ({ mode, voice, model }) => {
+        set: ({ mode, voice, model, music }) => {
           need("audio.sing");
-          world.sets.push({ mode, voice, model });
-          world.state = { ...world.state, mode, voice, model };
+          // An Ampify with a music level (1.5.6) has it in its state; an older one ignores it.
+          const withMusic = "music" in world.state ? { music } : {};
+          world.sets.push({ mode, voice, model, ...withMusic });
+          world.state = { ...world.state, mode, voice, model, ...withMusic };
           return true;
         },
         onChange: (fn) => (need("audio.sing"), world.listeners.push(fn), () => world.listeners.splice(world.listeners.indexOf(fn), 1)),
@@ -3509,13 +3511,37 @@ test("sing writes the voice as the slider moves and remembers it", () => {
   assert.equal(fake.world.writes, writes, "nothing written while the slider moves");
   fake.rest();
   assert.equal(fake.world.writes, writes + 1, "written once it rests");
-  assert.deepEqual(fake.storage.get("sing"), { enabled: true, mode: null, model: "standard", voice: 0.6 });
+  assert.deepEqual(fake.storage.get("sing"), { enabled: true, mode: null, model: "standard", voice: 0.6, solo: false, music: 0 });
   fake.find("tabs").onChange("light");
   assert.deepEqual(fake.world.sets.at(-1), { mode: "light", voice: 0.6, model: "standard" });
   fake.find("toggle").onChange(false);
   assert.deepEqual(fake.world.sets.at(-1), { mode: "off", voice: 0.6, model: "standard" });
   fake.rest();
   assert.equal(fake.storage.get("sing").mode, "light", "the quality chosen stays for the next time");
+});
+
+test("sing keeps the singer alone, turning the music down instead, and remembers it", () => {
+  const fake = fakeSing({ sing: { music: 1 } });
+  fake.open();
+  fake.find("toggle").onChange(true);
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "studio", voice: 0.1, model: "standard", music: 1 }, "karaoke first");
+  fake.find("tabs").onChange("solo");
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "studio", voice: 1, model: "standard", music: 0 }, "the singer alone");
+  fake.find("slider").onChange(20);
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "studio", voice: 1, model: "standard", music: 0.2 });
+  fake.find("tabs").onChange("karaoke");
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "studio", voice: 0.1, model: "standard", music: 1 }, "back to karaoke");
+  fake.find("tabs").onChange("solo");
+  fake.rest();
+  assert.deepEqual(fake.storage.get("sing"), { enabled: true, mode: null, model: "standard", voice: 0.1, solo: true, music: 0.2 });
+});
+
+test("sing offers no singer alone on an Ampify without a music level", () => {
+  const fake = fakeSing();
+  fake.open();
+  fake.find("toggle").onChange(true);
+  assert.deepEqual(fake.world.sets.at(-1), { mode: "studio", voice: 0.1, model: "standard" });
+  assert.equal(fake.find("tabs").options[0].value, "light", "the first tabs are the quality's");
 });
 
 test("sing picks Light by default when the graphics card cannot run Studio", () => {

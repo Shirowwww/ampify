@@ -197,8 +197,8 @@ namespace {
 struct BlockSing : ampify::SingHost {
     ampify::audio::SharedAudio block{};
     BlockSing() { ampify::audio::ClaimShared(block); }
-    bool Set(ampify::audio::SingMode mode, double voice, ampify::audio::SingModel model) override {
-        return ampify::audio::WriteSingRequest(block, mode, voice, model);
+    bool Set(ampify::audio::SingMode mode, double voice, ampify::audio::SingModel model, double music) override {
+        return ampify::audio::WriteSingRequest(block, mode, voice, model, music);
     }
     std::optional<ampify::audio::SingRequest> Request() override {
         ampify::audio::SingRequest request;
@@ -231,21 +231,29 @@ TEST_CASE(AudioSing_SetWritesTheRequestAndStateReadsItBackWithTheEngineStatus) {
         Ampify.log("set " + Ampify.audio.sing.set({ mode: "studio", voice: 0.2 }));
         Ampify.log("then " + JSON.stringify(Ampify.audio.sing.state()));
         Ampify.log("voice only " + Ampify.audio.sing.set({ mode: "light" }) + " " + Ampify.audio.sing.state().voice);
+        Ampify.log("singer alone " + Ampify.audio.sing.set({ mode: "light", voice: 1, music: 0.1 }) + " " +
+                   Ampify.audio.sing.state().music);
+        Ampify.log("music kept " + Ampify.audio.sing.set({ mode: "light", voice: 0.3 }) + " " + Ampify.audio.sing.state().music);
+        try { Ampify.audio.sing.set({ mode: "light", music: 2 }); } catch (e) { Ampify.log("refused " + e.message); }
+        Ampify.audio.sing.set({ mode: "light", voice: 0.2, music: 1 });
     )", R"("audio.sing")");
     CHECK(element->Start());
-    CHECK(f.Logged(R"([singer] first {"available":null,"mode":"off","voice":0,"model":"standard","phase":"off","progress":0,"delay":0,"reason":"none")" +
+    CHECK(f.Logged(R"([singer] first {"available":null,"mode":"off","voice":0,"music":1,"model":"standard","phase":"off","progress":0,"delay":0,"reason":"none")" +
                    PackPart("null")));
     CHECK(f.Logged("[singer] set true"));
-    CHECK(f.Logged(R"([singer] then {"available":null,"mode":"studio","voice":0.2,"model":"standard","phase":"off","progress":0,"delay":0,"reason":"none")" +
+    CHECK(f.Logged(R"([singer] then {"available":null,"mode":"studio","voice":0.2,"music":1,"model":"standard","phase":"off","progress":0,"delay":0,"reason":"none")" +
                    PackPart("null")));
     CHECK(f.Logged("[singer] voice only true 0.2"));
+    CHECK(f.Logged("[singer] singer alone true 0.1"));
+    CHECK(f.Logged("[singer] music kept true 0.1"));  // left out, the music stays as it was
+    CHECK(f.Logged("[singer] refused sing.set expects a music from 0 to 1"));
 
     ampify::audio::WriteSingStatus(sing.block, {ampify::audio::SingMode::Light, ampify::audio::SingPhase::Downloading, 0.42, 0,
                                                  ampify::audio::SingStudio::No, ampify::audio::SingReason::NoGraphicsCard});
     sing.pack = ampify::SingHost::Pack{false, 1234};
     auto reader = f.Make("reader", R"(Ampify.log("status " + JSON.stringify(Ampify.audio.sing.state()));)", R"("audio.sing")");
     CHECK(reader->Start());
-    CHECK(f.Logged(R"([reader] status {"available":false,"mode":"light","voice":0.2,"model":"standard","phase":"downloading","progress":0.42,"delay":0,"reason":"no-graphics-card")" +
+    CHECK(f.Logged(R"([reader] status {"available":false,"mode":"light","voice":0.2,"music":1,"model":"standard","phase":"downloading","progress":0.42,"delay":0,"reason":"no-graphics-card")" +
                    PackPart("false", 1234)));
     element->Stop();
     reader->Stop();

@@ -49,6 +49,7 @@ bool ClaimShared(SharedAudio& block) {
         block.volume = kNaN;
         block.momentary = kNaN;
         block.shortTerm = kNaN;
+        block.singRequestMusicMilli.store(1000, std::memory_order_relaxed);  // no request yet: all of the music
         block.layout.store(SharedAudio::kLayout, std::memory_order_release);
         return true;
     }
@@ -106,10 +107,11 @@ void DemandSound(SharedAudio& block, int64_t nowMs) {
     block.soundWantedUntilMs.store(nowMs + kWantedForMs, std::memory_order_relaxed);
 }
 
-bool WriteSingRequest(SharedAudio& block, SingMode mode, double voice, SingModel model) {
+bool WriteSingRequest(SharedAudio& block, SingMode mode, double voice, SingModel model, double music) {
     if (!SharedUsable(block)) return false;
     block.singRequestMode.store(static_cast<uint32_t>(mode), std::memory_order_relaxed);
     block.singRequestVoiceMilli.store(ToMilli(voice), std::memory_order_relaxed);
+    block.singRequestMusicMilli.store(ToMilli(music), std::memory_order_relaxed);
     block.singRequestModel.store(static_cast<uint32_t>(model), std::memory_order_relaxed);
     block.singRequestSequence.fetch_add(1, std::memory_order_release);
     return true;
@@ -120,6 +122,7 @@ bool ReadSingRequest(const SharedAudio& block, SingRequest& out) {
     out.sequence = block.singRequestSequence.load(std::memory_order_acquire);
     out.mode = Checked(block.singRequestMode.load(std::memory_order_relaxed), SingMode::Studio);
     out.voice = FromMilli(block.singRequestVoiceMilli.load(std::memory_order_relaxed));
+    out.music = FromMilli(block.singRequestMusicMilli.load(std::memory_order_relaxed));
     out.model = Checked(block.singRequestModel.load(std::memory_order_relaxed), SingModel::Precise);
     return true;
 }

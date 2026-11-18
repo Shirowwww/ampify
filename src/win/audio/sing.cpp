@@ -59,6 +59,7 @@ using ModelStudios = std::array<Studios, kModelCount>;
 // Read by the audio threads for each block.
 std::atomic<int> g_mode{static_cast<int>(Mode::Off)};
 std::atomic<float> g_voice{1.0f};
+std::atomic<float> g_music{1.0f};  // below 1: the music turned down, the singer alone at 0
 // The model studio mode runs, an index of core_sing::kModels. Changed only while studio mode is off, so an audio
 // thread in studio mode always meets the streams of the model being run.
 std::atomic<int> g_model{0};
@@ -164,8 +165,9 @@ void SingMain(float* samples, unsigned frames, int rate) {
     g_lightOn = mode == Mode::Light;
     if (mode == Mode::Off) return;
     const double voice = g_voice.load(std::memory_order_relaxed);
+    const double music = g_music.load(std::memory_order_relaxed);
     if (mode == Mode::Light) {
-        g_light.Process(samples, frames, rate, voice);
+        g_light.Process(samples, frames, rate, voice, music);
         return;
     }
     if (RateIndex(rate) < 0) return;  // a rate studio mode does not run at: the song as it is
@@ -178,7 +180,8 @@ void SingMain(float* samples, unsigned frames, int rate) {
     if (g_lastRate.exchange(rate, std::memory_order_relaxed) != rate) studio->Flush(Fade::None);
     bool paused = g_paused.load(std::memory_order_relaxed);
     if (paused && LocalPlayerMoved(*studio, samples, frames)) paused = false;
-    studio->Process(samples, frames, voice, paused);
+    // The player's volume as it changes is heard at once, not the delay later: the stream keeps the song without it.
+    studio->Process(samples, frames, voice, paused, music, LastPlayerVolume());
 }
 
 // The deck's copy of the old song gets what Apple's stream gets: in studio mode, the same lag, so the mix stays in
@@ -195,7 +198,7 @@ bool SingTail(float* samples, unsigned frames, int rate, bool heard) {
         const bool light = mode == Mode::Light && heard;
         if (light && !g_tailLightOn) g_tailLight.Reset();
         g_tailLightOn = light;
-        if (light) g_tailLight.Process(samples, frames, rate, g_voice.load());
+        if (light) g_tailLight.Process(samples, frames, rate, g_voice.load(), g_music.load());
         return heard;
     }
     if (RateIndex(rate) < 0) return heard;
@@ -218,7 +221,8 @@ bool SingTail(float* samples, unsigned frames, int rate, bool heard) {
         g_tailQuiet += frames;
         if (static_cast<double>(g_tailQuiet) > studio->Lag() * rate) g_tailOn = false;  // all of it heard
     }
-    studio->Process(samples, frames, g_voice.load(std::memory_order_relaxed));
+    studio->Process(samples, frames, g_voice.load(std::memory_order_relaxed), false,
+                    g_music.load(std::memory_order_relaxed));
     return true;
 }
 
@@ -323,6 +327,7 @@ struct SingWish {
     Mode mode = Mode::Off;
     double voice = 1;
     int model = 0;  // index of core_sing::kModels
+    double music = 1;
 };
 
 // What the interface asked last, through the shared block; off when there is none.
@@ -330,7 +335,8 @@ SingWish ReadWish() {
     audio::SingRequest request;
     audio::SharedAudio* block = SharedAudioBlock();
     if (!block || !audio::ReadSingRequest(*block, request)) return {};
-    return {static_cast<Mode>(request.mode), request.voice, request.model == audio::SingModel::Precise ? 1 : 0};
+    return {static_cast<Mode>(request.mode), request.voice, request.model == audio::SingModel::Precise ? 1 : 0,
+            request.music};
 }
 
 audio::SingReason ReasonCode(const std::string& reason) {
@@ -381,6 +387,7 @@ private:
     void Follow() {
         const SingWish wish = ReadWish();
         g_voice.store(static_cast<float>(wish.voice), std::memory_order_relaxed);
+        g_music.store(static_cast<float>(wish.music), std::memory_order_relaxed);
         if (g_localMoveSeen.exchange(false, std::memory_order_relaxed)) {
             Note("Sing: Apple's local file player moved, studio mode starts again from there");
         }

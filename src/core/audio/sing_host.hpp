@@ -18,8 +18,8 @@ struct SingHost {
 
     virtual ~SingHost() = default;
 
-    // False when the request could not be written (no shared block).
-    virtual bool Set(audio::SingMode mode, double voice, audio::SingModel model) = 0;
+    // False when the request could not be written (no shared block). `voice` and `music`, 0..1: how much of each stays.
+    virtual bool Set(audio::SingMode mode, double voice, audio::SingModel model, double music) = 0;
     // Empty when the block cannot be read.
     virtual std::optional<audio::SingRequest> Request() = 0;
     virtual std::optional<audio::SingStatus> Status() = 0;

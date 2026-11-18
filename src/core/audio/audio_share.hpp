@@ -24,7 +24,7 @@ struct SharedAudio {
     static constexpr uint32_t kMagic = 0x41414D50;  // "PMAA": the block is Ampify's
     // Raised when a field moves. It also names the mapping, so builds of two layouts never map the same block, and a
     // reader that finds another layout in it anyway reads nothing.
-    static constexpr uint32_t kLayout = 5;
+    static constexpr uint32_t kLayout = 6;
     static constexpr size_t kMaxBands = 32;
 
     std::atomic<uint32_t> magic;
@@ -58,6 +58,7 @@ struct SharedAudio {
     std::atomic<uint32_t> singStudio;             // SingStudio
     std::atomic<uint32_t> singReason;             // SingReason
     std::atomic<uint32_t> singRequestModel;       // SingModel: the voice model studio mode runs
+    std::atomic<uint32_t> singRequestMusicMilli;  // 0..1000: the share of the music left (the singer alone at 0)
 };
 
 enum class SingMode : uint32_t { Off = 0, Light = 1, Studio = 2 };
@@ -72,6 +73,7 @@ struct SingRequest {
     SingMode mode = SingMode::Off;
     double voice = 0;       // 0..1
     SingModel model = SingModel::Standard;
+    double music = 1;       // 0..1: below 1, the music is turned down instead and the singer stays
     uint32_t sequence = 0;  // moves with each request, so the engine sees a repeat of the same one
 };
 
@@ -102,7 +104,8 @@ void DemandSound(SharedAudio& block, int64_t nowMs);
 
 // Sing. The interface writes the request; the engine reads it and writes the status. Values out of range are clamped on
 // the way in, and read back as off or none when the block holds something else. False when the block is not usable.
-bool WriteSingRequest(SharedAudio& block, SingMode mode, double voice, SingModel model = SingModel::Standard);
+bool WriteSingRequest(SharedAudio& block, SingMode mode, double voice, SingModel model = SingModel::Standard,
+                      double music = 1.0);
 bool ReadSingRequest(const SharedAudio& block, SingRequest& out);
 bool WriteSingStatus(SharedAudio& block, const SingStatus& status);
 bool ReadSingStatus(const SharedAudio& block, SingStatus& out);

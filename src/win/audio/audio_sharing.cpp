@@ -158,9 +158,9 @@ SharedAudioHost& InterfaceAudio() {
     return *host;
 }
 
-bool SharedSingHost::Set(audio::SingMode mode, double voice, audio::SingModel model) {
+bool SharedSingHost::Set(audio::SingMode mode, double voice, audio::SingModel model, double music) {
     audio::SharedAudio* block = SharedAudioBlock();
-    return block && audio::WriteSingRequest(*block, mode, voice, model);
+    return block && audio::WriteSingRequest(*block, mode, voice, model, music);
 }
 
 std::optional<audio::SingRequest> SharedSingHost::Request() {

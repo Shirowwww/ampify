@@ -265,12 +265,15 @@ Permission `audio.sing`. Sing turns the singer's voice down, as Apple Music Sing
 and the audio process does the work, so `set` and `state` work from both processes, through the block they share.
 
 ```js
-Ampify.audio.sing.set({ mode, voice, model })  // mode "off" | "light" | "studio", voice 0 to 1, model "standard" | "precise"
-                                               // true once the request is written
-Ampify.audio.sing.state()                // -> { available, mode, voice, model, phase, progress, delay, reason, installed, downloadSize }
+Ampify.audio.sing.set({ mode, voice, music, model })  // mode "off" | "light" | "studio", voice and music 0 to 1,
+                                                      // model "standard" | "precise"; true once the request is written
+Ampify.audio.sing.state()                // -> { available, mode, voice, music, model, phase, progress, delay, reason, installed, downloadSize }
 Ampify.audio.sing.onChange(fn)           // fn(state) when the state moves (polled every 250 ms); returns the function that stops
 ```
 
+- `voice` is how much of the singer's voice stays, `music` how much of everything else (1 when left out). Karaoke turns
+  the voice down; `voice: 1, music: 0` keeps the singer alone. Ampify before 1.5.6 has no `music` in its state and
+  ignores it.
 - `Light` is the lighter quality; `Studio` is the studio quality, run on the graphics card, which holds the sound back
   for `delay` seconds so that the lyrics stay in step. A pause keeps what Studio holds, so playing again goes on at
   once; a move in the song, another song or Studio turned on starts it again silent for `delay`. AutoMix mixes with
@@ -280,7 +283,8 @@ Ampify.audio.sing.onChange(fn)           // fn(state) when the state moves (poll
   its `delay` is 1.5 s longer and it wants a graphics card from the last few years (GeForce RTX 2060 or RTX 3050, Radeon RX 6600 or better;
   about 1.6 GB of its memory). Changing the model while Studio is on stops Studio a moment, frees the
   graphics card of the old model, then starts again with the new one.
-- `mode`, `voice` and `model` are what was asked last (`voice` and `model` stay when `set` is called without them). The rest is what the
+- `mode`, `voice`, `music` and `model` are what was asked last (`voice`, `music` and `model` stay when `set` is called
+  without them). The rest is what the
   audio process says: `phase` is `off`, `downloading`, `loading`, `buffering`, `on` or `failed`; `progress` is 0 to 1
   while downloading or loading; `available` is whether Studio can run on this PC (`null` until known).
 - `installed` says whether the files Studio needs with the model asked are downloaded and checked (`null` where it

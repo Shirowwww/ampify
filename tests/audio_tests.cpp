@@ -576,6 +576,10 @@ TEST_CASE(AudioShare_ASingRequestIsReadWithANewSequence) {
     CHECK(ReadSingRequest(block, request));
     CHECK(request.mode == SingMode::Studio);
     CHECK_NEAR(request.voice, 0.2, 1e-9);
+    CHECK_NEAR(request.music, 1.0, 1e-9);  // all of the music, unless asked otherwise
+    CHECK(WriteSingRequest(block, SingMode::Studio, 1.0, SingModel::Precise, 0.1));
+    CHECK(ReadSingRequest(block, request));
+    CHECK_NEAR(request.music, 0.1, 1e-9);
     uint32_t first = request.sequence;
     CHECK(WriteSingRequest(block, SingMode::Studio, 0.2));  // the same request again is still a request
     CHECK(ReadSingRequest(block, request));

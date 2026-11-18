@@ -89,6 +89,7 @@ std::string StateJson(const std::optional<audio::SingRequest>& request, const st
     members.emplace_back("available", AvailableJson(seen.studio));
     members.emplace_back("mode", Json(ModeName(asked.mode)));
     members.emplace_back("voice", Rounded(asked.voice));
+    members.emplace_back("music", Rounded(asked.music));
     members.emplace_back("model", Json(ModelName(asked.model)));
     members.emplace_back("phase", Json(PhaseName(seen.phase)));
     members.emplace_back("progress", Rounded(seen.progress));
@@ -114,8 +115,12 @@ struct SingNatives : ScriptBridge {
         if (!std::isfinite(voice) || voice < 0 || voice > 1) {
             return Throw(ctx, "RangeError", "sing.set expects a voice from 0 to 1");
         }
+        double music = argc > 3 ? Number(ctx, argc, argv, 3) : 1.0;
+        if (!std::isfinite(music) || music < 0 || music > 1) {
+            return Throw(ctx, "RangeError", "sing.set expects a music from 0 to 1");
+        }
         SingHost* singer = Singer(ext);
-        return JS_NewBool(ctx, singer && singer->Set(*mode, voice, *model));
+        return JS_NewBool(ctx, singer && singer->Set(*mode, voice, *model, music));
     }
 
     AMPIFY_NATIVE(ReadState) {
@@ -136,7 +141,7 @@ struct SingNatives : ScriptBridge {
 }  // namespace
 
 void DefineAudioSing(api::NativeScope& scope) {
-    scope.Function("singSet", SingNatives::Set, 3);
+    scope.Function("singSet", SingNatives::Set, 4);
     scope.Function("singState", SingNatives::ReadState, 0);
 }
 

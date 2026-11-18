@@ -117,6 +117,7 @@ type SingState = {
   available: boolean | null;
   mode: SingMode;
   voice: number;
+  music: number;
   model: SingModel;
   phase: "off" | "downloading" | "loading" | "buffering" | "on" | "failed";
   progress: number;
@@ -298,9 +299,9 @@ declare const Ampify: {
     analyze(): AudioAnalysis;
     loudness(): Loudness;
     volume(): number | null;
-    // permission audio.sing; voice is the share of the singer's voice kept, 0 to 1
+    // permission audio.sing; voice is the share of the singer's voice kept, music that of the rest, 0 to 1
     sing: {
-      set(options: { mode: SingMode; voice?: number; model?: SingModel }): boolean;
+      set(options: { mode: SingMode; voice?: number; music?: number; model?: SingModel }): boolean;
       state(): SingState;
       onChange(fn: (state: SingState) => void): () => void;
     };

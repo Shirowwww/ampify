@@ -12,6 +12,9 @@ namespace {
 
 constexpr double kFadeSeconds = 0.01;    // between the song as it is and processed, and in and out of a pause
 constexpr double kVoiceSeconds = 0.05;   // a change of voice is spread over this
+constexpr double kVolumeSeconds = 0.01;  // the player's volume, from nothing to full, over this: steps never click
+constexpr double kQuietVolume = 1e-4;    // below it a block came in silent: it is kept as it is
+constexpr double kMaxVolume = 4.0;       // a gain the player could never set: refused above it
 constexpr double kChunkSeconds = 0.1;    // the audio thread hands blocks to the rings in pieces this long at most
 constexpr double kTailSeconds = 0.25;    // the most of the player's last sound a paused stream takes in
 constexpr float kMinWeight = 1e-6f;      // where no take weighs anything yet, the vocals are 0
@@ -60,6 +63,7 @@ StudioStream::StudioStream(int rate, double delaySeconds, double hopSeconds, con
     const double asked = std::isfinite(delaySeconds) ? delaySeconds * m_rate : 0.0;
     m_delay = std::max<std::int64_t>(std::llround(std::max(0.0, asked)), shortest);
     m_voiceStep = 1.0 / (kVoiceSeconds * m_rate);
+    m_volumeStep = 1.0 / (kVolumeSeconds * m_rate);
     m_capacity = m_delay + m_tail + 4 * m_hop + m_latency + 2 * m_chunk;
     m_dry.assign(static_cast<size_t>(m_capacity) * 2, 0.0f);
     m_vocals.assign(static_cast<size_t>(m_capacity) * 2, 0.0f);
@@ -121,15 +125,20 @@ std::uint64_t StudioStream::Misses() const { return m_misses.load(std::memory_or
 
 // ---- the audio thread
 
-void StudioStream::Process(float* interleaved, size_t frames, double voice, bool paused) {
+void StudioStream::Process(float* interleaved, size_t frames, double voice, bool paused, double music, double volume) {
     if (interleaved == nullptr || frames == 0) return;
     TakeFlush();
     const double target = std::isfinite(voice) ? std::clamp(voice, 0.0, 1.0) : 1.0;
+    const double musicTarget = std::isfinite(music) ? std::clamp(music, 0.0, 1.0) : 1.0;
+    const double gain = std::isfinite(volume) ? std::clamp(volume, 0.0, kMaxVolume) : 1.0;
+    // Kept without the player's volume, given back the volume of the moment it is heard: a change of volume is heard
+    // at once, not a delay later. A block that came in silent at no volume stays silent.
+    const auto unscale = static_cast<float>(gain > kQuietVolume ? 1.0 / gain : 1.0);
     while (frames > 0) {
         const size_t count = std::min(frames, static_cast<size_t>(m_chunk));
         const std::int64_t live = m_written.load(std::memory_order_relaxed);  // this thread is its only writer
-        const bool taken = Write(interleaved, count, paused);
-        Read(interleaved, count, taken ? live : -1, target, paused);
+        const bool taken = Write(interleaved, count, paused, unscale);
+        Read(interleaved, count, taken ? live : -1, target, musicTarget, gain, paused);
         interleaved += count * 2;
         frames -= count;
     }
@@ -156,7 +165,7 @@ void StudioStream::TakeFlush() {
 }
 
 // Takes a block in; paused, only the player's last sound, and no more than the ring keeps for it.
-bool StudioStream::Write(const float* interleaved, size_t frames, bool paused) {
+bool StudioStream::Write(const float* interleaved, size_t frames, bool paused, float unscale) {
     const std::int64_t first = m_written.load(std::memory_order_relaxed);
     if (paused) {
         if (Silent(interleaved, frames)) return false;
@@ -164,21 +173,23 @@ bool StudioStream::Write(const float* interleaved, size_t frames, bool paused) {
     }
     for (size_t i = 0; i < frames; i++) {
         const size_t slot = static_cast<size_t>((first + static_cast<std::int64_t>(i)) % m_capacity) * 2;
-        m_dry[slot] = interleaved[i * 2];
-        m_dry[slot + 1] = interleaved[i * 2 + 1];
+        m_dry[slot] = interleaved[i * 2] * unscale;
+        m_dry[slot + 1] = interleaved[i * 2 + 1] * unscale;
     }
     m_written.store(first + static_cast<std::int64_t>(frames), std::memory_order_release);  // publishes them
     return true;
 }
 
-double StudioStream::NextVoice(double voice) {
-    if (m_voice < 0) m_voice = voice;
-    m_voice = voice > m_voice ? std::min(voice, m_voice + m_voiceStep) : std::max(voice, m_voice - m_voiceStep);
-    return m_voice;
+// One frame of a smoothed level toward its target; a level below 0 (none yet) takes the target at once.
+double StudioStream::Toward(double& smoothed, double target, double step) {
+    if (smoothed < 0) smoothed = target;
+    smoothed = target > smoothed ? std::min(target, smoothed + step) : std::max(target, smoothed - step);
+    return smoothed;
 }
 
 // Fills `frames` with what is heard. `live` is the first of the frames this block took in, below 0 when none.
-void StudioStream::Read(float* interleaved, size_t frames, std::int64_t live, double voice, bool paused) {
+void StudioStream::Read(float* interleaved, size_t frames, std::int64_t live, double voice, double music,
+                        double volume, bool paused) {
     // End before begin: a worker restart stores begin first, so a new end always comes with its begin.
     const std::int64_t end = m_vocalEnd.load(std::memory_order_acquire);
     const std::int64_t begin = m_vocalBegin.load(std::memory_order_acquire);
@@ -189,7 +200,8 @@ void StudioStream::Read(float* interleaved, size_t frames, std::int64_t live, do
     for (; i < frames; i++) {
         if (paused && m_gain <= 0) break;  // faded out: the reading waits here until the player plays
         const std::int64_t at = m_readAt++;
-        const double gain = (1 - NextVoice(voice)) * m_spec.compensate;
+        const double voiceKept = Toward(m_voice, voice, m_voiceStep);
+        const double musicKept = Toward(m_music, music, m_voiceStep);
         double left = 0, right = 0;
         if (at < m_start) {
             // Silent from a flush on, after a fade of the song as it was heard: a cut mid-wave clicks.
@@ -208,13 +220,18 @@ void StudioStream::Read(float* interleaved, size_t frames, std::int64_t live, do
             missed = missed || !ready;
             m_mix = ready ? std::min(1.0, m_mix + step) : std::max(0.0, m_mix - step);
             const size_t slot = static_cast<size_t>(at % m_capacity) * 2;
-            const double take = at >= begin && at < end ? m_mix * gain : 0.0;
-            left = m_dry[slot] - take * m_vocals[slot];
-            right = m_dry[slot + 1] - take * m_vocals[slot + 1];
+            // The song is its music and its vocals (lifted by compensate), each kept at its own level once processed:
+            // music * (dry - vocals) + voice * vocals.
+            const double mix = at >= begin && at < end ? m_mix : 0.0;
+            const double keep = 1 - mix * (1 - musicKept);
+            const double take = mix * (musicKept - voiceKept) * m_spec.compensate;
+            left = keep * m_dry[slot] - take * m_vocals[slot];
+            right = keep * m_dry[slot + 1] - take * m_vocals[slot + 1];
         }
         m_gain = gainTo > m_gain ? std::min(gainTo, m_gain + step) : std::max(gainTo, m_gain - step);
-        interleaved[i * 2] = static_cast<float>(left * m_gain);
-        interleaved[i * 2 + 1] = static_cast<float>(right * m_gain);
+        const double heard = m_gain * Toward(m_volume, volume, m_volumeStep);
+        interleaved[i * 2] = static_cast<float>(left * heard);
+        interleaved[i * 2 + 1] = static_cast<float>(right * heard);
     }
     std::fill(interleaved + i * 2, interleaved + frames * 2, 0.0f);
     m_played.store(m_readAt, std::memory_order_release);  // the worker may overwrite the vocals below it
