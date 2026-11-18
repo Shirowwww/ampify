@@ -1,4 +1,5 @@
 #include "player_controls.hpp"
+#include "xaml_ending.hpp"
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -449,7 +450,7 @@ void StartFollowing(const xaml::UIElement& playerRoot) {
     state.timer = playerRoot.DispatcherQueue().CreateTimer();
     state.timer.Interval(kFollowStep);
     state.timer.IsRepeating(true);
-    state.timer.Tick([](auto const&, auto const&) noexcept {
+    OnUiTick(state.timer, [](auto const&, auto const&) noexcept {
         try {
             if (!g_shown) return RemoveCopies();
             SizeCopies();

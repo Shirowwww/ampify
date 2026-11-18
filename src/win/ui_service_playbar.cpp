@@ -4,6 +4,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "ui_service_detail.hpp"
+#include "xaml_ending.hpp"
 
 namespace ampify::win::ui_service_detail {
 
@@ -490,7 +491,7 @@ void QueueSongRoom(const UiEventSink& sink, const std::shared_ptr<WindowContext>
         if (context->songRoomQueued || !context->dispatcher) return;
         WeakContext weakContext = context;
         context->songRoomQueued =
-            context->dispatcher.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [weakContext, sink]() noexcept {
+            TryEnqueueUi(context->dispatcher, dispatching::DispatcherQueuePriority::Low, [weakContext, sink]() noexcept {
                 try {
                     auto live = weakContext.lock();
                     if (!live) return;

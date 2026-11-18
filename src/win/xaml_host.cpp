@@ -12,6 +12,7 @@
 #include "player_controls.hpp"
 #include "ui_thread.hpp"
 #include "winrt_abi.hpp"
+#include "xaml_ending.hpp"
 
 namespace ampify::win {
 
@@ -66,6 +67,7 @@ bool XamlAttach() {
         queue = nullptr;
     }
     if (!queue) return false;
+    WatchXamlEnding(queue);
     {
         std::lock_guard<std::mutex> lock(state.mutex);
         state.queue = queue;
@@ -100,6 +102,7 @@ bool XamlPost(std::function<void()> work) {
     try {
         if (queue.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [work = std::move(work)]() noexcept {
             DispatchState& current = State();
+            if (XamlEnding()) return;  // the queue drains after XAML has gone (xaml_ending.hpp)
             try {
                 current.threadId = GetCurrentThreadId();
                 if (!current.firstRun.exchange(true)) {

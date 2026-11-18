@@ -4,6 +4,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "xaml_backend.hpp"
+#include "xaml_ending.hpp"
 
 #include <atomic>
 #include <cctype>
@@ -63,7 +64,7 @@ std::atomic<void*> g_mainResources{nullptr};
 }  // namespace
 
 bool XamlTreeBackend::Attach(WindowRole role) {
-    if (*m_closed) return false;
+    if (WindowClosed()) return false;
     xaml::Window window = AppWindowOf(role);
     if (!window) return false;
     void* resources = winrt::get_abi(xaml::Application::Current().Resources());
@@ -132,7 +133,7 @@ void XamlTreeBackend::OnSizeChanged() noexcept {
 }
 
 bool XamlTreeBackend::SetAppMode(std::optional<bool> dark) {
-    if (*m_closed) return false;
+    if (WindowClosed()) return false;
     bool refresh = std::exchange(m_resourcesDirty, false);
     xaml::FrameworkElement root = m_modeRoot.get();
     if (!root) {
@@ -307,7 +308,7 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
     m_elements.clear();
     m_held.clear();
 
-    if (*m_closed) return nodes;
+    if (WindowClosed()) return nodes;
     xaml::Window window = m_window.get();  // the window of m_role, from AMP.Utils (Attach)
     if (!window) window = AppWindowOf(m_role);
     if (!window) return nodes;
@@ -647,7 +648,7 @@ void XamlTreeBackend::SchedulePass(int followUps) noexcept {
     // (its data arrives after the navigation).
     constexpr auto kSoon = std::chrono::milliseconds(60);
     try {
-        if (*m_closed || !m_pass) return;
+        if (WindowClosed() || !m_pass) return;
         m_followUps = std::max(m_followUps, followUps);
         if (!m_passTimer) {
             xaml::Window window = m_window.get();
@@ -655,7 +656,7 @@ void XamlTreeBackend::SchedulePass(int followUps) noexcept {
             m_passTimer = window.DispatcherQueue().CreateTimer();
             m_passTimer.IsRepeating(false);
             std::weak_ptr<bool> alive = m_alive;
-            m_passTimer.Tick([this, alive](auto const&, auto const&) noexcept {
+            OnUiTick(m_passTimer, [this, alive](auto const&, auto const&) noexcept {
                 if (!alive.expired()) RunPass();
             });
         }
@@ -670,7 +671,7 @@ void XamlTreeBackend::SchedulePass(int followUps) noexcept {
 void XamlTreeBackend::RunPass() noexcept {
     constexpr auto kFollowUp = std::chrono::milliseconds(450);
     try {
-        if (*m_closed || !m_pass) return;
+        if (WindowClosed() || !m_pass) return;
         m_pass();
         if (m_followUps > 0 && m_passTimer) {
             m_followUps--;
@@ -715,17 +716,17 @@ void XamlTreeBackend::WatchPopups(const xaml::UIElement& content) {
     if (!m_popupTimer) {
         m_popupTimer = content.DispatcherQueue().CreateTimer();
         m_popupTimer.Interval(kPopupCheck);
-        m_popupTimer.Tick([this, alive](auto const&, auto const&) noexcept {
+        OnUiTick(m_popupTimer, [this, alive](auto const&, auto const&) noexcept {
             if (!alive.expired()) CheckPopups();
         });
         m_popupTimer.Start();
     }
     auto check = [this, alive](IInspectable const&, auto const&) noexcept {
         try {
-            if (alive.expired() || *m_closed) return;
+            if (alive.expired() || WindowClosed()) return;
             xaml::Window window = m_window.get();
             if (!window) return;
-            window.DispatcherQueue().TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low,
+            TryEnqueueUi(window.DispatcherQueue(), winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low,
                                                 [this, alive]() noexcept {
                                                     if (!alive.expired()) CheckPopups();
                                                 });
@@ -742,7 +743,7 @@ void XamlTreeBackend::WatchPopups(const xaml::UIElement& content) {
 // A popup that opens gets a pass now, and another once its content is filled in.
 void XamlTreeBackend::CheckPopups() noexcept {
     try {
-        if (*m_closed || !WindowShown()) return;  // a hidden window opens no menu
+        if (WindowClosed() || !WindowShown()) return;  // a hidden window opens no menu
         xaml::Window window = m_window.get();
         if (!window) return;
         xaml::UIElement content = window.Content();

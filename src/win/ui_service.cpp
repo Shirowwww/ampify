@@ -6,6 +6,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "ui_service_detail.hpp"
+#include "xaml_ending.hpp"
 #include "apple_tweak.hpp"
 #include "lyrics_window.hpp"
 #include "mini_player_theme.hpp"
@@ -49,14 +50,14 @@ void RestoreMainAfterMini(std::weak_ptr<UiService::Shared> weakShared) noexcept 
         xaml::Window main = AppWindowOf(WindowRole::Main);
         auto queue = main ? main.DispatcherQueue() : nullptr;
         if (!queue) return;
-        queue.TryEnqueue([weakShared]() noexcept {
+        TryEnqueueUi(queue, [weakShared]() noexcept {
             try {
                 // Held until it fires, then let go: a timer no one holds may never fire.
                 auto held = std::make_shared<dispatching::DispatcherQueueTimer>(
                     dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer());
                 held->Interval(kMiniCloseSettle);
                 held->IsRepeating(false);
-                held->Tick([weakShared, held](auto const&, auto const&) noexcept {
+                OnUiTick(*held, [weakShared, held](auto const&, auto const&) noexcept {
                     try {
                         *held = nullptr;
                         xaml::Window player = AppWindowOf(WindowRole::Player);
@@ -148,7 +149,7 @@ void QueueRefresh(const WeakShared& weakShared, const std::shared_ptr<WindowCont
     if (!ticket) return;
     try {
         WeakContext weakContext = context;
-        if (context->dispatcher.TryEnqueue(dispatching::DispatcherQueuePriority::Low,
+        if (TryEnqueueUi(context->dispatcher, dispatching::DispatcherQueuePriority::Low,
                                            [weakShared, weakContext, ticket]() noexcept {
                                                std::shared_ptr<WindowContext> live = weakContext.lock();
                                                if (!live || !live->ticket.Take(ticket)) return;
@@ -271,7 +272,7 @@ void DropContext(std::shared_ptr<WindowContext> context) noexcept {
     if (!holder) return;
     try {
         dispatching::DispatcherQueue dispatcher = (*holder)->dispatcher;
-        if (dispatcher && dispatcher.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [holder]() noexcept {
+        if (dispatcher && TryEnqueueUi(dispatcher, dispatching::DispatcherQueuePriority::Low, [holder]() noexcept {
                 ReleaseXaml(**holder);
                 delete holder;
             })) {
@@ -613,7 +614,7 @@ void QueueAccentCheck(const std::shared_ptr<UiService::Shared>& shared) {
     for (const auto& context : windows) {
         if (context->role != WindowRole::Main) continue;
         WeakContext weakContext = context;
-        context->dispatcher.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [weakShared, weakContext]() noexcept {
+        TryEnqueueUi(context->dispatcher, dispatching::DispatcherQueuePriority::Low, [weakShared, weakContext]() noexcept {
             std::shared_ptr<WindowContext> live = weakContext.lock();
             if (!live || live->ticket.Closed()) return;
             std::optional<winrt::Windows::UI::Color> now = AccentTextNow();

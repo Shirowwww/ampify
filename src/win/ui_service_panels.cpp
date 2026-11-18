@@ -4,6 +4,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "ui_service_detail.hpp"
+#include "xaml_ending.hpp"
 
 namespace ampify::win::ui_service_detail {
 
@@ -549,7 +550,7 @@ void SlidePanelOut(WindowContext& context, const xaml::FrameworkElement& frame) 
     primitives::Popup popup = context.panelPopup;
     timer->Interval(kPanelOut);
     timer->IsRepeating(false);
-    timer->Tick([timer, frame, stack, popup, weakContext](auto&&, auto&&) mutable noexcept {
+    OnUiTick(*timer, [timer, frame, stack, popup, weakContext](auto&&, auto&&) mutable noexcept {
         try {
             RemoveFromParent(frame);
             if (auto live = weakContext.lock(); live && !AnyPanelShown(*live)) ReleasePages(*live);

@@ -7,7 +7,7 @@
 //
 // Threads: a worker thread (MTA) watches the windows (SetWinEventHook on the process + a poll every 5 s) and the
 // interface model (UiModel, every 250 ms); everything that touches XAML runs on the window's interface thread through
-// window.DispatcherQueue().TryEnqueue(Low), one queued refresh per window at a time (uirender::RefreshTicket).
+// TryEnqueueUi on the window's DispatcherQueue (Low), one queued refresh per window at a time (uirender::RefreshTicket).
 //
 // Discovery, page watching and the settings card follow AMExclusive (MIT, https://github.com/AntiOblivionis/AMExclusive,
 // mod/src/UiAdapter.cpp at 91f589d), adapted to Ampify.

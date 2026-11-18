@@ -1,6 +1,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "album_expand.hpp"
+#include "xaml_ending.hpp"
 
 #include <winrt/Microsoft.UI.Composition.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
@@ -194,7 +195,7 @@ std::shared_ptr<const std::vector<LibraryTrack>> LibraryTracks(bool& waiting) {
             }
         }
         if (!result.error.empty()) Note("Album click: the library file could not be read: " + result.error);
-        if (queue) queue.TryEnqueue([] { RefreshOpen(); });
+        if (queue) TryEnqueueUi(queue, [] { RefreshOpen(); });
     }).detach();
     return library.tracks;
 }
@@ -489,7 +490,7 @@ void OpenPage(int index) {
     if (invoke) invoke.Invoke();
     else Note("Album click: the album's page cannot be opened (no Invoke on the tile)");
     auto weak = state.grid;
-    grid.DispatcherQueue().TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low, [weak] {
+    TryEnqueueUi(grid.DispatcherQueue(), winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low, [weak] {
         if (auto again = weak.get(); again && g_wanted.load()) again.IsItemClickEnabled(false);
     });
 }

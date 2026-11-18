@@ -3,6 +3,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "theme_animations.hpp"
+#include "xaml_ending.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -476,7 +477,7 @@ void ThemeAnimations::EndAt(Running& running, double ms, std::vector<composition
     auto timer = queue.CreateTimer();
     timer.Interval(Span(ms));
     timer.IsRepeating(false);
-    timer.Tick([element = running.element, parts = std::move(parts)](auto const&, auto const&) noexcept {
+    OnUiTick(timer, [element = running.element, parts = std::move(parts)](auto const&, auto const&) noexcept {
         try {
             if (xaml::UIElement target = element.get()) {
                 for (const composition::CompositionAnimation& part : parts) target.StopAnimation(part);

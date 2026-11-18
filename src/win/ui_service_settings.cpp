@@ -4,6 +4,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "ui_service_detail.hpp"
+#include "xaml_ending.hpp"
 
 #include "../core/kit_layout.hpp"
 #include "ui_motion.hpp"
@@ -254,7 +255,7 @@ xaml::FrameworkElement AccentChoice(UiService::Shared& shared) {
     commit.Interval(kRingFade + kRingSettle);
     commit.IsRepeating(false);
     auto pending = std::make_shared<std::string>();
-    commit.Tick([owner, pending](auto const&, auto const&) noexcept {
+    OnUiTick(commit, [owner, pending](auto const&, auto const&) noexcept {
         try {
             if (*pending != uirender::ChosenAccent(owner->kit)) CommitAccent(*owner, *pending);
         } catch (...) {
@@ -412,7 +413,7 @@ xaml::FrameworkElement ReportRow(UiService::Shared& shared) {
             auto held = std::make_shared<controls::Button>(button);
             RunAmpifyInBackground({"report", "--dir"}, [queue, held, journal](int code) mutable {
                 journal->Write("Settings: report exported from the Ampify page (code " + std::to_string(code) + ")");
-                queue.TryEnqueue([held = std::move(held), code]() noexcept {
+                TryEnqueueUi(queue, [held = std::move(held), code]() noexcept {
                     try {
                         held->IsEnabled(true);
                         held->Content(winrt::box_value(Wide(i18n::Text(code == 0 ? "mods.report.done" : "mods.report.failed"))));

@@ -3,6 +3,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "dialog_fonts.hpp"
+#include "xaml_ending.hpp"
 #include "xaml_chrome.hpp"
 
 #include <string_view>
@@ -62,7 +63,7 @@ void GiveDialogButtonsTextFont(const controls::ContentDialog& dialog) {
     auto queue = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
     if (!queue) return;
     // Low priority: the layout pass runs before it, so the new content's buttons are in the visual tree.
-    queue.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low, [dialog]() noexcept {
+    TryEnqueueUi(queue, winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low, [dialog]() noexcept {
         try {
             // The text font is the one of the content, which is the dialog's body text.
             auto content = FindNamed(dialog, L"ContentScrollViewer", 0).try_as<controls::Control>();

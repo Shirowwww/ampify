@@ -4,6 +4,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "xaml_backend.hpp"
+#include "xaml_ending.hpp"
 
 #include "artwork_passthrough.hpp"
 
@@ -271,7 +272,7 @@ void XamlTreeBackend::FollowStates(theme::NodeId id, const xaml::UIElement& elem
             try {
                 auto source = sender.try_as<xaml::UIElement>();
                 if (alive.expired() || !source) return;
-                source.DispatcherQueue().TryEnqueue([this, alive, id]() noexcept {
+                TryEnqueueUi(source.DispatcherQueue(), [this, alive, id]() noexcept {
                     if (!alive.expired()) OnFocusLost(id);
                 });
             } catch (...) {
@@ -389,7 +390,7 @@ void XamlTreeBackend::WatchHoverEnd(theme::NodeId id) {
         handlers.exitCheck.Interval(kLookAgain);
         handlers.exitCheck.IsRepeating(true);
         std::weak_ptr<bool> alive = m_alive;
-        handlers.exitCheck.Tick([this, alive, id](auto const& timer, auto const&) noexcept {
+        OnUiTick(handlers.exitCheck, [this, alive, id](auto const& timer, auto const&) noexcept {
             try {
                 if (alive.expired() || *m_closed) return timer.Stop();
                 constexpr int kMostChecks = 50;  // 5 s: a pointer still there by then is in the shape for real
@@ -895,7 +896,7 @@ void XamlTreeBackend::OnHeldStateChanged(theme::NodeId id) noexcept {
         xaml::UIElement element = known->second.element.get();
         if (!element) return;
         std::weak_ptr<bool> alive = m_alive;
-        element.DispatcherQueue().TryEnqueue([this, alive, id]() noexcept {
+        TryEnqueueUi(element.DispatcherQueue(), [this, alive, id]() noexcept {
             if (alive.expired() || *m_closed) return;
             auto again = m_visibleHolds.find(id);
             xaml::UIElement held = again == m_visibleHolds.end() ? nullptr : again->second.element.get();
@@ -915,7 +916,7 @@ void XamlTreeBackend::OnHeldVisibility(theme::NodeId id) noexcept {
         if (!element || element.Visibility() == xaml::Visibility::Visible) return;
         if (std::chrono::steady_clock::now() - known->second.begun < kHoldRetry) return;
         std::weak_ptr<bool> alive = m_alive;
-        element.DispatcherQueue().TryEnqueue([this, alive, id]() noexcept {
+        TryEnqueueUi(element.DispatcherQueue(), [this, alive, id]() noexcept {
             if (alive.expired() || *m_closed) return;
             auto again = m_visibleHolds.find(id);
             xaml::UIElement held = again == m_visibleHolds.end() ? nullptr : again->second.element.get();

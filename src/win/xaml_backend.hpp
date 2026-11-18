@@ -48,6 +48,7 @@
 #include "width_glide.hpp"
 #include "theme_animations.hpp"
 #include "xaml_chrome.hpp"
+#include "xaml_ending.hpp"
 
 namespace ampify::win {
 
@@ -117,7 +118,8 @@ public:
     bool SetAppMode(std::optional<bool> dark);
 
     // True once the main window has closed: Apple Music is shutting down and its tree must not be touched any more.
-    bool WindowClosed() const { return *m_closed; }
+    // Closed, or Apple Music's interface thread ends without saying so (xaml_ending.hpp).
+    bool WindowClosed() const { return *m_closed || XamlEnding(); }
     // False while the main window is hidden (in the notification area) or minimized: nothing of it shows, so the
     // periodic work waits. True when it cannot be told.
     bool WindowShown() const;

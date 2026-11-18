@@ -1,4 +1,5 @@
 #include "presence_watch.hpp"
+#include "xaml_ending.hpp"
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -88,7 +89,7 @@ void EvaluateSoon() noexcept {
             later = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
             later.IsRepeating(false);
             later.Interval(kSettle);
-            later.Tick([](auto&&, auto&&) noexcept { Evaluate(); });
+            OnUiTick(later, [](auto&&, auto&&) noexcept { Evaluate(); });
         }
         later.Start();  // again from now, if a check was already waiting
     } catch (...) {
@@ -136,7 +137,7 @@ Presence::Listener OnThreadOf(std::weak_ptr<std::function<void(bool)>> weak) {
                 if (auto listener = weak.lock()) (*listener)(seen);
                 return;
             }
-            queue.TryEnqueue([weak, seen] {
+            TryEnqueueUi(queue, [weak, seen] {
                 try {
                     if (auto listener = weak.lock()) (*listener)(seen);
                 } catch (...) {
@@ -171,7 +172,7 @@ void SeenTimer::Run(winrt::Windows::Foundation::TimeSpan interval, std::function
         m_timer = queue.CreateTimer();
         m_timer.IsRepeating(true);
         // An exception out of a timer's handler is a failed HRESULT for the dispatcher, which ends the whole process.
-        m_timer.Tick([this](auto&&, auto&&) noexcept { Tick(); });
+        OnUiTick(m_timer, [this](auto&&, auto&&) noexcept { Tick(); });
     }
     Interval(interval);
     if (InterfacePresence().Seen() && !m_timer.IsRunning()) m_timer.Start();

@@ -3,6 +3,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "xaml_backend.hpp"
+#include "xaml_ending.hpp"
 
 #include <cctype>
 #include <chrono>
@@ -140,7 +141,7 @@ void XamlTreeBackend::SampleArtwork(const controls::Image& image, const std::str
                 m_artworkRetry = image.DispatcherQueue().CreateTimer();
                 m_artworkRetry.IsRepeating(false);
                 std::weak_ptr<bool> alive = m_alive;
-                m_artworkRetry.Tick([this, alive](auto const&, auto const&) noexcept {
+                OnUiTick(m_artworkRetry, [this, alive](auto const&, auto const&) noexcept {
                     if (!alive.expired()) OnArtworkChanged();
                 });
             }

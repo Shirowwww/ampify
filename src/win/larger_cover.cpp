@@ -1,4 +1,5 @@
 #include "larger_cover.hpp"
+#include "xaml_ending.hpp"
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -73,7 +74,7 @@ winrt::fire_and_forget Lookup(std::string id, double pixels, CoverFound found) {
         thumb.clear();  // offline, too slow, or an answer of another shape: Apple's cover stays
     }
     if (!dispatcher) co_return;
-    dispatcher.TryEnqueue([id, thumb, answered, pixels, found = std::move(found)]() noexcept {
+    TryEnqueueUi(dispatcher, [id, thumb, answered, pixels, found = std::move(found)]() noexcept {
         try {
             if (answered) Covers()[id] = thumb;
             // The song may have moved on while Apple's image had not yet: never the last song's cover on this one.

@@ -6,6 +6,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "ui_service_detail.hpp"
+#include "xaml_ending.hpp"
 
 #include <cstdio>
 
@@ -311,7 +312,7 @@ void FollowPointer(const UiEventSink& sink, const std::shared_ptr<WindowContext>
         context->hoverTimer = dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
         context->hoverTimer.Interval(kHoverReport);
         context->hoverTimer.IsRepeating(false);
-        context->hoverTimer.Tick([weakContext, sink](dispatching::DispatcherQueueTimer const&, IInspectable const&) noexcept {
+        OnUiTick(context->hoverTimer, [weakContext, sink](dispatching::DispatcherQueueTimer const&, IInspectable const&) noexcept {
             try {
                 if (auto live = weakContext.lock(); live && live->hoverPart >= 0) Report(sink, *live, live->hoverPart);
             } catch (...) {

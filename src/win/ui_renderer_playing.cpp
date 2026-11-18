@@ -3,6 +3,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "ui_renderer_playing.hpp"
+#include "xaml_ending.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -189,7 +190,7 @@ void PollArtworkWithoutApple(const std::shared_ptr<ArtworkFollow>& follow) {
         follow->poll.Interval(kArtworkPoll);
         follow->poll.IsRepeating(true);
         std::weak_ptr<ArtworkFollow> weak = follow;
-        follow->poll.Tick([weak](auto const&, auto const&) noexcept {
+        OnUiTick(follow->poll, [weak](auto const&, auto const&) noexcept {
             try {
                 if (std::shared_ptr<ArtworkFollow> alive = weak.lock()) PollArtwork(alive);
             } catch (...) {

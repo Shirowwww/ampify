@@ -3,6 +3,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "mini_player_theme.hpp"
+#include "xaml_ending.hpp"
 
 #include <fstream>
 #include <memory>
@@ -68,7 +69,7 @@ void Drop(std::shared_ptr<Binding> binding) noexcept {
     if (!holder) return;
     try {
         dispatching::DispatcherQueue dispatcher = (*holder)->dispatcher;
-        if (dispatcher && dispatcher.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [holder]() noexcept {
+        if (dispatcher && TryEnqueueUi(dispatcher, dispatching::DispatcherQueuePriority::Low, [holder]() noexcept {
                 (*holder)->side.reset();
                 delete holder;
             })) {
@@ -145,7 +146,7 @@ void TickOn(Binding& binding, const theme::SessionRequest& request, Journal& jou
 void Apply(const std::shared_ptr<Binding>& binding, const theme::SessionRequest& request, Journal& journal) noexcept {
     try {
         std::weak_ptr<Binding> weak = binding;
-        binding->dispatcher.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [weak, request, &journal]() noexcept {
+        TryEnqueueUi(binding->dispatcher, dispatching::DispatcherQueuePriority::Low, [weak, request, &journal]() noexcept {
             try {
                 if (std::shared_ptr<Binding> live = weak.lock()) TickOn(*live, request, journal);
             } catch (...) {

@@ -4,6 +4,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "apple_player.hpp"
+#include "xaml_ending.hpp"
 
 // The WinRT headers come before windows.h: its GetClassName macro would rename IAutomationPeer::GetClassName in some
 // of them and not in others (the error the CI's build without UNICODE gave).
@@ -784,7 +785,7 @@ void Watch(const xaml::Window& mainWindow, Journal& journal, uirender::PlayerMod
     if (!state.timer) {
         state.timer = mainWindow.DispatcherQueue().CreateTimer();
         state.timer.IsRepeating(true);
-        state.timer.Tick([](auto const&, auto const&) noexcept { OnTick(); });
+        OnUiTick(state.timer, [](auto const&, auto const&) noexcept { OnTick(); });
     }
     state.timer.Interval(kPollStep);
     state.timer.Start();

@@ -1,4 +1,5 @@
 #include "lyrics_fill.hpp"
+#include "xaml_ending.hpp"
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -520,13 +521,13 @@ void EnsureFollower(const dispatching::DispatcherQueue& queue) {
         if (std::find(g_followerQueues.begin(), g_followerQueues.end(), key) != g_followerQueues.end()) return;
         g_followerQueues.push_back(key);
     }
-    queue.TryEnqueue([queue]() noexcept {
+    TryEnqueueUi(queue, [queue]() noexcept {
         try {
             auto* follower = new Follower();
             follower->queue = queue;
             follower->timer = queue.CreateTimer();
             follower->timer.Interval(kTick);
-            follower->timer.Tick([follower](auto&&, auto&&) noexcept {
+            OnUiTick(follower->timer, [follower](auto&&, auto&&) noexcept {
                 try {
                     TickFollower(*follower);
                 } catch (...) {

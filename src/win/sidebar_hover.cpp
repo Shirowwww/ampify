@@ -1,4 +1,5 @@
 #include "sidebar_hover.hpp"
+#include "xaml_ending.hpp"
 
 #include "sidebar_hover_state.hpp"
 #if defined(AMPIFY_WITH_XAML)
@@ -243,7 +244,7 @@ void Watch(State& state) {
     if (!state.watch) {
         state.watch = dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
         state.watch.Interval(kCursorPollEvery);  // the real cursor, while the pane is open
-        state.watch.Tick([](auto const&, auto const&) noexcept {
+        OnUiTick(state.watch, [](auto const&, auto const&) noexcept {
             try {
                 State& live = TheState();
                 if (!CloseIfLeft(live)) live.watch.Stop();
@@ -337,7 +338,7 @@ void ShowIfCollapsed(const xaml::UIElement& element) {
 void ReopenAfterRefusedClose() {
     auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
     if (!queue) return;
-    queue.TryEnqueue(dispatching::DispatcherQueueHandler([]() noexcept {
+    TryEnqueueUi(queue, dispatching::DispatcherQueueHandler([]() noexcept {
         try {
             const State& live = TheState();
             auto navigation = live.navigation.get();
@@ -524,7 +525,7 @@ void Release(State& state) {
             GiveBack(navigation, state.apple);
             // WinUI applies the mode a little later: the same is done again then.
             if (auto queue = dispatching::DispatcherQueue::GetForCurrentThread()) {
-                queue.TryEnqueue(dispatching::DispatcherQueueHandler([navigation, apple = state.apple]() noexcept {
+                TryEnqueueUi(queue, dispatching::DispatcherQueueHandler([navigation, apple = state.apple]() noexcept {
                     try {
                         GiveBack(navigation, apple);
                     } catch (...) {
@@ -551,7 +552,7 @@ void Release(State& state) {
 void CloseAfterClick() {
     auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
     if (!queue) return;
-    queue.TryEnqueue(dispatching::DispatcherQueueHandler([]() noexcept {
+    TryEnqueueUi(queue, dispatching::DispatcherQueueHandler([]() noexcept {
         try {
             State& live = TheState();
             auto navigation = live.navigation.get();
@@ -568,7 +569,7 @@ void CloseAfterClick() {
 void NoteKeyOpen(bool byKey) {
     auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
     if (!queue) return;
-    queue.TryEnqueue(dispatching::DispatcherQueueHandler([byKey]() noexcept {
+    TryEnqueueUi(queue, dispatching::DispatcherQueueHandler([byKey]() noexcept {
         try {
             State& live = TheState();
             auto navigation = live.navigation.get();
@@ -616,7 +617,7 @@ void UnpinFromToggle(State& state) {
 void ToggleFromSpace() {
     auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
     if (!queue) return;
-    queue.TryEnqueue(dispatching::DispatcherQueueHandler([]() noexcept {
+    TryEnqueueUi(queue, dispatching::DispatcherQueueHandler([]() noexcept {
         try {
             State& live = TheState();
             auto navigation = live.navigation.get();

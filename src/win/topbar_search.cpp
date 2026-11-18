@@ -1,4 +1,5 @@
 #include "topbar_search.hpp"
+#include "xaml_ending.hpp"
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -320,7 +321,7 @@ void WatchPresenter(State& state) {
     auto changed = [](xaml::DependencyObject const&, xaml::DependencyProperty const&) noexcept {
         auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
         if (!queue) return;
-        queue.TryEnqueue(dispatching::DispatcherQueuePriority::High, dispatching::DispatcherQueueHandler([]() noexcept {
+        TryEnqueueUi(queue, dispatching::DispatcherQueuePriority::High, dispatching::DispatcherQueueHandler([]() noexcept {
             try {
                 KeepPresenterShown(TheState());
             } catch (...) {
@@ -366,7 +367,7 @@ void HoldHeader(State& state) {
 void HoldHeaderLater() {
     auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
     if (!queue) return;
-    queue.TryEnqueue(dispatching::DispatcherQueueHandler([]() noexcept {
+    TryEnqueueUi(queue, dispatching::DispatcherQueueHandler([]() noexcept {
         try {
             State& live = TheState();
             if (!live.closed && live.header) HoldHeader(live);
@@ -764,7 +765,7 @@ void StartTimer(State& state) {
     if (!state.timer) {
         state.timer = dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
         state.timer.Interval(kLayoutEvery);
-        state.timer.Tick([](auto const&, auto const&) noexcept {
+        OnUiTick(state.timer, [](auto const&, auto const&) noexcept {
             try {
                 Step(TheState(), false);
             } catch (...) {

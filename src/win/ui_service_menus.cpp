@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "ui_service_detail.hpp"
+#include "xaml_ending.hpp"
 
 namespace ampify::win::ui_service_detail {
 
@@ -181,7 +182,7 @@ void AppendMenuEntries(const UiEventSink& sink, const primitives::Popup& popup, 
         try {
             if (auto closed = sender.try_as<primitives::Popup>()) closed.Closed(*token);
             // Once the close has run its course. A menu opened in the meantime is looked for after this, in order.
-            dispatching::DispatcherQueue::GetForCurrentThread().TryEnqueue(
+            TryEnqueueUi(dispatching::DispatcherQueue::GetForCurrentThread(),
                 dispatching::DispatcherQueuePriority::Low, [items]() noexcept {
                     try {
                         for (std::uint32_t index = items.Size(); index-- > 0;) {
@@ -270,7 +271,7 @@ void LookForMenu(const WeakShared& weakShared, const WeakContext& weakContext) n
         if (!context->menuTimer) {
             context->menuTimer = context->dispatcher.CreateTimer();
             context->menuTimer.Interval(kMenuPoll);
-            context->menuTimer.Tick([weakShared, weakContext](auto const&, auto const&) noexcept {
+            OnUiTick(context->menuTimer, [weakShared, weakContext](auto const&, auto const&) noexcept {
                 LookForMenu(weakShared, weakContext);
             });
         }
@@ -297,7 +298,7 @@ void FollowMenus(UiService::Shared& shared, const std::shared_ptr<WindowContext>
             auto source = args.OriginalSource().template try_as<xaml::DependencyObject>();
             current->menuSource = source ? winrt::make_weak(source) : winrt::weak_ref<xaml::DependencyObject>();
             current->menuTries = 0;
-            current->dispatcher.TryEnqueue(dispatching::DispatcherQueuePriority::Low, [weakShared, weakContext]() noexcept {
+            TryEnqueueUi(current->dispatcher, dispatching::DispatcherQueuePriority::Low, [weakShared, weakContext]() noexcept {
                 LookForMenu(weakShared, weakContext);
             });
         } catch (...) {

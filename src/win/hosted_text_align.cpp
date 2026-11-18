@@ -1,4 +1,5 @@
 #include "hosted_text_align.hpp"
+#include "xaml_ending.hpp"
 #include "xaml_chrome.hpp"
 
 #if defined(AMPIFY_WITH_XAML)
@@ -105,7 +106,7 @@ void QueueAlign(HostStates::Key key) {
     controls::Border host = found->element.get();
     if (!host) return;
     found->value.queued = true;
-    host.DispatcherQueue().TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low, [key]() noexcept {
+    TryEnqueueUi(host.DispatcherQueue(), winrt::Microsoft::UI::Dispatching::DispatcherQueuePriority::Low, [key]() noexcept {
         try {
             auto* state = States().FindKey(key);
             if (!state) return;

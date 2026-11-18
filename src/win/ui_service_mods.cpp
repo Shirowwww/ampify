@@ -4,6 +4,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "ui_service_detail.hpp"
+#include "xaml_ending.hpp"
 
 #include <shellapi.h>
 
@@ -253,7 +254,7 @@ xaml::FrameworkElement SettingSlider(UiService::Shared& shared, const SettingOwn
     // strong one in the timer would make a cycle with the slider's own handler.
     auto moved = std::make_shared<double>(RoundToStep(slider.Value(), step));
     UiService::Shared* owner = &shared;
-    rest.Tick([owner, target, key = spec.key, last, moved](auto const&, auto const&) noexcept {
+    OnUiTick(rest, [owner, target, key = spec.key, last, moved](auto const&, auto const&) noexcept {
         try {
             std::string next = ShortestNumberText(*moved);
             if (next == *last) return;
@@ -584,7 +585,7 @@ void FillSettings(UiService::Shared& shared, const std::shared_ptr<SettingsCard>
     SettingsRefresh refresh = [owner = &shared, weak = std::weak_ptr<SettingsCard>(card),
                                kind = std::string(ToString(card->mod.kind)), id = card->mod.id, query](const std::string& notice) {
         // Next turn of the interface: the button that asked for it is still in its own click.
-        dispatching::DispatcherQueue::GetForCurrentThread().TryEnqueue([owner, weak, kind, id, query, notice]() {
+        TryEnqueueUi(dispatching::DispatcherQueue::GetForCurrentThread(), [owner, weak, kind, id, query, notice]() {
             try {
                 std::shared_ptr<SettingsCard> live = weak.lock();
                 std::optional<uirender::ModEntry> fresh = uirender::ElementSettings(owner->kit, kind, id);

@@ -3,6 +3,7 @@
 #if defined(AMPIFY_WITH_XAML)
 
 #include "xaml_chrome.hpp"
+#include "xaml_ending.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -43,7 +44,25 @@ GetAppPropertyFn GetAppPropertyFunction() noexcept {
 
 std::atomic<Journal*> g_journal{nullptr};
 
+std::atomic<bool> g_xamlEnding{false};
+std::atomic<bool> g_endingWatched{false};
+
 }  // namespace
+
+bool XamlEnding() noexcept { return g_xamlEnding.load(std::memory_order_acquire); }
+
+void WatchXamlEnding(const winrt::Microsoft::UI::Dispatching::DispatcherQueue& queue) noexcept {
+    if (!queue || g_endingWatched.exchange(true)) return;
+    try {
+        // The handler is never removed: the queue raises it once, as the process ends.
+        queue.ShutdownStarting([](auto const&, auto const&) noexcept {
+            g_xamlEnding.store(true, std::memory_order_release);
+            if (Journal* journal = g_journal.load()) journal->Write("Interface: Apple Music's interface thread ends");
+        });
+    } catch (...) {
+        g_endingWatched = false;  // tried again at the next attach
+    }
+}
 
 std::wstring_view AppPropertyName(WindowRole role) noexcept {
     switch (role) {
@@ -55,6 +74,7 @@ std::wstring_view AppPropertyName(WindowRole role) noexcept {
 }
 
 xaml::Window AppWindowOf(WindowRole role) noexcept {
+    if (XamlEnding()) return nullptr;  // closed windows, and no XAML left to ask anything of them
     GetAppPropertyFn function = GetAppPropertyFunction();
     if (!function) return nullptr;
     try {

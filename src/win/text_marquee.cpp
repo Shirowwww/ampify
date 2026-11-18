@@ -1,4 +1,5 @@
 #include "text_marquee.hpp"
+#include "xaml_ending.hpp"
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -283,7 +284,7 @@ void Watch(Marquee& state) {
     if (!state.watch) {
         state.watch = dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
         state.watch.Interval(kCursorPollEvery);  // the real cursor, while a text scrolls
-        state.watch.Tick([](auto const&, auto const&) noexcept {
+        OnUiTick(state.watch, [](auto const&, auto const&) noexcept {
             try {
                 Marquee& state = State();
                 if (state.running.empty()) state.watch.Stop();
@@ -335,7 +336,7 @@ void OnMoved(const IInspectable& sender, const xaml::Input::PointerRoutedEventAr
         state.trailing = dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
         state.trailing.IsRepeating(false);
         state.trailing.Interval(kEvaluateEvery);
-        state.trailing.Tick([](auto const&, auto const&) noexcept {
+        OnUiTick(state.trailing, [](auto const&, auto const&) noexcept {
             try {
                 Evaluate(State());
             } catch (...) {
