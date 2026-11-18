@@ -77,7 +77,12 @@ void Evaluate() noexcept {
 // "Minimize start" may come before the window is iconic, and "end" before it is restored: the state is read again a
 // moment later, so the work does not wait for the theme's next tick.
 void EvaluateSoon() noexcept {
-    static winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer later{nullptr};  // interface thread
+    // Interface thread; never destroyed: a static destructor would release the timer once Apple's queue has stopped,
+    // and Apple Music would crash while it exits after a minimize.
+    struct Holder {
+        winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer timer{nullptr};
+    };
+    static auto& later = (new Holder())->timer;
     try {
         if (!later) {
             later = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread().CreateTimer();
