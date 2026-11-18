@@ -66,14 +66,30 @@ Register-Case -Id 'background-launch' -Title 'Launcher started by Windows: Apple
     Close-AppleMusic | Out-Null
     $gone = Wait-Until -TimeoutSeconds 30 -Condition { @(Get-Process -Name 'ampify_launcher' -ErrorAction SilentlyContinue).Count -eq 0 }
     Add-Check -Ctx $Ctx -Name 'Apple Music closed: no launcher left running' -Passed $gone
+    # The second start follows a launch counted as failed, and is closed by the person before the kernel's 8 s health
+    # check: a normal close clears the count, or two quick closes in a row would leave the next start without Ampify.
+    Set-SafeModeCount -Count 1
     Start-AppNormally
     # A process of the second start: Windows may hand over two processes of the first one (a music: link, a relaunch).
-    $again = Wait-Until -TimeoutSeconds 120 -Condition {
-        $found = [regex]::Matches([string](Read-Journal 'attach.log'), $appPattern)
-        @($found | Where-Object { $_.Groups[1].Value -ne $firstProcess }).Count -gt 0
+    $secondStart = {
+        @([regex]::Matches([string](Read-Journal 'attach.log'), $appPattern) | Where-Object { $_.Groups[1].Value -ne $firstProcess })
     }
+    $again = Wait-Until -TimeoutSeconds 120 -Condition { @(& $secondStart).Count -gt 0 }
     Add-Check -Ctx $Ctx -Name 'second start: kernel loaded again' -Passed $again
+    $secondProcess = if ($again) { @(& $secondStart)[0].Groups[1].Value } else { '' }
+    $windowReady = $again -and (Wait-Until -TimeoutSeconds 60 -PollSeconds 1 -Condition {
+            $log = [string](Read-Journal 'AppleMusic.log')
+            $log.Contains("(process $secondProcess)") -and $log.Contains('Interface: main window obtained')
+        })
     Close-AppleMusic | Out-Null
+    $count = Get-SafeModeCount
+    $how = if (Test-JournalContains -FileName 'AppleMusic.log' -Text 'Apple Music closed normally: safe mode count reset') {
+        'cleared by the close'
+    } else {
+        'not cleared by the close'
+    }
+    Add-Check -Ctx $Ctx -Name 'quick close: not counted as a failed launch' -Passed ($windowReady -and $count -eq 0) `
+        -Detail "safe mode count: $count, $how"
 
     # Turned off, the way ampify restore and the uninstaller do: Apple Music then starts without the kernel.
     Remove-AttachSetting -FullName $fullName

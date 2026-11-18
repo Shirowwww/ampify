@@ -20,6 +20,10 @@ bool XamlEnding() noexcept;
 // Follows the shutdown of `queue`, the main window's. Once is enough; any thread.
 void WatchXamlEnding(const winrt::Microsoft::UI::Dispatching::DispatcherQueue& queue) noexcept;
 
+// Has `onEnding` run once, on the interface thread, as the queue starts shutting down: Apple Music closes normally.
+// A crash or a hang never gets there. Set it before the interface attaches.
+void OnXamlEnding(void (*onEnding)() noexcept) noexcept;
+
 // timer.Tick(handler), whose ticks do nothing once XamlEnding(). Returns the event's token, as Tick does.
 template <typename Handler>
 winrt::event_token OnUiTick(const winrt::Microsoft::UI::Dispatching::DispatcherQueueTimer& timer, Handler handler) {

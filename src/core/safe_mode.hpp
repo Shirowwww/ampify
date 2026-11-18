@@ -8,7 +8,8 @@ namespace ampify {
 // launches start without any extension, so the user gets the untouched app back.
 //
 // The count lives in a small settings file. It goes up at every launch and goes back to zero
-// once the app has proven healthy (MarkHealthy), so a single bad update never locks the mods out.
+// once the app has proven healthy or closed normally (MarkHealthy), so a single bad update never
+// locks the mods out, and neither do quick closes.
 class SafeMode {
 public:
     explicit SafeMode(std::string statePath, int maxUnhealthyLaunches = 2);
@@ -16,7 +17,7 @@ public:
     // Call once when the kernel starts. True when extensions must stay off for this launch.
     bool BeginLaunch();
 
-    // Call once the app has been up and responsive for a while (8 seconds in the kernel).
+    // Call once the app has been up and responsive for a while (8 seconds in the kernel), or once it closes normally.
     void MarkHealthy();
 
     int UnhealthyLaunches() const;

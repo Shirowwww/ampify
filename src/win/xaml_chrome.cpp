@@ -46,10 +46,13 @@ std::atomic<Journal*> g_journal{nullptr};
 
 std::atomic<bool> g_xamlEnding{false};
 std::atomic<bool> g_endingWatched{false};
+std::atomic<void (*)() noexcept> g_onEnding{nullptr};
 
 }  // namespace
 
 bool XamlEnding() noexcept { return g_xamlEnding.load(std::memory_order_acquire); }
+
+void OnXamlEnding(void (*onEnding)() noexcept) noexcept { g_onEnding.store(onEnding, std::memory_order_release); }
 
 void WatchXamlEnding(const winrt::Microsoft::UI::Dispatching::DispatcherQueue& queue) noexcept {
     if (!queue || g_endingWatched.exchange(true)) return;
@@ -58,6 +61,7 @@ void WatchXamlEnding(const winrt::Microsoft::UI::Dispatching::DispatcherQueue& q
         queue.ShutdownStarting([](auto const&, auto const&) noexcept {
             g_xamlEnding.store(true, std::memory_order_release);
             if (Journal* journal = g_journal.load()) journal->Write("Interface: Apple Music's interface thread ends");
+            if (auto onEnding = g_onEnding.load(std::memory_order_acquire)) onEnding();
         });
     } catch (...) {
         g_endingWatched = false;  // tried again at the next attach

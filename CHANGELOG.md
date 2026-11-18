@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Closing Apple Music twice within a few seconds of opening it no longer turns Ampify off at the next start. Safe mode
+  counted every launch that ended before its 8-second health check as a failure; a normal close now clears the count,
+  since a crash or a hang never gets there.
+
 ## 1.5.4 (2026-11-18)
 
 Two crashes when Apple Music closes are fixed.

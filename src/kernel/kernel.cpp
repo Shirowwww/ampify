@@ -43,6 +43,7 @@
 #include "../win/close_to_tray.hpp"
 #include "../win/theme_service.hpp"
 #include "../win/ui_service.hpp"
+#include "../win/xaml_ending.hpp"
 #include "../win/xaml_host.hpp"
 #endif
 
@@ -232,6 +233,22 @@ DWORD WINAPI KernelMain(LPVOID) {
         }
     }).detach();
 
+#if defined(AMPIFY_WITH_XAML)
+    if (role == ampify::ProcessRole::AppleMusic) {
+        // Closed by the person before the health check below: the launch did not break the app, since a crash or a
+        // hang never ends the interface thread. Two quick closes in a row used to leave the next start without Ampify.
+        ampify::win::OnXamlEnding([]() noexcept {
+            try {
+                ampify::SafeMode safeMode((ampify::win::KitDirectory() / "state.txt").string());
+                if (safeMode.UnhealthyLaunches() == 0) return;
+                safeMode.MarkHealthy();
+                journal.Write("Apple Music closed normally: safe mode count reset");
+            } catch (...) {
+                // On Apple Music's interface thread as it ends: nothing may escape.
+            }
+        });
+    }
+#endif
     if (role == ampify::ProcessRole::AppleMusic) StartInterface(journal, kit, winHost.Ui(), loader);
     if (role == ampify::ProcessRole::AppleMusic && tweaks.freezeLog) ampify::win::StartUiWatchdog(journal);
     if (tweaks.freezeLog && !laterProcess) ampify::win::StartMemoryWatch(journal, ampify::win::ExecutablePath().filename().string());
