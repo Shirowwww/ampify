@@ -20,6 +20,7 @@ Problems met while drawing inside Apple Music, and what fixed them. Read this be
 | Dark panel under a light theme | A Popup is outside the window tree and does not follow its mode. Copy `RequestedTheme` at each refresh |
 | Crash in `Microsoft.UI.Xaml.dll` at close | The theme service walked the tree during close. `Window.Closed` sets a flag and nothing touches XAML after it |
 | Crashes from XAML objects released on another thread | Release everything on the UI thread (`ReleaseXaml`, `DropContext`). Static services are never destroyed |
+| `AMPLibraryAgent.exe` crashed in `onnxruntime.dll` at each exit once Sing had loaded its model | Sing's thread object was a static: its destructor released the model's session after Windows had ended ONNX Runtime's and DirectML's threads. Like the other services, it is never destroyed (`src/win/audio/sing.cpp`) |
 | Navigating twice to the same page was not seen | Only the route was compared. `RouteSerial` counts navigations |
 | A large cover never replaced the blurry one | A `BitmapImage` that nothing in the window shows is never decoded, so `ImageOpened` and `ImageFailed` never fire. Load it through an element in the tree (the image node's invisible sizer), then give it to the visible brush |
 | Old handlers on a bitmap or frame kept running | `auto_revoke` goes through a weak reference to the source, which never resolves for Ampify's objects. Remove handlers by token and check the sender is still the latest one |

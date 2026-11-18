@@ -600,8 +600,10 @@ void StartSing() {
         std::thread([] {
             // The model runs here: above the interface's work, below the audio thread's.
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
-            static SingThread thread;
-            thread.Run();
+            // Never destroyed: by the time a static destructor runs at exit, Windows has ended ONNX Runtime's and
+            // DirectML's threads, and releasing the model's session then crashed AMPLibraryAgent.exe in onnxruntime.dll.
+            auto* thread = new SingThread();
+            thread->Run();
         }).detach();
     });
 }
