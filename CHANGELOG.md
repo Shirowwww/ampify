@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.5.6 (2026-11-19)
+
+Sing can now keep the singer alone, its button is in the full-screen player, and a change of volume is heard at once.
+
+- Sing 1.0.2 has a Vocals only switch beside Karaoke: the music goes and the singer stays, in Light and in Studio, with
+  a slider for how much of the music is left.
+- Sing's button is also in Apple Music's full-screen player now, just before the lyrics button, and it lights up while
+  Sing is on. A popup opened from there shows over the player.
+- With Sing's Studio on, a change of Apple Music's volume took about 3 s to be heard, the time Studio holds the sound
+  back. It is now heard at once.
+- In the full-screen player, skipping several songs quickly could leave the lyrics with no line above the one being
+  sung, until the player was opened again. The lines before the sung one now always show, as set in "Lyrics lines
+  above".
+- Extensions: `playbar.addButton({ player: true })` also shows a button in the full-screen player, and
+  `Ampify.audio.sing.set()` takes a `music` level beside `voice` (`voice: 1, music: 0` keeps the singer alone).
+
 ## 1.5.5 (2026-11-18)
 
 AutoMix can now leave a song on an echo, on its own ending or on a looped bar, its fades keep time again, and two bugs
