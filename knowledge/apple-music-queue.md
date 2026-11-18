@@ -52,6 +52,26 @@ Also learned: the queue panel's drag data (`IPlayQueueViewModel.SerializeDragDat
 entries' ids, such as `[11906]`, under the identifier `PlayQueueViewDragData`. `InsertItemsIntoPlayQueue` takes it, so it
 moves entries of the queue; it does not add catalog songs.
 
+## Playing an album of the library
+
+The same method does play library items (checked in 1.1792 on 2026-11-18): `Action` StartPlayback, `Items` an
+`IVector<ContentDescriptor>` holding the album, `StartItem` one of its songs, and Apple plays the album from that song.
+The vector is Ampify's own (`rt::MakeVector` with objects); the identifiers of the `ContentDescriptor` collections are
+listed in `src/core/amp_abi.hpp`. An album tile of the library serializes as:
+
+```json
+[{"kind":"album","identifiers":{"storeAdamID":"1658011741",
+  "libraryItemID":"DBID:0xf74fb9a3f2dce41c-PID:0xdea20c15cb557038-PPID:0x0-PIPID:0x0-IKIND:eAlbum",
+  "storeCloudAlbumID":"l.eREQ1D3"}}]
+```
+
+`PID` is the album's persistent id in `Library.musicdb` (`knowledge/apple-music-library-file.md`); `DBID` is the
+library's. A song needs only its library id, with its own persistent id and `IKIND:eSong`:
+
+```json
+[{"kind":"song","identifiers":{"libraryItemID":"DBID:0x…-PID:0x838c4443377adeea-PPID:0x0-PIPID:0x0-IKIND:eSong"}}]
+```
+
 ## Identifiers of parameterized interfaces
 
 `IVector<T>` and the other generic interfaces have no fixed identifier. It is the UUID version 5 of the interface's

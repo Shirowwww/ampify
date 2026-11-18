@@ -894,6 +894,7 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     CHECK(!none.sidebarOnHover);                // the sidebar as Apple Music shows it
     CHECK(!none.topbarSearch);                  // the search field stays in the sidebar unless asked
     CHECK(none.lyricsFill);                     // word-by-word lyrics lit smoothly (issue #5)
+    CHECK(!none.albumExpand);                   // a click on an album opens its page, as in Apple Music (issue #7)
 
     settings.Set("apple.notifications", "Background");
     settings.Set("apple.fullscreen", "replace");
@@ -904,9 +905,11 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     settings.Set("apple.sidebar", "Hover");
     settings.Set("apple.topbar", "Search");
     settings.Set("apple.lyricsFill", "Apple");
+    settings.Set("apple.albumClick", "Expand");
     AppleTweaks set = ReadAppleTweaks(settings);
     CHECK(set.topbarSearch);
     CHECK(!set.lyricsFill);
+    CHECK(set.albumExpand);
     CHECK(!set.playerControls);
     CHECK(!set.sharpArtwork);
     CHECK(!set.textMarquee);
@@ -1076,7 +1079,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK((keysOf(TweakGroup::Window) == std::vector<std::string>{"apple.topbar",
                                                                   "ampify.entry",
                                                                   "apple.marquee", "apple.close",
-                                                                  "apple.notifications"}));
+                                                                  "apple.notifications", "apple.albumClick"}));
     CHECK((keysOf(TweakGroup::Player) ==
            std::vector<std::string>{"apple.fullscreen", "apple.playerControls", "apple.lyricsBefore",
                                     "apple.lyricsAfter", "apple.lyricsFill", "apple.artwork"}));
@@ -1104,6 +1107,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(card("apple.lyricsBefore").value == "all" && card("apple.lyricsBefore").options.size() == 7);
     CHECK(card("apple.lyricsAfter").value == "all" && card("apple.lyricsAfter").options.size() == 7);
     CHECK(card("apple.lyricsFill").value == "smooth" && card("apple.lyricsFill").options.size() == 2);
+    CHECK(card("apple.albumClick").value == "page" && card("apple.albumClick").options.size() == 2);
     CHECK(card("apple.artwork").value == "sharp");
     CHECK(card("apple.marquee").value == "hover");
     CHECK(SidebarChoice(kit).value == "open");  // on the Look tab, beside the playback bar
@@ -1126,6 +1130,8 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(!SetAppleTweak(kit, "apple.lyricsAfter", "6", error));
     CHECK(SetAppleTweak(kit, "apple.lyricsFill", "apple", error));
     CHECK(!SetAppleTweak(kit, "apple.lyricsFill", "fast", error));
+    CHECK(SetAppleTweak(kit, "apple.albumClick", "expand", error));
+    CHECK(!SetAppleTweak(kit, "apple.albumClick", "open", error));
     choices = allChoices();
     {
         ampify::Settings saved;

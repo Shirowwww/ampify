@@ -59,6 +59,8 @@ struct AppleTweaks {
     int lyricsAfter = -1;
     // Word-by-word lyrics lit at the screen's pace rather than in Apple's steps (win/lyrics_fill.cpp). On by default.
     bool lyricsFill = true;
+    // A click on an album of the library opens its track list in the grid (win/album_expand.cpp). Off by default.
+    bool albumExpand = false;
     // The buttons at the right of the playback bar, in the order chosen on the settings page (win/user_order.cpp).
     std::vector<std::string> playbarOrder;
     // The entries Ampify adds under the sidebar's own, in the order chosen there too.

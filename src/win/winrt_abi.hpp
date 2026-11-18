@@ -152,6 +152,9 @@ struct VectorIids {
 // It answers IVector, IVectorView and IIterable; the methods that would change it answer E_ACCESSDENIED. Agile and
 // never changed once made, since an asynchronous method may read it later from another thread.
 Ref MakeVector(const VectorIids& iids, std::vector<uint64_t> values);
+// The same for objects, such as an IVector<ContentDescriptor>: each element must already be the element type's default
+// interface (a runtime class crosses the ABI as that interface); the vector holds a reference to each.
+Ref MakeVector(const VectorIids& iids, std::vector<Ref> objects);
 
 // A delegate that counts its calls: PropertyChangedEventHandler, or any delegate whose Invoke (slot 3) takes two
 // pointers. Agile, so that the object that raises the event may call it from any thread.

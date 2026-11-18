@@ -516,4 +516,76 @@ rt::Ref StartAppleQueueRemove(uint64_t itemId, std::string& failure) {
     return operation;
 }
 
+std::string DescriptorIdentifier(const rt::Ref& descriptor) {
+    return descriptor ? rt::ReadString(descriptor, slot::kDescriptorMakeIdentifier) : std::string();
+}
+
+namespace {
+
+rt::Ref DescriptorStatics(std::string& failure) {
+    rt::Ref statics;
+    rt::Activation activation = rt::GetActivationFactory(L"AMP.Services.CommonModels.ContentDescriptor",
+                                                         rt::GuidOf(amp::kIidContentDescriptorStatics), statics);
+    if (FAILED(activation.result)) failure = "ContentDescriptor statics missing (code " + HresultText(activation.result) + ")";
+    return statics;
+}
+
+rt::Ref CurrentPlayer(std::string& failure) {
+    rt::Ref statics, current, player;
+    rt::GetActivationFactory(L"AMP.Services.Player", kIidPlayerStatics, statics);
+    if (!statics || FAILED(rt::CallSlot(statics, slot::kPlayerStaticsCurrent, current.Put())) || !current ||
+        !rt::QueryAny(current, amp::kIidsPlayer, player)) {
+        failure = "Apple's player is not reachable";
+        return {};
+    }
+    return player;
+}
+
+}  // namespace
+
+rt::Ref DescriptorFromJson(const std::string& json, std::string& failure) {
+    rt::Ref statics = DescriptorStatics(failure);
+    if (!statics) return {};
+    rt::HString text(FromUtf8(json));
+    rt::Ref list, first, typed;
+    HRESULT hr = rt::CallSlot(statics, slot::kDescriptorsDeserialize, text.Get(), list.Put());
+    UINT32 size = 0;
+    if (SUCCEEDED(hr) && list) rt::CallSlot(list, rt::kVectorSizeSlot, &size);
+    if (size == 0 || FAILED(rt::CallSlot(list, rt::kVectorGetAtSlot, 0u, first.Put())) || !first ||
+        !rt::Query(first, rt::GuidOf(amp::kIidContentDescriptor), typed)) {
+        failure = "Apple read no content descriptor from the JSON (code " + HresultText(hr) + ")";
+        return {};
+    }
+    return typed;
+}
+
+rt::Ref StartLibraryPlayback(const rt::Ref& container, const rt::Ref& start, bool shuffle, std::string& failure) {
+    rt::Ref factory, created, args, operation;
+    rt::GetActivationFactory(L"AMP.Services.StartOrQueuePlaybackArgs", rt::GuidOf(amp::kIidActivationFactory), factory);
+    if (!factory || FAILED(rt::CallSlot(factory, slot::kActivateInstance, created.Put())) || !created ||
+        !rt::Query(created, rt::GuidOf(amp::kIidStartOrQueuePlaybackArgs), args)) {
+        failure = "StartOrQueuePlaybackArgs cannot be made";
+        return {};
+    }
+    rt::Ref items = rt::MakeVector(CollectionIids(amp::kIidsContentDescriptorCollections), std::vector<rt::Ref>{container});
+    HRESULT hr = rt::CallSlot(args, slot::kStartArgsPutAction, amp::kPlayOrQueueStartPlayback);
+    if (SUCCEEDED(hr)) hr = rt::CallSlot(args, slot::kStartArgsPutItems, items.Get());
+    if (SUCCEEDED(hr) && start) hr = rt::CallSlot(args, slot::kStartArgsPutStartItem, start.Get());
+    if (SUCCEEDED(hr)) {
+        hr = rt::CallSlot(args, slot::kStartArgsPutShuffleMode, shuffle ? amp::kShuffleTracks : amp::kShuffleOff);
+    }
+    if (FAILED(hr)) {
+        failure = "the playback arguments refused a value (code " + HresultText(hr) + ")";
+        return {};
+    }
+    rt::Ref player = CurrentPlayer(failure);
+    if (!player) return {};
+    hr = rt::CallSlot(player, slot::kPlayerStartOrQueueLibraryPlayback, args.Get(), operation.Put());
+    if (FAILED(hr) || !operation) {
+        failure = "StartOrQueueLibraryPlaybackAsync failed (code " + HresultText(hr) + ")";
+        return {};
+    }
+    return operation;
+}
+
 }  // namespace ampify::win

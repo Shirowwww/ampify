@@ -40,6 +40,35 @@ MainPage (AMP.UI.Views.MainPage)                      content of the window "Mai
    └─ Rectangle#Frost (collapsed)
 ```
 
+## Library > Albums (1.1792, read 2026-11-18)
+
+```
+Grid#FixedGridPageContent
+└─ GridView (AMP.UI.Controls.GridView)   Padding 30,142,30,0; IsItemClickEnabled, SelectionMode Extended
+   └─ Border > ScrollViewer#ScrollViewer > ScrollContentPresenter > ItemsPresenter
+      └─ ItemsWrapGrid                    ItemWidth 199, one GridViewItem per album (Margin 6, Padding 4)
+         └─ GridViewItem > ListViewItemPresenter#Root
+            └─ HoverGrid#SquareLockupContent
+               ├─ GlowEffect > ArtworkImage > Image#StaticArtwork
+               ├─ Button#PlayButton, Button (more)        shown under the pointer
+               └─ TitleSubtitleControl > TitleTextBlock, FavoriteButton, SubtitleTextBlock (the artist)
+```
+
+Each item's `Content` is a `CommonModels.SquareLockup` (ILockup, ITitledComponent, IContentDescriptorDriven,
+IPlayActionDriven...). Its descriptor's `MakeIdentifier` names a library album as
+`DBID:0x…-PID:0x…-PPID:0x0-PIPID:0x0-IKIND:eAlbum` (knowledge/apple-music-queue.md). A click opens the album's page
+through the grid's `ItemClick`; the item's automation peer offers Invoke, which raises it, only while
+`IsItemClickEnabled` is on. `apple.albumClick` (src/win/album_expand.cpp) builds on all of this.
+
+Library > Recently Added holds the same `GridView` under `Grid#FixedGroupedGridSectionContent`, grouped by when the
+album was added ("This month", "Last 3 months"...). Each group's header is a child of the same `ItemsWrapGrid`, wider
+than a tile, and each group starts a new row: a tile's row comes from its layout slot
+(`LayoutInformation::GetLayoutSlot`), not from its index.
+
+A click on the artwork or on the title raises `Tapped` on the grid (seen through `AddHandler(..., handledEventsToo)`,
+since the `ListViewItemPresenter` handles the pointer), after `PointerPressed`, `PointerCaptureLost` and
+`PointerReleased`. A synthetic click whose press and release come in the same millisecond may raise no `Tapped`.
+
 ## A dialog
 
 Read on the welcome dialog (`GDPRWelcomeDialog`) of the CI bench, 1.1792. A dialog is a root of its own: a `Popup` that

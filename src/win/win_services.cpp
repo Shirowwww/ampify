@@ -309,12 +309,7 @@ bool Services::WriteOutputText(const std::string& elementId, const std::string& 
     return WriteOutputFile(m_kit / "output", elementId, name, text, error);
 }
 
-// Apple Music keeps its library under the Music known folder, which may be moved off %USERPROFILE%\Music.
-std::filesystem::path Services::LibraryFile() {
-    std::filesystem::path music = KnownFolder(FOLDERID_Music);
-    if (music.empty()) return {};
-    return music / L"Apple Music" / L"Apple Music Library.musiclibrary" / L"Library.musicdb";
-}
+std::filesystem::path Services::LibraryFile() { return AppleLibraryFile(); }
 
 void Services::Service() {
     EnsureStarted();

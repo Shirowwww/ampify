@@ -79,6 +79,9 @@ inline constexpr char kLyricsBeforeKey[] = "apple.lyricsBefore";
 inline constexpr char kLyricsAfterKey[] = "apple.lyricsAfter";
 // Word-by-word lyrics lit smoothly (smooth) or in Apple's own steps (apple) (win/lyrics_fill.cpp, issue #5).
 inline constexpr char kLyricsFillKey[] = "apple.lyricsFill";
+// A click on an album of the library opens its page (page) or its track list in the grid, as iTunes did (expand)
+// (win/album_expand.cpp, issue #7).
+inline constexpr char kAlbumClickKey[] = "apple.albumClick";
 inline constexpr char kKitUpdateKey[] = "kit_update";
 inline constexpr char kEntryKey[] = "ampify.entry";
 inline constexpr char kGlassChoiceKey[] = "theme.glass";

@@ -27,8 +27,12 @@ track list. The others hold the library header (`hfma` again, type 3), playlists
 
 - `ltma`, the track list: header length at 4 (0x5C), track count at 8. The tracks follow.
 - `itma`, one track: header length at 4 (0x178), total length at 8, sub-record count at 12, persistent id (UInt64) at 16,
-  year (UInt16) at 0xA8 (checked on a real library in November 2026: "Timeless" gives 2024). The sub-records follow
-  the header.
+  year (UInt16) at 0xA8 (checked on a real library in November 2026: "Timeless" gives 2024), track number (UInt16)
+  at 0xA0, album persistent id (UInt64) at 0xAC, disc number (UInt16) at 0x54 and the album's disc count at 0x5A
+  (checked on 2026-11-18: "Count Me Out", the first track of the second disc of a two-disc album, reads 2 and 2, its
+  other tracks 1 and 2). The sub-records follow the header.
+- `iama`, one album: its persistent id (UInt64) at 16, the one the tracks hold at 0xAC and Apple Music's album tiles
+  give in their `libraryItemID` (`knowledge/apple-music-queue.md`).
 - `boma`, a sub-record: 0x14 at 4, total length at 8, subtype at 12.
 
 | Subtype | Content |

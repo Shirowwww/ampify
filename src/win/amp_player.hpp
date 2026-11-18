@@ -101,4 +101,14 @@ void ForgetQueuedArtworkForTests();
 // Starts removing one entry (IPlayQueue.DeletePlayQueueItemsAsync): its IAsyncAction, empty on failure.
 rt::Ref StartAppleQueueRemove(uint64_t itemId, std::string& failure);
 
+// Library playback (knowledge/apple-music-queue.md), on the interface thread too; an item's descriptor comes from
+// ContentDescriptorOf (amp_item.hpp).
+// IContentDescriptor.MakeIdentifier: "DBID:0x...-PID:0x...-IKIND:eAlbum" for a library item, "" on failure.
+std::string DescriptorIdentifier(const rt::Ref& descriptor);
+// The first descriptor of Apple's JSON (DeserializeContentDescriptors), empty when there is none.
+rt::Ref DescriptorFromJson(const std::string& json, std::string& failure);
+// IPlayer.StartOrQueueLibraryPlaybackAsync: plays `container` (an album of the library) from `start` (one of its
+// songs; empty for the first), shuffled or not. Its IAsyncAction, empty on failure.
+rt::Ref StartLibraryPlayback(const rt::Ref& container, const rt::Ref& start, bool shuffle, std::string& failure);
+
 }  // namespace ampify::win

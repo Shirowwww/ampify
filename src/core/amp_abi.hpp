@@ -114,6 +114,24 @@ inline constexpr char kIidLockup[] = "9FE979C2-14FE-57AF-AF3A-5A23505F16FF";    
 // the interfaces Apple Music 1.1792 lists for PlayQueue.Sections, with its IVectorView, IIterable and
 // IObservableVector computed the same way.
 inline constexpr char kIidVectorOfComponentModel[] = "2C559B4A-4165-5E91-86F1-CD3EC0884419";
+// IVector, IVectorView, IIterable and IIterator of ContentDescriptor, whose default interface is IContentDescriptor:
+// "rc(AMP.Services.CommonModels.ContentDescriptor;{659506eb-e228-5a4a-b8a4-0af7125fb4e5})". Checked in 1.1792: the
+// list DeserializeContentDescriptors returns answers the view's identifier.
+inline constexpr const char* kIidsContentDescriptorCollections[] = {
+    "B8AEEAD4-B612-55FD-A620-A082982B5EED",  // IVector<ContentDescriptor>
+    "93B17BA4-5AFC-59D6-A446-52372C919DB6",  // IVectorView<ContentDescriptor>
+    "272DDCF0-4C0B-54D4-9743-F9D9E903D329",  // IIterable<ContentDescriptor>
+    "CD283EDF-6F1B-564A-8C62-D10FF7DA1B35",  // IIterator<ContentDescriptor>
+};
+// Library playback (knowledge/apple-music-queue.md), in AMP.Services.winmd 1.1792: the descriptors' statics, the
+// playback arguments (StartOrQueuePlaybackArgs is activated with no parameters) and IActivationFactory.
+inline constexpr char kIidContentDescriptorStatics[] = "B747953E-2EF9-5270-8448-42DC51DD0609";
+inline constexpr char kIidStartOrQueuePlaybackArgs[] = "73EE8EAC-46B3-529D-96DF-3A268E3F8A06";
+inline constexpr char kIidActivationFactory[] = "00000035-0000-0000-C000-000000000046";
+// PlayOrQueueCommand.StartPlayback and ShuffleMode (Off 0, Tracks 1).
+inline constexpr int kPlayOrQueueStartPlayback = 0;
+inline constexpr int kShuffleOff = 0;
+inline constexpr int kShuffleTracks = 1;
 inline constexpr const char* kIidsUInt64Collections[] = {
     "CF4A637F-456A-5A47-A927-BCF07FC69901",  // IVector<UInt64>
     "23D156C7-7EF9-5096-AABA-1E6C9AB5CEB4",  // IVectorView<UInt64>
@@ -232,6 +250,17 @@ inline constexpr int kDescriptorIsContainer = 18;
 inline constexpr int kDescriptorIsVideo = 19;
 inline constexpr int kDescriptorIsConcert = 20;
 inline constexpr int kDescriptorCanonicalId = 22;
+// IContentDescriptor.MakeIdentifier: "DBID:0x...-PID:0x...-IKIND:eAlbum" for a library item, the AdamId otherwise.
+inline constexpr int kDescriptorMakeIdentifier = 17;
+// IContentDescriptorStatics; IActivationFactory.ActivateInstance; IStartOrQueuePlaybackArgs; IPlayer.
+inline constexpr int kDescriptorsSerialize = 6;
+inline constexpr int kDescriptorsDeserialize = 7;
+inline constexpr int kActivateInstance = 6;
+inline constexpr int kStartArgsPutAction = 7;
+inline constexpr int kStartArgsPutItems = 9;
+inline constexpr int kStartArgsPutStartItem = 11;
+inline constexpr int kStartArgsPutShuffleMode = 17;
+inline constexpr int kPlayerStartOrQueueLibraryPlayback = 8;
 
 // AMP.UI.Controls.IScrubberControlStatics: each getter returns a DependencyProperty.
 inline constexpr int kScrubberThumbVisibilityProperty = 6;
@@ -293,6 +322,15 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.CommonModels.IContentDescriptorDriven", "get_ContentDescriptor", slot::kDrivenContentDescriptor},
     {"AMP.Services.CommonModels.IContentDescriptor", "get_AdamId", slot::kDescriptorAdamId},
     {"AMP.Services.CommonModels.IContentDescriptor", "get_CanonicalId", slot::kDescriptorCanonicalId},
+    {"AMP.Services.CommonModels.IContentDescriptor", "MakeIdentifier", slot::kDescriptorMakeIdentifier},
+    {"AMP.Services.CommonModels.IContentDescriptorStatics", "SerializeContentDescriptors", slot::kDescriptorsSerialize},
+    {"AMP.Services.CommonModels.IContentDescriptorStatics", "DeserializeContentDescriptors",
+     slot::kDescriptorsDeserialize},
+    {"AMP.Services.IStartOrQueuePlaybackArgs", "put_Action", slot::kStartArgsPutAction},
+    {"AMP.Services.IStartOrQueuePlaybackArgs", "put_Items", slot::kStartArgsPutItems},
+    {"AMP.Services.IStartOrQueuePlaybackArgs", "put_StartItem", slot::kStartArgsPutStartItem},
+    {"AMP.Services.IStartOrQueuePlaybackArgs", "put_ShuffleMode", slot::kStartArgsPutShuffleMode},
+    {"AMP.Services.IPlayer", "StartOrQueueLibraryPlaybackAsync", slot::kPlayerStartOrQueueLibraryPlayback},
     {"AMP.Services.CommonModels.IContentDescriptor", "get_IsAlbum", slot::kDescriptorIsAlbum},
     {"AMP.Services.CommonModels.IContentDescriptor", "get_IsArtist", slot::kDescriptorIsArtist},
     {"AMP.Services.CommonModels.IContentDescriptor", "get_IsComposer", slot::kDescriptorIsComposer},

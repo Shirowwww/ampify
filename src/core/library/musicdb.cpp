@@ -54,8 +54,11 @@ constexpr uint32_t kBomaGenre = 0x5;
 constexpr uint32_t kBomaComposer = 0xC;
 constexpr uint32_t kBomaPlays = 0x17;
 constexpr uint32_t kBomaAlbumArtist = 0x1B;
-// The track's year, a 16-bit number in the itma header.
+// In the itma header: the track's disc, number and year (16-bit), its album's persistent id (64-bit).
+constexpr size_t kTrackDisc = 0x54;
+constexpr size_t kTrackNumber = 0xA0;
 constexpr size_t kTrackYear = 0xA8;
+constexpr size_t kTrackAlbum = 0xAC;
 // Text sub-record: encoding at 20 (1 is UTF-16LE), byte length at 24, the text from 36.
 constexpr size_t kTextStart = 36;
 constexpr uint32_t kTextUtf16 = 1;
@@ -82,6 +85,10 @@ uint32_t U32(std::string_view data, size_t at) {
     uint32_t value = 0;
     for (int i = 3; i >= 0; i--) value = (value << 8) | static_cast<uint8_t>(data[at + i]);
     return value;
+}
+
+uint32_t U16(std::string_view data, size_t at) {
+    return static_cast<uint8_t>(data[at]) | (static_cast<uint32_t>(static_cast<uint8_t>(data[at + 1])) << 8);
 }
 
 uint64_t U64(std::string_view data, size_t at) {
@@ -147,8 +154,11 @@ bool ReadTrack(std::string_view record, LibraryTrack& track, std::string* error)
     size_t at = U32(record, 4);
     uint32_t count = U32(record, 12);
     track.persistentId = U64(record, 16);
-    if (at >= kTrackYear + 2) {
-        track.year = static_cast<uint8_t>(record[kTrackYear]) | (static_cast<uint8_t>(record[kTrackYear + 1]) << 8);
+    if (at >= kTrackAlbum + 8) {
+        track.discNumber = U16(record, kTrackDisc);
+        track.trackNumber = U16(record, kTrackNumber);
+        track.year = U16(record, kTrackYear);
+        track.albumId = U64(record, kTrackAlbum);
     }
     for (uint32_t i = 0; i < count && at < record.size(); i++) {
         std::string_view rest = record.substr(at);

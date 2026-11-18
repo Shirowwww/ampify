@@ -510,8 +510,9 @@ Ampify.fonts.roles() -> { [role]: { family, weight, size, fromTheme } }
 Ampify.fonts.style(name) -> { role, family, weight, size, fromTheme } | null
 Ampify.lyrics.current() -> Promise<lyrics | null>   // player.lyrics() as a promise, permission player.read
 Ampify.library.tracks() -> Promise<track[]>         // permission library.read
-//   track: { persistentId, title, artist, album, albumArtist, genre, composer, year, playCount, skipCount,
-//            lastPlayed, dateAdded, durationMs }   // text fields "" and year 0 when the library does not say
+//   track: { persistentId, title, artist, album, albumArtist, genre, composer, year, trackNumber, discNumber,
+//            albumId, playCount, skipCount, lastPlayed, dateAdded, durationMs }
+//            // text fields and albumId "" (the album's persistent id), numbers 0 when the library does not say
 ```
 
 - `http` calls go over https to declared hosts only. A string body is sent as a form, an object as JSON. Allowed

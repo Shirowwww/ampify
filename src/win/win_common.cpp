@@ -123,6 +123,12 @@ std::filesystem::path InstallDirectory() {
     return KnownFolder(FOLDERID_LocalAppData) / L"Programs" / kKitFolderName;
 }
 
+std::filesystem::path AppleLibraryFile() {
+    std::filesystem::path music = KnownFolder(FOLDERID_Music);
+    if (music.empty()) return {};
+    return music / L"Apple Music" / L"Apple Music Library.musiclibrary" / L"Library.musicdb";
+}
+
 std::string HresultText(long code) {
     char text[16];
     std::snprintf(text, sizeof(text), "0x%08lX", static_cast<unsigned long>(code));

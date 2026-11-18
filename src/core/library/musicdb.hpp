@@ -23,6 +23,9 @@ struct LibraryTrack {
     std::string genre;
     std::string composer;
     uint32_t year = 0;
+    uint32_t trackNumber = 0;  // 0 when the file does not say
+    uint32_t discNumber = 0;   // 0 when the file does not say
+    uint64_t albumId = 0;      // the persistent id of the track's album, 0 for none
     uint32_t playCount = 0;
     uint32_t skipCount = 0;
     int64_t lastPlayedMs = 0;  // Unix time in milliseconds; 0 when never played

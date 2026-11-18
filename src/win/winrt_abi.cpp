@@ -192,35 +192,64 @@ namespace {
 
 const GUID kIidInspectable = {0xAF86E2E0, 0xB12D, 0x4C6A, {0x9C, 0x5A, 0xD7, 0xAA, 0x65, 0x10, 0x1E, 0x90}};
 
-// The vtables of windows.foundation.collections.h for UInt64, in their slot order.
+// How a vector element crosses the ABI: a UInt64 is copied; an object goes out as its interface pointer, with a
+// reference the caller then owns, and two objects are the same when their IUnknown is.
+template <typename Item>
+struct ElementOf;
+
+template <>
+struct ElementOf<uint64_t> {
+    using Abi = uint64_t;
+    static void Give(const uint64_t& item, Abi* out) { *out = item; }
+    static bool Same(const uint64_t& item, Abi value) { return item == value; }
+};
+
+template <>
+struct ElementOf<Ref> {
+    using Abi = IInspectable*;
+    static void Give(const Ref& item, Abi* out) {
+        *out = static_cast<IInspectable*>(item.Get());
+        if (*out) (*out)->AddRef();
+    }
+    static bool Same(const Ref& item, Abi value) {
+        if (!value) return !item;
+        value->AddRef();
+        return item.SameObject(Ref(value));
+    }
+};
+
+// The vtables of windows.foundation.collections.h, in their slot order.
+template <typename T>
 struct VectorAbi : IInspectable {
-    virtual HRESULT STDMETHODCALLTYPE GetAt(UINT32 index, uint64_t* item) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetAt(UINT32 index, T* item) = 0;
     virtual HRESULT STDMETHODCALLTYPE get_Size(UINT32* size) = 0;
     virtual HRESULT STDMETHODCALLTYPE GetView(void** view) = 0;
-    virtual HRESULT STDMETHODCALLTYPE IndexOf(uint64_t value, UINT32* index, boolean* found) = 0;
-    virtual HRESULT STDMETHODCALLTYPE SetAt(UINT32 index, uint64_t item) = 0;
-    virtual HRESULT STDMETHODCALLTYPE InsertAt(UINT32 index, uint64_t item) = 0;
+    virtual HRESULT STDMETHODCALLTYPE IndexOf(T value, UINT32* index, boolean* found) = 0;
+    virtual HRESULT STDMETHODCALLTYPE SetAt(UINT32 index, T item) = 0;
+    virtual HRESULT STDMETHODCALLTYPE InsertAt(UINT32 index, T item) = 0;
     virtual HRESULT STDMETHODCALLTYPE RemoveAt(UINT32 index) = 0;
-    virtual HRESULT STDMETHODCALLTYPE Append(uint64_t item) = 0;
+    virtual HRESULT STDMETHODCALLTYPE Append(T item) = 0;
     virtual HRESULT STDMETHODCALLTYPE RemoveAtEnd() = 0;
     virtual HRESULT STDMETHODCALLTYPE Clear() = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetMany(UINT32 start, UINT32 capacity, uint64_t* items, UINT32* actual) = 0;
-    virtual HRESULT STDMETHODCALLTYPE ReplaceAll(UINT32 count, uint64_t* items) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetMany(UINT32 start, UINT32 capacity, T* items, UINT32* actual) = 0;
+    virtual HRESULT STDMETHODCALLTYPE ReplaceAll(UINT32 count, T* items) = 0;
 };
+template <typename T>
 struct VectorViewAbi : IInspectable {
-    virtual HRESULT STDMETHODCALLTYPE GetAt(UINT32 index, uint64_t* item) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetAt(UINT32 index, T* item) = 0;
     virtual HRESULT STDMETHODCALLTYPE get_Size(UINT32* size) = 0;
-    virtual HRESULT STDMETHODCALLTYPE IndexOf(uint64_t value, UINT32* index, boolean* found) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetMany(UINT32 start, UINT32 capacity, uint64_t* items, UINT32* actual) = 0;
+    virtual HRESULT STDMETHODCALLTYPE IndexOf(T value, UINT32* index, boolean* found) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetMany(UINT32 start, UINT32 capacity, T* items, UINT32* actual) = 0;
 };
 struct IterableAbi : IInspectable {
     virtual HRESULT STDMETHODCALLTYPE First(void** iterator) = 0;
 };
+template <typename T>
 struct IteratorAbi : IInspectable {
-    virtual HRESULT STDMETHODCALLTYPE get_Current(uint64_t* item) = 0;
+    virtual HRESULT STDMETHODCALLTYPE get_Current(T* item) = 0;
     virtual HRESULT STDMETHODCALLTYPE get_HasCurrent(boolean* has) = 0;
     virtual HRESULT STDMETHODCALLTYPE MoveNext(boolean* has) = 0;
-    virtual HRESULT STDMETHODCALLTYPE GetMany(UINT32 capacity, uint64_t* items, UINT32* actual) = 0;
+    virtual HRESULT STDMETHODCALLTYPE GetMany(UINT32 capacity, T* items, UINT32* actual) = 0;
 };
 
 // IInspectable for the objects below: their interfaces, no class name, base trust.
@@ -233,9 +262,25 @@ HRESULT GiveIids(std::initializer_list<GUID> list, ULONG* count, GUID** iids) {
     return S_OK;
 }
 
-class FixedIterator final : public IteratorAbi {
+HRESULT NoClassName(HSTRING* name) {
+    if (!name) return E_POINTER;
+    *name = nullptr;
+    return S_OK;
+}
+
+HRESULT BaseTrustLevel(TrustLevel* level) {
+    if (!level) return E_POINTER;
+    *level = BaseTrust;
+    return S_OK;
+}
+
+template <typename Item>
+class FixedIterator final : public IteratorAbi<typename ElementOf<Item>::Abi> {
+    using Element = ElementOf<Item>;
+    using Abi = typename Element::Abi;
+
 public:
-    FixedIterator(IUnknown* vector, const std::vector<uint64_t>& items, const GUID& iid)
+    FixedIterator(IUnknown* vector, const std::vector<Item>& items, const GUID& iid)
         : m_vector(vector), m_items(items), m_iid(iid) {
         m_vector->AddRef();
     }
@@ -245,7 +290,7 @@ public:
         if (IsEqualGUID(iid, kIidUnknown) || IsEqualGUID(iid, kIidInspectable) || IsEqualGUID(iid, kIidAgileObject) ||
             IsEqualGUID(iid, m_iid)) {
             AddRef();
-            *out = static_cast<IteratorAbi*>(this);
+            *out = static_cast<IteratorAbi<Abi>*>(this);
             return S_OK;
         }
         *out = nullptr;
@@ -258,21 +303,13 @@ public:
         return left;
     }
     HRESULT STDMETHODCALLTYPE GetIids(ULONG* count, GUID** iids) override { return GiveIids({m_iid}, count, iids); }
-    HRESULT STDMETHODCALLTYPE GetRuntimeClassName(HSTRING* name) override {
-        if (!name) return E_POINTER;
-        *name = nullptr;
-        return S_OK;
-    }
-    HRESULT STDMETHODCALLTYPE GetTrustLevel(TrustLevel* level) override {
-        if (!level) return E_POINTER;
-        *level = BaseTrust;
-        return S_OK;
-    }
+    HRESULT STDMETHODCALLTYPE GetRuntimeClassName(HSTRING* name) override { return NoClassName(name); }
+    HRESULT STDMETHODCALLTYPE GetTrustLevel(TrustLevel* level) override { return BaseTrustLevel(level); }
 
-    HRESULT STDMETHODCALLTYPE get_Current(uint64_t* item) override {
+    HRESULT STDMETHODCALLTYPE get_Current(Abi* item) override {
         if (!item) return E_POINTER;
         if (m_next >= m_items.size()) return E_BOUNDS;
-        *item = m_items[m_next];
+        Element::Give(m_items[m_next], item);
         return S_OK;
     }
     HRESULT STDMETHODCALLTYPE get_HasCurrent(boolean* has) override {
@@ -286,10 +323,10 @@ public:
         *has = m_next < m_items.size();
         return S_OK;
     }
-    HRESULT STDMETHODCALLTYPE GetMany(UINT32 capacity, uint64_t* items, UINT32* actual) override {
+    HRESULT STDMETHODCALLTYPE GetMany(UINT32 capacity, Abi* items, UINT32* actual) override {
         if (!actual || (capacity > 0 && !items)) return E_POINTER;
         UINT32 copied = 0;
-        while (copied < capacity && m_next < m_items.size()) items[copied++] = m_items[m_next++];
+        while (copied < capacity && m_next < m_items.size()) Element::Give(m_items[m_next++], &items[copied++]);
         *actual = copied;
         return S_OK;
     }
@@ -298,25 +335,33 @@ private:
     ~FixedIterator() { m_vector->Release(); }
     std::atomic<ULONG> m_refs{1};
     IUnknown* m_vector;  // holds a reference, so that m_items lives as long as the iterator
-    const std::vector<uint64_t>& m_items;
+    const std::vector<Item>& m_items;
     GUID m_iid;
     size_t m_next = 0;
 };
 
-class FixedVector final : public VectorAbi, public VectorViewAbi, public IterableAbi {
-public:
-    FixedVector(const VectorIids& iids, std::vector<uint64_t> items) : m_iids(iids), m_items(std::move(items)) {}
+template <typename Item>
+class FixedVector final : public VectorAbi<typename ElementOf<Item>::Abi>,
+                          public VectorViewAbi<typename ElementOf<Item>::Abi>,
+                          public IterableAbi {
+    using Element = ElementOf<Item>;
+    using Abi = typename Element::Abi;
+    using Vector = VectorAbi<Abi>;
+    using View = VectorViewAbi<Abi>;
 
-    IUnknown* Identity() { return static_cast<VectorAbi*>(this); }
+public:
+    FixedVector(const VectorIids& iids, std::vector<Item> items) : m_iids(iids), m_items(std::move(items)) {}
+
+    IUnknown* Identity() { return static_cast<Vector*>(this); }
 
     HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, void** out) override {
         if (!out) return E_POINTER;
         void* facet = nullptr;
         if (IsEqualGUID(iid, kIidUnknown) || IsEqualGUID(iid, kIidInspectable) || IsEqualGUID(iid, kIidAgileObject) ||
             IsEqualGUID(iid, m_iids.vector)) {
-            facet = static_cast<VectorAbi*>(this);
+            facet = static_cast<Vector*>(this);
         } else if (IsEqualGUID(iid, m_iids.view)) {
-            facet = static_cast<VectorViewAbi*>(this);
+            facet = static_cast<View*>(this);
         } else if (IsEqualGUID(iid, m_iids.iterable)) {
             facet = static_cast<IterableAbi*>(this);
         }
@@ -334,21 +379,13 @@ public:
     HRESULT STDMETHODCALLTYPE GetIids(ULONG* count, GUID** iids) override {
         return GiveIids({m_iids.vector, m_iids.view, m_iids.iterable}, count, iids);
     }
-    HRESULT STDMETHODCALLTYPE GetRuntimeClassName(HSTRING* name) override {
-        if (!name) return E_POINTER;
-        *name = nullptr;
-        return S_OK;
-    }
-    HRESULT STDMETHODCALLTYPE GetTrustLevel(TrustLevel* level) override {
-        if (!level) return E_POINTER;
-        *level = BaseTrust;
-        return S_OK;
-    }
+    HRESULT STDMETHODCALLTYPE GetRuntimeClassName(HSTRING* name) override { return NoClassName(name); }
+    HRESULT STDMETHODCALLTYPE GetTrustLevel(TrustLevel* level) override { return BaseTrustLevel(level); }
 
-    HRESULT STDMETHODCALLTYPE GetAt(UINT32 index, uint64_t* item) override {
+    HRESULT STDMETHODCALLTYPE GetAt(UINT32 index, Abi* item) override {
         if (!item) return E_POINTER;
         if (index >= m_items.size()) return E_BOUNDS;
-        *item = m_items[index];
+        Element::Give(m_items[index], item);
         return S_OK;
     }
     HRESULT STDMETHODCALLTYPE get_Size(UINT32* size) override {
@@ -357,12 +394,12 @@ public:
         return S_OK;
     }
     HRESULT STDMETHODCALLTYPE GetView(void** view) override { return QueryInterface(m_iids.view, view); }
-    HRESULT STDMETHODCALLTYPE IndexOf(uint64_t value, UINT32* index, boolean* found) override {
+    HRESULT STDMETHODCALLTYPE IndexOf(Abi value, UINT32* index, boolean* found) override {
         if (!index || !found) return E_POINTER;
         *index = 0;
         *found = false;
         for (size_t i = 0; i < m_items.size(); i++) {
-            if (m_items[i] == value) {
+            if (Element::Same(m_items[i], value)) {
                 *index = static_cast<UINT32>(i);
                 *found = true;
                 break;
@@ -370,26 +407,26 @@ public:
         }
         return S_OK;
     }
-    HRESULT STDMETHODCALLTYPE GetMany(UINT32 start, UINT32 capacity, uint64_t* items, UINT32* actual) override {
+    HRESULT STDMETHODCALLTYPE GetMany(UINT32 start, UINT32 capacity, Abi* items, UINT32* actual) override {
         if (!actual || (capacity > 0 && !items)) return E_POINTER;
         *actual = 0;
         if (start > m_items.size()) return E_BOUNDS;
         UINT32 copied = 0;
-        for (size_t i = start; i < m_items.size() && copied < capacity; i++) items[copied++] = m_items[i];
+        for (size_t i = start; i < m_items.size() && copied < capacity; i++) Element::Give(m_items[i], &items[copied++]);
         *actual = copied;
         return S_OK;
     }
-    HRESULT STDMETHODCALLTYPE SetAt(UINT32, uint64_t) override { return E_ACCESSDENIED; }
-    HRESULT STDMETHODCALLTYPE InsertAt(UINT32, uint64_t) override { return E_ACCESSDENIED; }
+    HRESULT STDMETHODCALLTYPE SetAt(UINT32, Abi) override { return E_ACCESSDENIED; }
+    HRESULT STDMETHODCALLTYPE InsertAt(UINT32, Abi) override { return E_ACCESSDENIED; }
     HRESULT STDMETHODCALLTYPE RemoveAt(UINT32) override { return E_ACCESSDENIED; }
-    HRESULT STDMETHODCALLTYPE Append(uint64_t) override { return E_ACCESSDENIED; }
+    HRESULT STDMETHODCALLTYPE Append(Abi) override { return E_ACCESSDENIED; }
     HRESULT STDMETHODCALLTYPE RemoveAtEnd() override { return E_ACCESSDENIED; }
     HRESULT STDMETHODCALLTYPE Clear() override { return E_ACCESSDENIED; }
-    HRESULT STDMETHODCALLTYPE ReplaceAll(UINT32, uint64_t*) override { return E_ACCESSDENIED; }
+    HRESULT STDMETHODCALLTYPE ReplaceAll(UINT32, Abi*) override { return E_ACCESSDENIED; }
 
     HRESULT STDMETHODCALLTYPE First(void** iterator) override {
         if (!iterator) return E_POINTER;
-        *iterator = static_cast<IteratorAbi*>(new FixedIterator(Identity(), m_items, m_iids.iterator));
+        *iterator = static_cast<IteratorAbi<Abi>*>(new FixedIterator<Item>(Identity(), m_items, m_iids.iterator));
         return S_OK;
     }
 
@@ -397,15 +434,20 @@ private:
     ~FixedVector() = default;
     std::atomic<ULONG> m_refs{1};
     VectorIids m_iids;
-    const std::vector<uint64_t> m_items;
+    const std::vector<Item> m_items;
 };
+
+template <typename Item>
+Ref MakeFixedVector(const VectorIids& iids, std::vector<Item> values) {
+    auto* vector = new FixedVector<Item>(iids, std::move(values));
+    return Ref(vector->Identity());  // takes the reference the object was born with
+}
 
 }  // namespace
 
-Ref MakeVector(const VectorIids& iids, std::vector<uint64_t> values) {
-    auto* vector = new FixedVector(iids, std::move(values));
-    return Ref(vector->Identity());  // takes the reference the object was born with
-}
+Ref MakeVector(const VectorIids& iids, std::vector<uint64_t> values) { return MakeFixedVector(iids, std::move(values)); }
+
+Ref MakeVector(const VectorIids& iids, std::vector<Ref> objects) { return MakeFixedVector(iids, std::move(objects)); }
 
 ChangeCounter::ChangeCounter(const GUID& delegateIid, std::shared_ptr<std::atomic<unsigned>> count)
     : m_iid(delegateIid), m_count(std::move(count)) {}
