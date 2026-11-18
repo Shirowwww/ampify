@@ -101,6 +101,14 @@ struct UiNatives : ScriptBridge {
         return JS_NewBool(ctx, HostOf(ext).Ui().SetControlBeside(ext->id(), id, beside));
     }
 
+    // Same rule: whether a play bar button the element added shows in Apple's full-screen player too.
+    AMPIFY_NATIVE(UiControlPlayer) {
+        ScriptExtension* ext = Owner(ctx);
+        int id = static_cast<int>(Number(ctx, argc, argv, 0));
+        bool player = argc >= 2 && JS_ToBool(ctx, argv[1]) != 0;
+        return JS_NewBool(ctx, HostOf(ext).Ui().SetControlPlayer(ext->id(), id, player));
+    }
+
     // Same rule again: the element can only grey or take out what it added.
     AMPIFY_NATIVE(UiControlDisabled) {
         ScriptExtension* ext = Owner(ctx);
@@ -286,6 +294,7 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiControlActive", UiNatives::UiControlActive, 2);
     scope.Function("uiControlDisabled", UiNatives::UiControlDisabled, 2);
     scope.Function("uiControlBeside", UiNatives::UiControlBeside, 2);
+    scope.Function("uiControlPlayer", UiNatives::UiControlPlayer, 2);
     scope.Function("uiControlMark", UiNatives::UiControlMark, 3);
     scope.Function("uiPlaybarReadout", UiNatives::UiPlaybarReadout, 1);
     scope.Function("uiPlaybarHover", UiNatives::UiPlaybarHover, 1);

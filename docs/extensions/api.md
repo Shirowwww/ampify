@@ -464,6 +464,11 @@ Ampify.ui.navigate(path)
 - `playbar.addButton({ label, beside: "volume" })` puts the button, or the text, right after Apple Music's volume
   button instead of at the end of the bar, as Volume percentage does. `"volume"` is the only name for now; another
   throws. Ampify before 1.3.2 leaves `beside` out and puts the button at the end.
+- `playbar.addButton({ label, icon, onClick, player: true })` also shows the button in Apple Music's full-screen
+  player, just before its lyrics button, drawn like that button and checked while it is on (`active`, `setActive`).
+  A click there runs the same `onClick`, and a popup opened then shows over the player. A text without `onClick`
+  stays in the bar only. Sing does this. Ampify before
+  1.5.6 leaves `player` out.
 - `playbar.mark(id, from, to)` draws two ticks on the progress line of the playback bar and shades the stretch between
   them, as the A-B loop does with its passage. `from` and `to` are parts of the song, from 0 to 1 (a position divided by
   `state().durationMs`), in either order; without `to` only the first tick shows, and without `from` the line is clear

@@ -116,6 +116,7 @@ const char kUi[] = R"AMPIFYJS(
         throw error;
       }
     }
+    if (placement === "playbar" && note.player) native.uiControlPlayer(id, true);
     applyKinds(id, kinds);
     return id;
   };

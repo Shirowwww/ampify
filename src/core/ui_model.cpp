@@ -262,6 +262,18 @@ bool ChangeControl(std::vector<UiControl>& controls, const std::string& elementI
     return false;
 }
 
+// The same for a play bar control only: false as well when the element's control with this id is elsewhere.
+template <typename Change>
+bool ChangePlaybarControl(std::vector<UiControl>& controls, const std::string& elementId, int controlId, Change change) {
+    for (UiControl& control : controls) {
+        if (control.id != controlId || control.elementId != elementId) continue;
+        if (control.placement != "playbar") return false;
+        change(control);
+        return true;
+    }
+    return false;
+}
+
 }  // namespace
 
 int UiModel::AddControl(const std::string& elementId, const std::string& placement, const std::string& label,
@@ -372,13 +384,12 @@ bool UiModel::SetControlDisabled(const std::string& elementId, int controlId, bo
 
 bool UiModel::SetControlBeside(const std::string& elementId, int controlId, const std::string& beside) {
     Edit edit(*this);
-    for (UiControl& control : m_controls) {
-        if (control.id != controlId || control.elementId != elementId) continue;
-        if (control.placement != "playbar") return false;
-        control.beside = beside;
-        return true;
-    }
-    return false;
+    return ChangePlaybarControl(m_controls, elementId, controlId, [&](UiControl& control) { control.beside = beside; });
+}
+
+bool UiModel::SetControlPlayer(const std::string& elementId, int controlId, bool player) {
+    Edit edit(*this);
+    return ChangePlaybarControl(m_controls, elementId, controlId, [&](UiControl& control) { control.player = player; });
 }
 
 bool UiModel::SetControlMark(const std::string& elementId, int controlId, double from, double to) {

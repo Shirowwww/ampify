@@ -31,6 +31,8 @@ struct UiControl {
     // A play bar control placed right after this button of Apple Music's (uirender::IsPlaybarNeighbour, "volume");
     // empty: after the others, at the end.
     std::string beside;
+    // A play bar button that Apple's full-screen player shows too, before its lyrics button (`player: true`).
+    bool player = false;
     // A context menu entry shows only in the menus of these kinds of item (IsMenuItemKind); empty: in every one.
     std::vector<std::string> kinds;
     // A play bar button's stretch of the progress line, as parts of the song from 0 to 1 (the A-B loop's passage);
@@ -76,6 +78,10 @@ public:
     // Places a play bar control the element added right after one of Apple Music's buttons (UiControl::beside).
     // False when the element has no such play bar control.
     bool SetControlBeside(const std::string& elementId, int controlId, const std::string& beside);
+
+    // Shows a play bar control the element added in Apple's full-screen player too (UiControl::player). False when
+    // the element has no such play bar control.
+    bool SetControlPlayer(const std::string& elementId, int controlId, bool player);
 
     // Marks a stretch of the progress line for a play bar button the element added (see UiControl::markFrom), kept
     // within 0 to 1 and in order; a negative `from` clears it, a negative `to` marks the start alone. False when the

@@ -74,6 +74,20 @@ TEST_CASE(Interface_APlaybarTextGoesBesideTheVolume) {
     element->Stop();
 }
 
+TEST_CASE(Interface_APlaybarButtonAsksForTheFullScreenPlayer) {
+    Fixture f;
+    auto element = f.Make("player", "extension", R"("ui.playbar", "ui.topbar")",
+                          R"(Ampify.ui.playbar.addButton({ label: "Sing", onClick: () => {}, player: true });
+                             Ampify.ui.playbar.addButton({ label: "Panel", onClick: () => {} });
+                             Ampify.ui.topbar.addButton({ label: "Top", onClick: () => {}, player: true });)");
+    CHECK(element->Start());
+    auto controls = f.host.ui.Controls();
+    CHECK(controls.size() == 3);
+    CHECK(controls.size() == 3 && controls[0].player && !controls[1].player);
+    CHECK(controls.size() == 3 && !controls[2].player);  // the top bar has no place in the player
+    element->Stop();
+}
+
 TEST_CASE(Interface_AButtonNeedsItsPermission) {
     Fixture f;
     auto element = f.Make("nobar", "extension", "", R"(Ampify.ui.playbar.addButton({ onClick: () => {} });)");

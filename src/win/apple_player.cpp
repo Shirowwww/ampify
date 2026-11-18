@@ -225,6 +225,19 @@ void ControlRects(const xaml::UIElement& root, double scale, std::vector<winrt::
     }
 }
 
+// What is open over the player (a dialog, such as an extension's popup, a flyout, a menu) passes through whole: under
+// the caption, dragging a dialog's slider moved the window.
+void PopupRects(const xaml::UIElement& root, double scale, std::vector<winrt::Windows::Graphics::RectInt32>& out) {
+    for (const auto& popup : xaml::Media::VisualTreeHelper::GetOpenPopupsForXamlRoot(root.XamlRoot())) {
+        auto child = popup.Child().try_as<xaml::FrameworkElement>();
+        if (!child || child.Visibility() != xaml::Visibility::Visible || child.ActualWidth() <= 0) continue;
+        auto box = child.TransformToVisual(nullptr).TransformBounds(
+            {0, 0, static_cast<float>(child.ActualWidth()), static_cast<float>(child.ActualHeight())});
+        out.push_back({static_cast<int32_t>(std::floor(box.X * scale)), static_cast<int32_t>(std::floor(box.Y * scale)),
+                       static_cast<int32_t>(std::ceil(box.Width * scale)), static_cast<int32_t>(std::ceil(box.Height * scale))});
+    }
+}
+
 // The player's background is a caption for Windows, its controls pass through: a drag from it is the window's own, so
 // Windows' snap layouts and PowerToys FancyZones see it, and it ends on the release. Ampify's moves never could: a move
 // loop started from a press XAML had taken left the window stuck to the pointer until the next click. Laid out
@@ -240,6 +253,7 @@ void SetCaption(const xaml::Window& player, Placement& state) {
         winrt::Windows::Graphics::SizeInt32 size = player.AppWindow().ClientSize();
         std::vector<winrt::Windows::Graphics::RectInt32> controls;
         ControlRects(root, scale, controls);
+        PopupRects(root, scale, controls);
         auto source = InputNonClientPointerSource::GetForWindowId(player.AppWindow().Id());
         source.SetRegionRects(NonClientRegionKind::Caption, {{0, 0, size.Width, size.Height}});
         source.SetRegionRects(NonClientRegionKind::Passthrough, controls);

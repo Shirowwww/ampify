@@ -448,13 +448,19 @@ void MountPopup(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
     if (context->dialogOpen) return;  // one dialog at a time: the next one opens when this one closes
     auto rootElement = content.try_as<xaml::UIElement>();
     if (!rootElement || !rootElement.XamlRoot()) return;
+    // Apple's full-screen player covers the main window: a popup opened meanwhile (Sing's, from its button there)
+    // shows over the player.
+    xaml::XamlRoot xamlRoot = rootElement.XamlRoot();
+    if (context->role == WindowRole::Main) {
+        if (xaml::UIElement player = ShownPlayerContent()) xamlRoot = player.XamlRoot();
+    }
 
     mounted.renderer = std::make_unique<XamlRenderer>(surface.elementId, shared.sink);
     uirender::PatchStats stats;
     bool replaced = false;
     xaml::FrameworkElement root = mounted.renderer->Render(uirender::BuildRenderTree(surface.tree, surface.nodeId),
                                                            shared.probe, stats, replaced);
-    controls::ContentDialog dialog = MakePopupDialog(shared, surface, root, rootElement.XamlRoot());
+    controls::ContentDialog dialog = MakePopupDialog(shared, surface, root, xamlRoot);
     WatchPopupClose(shared, context, surface, dialog);
     try {
         dialog.ShowAsync();

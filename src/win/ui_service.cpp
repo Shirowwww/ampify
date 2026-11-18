@@ -256,6 +256,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
         context.playbarMore = nullptr;
         ReleasePlaybarMark(context);
         ReleasePlaybarHover(context);
+        ReleasePlayerRow(context);
         context.probe.clear();
         context.probeObjects.clear();
         context.dialogOpen = false;

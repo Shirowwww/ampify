@@ -154,6 +154,15 @@ struct PlacedControl {
     double width = 0;       // its width when it was folded: the room it needs to come back
 };
 
+// A play bar button shown in Apple's full-screen player too (UiControl::player, FollowPlayerRow): a toggle with the
+// style of the player's lyrics button, checked while the button is on. Strong, like the other buttons.
+struct PlayerCopy {
+    primitives::ToggleButton button{nullptr};
+    std::string label;
+    bool hasIcon = false;  // the label is then the tooltip only
+    bool disabled = false;
+};
+
 // One XAML window of Apple Music (the main window or the mini player).
 struct WindowContext : std::enable_shared_from_this<WindowContext> {
     WindowRole role = WindowRole::Main;
@@ -308,6 +317,12 @@ struct WindowContext : std::enable_shared_from_this<WindowContext> {
     winrt::weak_ref<xaml::DependencyObject> menuSource;  // what the last click or key went to
     dispatching::DispatcherQueueTimer menuTimer{nullptr};
     int menuTries = 0;
+    // The play bar buttons Apple's full-screen player shows too, by surface key, the panel of its row they stand in
+    // (the lyrics button's), and the timer that looks again while the player's row is not laid out yet.
+    std::map<std::string, PlayerCopy> playerCopies;
+    winrt::weak_ref<controls::StackPanel> playerRow;
+    dispatching::DispatcherQueueTimer playerRetry{nullptr};
+    int playerTries = 0;
 };
 
 // One element's settings card, held strongly: a weak reference to an element Ampify made never resolves. Its controls
@@ -517,6 +532,14 @@ void FollowPlaybarMark(UiService::Shared& shared, const std::shared_ptr<WindowCo
 void ReleasePlaybarMark(WindowContext& context) noexcept;
 void FollowPlaybarHover(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context);
 void ReleasePlaybarHover(WindowContext& context) noexcept;
+
+// ui_service_player.cpp
+void FollowPlayerRow(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
+                     const std::vector<Surface>& surfaces);
+void ReleasePlayerRow(WindowContext& context) noexcept;
+// The content of Apple's full-screen player while it is on screen and run by this thread, else null: a popup opened
+// meanwhile shows over it, not behind it in the main window.
+xaml::UIElement ShownPlayerContent() noexcept;
 
 }  // namespace ui_service_detail
 

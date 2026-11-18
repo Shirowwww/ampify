@@ -204,6 +204,7 @@ void PlaceControls(UiService::Shared& shared, const std::shared_ptr<WindowContex
     FollowMenus(shared, context);
     FollowPlaybarMark(shared, context, surfaces);
     FollowPlaybarHover(shared, context);
+    if (context->role == WindowRole::Main) FollowPlayerRow(shared, context, surfaces);
     QueueSongRoom(shared.sink, context);  // a button gone may leave a single one folded
 }
 

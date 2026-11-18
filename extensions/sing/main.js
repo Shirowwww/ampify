@@ -256,6 +256,7 @@ const button = Ampify.ui.playbar.addButton({
   label: t("label"),
   icon: MIC,
   active: false,
+  player: true,  // in Apple's full-screen player too, before its lyrics button
   onClick: () => root.render(h(SingPopup)),
 });
 
