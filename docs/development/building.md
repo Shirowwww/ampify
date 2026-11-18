@@ -45,8 +45,9 @@ Targets: `ampify_kernel`, `ampify_launcher`, `ampify_setup`, `ampify`, `ampify_t
 | `AMPIFY_BENCH` | `OFF` | The kernel and launcher accept any Apple Music version. Never distribute this build; `BUILD_INFO.txt` says so |
 | `AMPIFY_XAML` | `OFF` | Builds the XAML theme backend and native interface. Needs the C++/WinRT projection in `AMPIFY_WINAPPSDK_INCLUDE` |
 
-With MSVC and no compiler launcher, the XAML files use a precompiled header (`src/win/xaml_pch.hpp`). CI uses ccache,
-which cannot cache files built on a precompiled header, so it turns the header off.
+With MSVC, the XAML files use a precompiled header (`src/win/xaml_pch.hpp`). CI uses ccache, which cannot cache a file
+built on a precompiled header, so the kernel compiles without the cache: without the header, each XAML file parsed the
+WinUI projection again, and a change to a shared header cost 10 to 15 minutes of build.
 
 ## Facts files
 

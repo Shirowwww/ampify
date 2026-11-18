@@ -160,9 +160,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         target_link_libraries(ampify_kernel PRIVATE ampify_theme runtimeobject dwmapi)
         # The WinUI projection gives objects with more sections than the default COFF limit.
         target_compile_options(ampify_kernel PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
-        if(MSVC AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+        if(MSVC)
             # The projection headers are parsed once, for the XAML files only; the other kernel files skip the PCH.
-            # Not with a compiler cache (CI: ccache), which cannot cache a file built on a precompiled header.
+            # A compiler cache (CI: ccache) cannot cache a file built on a precompiled header, so the kernel compiles
+            # without it: parsing the projection again in each XAML file took far longer than the cache saved.
+            set_target_properties(ampify_kernel PROPERTIES C_COMPILER_LAUNCHER "" CXX_COMPILER_LAUNCHER "")
             target_precompile_headers(ampify_kernel PRIVATE "$<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/src/win/xaml_pch.hpp>")
             set_source_files_properties(${AMPIFY_KERNEL_SOURCES} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
         endif()

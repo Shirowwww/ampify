@@ -169,7 +169,7 @@ appear dozens of times. Target them under a named parent.
 | XAML link error on `RoGetActivationFactory` | Link `runtimeobject` |
 | CI: `'GetClassNameA': is not a member of ... IAutomationPeer` | `windows.h` between two WinRT headers renamed the method through its `GetClassName` macro (CI builds without `UNICODE`). Include every WinRT header before `windows.h` |
 | Screenshot cut off on the right | PowerShell is not DPI aware and the screen is at 125%. `SetProcessDpiAwarenessContext(-4)` before capturing |
-| CI build back to six minutes | A header included by the slow XAML files changed. Keep headers they include small, since ccache runs without the precompiled header |
+| CI build back to six minutes, then fifteen | A header included by the XAML files changed, and ccache ran them without the precompiled header. The kernel now compiles on the header, without ccache |
 
 ## Apple Music's quirks
 
