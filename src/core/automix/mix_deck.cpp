@@ -354,9 +354,17 @@ void MixDeck::SetGains(const DeckGains& gains, double volume) {
     // From where neither stream has written yet, so that both play the very same line.
     const std::int64_t written = std::max(static_cast<std::int64_t>(m_tailSent),
                                           static_cast<std::int64_t>(m_mainFrames) + m_apart);
-    const std::int64_t from = std::max(written, last.at);
-    if (from > last.at) m_curve.push_back({from, last.gains});
-    m_curve.push_back({from + std::max<std::int64_t>(1, std::llround(kGainSeconds * m_rate)), gains});
+    // And from where the line has got to there: a ramp not ended yet gives way to the new one. Queued behind it,
+    // gains moved at every tick (ticks come faster than a ramp lasts) fell further behind each time: a song filtered
+    // over a bar was cut more than a second after its bar (18/11/2026).
+    const DeckGains reached = GainsAt(written);
+    while (m_curve.size() > 1 && m_curve.back().at > written) m_curve.pop_back();
+    if (m_curve.back().at > written) {
+        m_curve.back() = {written, reached};
+    } else if (m_curve.back().at < written) {
+        m_curve.push_back({written, reached});
+    }
+    m_curve.push_back({written + std::max<std::int64_t>(1, std::llround(kGainSeconds * m_rate)), gains});
     if (m_curve.size() > kCurvePoints) {
         m_curve.erase(m_curve.begin(), m_curve.begin() + static_cast<std::ptrdiff_t>(m_curve.size() - kCurvePoints));
     }

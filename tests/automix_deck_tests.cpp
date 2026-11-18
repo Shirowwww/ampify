@@ -328,6 +328,33 @@ TEST_CASE(AutoMixDeck_MixesTheNextSongUnderTheOldOne) {
     CHECK(WorstError(rig.out, quieter, rig.at, mixed) < 1e-5);
 }
 
+// The session moves the gains at each of its ticks, every 10 ms, and the deck reaches each one over 20 ms: a new one
+// must start from where the last has got to, not wait behind it, or a second of moving gains (a fade, a filter
+// sweep) leaves everything after it half a second late.
+TEST_CASE(AutoMixDeck_KeepsUpWithGainsThatMoveFasterThanItsRamps) {
+    Rig rig(Song(12, 3), Song(12, 4));
+    rig.Run(3.0);
+    REQUIRE(rig.Align().has_value());
+    rig.deck.SetGains({0, 1, 1, 1}, rig.volume);
+    rig.Run(0.5);
+    for (int tick = 1; tick <= 100; tick++) {  // A from full to half over a second
+        rig.deck.SetGains({0, 1 - 0.5 * tick / 100.0, 1, 1}, rig.volume);
+        rig.Run(0.01);
+    }
+    const size_t half = rig.at;
+    auto copy = [&](double gain) {
+        return [&rig, gain](size_t frame, size_t channel) {
+            return gain * rig.volume * rig.a[frame * 2 + channel];
+        };
+    };
+    rig.Run(0.05);
+    CHECK(WorstError(rig.out, half + kRate / 50, rig.at, copy(0.5)) < 1e-5);  // half way, as asked
+    rig.deck.SetGains({0, 0, 1, 1}, rig.volume);  // then gone at once
+    const size_t cut = rig.at;
+    rig.Run(0.3);
+    CHECK(Rms(rig.out, cut + kRate / 20, rig.at) < 1e-6);  // gone within the ramp, not half a second later
+}
+
 TEST_CASE(AutoMixDeck_TakesTheBassOfOneSongOnly) {
     // A is a bass note, B a higher one: with A's lows gone, B is all that is left.
     std::vector<float> a = Song(12, 5);

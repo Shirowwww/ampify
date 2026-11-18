@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- AutoMix's fades no longer fall behind. AutoMix changes the volumes about every 10 ms and each change takes 20 ms to
+  arrive, but each one waited for the one before it to finish. A fade over a bar therefore played slower than planned,
+  and what came after it, such as the swap into the next song, came up to 1.3 s late, off the bar. Each change now
+  starts from wherever the previous one has got to.
 - Closing Apple Music twice within a few seconds of opening it no longer turns Ampify off at the next start. Safe mode
   counted every launch that ended before its 8-second health check as a failure; a normal close now clears the count,
   since a crash or a hang never gets there.
