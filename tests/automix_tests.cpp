@@ -41,6 +41,10 @@ public:
     int stops = 0;
     double stoppedAt = -1;  // the test's clock at the last StopGhost
     double heldBack = 0;    // what Sing holds back after the deck
+    int quiets = 0;         // QuietGhost calls
+    int drops = 0;          // DropHeldBack calls
+    bool loopHeld = false;  // the deck keeps all of the plan's loop
+    std::vector<double> gainClock;  // the test's clock at every SetGains
 
     double ATime() const { return aOrigin + t; }
 
@@ -84,6 +88,9 @@ public:
         stoppedAt = t;
     }
     double SoundHeldBack() override { return heldBack; }
+    void QuietGhost() override { quiets++; }
+    void DropHeldBack() override { drops++; }
+    bool LoopHeld() override { return loopHeld; }
     std::optional<DeckStep> Align() override {
         aligns++;
         if (foundAgainLead >= 0) {
@@ -113,7 +120,10 @@ public:
     std::optional<double> SwitchGap() override {  // what the streams show of it
         return switched ? std::optional<double>(bLate - MixSession::kUnseenDelay) : std::nullopt;
     }
-    void SetGains(const DeckGains& set) override { gains.push_back(set); }
+    void SetGains(const DeckGains& set) override {
+        gains.push_back(set);
+        gainClock.push_back(t);
+    }
     bool ArmSwitch(double aEnd, double bAt) override {
         armed = true;
         armEnd = aEnd;
@@ -140,7 +150,8 @@ public:
     bool ApplesAlone() const {
         if (gains.empty()) return true;
         const DeckGains& last = gains.back();
-        return last.main == 1 && last.tail == 0 && last.mainLow == 1 && last.tailLow == 1;
+        return last.main == 1 && last.tail == 0 && last.mainLow == 1 && last.tailLow == 1 && last.mainFilter == 0 &&
+               last.tailFilter == 0;
     }
     bool NothingHeard() const {
         for (const DeckGains& set : gains) {
@@ -155,6 +166,31 @@ MixPlan Plan() {
     plan.next = "B";
     plan.bStart = 30;
     plan.keys = {{100, 1, 0}, {108, 0, 1}};
+    return plan;
+}
+
+// A at 110 goes straight to B at 2 s: no overlap.
+MixPlan CutPlan() {
+    MixPlan plan;
+    plan.next = "B";
+    plan.bStart = 2;
+    plan.keys = {{110, 1, 0}, {110, 0, 1}};
+    return plan;
+}
+
+// An echo thrown on A's last two seconds of the mix: 0.5 s between repeats, each half the one before, eight repeats
+// until they are 40 dB down, so 4 s of them, 2 s after the last key.
+MixPlan EchoPlan() {
+    MixPlan plan = Plan();
+    plan.echo = {104, 106, 0.5, 0.5};
+    return plan;
+}
+
+// A's bar from 102 to 104 over and over, while B comes in and A goes, past the end of A at 106.
+MixPlan LoopPlan() {
+    MixPlan plan = Plan();
+    plan.keys = {{100, 1, 0}, {104, 1, 1}, {112, 0, 1}};
+    plan.loop = {102, 2};
     return plan;
 }
 
@@ -210,6 +246,21 @@ TEST_CASE(AutoMix_TheLowsOfBothSongsSwapBetweenKeys) {
     CHECK(GainsAt(keys, 8).bLow == 1);
 }
 
+TEST_CASE(AutoMix_TheFiltersSweepBetweenKeys) {
+    // B comes in muffled and opens up while A thins out.
+    std::vector<GainKey> keys = {{0, 1, 0, 1, 1, 0, 1}, {10, 0, 1, 1, 1, 1, 0}};
+    CHECK(GainsAt(keys, -1).aFilter == 0);
+    CHECK(GainsAt(keys, -1).bFilter == 1);
+    Gains middle = GainsAt(keys, 5);
+    CHECK_NEAR(middle.aFilter, 0.5, 1e-9);
+    CHECK_NEAR(middle.bFilter, 0.5, 1e-9);
+    CHECK(GainsAt(keys, 9.9).aFilter > 0.999);  // along the same smoothstep as the volumes
+    CHECK(GainsAt(keys, 11).aFilter == 1);
+    CHECK(GainsAt(keys, 11).bFilter == 0);
+    CHECK(GainsAt({{0, 1, 0}, {10, 0, 1}}, 5).aFilter == 0);  // keys without filters leave both songs open
+    CHECK(GainsAt({{0, 1, 0}, {10, 0, 1}}, 5).bFilter == 0);
+}
+
 TEST_CASE(AutoMix_CheckRefusesPlansThatCannotBePlayed) {
     CHECK(Check(Plan(), 200, 200).empty());
     MixPlan plan = Plan();
@@ -241,6 +292,17 @@ TEST_CASE(AutoMix_CheckRefusesPlansThatCannotBePlayed) {
     CHECK(!Check(plan, 200, 200).empty());  // B must have its lows back at the end
     plan = Plan();
     plan.keys.front().aLow = 1.5;
+    CHECK(!Check(plan, 200, 200).empty());
+    plan = Plan();
+    plan.keys.front().bFilter = 1;
+    plan.keys.back().aFilter = 1;
+    CHECK(Check(plan, 200, 200).empty());  // B muffled at first, A thin at the end
+    plan.keys.back().bFilter = 0.2;
+    CHECK(!Check(plan, 200, 200).empty());  // but B must be open once A is gone
+    plan = Plan();
+    plan.keys.front().aFilter = -0.1;
+    CHECK(!Check(plan, 200, 200).empty());
+    plan.keys.front().aFilter = NAN;
     CHECK(!Check(plan, 200, 200).empty());
 }
 
@@ -307,6 +369,31 @@ TEST_CASE(AutoMix_ThePlanReadsFromTheScriptsObject) {
     CHECK(plan->keys[0].bLow == 0);
     CHECK(plan->keys[1].aLow == 0);
     CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0,1]]})"), &error));
+    json = ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0,1,1,0,0.8],[108,0,1,1,1,0.6,0]]})");
+    REQUIRE(json.has_value());
+    plan = PlanFromJson(*json, &error);
+    REQUIRE(plan.has_value());
+    CHECK(plan->keys[0].bFilter == 0.8);
+    CHECK(plan->keys[1].aFilter == 0.6);
+    CHECK(plan->keys[0].aLow == 1);
+    CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0,1,1,0]]})"), &error));
+    json = ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],
+        "echo":{"from":104,"to":106,"delay":0.5,"feedback":0.5},"loop":{"from":102,"length":2}})");
+    REQUIRE(json.has_value());
+    plan = PlanFromJson(*json, &error);
+    REQUIRE(plan.has_value());
+    CHECK(plan->echo.from == 104 && plan->echo.to == 106 && plan->echo.delay == 0.5 && plan->echo.feedback == 0.5);
+    CHECK(plan->loop.from == 102 && plan->loop.length == 2);
+    CHECK(Echoes(*plan) && Loops(*plan));
+    plan = PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]]})"), &error);
+    REQUIRE(plan.has_value());
+    CHECK(!Echoes(*plan) && !Loops(*plan));
+    CHECK(!PlanFromJson(*ampify::Json::Parse(
+                            R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],"echo":{"from":104,"delay":0.5}})"),
+                        &error));
+    CHECK(error.find("echo") != std::string::npos);
+    CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],"loop":2})"),
+                        &error));
     CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"rate":"fast","keys":[]})"), &error));
 }
 
@@ -326,6 +413,56 @@ TEST_CASE(AutoMix_ASessionLetsTheSoundHeldBackPlayOutBeforeTheSecondPlayerStops)
     CHECK(heldSession.GetStatus().phase == Phase::Done);
     CHECK_NEAR(held.stoppedAt - plain.stoppedAt, 1.3, 0.02);
     CHECK(held.ApplesAlone());
+    CHECK(held.quiets == 0);  // far from the end of A: the second player plays on, as it always did
+    CHECK(held.drops == 0);
+}
+
+// The second player stops a second after it reaches the end of A, and its stream with it: with 2.8 s held back and
+// the mix ending 3.2 s before the end, it would stop before the end of A's fade is heard. Paused, it keeps its stream.
+TEST_CASE(AutoMix_ASecondPlayerNearTheEndIsPausedWhileWhatIsHeldBackPlaysOut) {
+    FakeDecks decks;
+    decks.heldBack = 2.8;
+    MixSession session(decks);
+    REQUIRE(session.Start(Plan(), 111.2, 200).empty());
+    Run(session, decks, 60);
+    CHECK(session.GetStatus().phase == Phase::Done);
+    CHECK(decks.quiets == 1);
+    CHECK(decks.drops == 0);
+    CHECK_NEAR(decks.stoppedAt, 28 + 2.8, 0.05);  // A's last key at 108, then all that is held back
+    CHECK(decks.ApplesAlone());
+}
+
+// A pause, a skip or a seek in the middle of a mix: the user moved on, so the 2.8 s Sing holds of the old song are not
+// played out over the next one, and the second player goes at once.
+TEST_CASE(AutoMix_AQuickCancelLetsGoOfWhatIsHeldBackAtOnce) {
+    FakeDecks decks;
+    decks.heldBack = 2.8;
+    MixSession session(decks);
+    REQUIRE(session.Start(Plan(), 200, 200).empty());
+    Run(session, decks, 24);  // A at 104: mixing, Apple's player on B
+    REQUIRE(session.GetStatus().phase == Phase::Mixing);
+    session.Cancel("skipped", true);
+    Run(session, decks, 40);
+    CHECK(session.GetStatus().phase == Phase::Failed);
+    CHECK(decks.drops == 1);
+    CHECK(decks.stops == 1);
+    CHECK(decks.stoppedAt - 24 < 0.2);
+    CHECK(decks.ApplesAlone());
+}
+
+// A slower failure fades the old song out as heard: what is held back of that fade plays out first.
+TEST_CASE(AutoMix_ASlowFailureStillPlaysOutWhatIsHeldBack) {
+    FakeDecks decks;
+    decks.heldBack = 2.8;
+    MixSession session(decks);
+    REQUIRE(session.Start(Plan(), 200, 200).empty());
+    Run(session, decks, 24);
+    REQUIRE(session.GetStatus().phase == Phase::Mixing);
+    session.Cancel("cancelled");
+    Run(session, decks, 40);
+    CHECK(session.GetStatus().phase == Phase::Failed);
+    CHECK(decks.drops == 0);
+    CHECK(decks.stoppedAt - 24 > 2.8);
 }
 
 TEST_CASE(AutoMix_ASessionCarriesTheEndOfTheSongWhileApplesPlayerMovesOn) {
@@ -594,6 +731,163 @@ TEST_CASE(AutoMix_ACopyFoundAgainTooCloseIsNeverHeard) {
     CHECK(status.phase == Phase::Failed);
     CHECK(status.reason == "the second player drifted");
     CHECK(decks.NothingHeard());
+}
+
+// A ballad left to finish, or a song that ends on a hit: Apple's player alone goes from A's end to B's start. No
+// second player plays, so A may go on up to its very end.
+TEST_CASE(AutoMix_ACutNeedsNoSecondPlayerAndMayEndAtTheEndOfTheSong) {
+    CHECK(Cuts(CutPlan()));
+    CHECK(!Cuts(Plan()));
+    CHECK(Check(CutPlan(), 110.3, 200).empty());  // no room is needed after a cut
+    CHECK(!Check(CutPlan(), 110, 200).empty());   // but it is still within the song
+    MixPlan plan = CutPlan();
+    plan.rate = 1.04;
+    plan.rateFrom = 100;
+    CHECK(!Check(plan, 200, 200).empty());  // nothing plays A faster or slower
+    plan = CutPlan();
+    plan.keys = {{110, 1, 0}, {110, 0.5, 1}};
+    CHECK(!Check(plan, 200, 200).empty());  // A is gone after it
+
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(CutPlan(), 110.3, 200).empty());
+    Run(session, decks, 60);
+    CHECK(session.GetStatus().phase == Phase::Done);
+    CHECK(decks.stops == 0);  // no second player was started
+    CHECK(decks.aligns == 0);
+    CHECK(decks.armEnd == 110);
+    CHECK_NEAR(decks.armAt, 2 + MixSession::kSwitchDelay, 1e-9);
+    CHECK(decks.switched);
+    CHECK(decks.disarms == 1);  // A, done, is let go
+    CHECK(decks.rewinds == 0);
+    CHECK(decks.NothingHeard());
+}
+
+TEST_CASE(AutoMix_ASkipBeforeACutStartsTheNextSongFromItsBeginning) {
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(CutPlan(), 200, 200).empty());
+    Run(session, decks, 28);  // A at 108: Apple's player armed
+    REQUIRE(session.GetStatus().phase == Phase::Ready);
+    decks.switched = true;  // the user skips: Apple's player goes to B, where the plan put it
+    decks.switchClock = decks.t;
+    Run(session, decks, 30);
+    CHECK(session.GetStatus().phase == Phase::Failed);
+    CHECK(decks.rewinds == 1);
+}
+
+TEST_CASE(AutoMix_CheckKeepsTheEchoAndTheLoopWithinWhatCanBePlayed) {
+    CHECK(Check(EchoPlan(), 200, 200).empty());
+    MixPlan plan = EchoPlan();
+    plan.echo.to = 109;
+    CHECK(!Check(plan, 200, 200).empty());  // thrown after A is gone
+    plan.echo = {99, 104, 0.5, 0.5};
+    CHECK(!Check(plan, 200, 200).empty());  // before the deck carries A
+    plan.echo = {106, 106, 0.5, 0.5};
+    CHECK(!Check(plan, 200, 200).empty());
+    plan.echo = {104, 106, 3, 0.5};
+    CHECK(!Check(plan, 200, 200).empty());  // repeats too far apart
+    plan.echo = {104, 106, -0.5, 0.5};
+    CHECK(!Check(plan, 200, 200).empty());  // not a delay, not "no echo" either
+    plan.echo = {104, 106, 0.5, 0.95};
+    CHECK(!Check(plan, 200, 200).empty());  // repeats that would never end
+    plan = CutPlan();
+    plan.echo = {110, 110, 0.5, 0.5};
+    CHECK(!Check(plan, 200, 200).empty());  // a cut has no deck to echo A
+    CHECK_NEAR(EchoAfter(EchoPlan()), 2, 1e-9);
+    plan = EchoPlan();
+    plan.echo.feedback = 0;
+    CHECK(EchoAfter(plan) == 0);  // one repeat, heard before the last key
+    plan.echo.feedback = 0.9;
+    CHECK_NEAR(EchoAfter(plan), 8 - 2, 1e-9);  // 8 s at most
+    CHECK(EchoAfter(Plan()) == 0);
+
+    // A loop needs the second player only until the deck holds it: the mix may outlast A.
+    CHECK(Check(LoopPlan(), 106, 200).empty());
+    CHECK(!Check(Plan(), 106, 200).empty());
+    plan = LoopPlan();
+    plan.loop.from = 104;
+    CHECK(!Check(plan, 106, 200).empty());  // A must go on a second after the loop, or the second player stops first
+    plan.loop = {99, 2};
+    CHECK(!Check(plan, 200, 200).empty());  // before the mix
+    plan.loop = {102, 0.1};
+    CHECK(!Check(plan, 200, 200).empty());
+    plan.loop = {102, 9};
+    CHECK(!Check(plan, 200, 200).empty());
+    plan = LoopPlan();
+    CHECK(!Check(plan, 102.5, 200).empty());  // the mix itself starts too close to the end
+    plan = CutPlan();
+    plan.loop = {110, 2};
+    CHECK(!Check(plan, 200, 200).empty());
+}
+
+TEST_CASE(AutoMix_AnEchoTakesAOnlyWhileThrownAndRingsOutAfterTheMix) {
+    FakeDecks plain, echoed;
+    MixSession plainSession(plain), echoSession(echoed);
+    REQUIRE(plainSession.Start(Plan(), 200, 200).empty());
+    REQUIRE(echoSession.Start(EchoPlan(), 200, 200).empty());
+    Run(plainSession, plain, 60);
+    Run(echoSession, echoed, 60);
+    CHECK(echoSession.GetStatus().phase == Phase::Done);
+    CHECK_NEAR(echoed.stoppedAt - plain.stoppedAt, 2, 0.02);  // the deck goes once the repeats are over
+    for (const DeckGains& set : plain.gains) CHECK(set.echoSend == 0 && set.echoReturn == 0);
+    bool thrown = false;
+    double lastReturn = 1;
+    for (size_t i = 0; i < echoed.gains.size(); i++) {
+        const DeckGains& set = echoed.gains[i];
+        const double a = 80 + echoed.gainClock[i];  // A's time, as the deck carries it
+        if (a > 104.05 && a < 105.95) thrown = thrown || set.echoSend == 1;
+        if (a < 103.95 || a > 106.05) CHECK(set.echoSend == 0);
+        if (a > 101 && a < 109) CHECK(set.echoReturn == 1);  // heard all along, and a second after the last key
+        if (a > 109.05 && a < 110 && set.echoReturn > 0) {
+            CHECK(set.echoReturn < 1);  // then faded out over the last second of the repeats
+            CHECK(set.echoReturn <= lastReturn);
+            lastReturn = set.echoReturn;
+        }
+    }
+    CHECK(thrown);
+    CHECK(lastReturn < 0.05);
+    CHECK(echoed.ApplesAlone() && echoed.gains.back().echoReturn == 0);
+}
+
+TEST_CASE(AutoMix_AFailedMixFadesItsEchoOutWithA) {
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(EchoPlan(), 200, 200).empty());
+    Run(session, decks, 25);  // A at 105: thrown
+    REQUIRE(session.GetStatus().phase == Phase::Mixing);
+    session.Cancel("the queue changed");
+    const double from = decks.t;
+    Run(session, decks, 40);
+    CHECK(session.GetStatus().phase == Phase::Failed);
+    CHECK(decks.stoppedAt - from < MixSession::kRecoverSeconds + 0.05);  // no waiting for the repeats
+    CHECK(decks.ApplesAlone() && decks.gains.back().echoReturn == 0);
+}
+
+TEST_CASE(AutoMix_ALoopPausesTheSecondPlayerOnceHeldAndMayOutlastTheSong) {
+    FakeDecks decks;
+    decks.loopHeld = true;  // the deck holds the loop early: nothing changes until its copy is heard
+    MixSession session(decks);
+    REQUIRE(session.Start(LoopPlan(), 106, 200).empty());
+    Run(session, decks, 19.5);  // A at 99.5: ready, the second player still needed to keep the copies in step
+    REQUIRE(session.GetStatus().phase == Phase::Ready);
+    CHECK(decks.quiets == 0);
+    Run(session, decks, 20.5);
+    CHECK(decks.quiets == 1);
+    Run(session, decks, 60);
+    CHECK(session.GetStatus().phase == Phase::Done);
+    CHECK(decks.quiets == 1);
+    CHECK_NEAR(decks.stoppedAt, 32, 0.05);  // the last key at 112: A's time runs on through the loop
+    CHECK(decks.ApplesAlone());
+}
+
+TEST_CASE(AutoMix_ALoopNotHeldLeavesTheSecondPlayerPlaying) {
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(LoopPlan(), 200, 200).empty());
+    Run(session, decks, 60);
+    CHECK(session.GetStatus().phase == Phase::Done);
+    CHECK(decks.quiets == 0);
 }
 
 TEST_CASE(AutoMix_ANewPlanReplacesOneWhoseMixHasNotBegun) {

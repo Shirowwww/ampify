@@ -1,6 +1,7 @@
 #include "mix_deck.hpp"
 
 #include <algorithm>
+#include <numbers>
 #include <numeric>
 
 #include "../audio/equalizer.hpp"
@@ -21,6 +22,17 @@ constexpr double kWarmSeconds = 0.5;     // the stretch runs this long at normal
 constexpr double kBlendSeconds = 0.05;   // then replaces the plain copy within this
 constexpr double kLowHz = 150;           // the shelf that takes a song's bass away
 constexpr double kLowFloor = 0.0316;     // -30 dB: "no lows"
+// The sweeps: A's high-pass from 20 Hz (amount 0) to 2 kHz (1), B's low-pass from 20 kHz down to 400 Hz, evenly
+// spaced in pitch, without a resonant peak.
+constexpr double kHighPassOpen = 20, kHighPassShut = 2000;
+constexpr double kLowPassOpen = 20000, kLowPassShut = 400;
+constexpr double kSweepQ = 0.7071;
+constexpr double kEchoLevel = 0.7;       // the echo's first repeat against what was sent
+constexpr double kEchoLowPassHz = 5000;  // in the echo's loop: each repeat a little darker
+constexpr double kEchoHighPassHz = 300;  // and a little thinner, out of B's bass
+constexpr double kSilent = 1e-6;         // a sample under this is silence
+constexpr double kDust = 1e-15;          // the echo's state under this is zeroed: it fades forever, never to denormals
+constexpr double kLoopSeamSeconds = 0.02;
 constexpr double kMeasureSeconds = 0.25;
 constexpr double kMaxSpeed = 1.2;
 constexpr double kMaxPadSeconds = 0.2;   // of empty frames at the start of a stream: more is the song's own silence
@@ -99,8 +111,24 @@ size_t EmptyFrames(const float* stereo, size_t frames, bool fromEnd) {
 }
 
 DeckGains Lerp(const DeckGains& from, const DeckGains& to, double t) {
-    return {Lerp(from.main, to.main, t), Lerp(from.tail, to.tail, t), Lerp(from.mainLow, to.mainLow, t),
-            Lerp(from.tailLow, to.tailLow, t)};
+    return {Lerp(from.main, to.main, t),       Lerp(from.tail, to.tail, t),
+            Lerp(from.mainLow, to.mainLow, t), Lerp(from.tailLow, to.tailLow, t),
+            Lerp(from.mainFilter, to.mainFilter, t), Lerp(from.tailFilter, to.tailFilter, t),
+            Lerp(from.echoSend, to.echoSend, t), Lerp(from.echoReturn, to.echoReturn, t)};
+}
+
+bool SameGains(const DeckGains& x, const DeckGains& y) {
+    return x.main == y.main && x.tail == y.tail && x.mainLow == y.mainLow && x.tailLow == y.tailLow &&
+           x.mainFilter == y.mainFilter && x.tailFilter == y.tailFilter && x.echoSend == y.echoSend &&
+           x.echoReturn == y.echoReturn;
+}
+
+double Settled(double value) { return std::abs(value) < kDust ? 0 : value; }
+
+double Cutoff(double amount, bool highPass, int sampleRate) {
+    const double open = highPass ? kHighPassOpen : kLowPassOpen;
+    const double shut = highPass ? kHighPassShut : kLowPassShut;
+    return std::min(open * std::pow(shut / open, std::clamp(amount, 0.0, 1.0)), 0.45 * sampleRate);
 }
 
 }  // namespace
@@ -129,6 +157,64 @@ void MixDeck::LowShelf::Run(float* stereo, size_t frames, double low, int sample
     }
 }
 
+void MixDeck::Sweep::Clear() { ic1[0] = ic1[1] = ic2[0] = ic2[1] = 0; }
+
+// One cutoff per chunk (a few ms), taken halfway through the chunk's move: a sweep lasts seconds, so no step is heard.
+void MixDeck::Sweep::Run(float* stereo, size_t frames, double from, double to, int sampleRate) {
+    const double wetFrom = from > 0 ? 1 : 0;
+    const double wetTo = to > 0 ? 1 : 0;
+    const bool used = wetFrom + wetTo > 0;
+    const double k = 1 / kSweepQ;
+    const double g = std::tan(std::numbers::pi * Cutoff((from + to) * 0.5, highPass, sampleRate) / sampleRate);
+    const double a1 = 1 / (1 + g * (g + k));
+    const double a2 = g * a1;
+    const double a3 = g * a2;
+    for (int channel = 0; channel < 2; channel++) {
+        double s1 = ic1[channel], s2 = ic2[channel];
+        for (size_t i = 0; i < frames; i++) {
+            const double v0 = stereo[i * 2 + channel];
+            const double v3 = v0 - s2;
+            const double v1 = a1 * s1 + a2 * v3;
+            const double v2 = s2 + a2 * s1 + a3 * v3;
+            s1 = 2 * v1 - s1;
+            s2 = 2 * v2 - s2;
+            if (!used) continue;
+            const double wet = Lerp(wetFrom, wetTo, static_cast<double>(i + 1) / static_cast<double>(frames));
+            const double filtered = highPass ? v0 - k * v1 - v2 : v2;
+            stereo[i * 2 + channel] = static_cast<float>(v0 + (filtered - v0) * wet);
+        }
+        ic1[channel] = s1;
+        ic2[channel] = s2;
+    }
+}
+
+bool MixDeck::Echo::Run(const float* in, float* out, size_t frames, const DeckGains& from, const DeckGains& to,
+                        double scale, int sampleRate) {
+    if (line.empty()) return false;
+    const double lowCoef = 1 - std::exp(-2 * std::numbers::pi * kEchoLowPassHz / sampleRate);
+    const double baseCoef = 1 - std::exp(-2 * std::numbers::pi * kEchoHighPassHz / sampleRate);
+    const size_t length = line.size() / 2;
+    bool sounding = false;
+    for (size_t i = 0; i < frames; i++) {
+        const double t = static_cast<double>(i) / static_cast<double>(frames);
+        const double send = Lerp(from.echoSend, to.echoSend, t);
+        const double back = Lerp(from.echoReturn, to.echoReturn, t) * kEchoLevel * scale;
+        for (int c = 0; c < 2; c++) {
+            float& slot = line[at * 2 + c];
+            const double repeat = slot;  // written a delay ago
+            const double fed = in[i * 2 + c] * send + repeat * feedback;
+            low[c] = Settled(low[c] + lowCoef * (fed - low[c]));
+            base[c] = Settled(base[c] + baseCoef * (low[c] - base[c]));
+            slot = static_cast<float>(Settled(low[c] - base[c]));
+            const double heard = repeat * back;
+            out[i * 2 + c] += static_cast<float>(heard);
+            sounding = sounding || std::abs(heard) > kSilent;
+        }
+        at = at + 1 == length ? 0 : at + 1;
+    }
+    return sounding;
+}
+
 void MixDeck::Open(int sampleRate, double holdSeconds) {
     if (sampleRate <= 0 || !(holdSeconds > 0)) return;
     // Made before the lock: the audio threads never wait for memory.
@@ -141,8 +227,15 @@ void MixDeck::Open(int sampleRate, double holdSeconds) {
     curve.reserve(kCurvePoints * 2);
     curve.push_back({0, DeckGains{}});
     std::unique_ptr<TempoStretch> old;
+    std::vector<float> oldEcho, oldLoop;
     {
         std::lock_guard<std::mutex> guard(m_lock);
+        m_echo.line.swap(oldEcho);
+        m_echo = Echo{};
+        m_loop.swap(oldLoop);
+        m_loopFrames = m_loopSeam = m_loopKept = 0;
+        m_loopAt = -1;
+        m_loopHeld = false;
         m_rate = sampleRate;
         m_hold = hold;
         m_tail.swap(tail);
@@ -161,6 +254,8 @@ void MixDeck::Open(int sampleRate, double holdSeconds) {
         m_headCounted = false;
         m_mainShelf.Clear();
         m_tailShelf.Clear();
+        m_mainSweep.Clear();
+        m_tailSweep.Clear();
         m_residualDb = NAN;
         m_residualError = m_residualPower = 0;
         m_residualFrames = 0;
@@ -172,7 +267,7 @@ void MixDeck::Open(int sampleRate, double holdSeconds) {
 }
 
 void MixDeck::Close() {
-    std::vector<float> tail, history;
+    std::vector<float> tail, history, echo, loop;
     std::unique_ptr<TempoStretch> stretch;
     {
         std::lock_guard<std::mutex> guard(m_lock);
@@ -180,6 +275,11 @@ void MixDeck::Close() {
         m_curve.assign(1, Point{});
         m_tail.swap(tail);
         m_history.swap(history);
+        m_echo.line.swap(echo);
+        m_loop.swap(loop);
+        m_loopFrames = 0;
+        m_loopAt = -1;
+        m_loopHeld = false;
         stretch = std::move(m_stretch);
         m_state = Stretch::Off;
     }
@@ -319,6 +419,10 @@ std::optional<DeckStep> MixDeck::Align(double leadHint, double aTime, double vol
     m_scale = found->scale;
     m_alignVolume = m_volume = volume;
     m_aligned = true;
+    // The loop's place in the second player's sound, which it may already have begun to give.
+    m_loopAt = m_loopFrames > 0 ? std::llround(m_cursor + (m_loopFrom - m_pos) * rate) : -1;
+    m_loopKept = 0;
+    m_loopHeld = false;
     m_state = Stretch::Off;
     m_residualDb = NAN;
     m_residualError = m_residualPower = 0;
@@ -342,15 +446,53 @@ void MixDeck::SetStretch(double from, double first, double rate) {
     m_rampFrames = wanted ? static_cast<std::uint64_t>(std::llround(2 * (first - from) / (1 + rate) * sampleRate)) : 0;
 }
 
+void MixDeck::SetEcho(double delay, double feedback) {
+    int sampleRate = 0;
+    {
+        std::lock_guard<std::mutex> guard(m_lock);
+        sampleRate = m_rate;
+    }
+    const size_t frames = sampleRate > 0 && delay > 0 ? static_cast<size_t>(std::llround(delay * sampleRate)) : 0;
+    std::vector<float> line(frames * 2);
+    std::lock_guard<std::mutex> guard(m_lock);  // released before `line`, now the old one, is freed
+    if (!m_open || m_rate != sampleRate) return;
+    m_echo.line.swap(line);
+    m_echo.at = 0;
+    m_echo.feedback = std::clamp(feedback, 0.0, 0.95);
+    m_echo.low[0] = m_echo.low[1] = m_echo.base[0] = m_echo.base[1] = 0;
+}
+
+void MixDeck::SetLoop(double from, double length) {
+    int sampleRate = 0;
+    {
+        std::lock_guard<std::mutex> guard(m_lock);
+        sampleRate = m_rate;
+    }
+    const size_t frames = sampleRate > 0 && length > 0 ? static_cast<size_t>(std::llround(length * sampleRate)) : 0;
+    const size_t seam = std::min(frames / 2, static_cast<size_t>(kLoopSeamSeconds * sampleRate));
+    std::vector<float> loop((frames + seam) * 2);
+    std::lock_guard<std::mutex> guard(m_lock);
+    if (!m_open || m_rate != sampleRate) return;
+    m_loop.swap(loop);
+    m_loopFrom = from;
+    m_loopFrames = frames;
+    m_loopSeam = seam;
+    m_loopAt = m_aligned && frames > 0 ? std::llround(m_cursor + (from - m_pos) * m_rate) : -1;
+    m_loopKept = 0;
+    m_loopHeld = false;
+}
+
+bool MixDeck::LoopHeld() const {
+    std::lock_guard<std::mutex> guard(m_lock);
+    return m_open && m_loopHeld;
+}
+
 void MixDeck::SetGains(const DeckGains& gains, double volume) {
     std::lock_guard<std::mutex> guard(m_lock);
     m_volume = volume;
     if (!m_open) return;
     const Point last = m_curve.back();
-    if (last.gains.main == gains.main && last.gains.tail == gains.tail && last.gains.mainLow == gains.mainLow &&
-        last.gains.tailLow == gains.tailLow) {
-        return;
-    }
+    if (SameGains(last.gains, gains)) return;
     // From where neither stream has written yet, so that both play the very same line.
     const std::int64_t written = std::max(static_cast<std::int64_t>(m_tailSent),
                                           static_cast<std::int64_t>(m_mainFrames) + m_apart);
@@ -411,6 +553,50 @@ bool MixDeck::ReadTail(std::uint64_t from, size_t frames, float* out) const {
     return true;
 }
 
+// The deck's A from the second player's frame `from` on: what it gave, and past the loop's start the loop it kept.
+bool MixDeck::ReadSong(std::uint64_t from, size_t frames, float* out) const {
+    if (!m_loopHeld) return ReadTail(from, frames, out);
+    const auto start = static_cast<std::uint64_t>(m_loopAt);
+    size_t done = 0;
+    if (from < start) {
+        done = static_cast<size_t>(std::min<std::uint64_t>(frames, start - from));
+        if (!ReadTail(from, done, out)) return false;
+    }
+    for (; done < frames; done++) {
+        const size_t k = m_loopSeam + static_cast<size_t>((from + done - start) % m_loopFrames);
+        out[done * 2] = m_loop[k * 2];
+        out[done * 2 + 1] = m_loop[k * 2 + 1];
+    }
+    return true;
+}
+
+// Copies what came in of the loop, from a seam before its start. Once all of it is there, its last frames go over
+// into those that led into its start, so that it follows itself as A led into it: no click at each turn.
+void MixDeck::KeepLoop() {
+    const std::int64_t start = m_loopAt - static_cast<std::int64_t>(m_loopSeam);
+    const size_t total = m_loopFrames + m_loopSeam;
+    while (m_loopKept < total) {
+        const std::int64_t from = start + static_cast<std::int64_t>(m_loopKept);
+        const std::int64_t given = static_cast<std::int64_t>(m_tailFrames) - from;
+        if (given <= 0) return;  // not given yet
+        const size_t count = static_cast<size_t>(std::min<std::int64_t>(static_cast<std::int64_t>(total - m_loopKept), given));
+        // Before the second player's first frame, or already written over: no loop, A plays on as it is.
+        if (from < 0 || !ReadTail(static_cast<std::uint64_t>(from), count, m_loop.data() + m_loopKept * 2)) {
+            m_loopAt = -1;
+            return;
+        }
+        m_loopKept += count;
+    }
+    for (size_t j = 0; j < m_loopSeam; j++) {
+        const float w = static_cast<float>(j + 1) / static_cast<float>(m_loopSeam);  // 1 on the last: A before the start
+        float* end = m_loop.data() + (m_loopFrames + j) * 2;
+        const float* before = m_loop.data() + j * 2;
+        end[0] += (before[0] - end[0]) * w;
+        end[1] += (before[1] - end[1]) * w;
+    }
+    m_loopHeld = true;
+}
+
 // Shortens a chunk so that it ends where the stretch warms up, starts to move, or reaches its speed.
 size_t MixDeck::UntilEvent(size_t frames) {
     if (!m_stretch) return frames;
@@ -441,7 +627,7 @@ bool MixDeck::NextTail(size_t frames) {
         return false;
     };
     if (m_state == Stretch::Off) {
-        if (!ReadTail(static_cast<std::uint64_t>(m_cursor), frames, m_dry.data())) return starved();
+        if (!ReadSong(static_cast<std::uint64_t>(m_cursor), frames, m_dry.data())) return starved();
         m_cursor += static_cast<double>(frames);
         m_pos += static_cast<double>(frames) / m_rate;
         return true;
@@ -455,10 +641,10 @@ bool MixDeck::NextTail(size_t frames) {
     }
     const double owed = frames * speed + m_feedDebt;
     const size_t take = static_cast<size_t>(owed);
-    if (take * 2 > m_in.size() || !ReadTail(m_feed, take, m_in.data())) return starved();
+    if (take * 2 > m_in.size() || !ReadSong(m_feed, take, m_in.data())) return starved();
     // Read before the stretch is fed: starved, it must not be given the same sound twice.
     const bool warming = m_state == Stretch::Warming;
-    if (warming && !ReadTail(static_cast<std::uint64_t>(m_cursor), frames, m_dry.data())) return starved();
+    if (warming && !ReadSong(static_cast<std::uint64_t>(m_cursor), frames, m_dry.data())) return starved();
     m_stretch->Process(m_in.data(), take, m_wet.data(), frames);
     if (warming) {
         // Both copies say the same thing at the same time: the stretched one replaces the plain one just before A
@@ -540,6 +726,8 @@ void MixDeck::ProcessMain(float* stereo, size_t frames, int sampleRate, const De
         } else {
             m_mainShelf.Clear();
         }
+        const bool filtered = from.mainFilter > 0 || to.mainFilter > 0;
+        m_mainSweep.Run(chunk, count, from.mainFilter, to.mainFilter, m_rate);
         if (from.main != 1 || to.main != 1) {
             for (size_t i = 0; i < count; i++) {
                 const float gain = static_cast<float>(Lerp(from.main, to.main, static_cast<double>(i) / count));
@@ -547,7 +735,7 @@ void MixDeck::ProcessMain(float* stereo, size_t frames, int sampleRate, const De
                 chunk[i * 2 + 1] *= gain;
             }
         } else if (m_exact && m_state == Stretch::Off && from.tail == 0 && to.tail == 0 && from.mainLow == 1 &&
-                   to.mainLow == 1) {
+                   to.mainLow == 1 && !filtered) {
             Measure(chunk, first + done, count, scale);
         }
         done += count;
@@ -575,6 +763,7 @@ bool MixDeck::ProcessTail(float* stereo, size_t frames, int sampleRate, bool sil
         done += count;
     }
     if (!m_aligned) return nothing();
+    if (m_loopAt >= 0 && !m_loopHeld) KeepLoop();
     const double scale = m_scale * (m_alignVolume > 0 ? m_volume / m_alignVolume : 1);
     bool heard = false;
     for (size_t done = 0; done < frames;) {
@@ -582,24 +771,28 @@ bool MixDeck::ProcessTail(float* stereo, size_t frames, int sampleRate, bool sil
         const size_t count = UntilPoint(at, UntilEvent(std::min(kChunk, frames - done)));
         const DeckGains from = GainsAt(at);
         const DeckGains to = GainsAt(at + static_cast<std::int64_t>(count));
-        const bool there = NextTail(count);
+        const bool there = NextTail(count);  // silence in m_dry when not
         float* chunk = stereo + done * 2;
-        if (!there || (from.tail == 0 && to.tail == 0)) {
-            std::fill_n(chunk, count * 2, 0.0f);
-            m_tailShelf.Clear();
+        const bool audible = there && (from.tail > 0 || to.tail > 0);
+        const bool sent = there && (from.echoSend > 0 || to.echoSend > 0);
+        if ((audible || sent) && (from.tailLow != 1 || to.tailLow != 1)) {
+            m_tailShelf.Run(m_dry.data(), count, (from.tailLow + to.tailLow) * 0.5, m_rate);
         } else {
-            if (from.tailLow != 1 || to.tailLow != 1) {
-                m_tailShelf.Run(m_dry.data(), count, (from.tailLow + to.tailLow) * 0.5, m_rate);
-            } else {
-                m_tailShelf.Clear();
-            }
+            m_tailShelf.Clear();
+        }
+        m_tailSweep.Run(m_dry.data(), count, from.tailFilter, to.tailFilter, m_rate);
+        if (audible) {
             for (size_t i = 0; i < count; i++) {
                 const float gain = static_cast<float>(Lerp(from.tail, to.tail, static_cast<double>(i) / count) * scale);
                 chunk[i * 2] = m_dry[i * 2] * gain;
                 chunk[i * 2 + 1] = m_dry[i * 2 + 1] * gain;
             }
             heard = true;
+        } else {
+            std::fill_n(chunk, count * 2, 0.0f);
         }
+        // A's echo rings on whatever A does: after its volume, its sound gone, its second player out of sound.
+        if (m_echo.Run(m_dry.data(), chunk, count, from, to, scale, m_rate)) heard = true;
         done += count;
     }
     return heard;

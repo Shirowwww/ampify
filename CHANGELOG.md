@@ -2,13 +2,29 @@
 
 ## Unreleased
 
+- AutoMix 1.2.0 has new ways to go from one song to the next, picked from Apple's analysis of the two songs:
+  - An echo out, for songs with a beat that cannot share a tempo: the current song thins out over its last bar, its
+    last beat goes into an echo, and the next song lands on the bar while the echo rings on over its first bars.
+  - Natural endings: a song that stops on a hit, or lets its last note die away, is heard to its very end, and the
+    next one comes in after a breath (a short one after a hit, into a song that starts strong), with the silences
+    between them cut short.
+  - Bar looping: a song that stops on a hit and shares the next one's tempo can loop one of its last bars, one its
+    singer is not on, while the next song comes in on the beat, rather than mixing over its last lines.
+  - Filters: in a mix on the beat or a crossfade, the next song comes in muffled and opens up while the current one
+    thins out.
 - AutoMix's fades no longer fall behind. AutoMix changes the volumes about every 10 ms and each change takes 20 ms to
   arrive, but each one waited for the one before it to finish. A fade over a bar therefore played slower than planned,
   and what came after it, such as the swap into the next song, came up to 1.3 s late, off the bar. Each change now
   starts from wherever the previous one has got to.
+- With Sing's Studio on, the end of a mix could stop dead, and that missing end came back at the start of the next
+  mix. Studio plays everything 2.8 s late, and AutoMix's second player, which carries the old song, stopped at the end
+  of that song before those 2.8 s were heard. It is now paused there instead, which keeps its sound going. A skip, a
+  pause or a seek during a mix now lets go of what Studio still holds of the old song at once.
 - Closing Apple Music twice within a few seconds of opening it no longer turns Ampify off at the next start. Safe mode
   counted every launch that ended before its 8-second health check as a failure; a normal close now clears the count,
   since a crash or a hang never gets there.
+- Extensions: an AutoMix plan can cut from one song to the next, filter both songs, throw an echo and loop a bar
+  (`echo`, `loop`, keys of seven numbers); `Ampify.automix.state().features` says what the kernel takes.
 
 ## 1.5.4 (2026-11-18)
 

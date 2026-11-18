@@ -379,6 +379,11 @@ struct Feed {
     std::atomic<long long> frames{0};
     std::atomic<double> earliest{0};  // a block's arrival against an even feed, seconds
     std::atomic<double> latest{0};
+    // Once the second player is paused for what Sing still holds (QuietGhost): its stream's frames since, which tell
+    // whether a paused player's stream keeps running.
+    std::atomic<bool> quiet{false};
+    std::atomic<long long> quietFrames{0};
+    std::atomic<int> rate{0};
 };
 Feed g_feed;
 
@@ -463,8 +468,13 @@ public:
         A().setVolume(m_ghost, 0.0f);
         g_deck.Open(rate, automix::HoldFor(plan));
         if (automix::Stretches(plan)) g_deck.SetStretch(automix::CarryFrom(plan), plan.keys.front().at, plan.rate);
+        if (automix::Echoes(plan)) g_deck.SetEcho(plan.echo.delay, plan.echo.feedback);
+        if (automix::Loops(plan)) g_deck.SetLoop(plan.loop.from, plan.loop.length);
         g_feed.start = 0;
         g_feed.live = false;
+        g_feed.quiet = false;
+        g_feed.quietFrames = 0;
+        detail::SingTailNewMix();
         g_deckOpen = true;
         detail::ExpectTailStreams(true);
         A().play(m_ghost);
@@ -497,7 +507,21 @@ public:
         g_deckOpen = false;
         g_deck.Close();
         detail::ForgetTailStreams();
+        detail::SingTailNewMix();
     }
+
+    void QuietGhost() override {
+        if (!m_ghost) return;
+        A().pause(m_ghost);
+        g_feed.quietFrames = 0;
+        g_feed.quiet = true;
+        Note("AutoMix: second player paused, its stream kept for what is left to play (Studio holds " +
+             detail::Fixed(SoundHeldBack(), 2) + " s)");
+    }
+
+    bool LoopHeld() override { return g_deck.LoopHeld(); }
+
+    void DropHeldBack() override { detail::SingTailDrop(); }
 
     std::optional<automix::DeckStep> Align() override {
         std::optional<double> ghost = GhostTime();
@@ -597,7 +621,11 @@ public:
         if (!refused.empty()) return refused;
         m_interrupt = nullptr;  // a pause or a seek from before this plan says nothing about it
         m_plans++;
-        Note("AutoMix: mix planned into the next song at " + detail::Fixed(plan.keys.front().at, 1) + " s");
+        std::string also;
+        if (automix::Cuts(plan)) also += ", a cut";
+        if (automix::Echoes(plan)) also += ", an echo every " + detail::Fixed(plan.echo.delay, 3) + " s";
+        if (automix::Loops(plan)) also += ", a loop of " + detail::Fixed(plan.loop.length, 3) + " s";
+        Note("AutoMix: mix planned into the next song at " + detail::Fixed(plan.keys.front().at, 1) + " s" + also);
         Wake();
         return {};
     }
@@ -638,6 +666,10 @@ private:
             if (g_feed.start.load() != 0) {
                 line += ", the old song's stream fed within " +
                         detail::Fixed((g_feed.latest.load() - g_feed.earliest.load()) * 1000, 1) + " ms";
+            }
+            if (g_feed.quiet.load() && g_feed.rate.load() > 0) {
+                line += ", " + detail::Fixed(static_cast<double>(g_feed.quietFrames.load()) / g_feed.rate.load(), 2) +
+                        " s of its stream once paused";
             }
         }
         if (!status.reason.empty()) line += " (" + status.reason + ")";
@@ -993,6 +1025,8 @@ void AutoMixMain(float* samples, unsigned frames, int rate, std::uint64_t stream
 
 bool AutoMixTail(float* samples, unsigned frames, int rate, bool silent, std::uint64_t stream, unsigned queued) {
     const double now = SteadySeconds();
+    g_feed.rate.store(rate, std::memory_order_relaxed);
+    if (g_feed.quiet.load(std::memory_order_relaxed)) g_feed.quietFrames += frames;
     const bool heard = g_deck.ProcessTail(samples, frames, rate, silent, {stream, queued, now});
     if (!heard) {
         g_feed.live = false;

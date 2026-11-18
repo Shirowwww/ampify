@@ -49,6 +49,12 @@ public:
     // Seconds the sound is held back after the deck (Sing's studio mode): the second player plays on that long after
     // the mix, so that the end of A's fade it carried is heard.
     virtual double SoundHeldBack() { return 0; }
+    // The second player paused, its stream kept: what is held back of A, an echo or a loop plays out there even
+    // where the song ends first (a playing second player's stream stops a second after the end of the song).
+    virtual void QuietGhost() {}
+    virtual bool LoopHeld() { return false; }  // the deck keeps all of the plan's loop
+    // What is held back of A goes at once, after a short fade: the user moved on (a pause, a skip, a seek).
+    virtual void DropHeldBack() {}
 };
 
 enum class Phase { Idle, Waiting, Preparing, Aligning, Ready, TakingOver, Mixing, Recovering, Done, Failed };
@@ -78,6 +84,7 @@ public:
     static constexpr double kTakeOverSeconds = 0.1;
     static constexpr double kRecoverSeconds = 0.3;
     static constexpr double kQuickRecoverSeconds = 0.05;  // the user paused or skipped: no tail
+    static constexpr double kEchoFadeSeconds = 1;  // an echo still ringing is faded out over its last second
     static constexpr double kGhostStartTimeout = 8;
     // Apple's player starts the next song this long after its switch point, so B is sought this much further.
     // Measured on 12/11/2026 in the recorded sound: 60 or 70 ms. Counted again at each mix.
@@ -107,10 +114,16 @@ private:
     bool LeadFits(double lead) const;
     void TickAligning(double now, double aTime);
     void TickReady(double now, double aTime);
+    void TickCutWaiting(double now, double aTime);
+    void TickCutReady(double now, double aTime);
     void LearnSwitchDelay();
     bool SwitchedOnPlan();  // Apple's player moved to B at the plan's point, not before (a skip)
     void LetGo();           // the second player stops and Apple's player is left as it plays
-    bool HeldBackPlayed(double now);  // the mix's sound is all given: true once what is held back was heard too
+    // The mix's sound is all given: true once what is held back, and the echo still ringing, were heard too.
+    bool HeldBackPlayed(double now);
+    double LeftToPlay() const;  // seconds of that
+    void QuietGhostIfShort();   // pauses the second player if it would reach the end of A before that
+    void FadeEcho(double now);
 
     MixDecks& m_decks;
     mutable std::mutex m_lock;
@@ -131,10 +144,14 @@ private:
     double m_lastCheck = 0;
     double m_lastA = NAN;
     double m_lastAMoved = -1;
+    double m_lastAOnA = NAN;       // a cut's A time, last seen while Apple's player was still on A
     double m_lastGhost = NAN;      // the second player's clock at the last tick, while it starts
     double m_lastHeard = NAN;
     double m_lastHeardMoved = -1;  // while the deck's copy is heard, when its time last moved
     double m_endSince = -1;        // when the mix's sound was all given, while what is held back plays out
+    bool m_heldDropped = false;    // what was held back was let go: nothing to wait for
+    bool m_ghostQuiet = false;     // the second player was paused, its stream kept
+    double m_aDuration = 0;        // A's length, 0 when unknown
     DeckGains m_gains;             // last gains set
     DeckGains m_recoverFrom;
     double m_recoverSeconds = kRecoverSeconds;

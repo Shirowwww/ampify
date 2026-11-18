@@ -86,6 +86,10 @@ bool g_lightOn = false;              // Apple's audio thread only
 bool g_tailLightOn = false;          // the deck's audio thread only
 bool g_tailOn = false;               // the deck's audio thread only: its studio stream holds the old song
 std::int64_t g_tailQuiet = 0;        // the deck's audio thread only: frames fed since the deck fell silent
+// Counts the mixes' second players, started and stopped. One whose stream stopped before all it held was heard (a mix
+// cancelled, a song that ended) leaves that in the deck's studio stream: the next mix must not play it.
+std::atomic<std::uint32_t> g_tailMix{0};
+std::uint32_t g_tailMixSeen = 0;     // the deck's audio thread only
 
 // Studio mode on and off (Sing's thread) and Apple's player paused and playing (the thread that sets its rate) both
 // move Apple's clock: under one lock.
@@ -180,6 +184,11 @@ void SingMain(float* samples, unsigned frames, int rate) {
 // The deck's copy of the old song gets what Apple's stream gets: in studio mode, the same lag, so the mix stays in
 // step as heard, and after the deck falls silent, what its stream still holds.
 bool SingTail(float* samples, unsigned frames, int rate, bool heard) {
+    if (const std::uint32_t mix = g_tailMix.load(std::memory_order_relaxed); mix != g_tailMixSeen) {
+        g_tailMixSeen = mix;
+        g_tailOn = g_tailLightOn = false;  // the next sound the deck gives starts a flushed stream
+        g_tailQuiet = 0;
+    }
     const auto mode = static_cast<Mode>(g_mode.load(std::memory_order_relaxed));
     if (mode != Mode::Studio) {
         g_tailOn = false;
@@ -266,6 +275,10 @@ double SingLag() {
     std::lock_guard lock(g_transition);
     return g_holding ? LagNow() : 0;
 }
+
+void SingTailNewMix() { g_tailMix.fetch_add(1, std::memory_order_relaxed); }
+
+void SingTailDrop() { FlushAll(TailStudios(), Fade::Held); }
 
 }  // namespace detail
 

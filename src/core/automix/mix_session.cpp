@@ -19,6 +19,10 @@ constexpr double kStallSeconds = 1.5;   // a player not moving for this long: pa
 constexpr double kSwitchMargin = 0.5;   // Apple's player still on A this long after the switch point: it will not
 constexpr double kMaxSwitchDelay = 0.25;  // a later start of B is a stall, not the player's usual delay
 constexpr double kSwitchSlack = 0.2;      // Apple's player on B this long before the switch point: the user skipped
+// A playing second player keeps its stream about a second past the end of the song: counted as half a second.
+constexpr double kGhostEndMargin = 0.5;
+constexpr double kCutArmLead = 3;      // a cut arms Apple's player this long before, so B is sought where it starts
+constexpr double kCutArmSafety = 0.5;  // and no later than this before
 
 constexpr DeckGains kApplesAlone{1, 0, 1, 1};
 
@@ -50,14 +54,15 @@ std::string MixSession::Start(const MixPlan& plan, double aDuration, double bDur
     // A plan whose mix has not begun is replaced: nothing of its second player is heard.
     if (m_ghostOn) m_decks.StopGhost();
     if (m_armed) m_decks.Disarm(true);
-    m_ghostOn = m_armed = m_lagMeasured = false;
+    m_ghostOn = m_armed = m_lagMeasured = m_heldDropped = m_ghostQuiet = false;
+    m_aDuration = aDuration;
     m_plan = plan;
     m_status = Status{};
     m_status.phase = Phase::Waiting;
     m_status.next = plan.next;
     m_cancel.reset();
     m_phaseSince = -1;
-    m_lastA = m_lastGhost = m_lastHeard = NAN;
+    m_lastA = m_lastGhost = m_lastHeard = m_lastAOnA = NAN;
     m_lastAMoved = m_lastHeardMoved = -1;
     return {};
 }
@@ -102,8 +107,36 @@ void MixSession::Enter(Phase phase, double now) {
 }
 
 bool MixSession::HeldBackPlayed(double now) {
-    if (m_endSince < 0) m_endSince = now;
-    return now - m_endSince >= m_decks.SoundHeldBack();
+    if (m_endSince < 0) {
+        m_endSince = now;
+        QuietGhostIfShort();
+    }
+    return m_heldDropped || now - m_endSince >= LeftToPlay();
+}
+
+// A failed mix fades its echo out with A: only the sound held back is waited for.
+double MixSession::LeftToPlay() const {
+    return m_decks.SoundHeldBack() + (m_status.phase == Phase::Mixing ? EchoAfter(m_plan) : 0);
+}
+
+// Called once nothing more of the second player's sound is needed. Playing on, it would reach the end of A and stop
+// its stream before what Sing holds back (or the echo) is heard: that end would be cut, and left over for the next mix.
+void MixSession::QuietGhostIfShort() {
+    const double left = LeftToPlay();
+    if (left <= 0 || m_heldDropped || !m_ghostOn || m_ghostQuiet) return;
+    const std::optional<double> ghost = m_decks.GhostTime();
+    if (ghost && m_aDuration > 0 && *ghost + left + kGhostEndMargin <= m_aDuration) return;
+    m_decks.QuietGhost();
+    m_ghostQuiet = true;
+}
+
+// After the last key the echo rings on by itself; over its last second it is faded out, not cut when the deck goes.
+void MixSession::FadeEcho(double now) {
+    if (!Echoes(m_plan) || m_status.phase != Phase::Mixing) return;
+    DeckGains gains = m_gains;
+    gains.echoSend = 0;
+    gains.echoReturn = std::clamp((EchoAfter(m_plan) - (now - m_endSince)) / kEchoFadeSeconds, 0.0, 1.0);
+    Gain(gains);
 }
 
 void MixSession::Gain(const DeckGains& gains) {
@@ -114,9 +147,37 @@ void MixSession::Gain(const DeckGains& gains) {
 bool MixSession::SwitchedOnPlan() {
     if (!m_decks.MainOnNext()) return false;
     // A's time: Apple's player leaves A at the first key. A deck that lost its place no longer tells it: the last
-    // time it gave stands, or B, switched on the plan, would go back to its start.
-    const double heard = m_decks.HeardTime().value_or(m_lastHeard);
+    // time it gave stands, or B, switched on the plan, would go back to its start. A cut has no deck: A's last time
+    // on Apple's player tells.
+    const double heard = Cuts(m_plan) ? m_lastAOnA : m_decks.HeardTime().value_or(m_lastHeard);
     return heard >= m_plan.keys.front().at - kSwitchSlack;
+}
+
+// A cut needs no second player: Apple's player is armed a few seconds before, so that B is sought to where it starts.
+void MixSession::TickCutWaiting(double now, double aTime) {
+    const double at = m_plan.keys.front().at;
+    if (aTime > at - kCutArmSafety) return Fail("too late for this mix", now);
+    if (aTime < at - kCutArmLead) return;
+    m_armedDelay = m_switchDelay;
+    if (!m_decks.ArmSwitch(at, m_plan.bStart + m_armedDelay)) return Fail("Apple's player refused the switch", now);
+    m_armed = true;
+    m_lastAOnA = aTime;
+    m_lastCheck = now;
+    Enter(Phase::Ready, now);
+}
+
+void MixSession::TickCutReady(double now, double aTime) {
+    if (m_decks.MainOnNext()) {
+        if (!SwitchedOnPlan()) return Fail("skipped", now);  // the user went to B before the cut
+        LetGo();
+        return Enter(Phase::Done, now);
+    }
+    m_lastAOnA = aTime;
+    if (now - m_lastCheck >= kRetry) {
+        m_lastCheck = now;
+        if (m_decks.NextItem() != m_plan.next) return Fail("the queue changed", now);
+    }
+    if (aTime > m_plan.keys.front().at + kSwitchMargin) return Fail("Apple's player did not switch", now);
 }
 
 void MixSession::LetGo() {
@@ -139,6 +200,11 @@ void MixSession::Fail(const std::string& reason, double now, bool quick) {
         // the crossing is short; after it the deck's A fades out under B.
         m_recoverFrom = m_gains;
         m_recoverSeconds = quick ? kQuickRecoverSeconds : switched ? kRecoverSeconds : kTakeOverSeconds;
+        // The user moved on: what is held back of A is of a song left, not the end of a fade to hear out.
+        if (quick) {
+            m_decks.DropHeldBack();
+            m_heldDropped = true;
+        }
         Enter(Phase::Recovering, now);
         return;
     }
@@ -236,7 +302,8 @@ void MixSession::TickLocked(double now) {
     if (phase == Phase::Recovering) {
         double p = std::clamp((now - m_phaseSince) / m_recoverSeconds, 0.0, 1.0);
         Gain({Lerp(m_recoverFrom.main, 1, p), m_recoverFrom.tail * (1 - p), Lerp(m_recoverFrom.mainLow, 1, p),
-              m_recoverFrom.tailLow});
+              m_recoverFrom.tailLow, Lerp(m_recoverFrom.mainFilter, 0, p), m_recoverFrom.tailFilter, 0,
+              m_recoverFrom.echoReturn * (1 - p)});
         if (p < 1 || !HeldBackPlayed(now)) return;
         LetGo();
         Gain(kApplesAlone);
@@ -265,10 +332,17 @@ void MixSession::TickLocked(double now) {
     if (phase != Phase::Waiting && m_lastAMoved >= 0 && now - m_lastAMoved > kStallSeconds) {
         return Fail("the song stopped moving", now, true);
     }
+    // Once the deck holds the loop, the second player has given all that is needed: paused, it cannot reach the end
+    // of A and take its stream away while the loop plays on.
+    if (Audible(phase) && Loops(m_plan) && m_ghostOn && !m_ghostQuiet && m_decks.LoopHeld()) {
+        m_decks.QuietGhost();
+        m_ghostQuiet = true;
+    }
     switch (phase) {
         case Phase::Waiting:
             if (m_decks.NextItem() != m_plan.next) return Fail("the queue changed", now);
             if (!a) return;
+            if (Cuts(m_plan)) return TickCutWaiting(now, *a);
             // The deck finds Apple's sound only once Apple's player reaches what the second player, sent ahead,
             // played first: the lead is waited for, on top of the second player's start.
             if (*a > takeAt - kSeekSafety - kSettle - LeadFor(m_plan) - kLeadSlack) {
@@ -295,7 +369,9 @@ void MixSession::TickLocked(double now) {
             if (a) TickAligning(now, *a);
             return;
         case Phase::Ready:
-            if (a) TickReady(now, *a);
+            if (!a) return;
+            if (Cuts(m_plan)) return TickCutReady(now, *a);
+            TickReady(now, *a);
             return;
         case Phase::TakingOver: {
             // Both copies of A, sample for sample: a straight crossfade leaves the sound unchanged.
@@ -314,10 +390,11 @@ void MixSession::TickLocked(double now) {
                 if (!heard) return;
                 if (!m_lagMeasured) LearnSwitchDelay();
                 Gains gains = GainsAt(m_plan.keys, *heard);
-                Gain({gains.b, gains.a, gains.bLow, gains.aLow});
+                Gain({gains.b, gains.a, gains.bLow, gains.aLow, gains.bFilter, gains.aFilter, EchoSendAt(m_plan, *heard),
+                      Echoes(m_plan) ? 1.0 : 0.0});
                 if (*heard < m_plan.keys.back().at) return;
             }
-            if (!HeldBackPlayed(now)) return;
+            if (!HeldBackPlayed(now)) return FadeEcho(now);
             LetGo();
             Gain(kApplesAlone);
             return Enter(Phase::Done, now);

@@ -20,7 +20,7 @@ en:
       text: Choose how many lines show around the sung one, centre them or keep them left, blur the others or leave them sharp, on a dark or artwork background.
       fact: In the pane and in full screen
     - name: AutoMix
-      text: Each song flows into the next like a DJ set, on the beat when the tempos are close and with a crossfade when they are not. It is young and still getting better.
+      text: Each song flows into the next like a DJ set: on the beat when the tempos are close, otherwise an echo out on a bar, the song's own ending and a breath, or a crossfade. It is young and still getting better.
       fact: Off by default, one switch
     - name: Still Apple Music
       text: Lossless, Dolby Atmos, your library and its sync, and whatever Apple adds to the app keep working. An Atmos leveler plays Atmos songs as loud as stereo ones.
@@ -60,7 +60,7 @@ fr:
       text: Choisissez combien de lignes entourent celle qui est chantée, centrées ou à gauche, floutez les autres ou gardez-les nettes, sur un fond sombre ou tiré de la pochette.
       fact: Dans le panneau et en plein écran
     - name: AutoMix
-      text: Chaque morceau s'enchaîne dans le suivant comme un set de DJ, sur le temps quand les tempos sont proches, en fondu sinon. Il est jeune et s'améliore encore.
+      text: Chaque morceau s'enchaîne dans le suivant comme un set de DJ : sur le temps quand les tempos sont proches, sinon une sortie en écho sur une mesure, la vraie fin du morceau et un court silence, ou un fondu. Il est jeune et s'améliore encore.
       fact: Désactivé par défaut, un seul bouton
     - name: Toujours Apple Music
       text: Lossless, Dolby Atmos, votre bibliothèque et sa synchro, et tout ce qu'Apple ajoute à l'app continuent de marcher. Un niveleur joue les morceaux Atmos aussi fort que la stéréo.
@@ -100,7 +100,7 @@ it:
       text: Scegli quante righe mostrare intorno a quella cantata, centrate o a sinistra, sfoca le altre o lasciale nitide, su uno sfondo scuro o preso dalla copertina.
       fact: Nel pannello e a schermo intero
     - name: AutoMix
-      text: Ogni brano sfuma nel successivo come in un set da DJ, a tempo quando i tempi sono vicini, con una dissolvenza quando non lo sono. È giovane e migliora ancora.
+      text: Ogni brano sfuma nel successivo come in un set da DJ: a tempo quando i tempi sono vicini, altrimenti un'uscita in eco su una battuta, il finale del brano stesso e un respiro, o una dissolvenza. È giovane e migliora ancora.
       fact: Spento di default, un solo interruttore
     - name: Sempre Apple Music
       text: Lossless, Dolby Atmos, la tua libreria con la sincronizzazione e tutto ciò che Apple aggiunge all'app continuano a funzionare. Un livellatore porta i brani Atmos al volume della stereo.
@@ -140,7 +140,7 @@ ko:
       text: 부르고 있는 줄 주변에 몇 줄을 보일지 정하고, 가운데 또는 왼쪽으로 맞추고, 나머지 줄을 흐리게 하거나 선명하게 두고, 어두운 배경이나 앨범 아트 배경을 고를 수 있습니다.
       fact: 가사 패널과 전체 화면 모두
     - name: AutoMix
-      text: DJ 세트처럼 곡과 곡을 이어 줍니다. 템포가 비슷하면 박자에 맞춰, 아니면 크로스페이드로 넘어갑니다. 아직 초기 기능이라 계속 다듬고 있습니다.
+      text: DJ 세트처럼 곡과 곡을 이어 줍니다. 템포가 비슷하면 박자에 맞춰, 아니면 마디에 맞춘 에코 아웃, 곡 본래의 끝과 짧은 숨 고르기, 또는 크로스페이드로 넘어갑니다. 아직 초기 기능이라 계속 다듬고 있습니다.
       fact: 기본값은 꺼짐, 스위치 하나
     - name: 그대로 Apple Music
       text: 무손실, Dolby Atmos, 라이브러리와 동기화, 그리고 Apple이 앱에 새로 더하는 기능도 그대로 작동합니다. Atmos 레벨러는 Atmos 곡을 스테레오 곡과 같은 음량으로 재생합니다.
@@ -180,7 +180,7 @@ de:
       text: Wählen Sie, wie viele Zeilen um die gesungene stehen, zentriert oder linksbündig, die anderen weichgezeichnet oder scharf, auf dunklem Grund oder auf dem Cover.
       fact: Im Bereich und im Vollbild
     - name: AutoMix
-      text: Jeder Titel geht wie in einem DJ-Set in den nächsten über, im Takt, wenn die Tempi nah beieinander liegen, sonst mit Überblendung. Er ist noch jung und wird weiter besser.
+      text: Jeder Titel geht wie in einem DJ-Set in den nächsten über: im Takt, wenn die Tempi nah beieinander liegen, sonst mit einem Echo-Ausstieg auf einem Takt, dem eigenen Ende des Titels und einer kurzen Pause oder einer Überblendung. Er ist noch jung und wird weiter besser.
       fact: Standardmäßig aus, ein Schalter
     - name: Weiter Apple Music
       text: Lossless, Dolby Atmos, Ihre Mediathek samt Sync und alles, was Apple der App hinzufügt, funktioniert weiter. Ein Leveler spielt Atmos-Titel so laut wie Stereo-Titel.
@@ -220,7 +220,7 @@ es:
       text: Elige cuántas líneas rodean a la que se canta, centradas o a la izquierda, las demás desenfocadas o nítidas, sobre fondo oscuro o con la portada.
       fact: En el panel y a pantalla completa
     - name: AutoMix
-      text: Cada canción enlaza con la siguiente como en una sesión de DJ, al compás cuando los tempos se parecen y con un fundido cuando no. Es joven y sigue mejorando.
+      text: Cada canción enlaza con la siguiente como en una sesión de DJ: al compás cuando los tempos se parecen; si no, una salida con eco en un compás, el final propio de la canción y una pausa breve, o un fundido. Es joven y sigue mejorando.
       fact: Desactivado por defecto, un solo interruptor
     - name: Sigue siendo Apple Music
       text: Lossless, Dolby Atmos, tu biblioteca y su sincronización, y todo lo que Apple añada a la app siguen funcionando. Un igualador hace que las canciones Atmos suenen tan fuerte como las estéreo.
@@ -260,7 +260,7 @@ pt:
       text: Escolha quantas linhas ficam em volta da que está sendo cantada, centralizadas ou à esquerda, as outras desfocadas ou nítidas, sobre fundo escuro ou com a capa.
       fact: No painel e em tela cheia
     - name: AutoMix
-      text: Cada música emenda na seguinte como num set de DJ, no tempo quando os andamentos são parecidos e com um fade quando não são. Ele ainda é novo e continua melhorando.
+      text: Cada música emenda na seguinte como num set de DJ: no tempo quando os andamentos são parecidos; senão, uma saída com eco num compasso, o final da própria música e uma pausa curta, ou um fade. Ele ainda é novo e continua melhorando.
       fact: Desligado por padrão, um só interruptor
     - name: Continua sendo o Apple Music
       text: Lossless, Dolby Atmos, a sua biblioteca com a sincronização e tudo o que a Apple acrescentar ao app continuam funcionando. Um nivelador faz as músicas em Atmos tocarem tão alto quanto as estéreo.
@@ -300,7 +300,7 @@ ru:
       text: Выберите, сколько строк показывать вокруг той, что поётся, выровняйте их по центру или по левому краю, размойте остальные или оставьте чёткими, на тёмном фоне или на фоне обложки.
       fact: В панели и на весь экран
     - name: AutoMix
-      text: Каждый трек перетекает в следующий, как в диджейском сете. В такт, если темпы близки, и плавным переходом, если нет. Функция совсем молодая и пока улучшается.
+      text: Каждый трек перетекает в следующий, как в диджейском сете. В такт, если темпы близки, а если нет, то выходом через эхо на такте, собственной концовкой трека с короткой паузой или плавным переходом. Функция совсем молодая и пока улучшается.
       fact: По умолчанию выключен, один переключатель
     - name: Всё тот же Apple Music
       text: Lossless, Dolby Atmos, ваша медиатека с синхронизацией и всё, что Apple добавляет в приложение, продолжает работать. Выравниватель Atmos делает треки Atmos такими же громкими, как стереотреки.
@@ -340,7 +340,7 @@ ja:
       text: 歌われている行の前後に何行表示するか、中央にそろえるか左にそろえるか、ほかの行をぼかすかくっきり見せるか、背景を暗くするかアートワークにするかを選べます。
       fact: パネルでもフルスクリーンでも
     - name: AutoMix
-      text: 曲から曲へ、DJ セットのようにつながります。テンポが近ければビートに合わせ、離れていればクロスフェードで。まだ生まれたばかりで、改良を続けています。
+      text: 曲から曲へ、DJ セットのようにつながります。テンポが近ければビートに合わせ、離れていれば小節でのエコーアウト、ひと呼吸おいた曲本来のエンディング、またはクロスフェードで。まだ生まれたばかりで、改良を続けています。
       fact: 初期設定はオフ、スイッチ 1 つ
     - name: やっぱり Apple Music
       text: ロスレス、Dolby Atmos、ライブラリとその同期、Apple がアプリに加える新機能は、そのまま使えます。Atmos レベラーが、Atmos の曲をステレオの曲と同じ音量にそろえます。
@@ -380,7 +380,7 @@ zh:
       text: 选择正在演唱的那一行前后显示几行，居中还是靠左，其余行模糊还是保持清晰，背景用深色还是封面。
       fact: 侧边面板和全屏中都适用
     - name: AutoMix
-      text: 歌曲之间像 DJ 现场混音一样衔接。节奏相近时卡着拍子，不相近时用淡入淡出。它还很年轻，仍在不断改进。
+      text: 歌曲之间像 DJ 现场混音一样衔接。节奏相近时卡着拍子，不相近时在小节上以回声淡出、让歌曲自然收尾并稍作停顿，或用淡入淡出。它还很年轻，仍在不断改进。
       fact: 默认关闭，只有一个开关
     - name: 依然是 Apple Music
       text: 无损音质、杜比全景声、资料库及其同步，以及 Apple 日后给应用加的功能，都照常工作。全景声均衡器让全景声歌曲和立体声歌曲一样响。

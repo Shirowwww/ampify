@@ -85,6 +85,8 @@ void SingLocalReset();    // after it reset
 void SingLocalStopped();  // after it stopped
 bool SingHoldsSound();  // studio mode on: Apple's silent blocks are played through it, so what it holds is heard
 double SingLag();       // seconds studio mode holds the sound back, 0 when off: a mix waits that long to end
+void SingTailNewMix();  // a mix's second player starts or stops: nothing the deck's stream held before is played
+void SingTailDrop();    // what the deck's stream holds goes now, after a short fade: the user moved on
 
 // Diagnostic (output_record.cpp): while record.on exists in the kit, what the stereo stream sends goes to a WAV file.
 void RecordOutput(const float* samples, unsigned frames, int rate);  // audio thread, after Ampify's steps

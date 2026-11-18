@@ -384,6 +384,133 @@ TEST_CASE(AutoMixDeck_TakesTheBassOfOneSongOnly) {
     CHECK(WorstError(rig.out, from, rig.at, apples) == 0);
 }
 
+TEST_CASE(AutoMixDeck_ThinsTheOldSongOutAndMufflesTheNewOne) {
+    // A is a low note, B a high one: A's high-pass at its top and B's low-pass at its bottom leave next to nothing.
+    Rig rig(Tone(12, 100, 0.5), Tone(12, 5000, 0.5));
+    rig.volume = 1;
+    rig.Run(3.0);
+    REQUIRE(rig.Align().has_value());
+    rig.deck.SetGains({0, 1, 1, 1}, 1);
+    rig.Run(0.5);
+    const double low = Rms(rig.out, rig.at - kRate / 4, rig.at);
+    rig.deck.SetGains({0, 1, 1, 1, 0, 1}, 1);
+    rig.Run(1.0);
+    CHECK(Db(Rms(rig.out, rig.at - kRate / 4, rig.at) / low) < -40);  // 100 Hz under a 2 kHz high-pass
+    rig.onB = true;
+    rig.deck.SetGains({1, 0, 1, 1, 0, 0}, 1);
+    rig.Run(0.5);
+    const double high = Rms(rig.out, rig.at - kRate / 4, rig.at);
+    CHECK(std::abs(Db(high / (0.5 / std::sqrt(2.0)))) < 0.5);
+    rig.deck.SetGains({1, 0, 1, 1, 1, 0}, 1);
+    rig.Run(1.0);
+    CHECK(Db(Rms(rig.out, rig.at - kRate / 4, rig.at) / high) < -35);  // 5 kHz over a 400 Hz low-pass
+    rig.deck.SetGains({1, 0, 1, 1, 0, 0}, 1);  // and open again, it is Apple's stream to the sample
+    rig.Run(0.5);
+    const size_t from = rig.at;
+    rig.Run(0.5);
+    auto apples = [&](size_t frame, size_t channel) { return static_cast<double>(rig.sent[frame * 2 + channel]); };
+    CHECK(WorstError(rig.out, from, rig.at, apples) == 0);
+}
+
+TEST_CASE(AutoMixDeck_ASweepComesInAndGoesOutWithoutAClick) {
+    // Even nearly open, a filter shifts a low note: switched in or out at once, the wave would jump.
+    Rig rig(Tone(12, 100, 0.5));
+    rig.volume = 1;
+    rig.Run(3.0);
+    REQUIRE(rig.Align().has_value());
+    rig.deck.SetGains({0, 1, 1, 1}, 1);
+    rig.Run(0.5);
+    const size_t from = rig.at;
+    for (int n = 1; n <= 50; n++) {  // the session's pace: a new amount every 10 ms, up to a quarter and back to 0
+        const double amount = 0.25 * (n <= 25 ? n : 50 - n) / 25.0;
+        rig.deck.SetGains({0, 1, 1, 1, 0, amount}, 1);
+        rig.Run(0.01);
+    }
+    rig.Run(0.5);
+    double worst = 0;
+    for (size_t i = from; i < rig.at; i++) {  // from the step into the first frame the filter may touch
+        worst = std::max<double>(worst, std::abs(rig.out[i * 2] - rig.out[(i - 1) * 2]));
+    }
+    CHECK(worst < 1.2 * 0.5 * 2 * std::sin(kPi * 100 / kRate));  // the note's own steepest step, and a little
+    const size_t open = rig.at;
+    rig.Run(0.5);
+    auto apples = [&](size_t frame, size_t channel) { return static_cast<double>(rig.sent[frame * 2 + channel]); };
+    CHECK(WorstError(rig.out, open, rig.at, apples) < 1e-5);
+}
+
+TEST_CASE(AutoMixDeck_AnEchoRepeatsWhatWasThrownEachRepeatQuieter) {
+    Rig rig(Song(12, 8));
+    rig.volume = 1;
+    rig.Run(3.0);
+    REQUIRE(rig.Align().has_value());
+    rig.deck.SetEcho(0.5, 0.5);
+    rig.deck.SetGains({0, 1, 1, 1, 0, 0, 0, 1}, 1);  // the deck's copy alone, the echo heard but fed nothing
+    rig.Run(0.5);
+    const double level = Rms(rig.out, rig.at - kRate / 4, rig.at);
+    const size_t thrown = rig.at;
+    rig.deck.SetGains({0, 1, 1, 1, 0, 0, 1, 1}, 1);  // a quarter of a second of A thrown into it
+    rig.Run(0.25);
+    rig.deck.SetGains({0, 0, 1, 1, 0, 0, 0, 1}, 1);  // and A gone
+    rig.Run(2.0);
+    auto window = [&](double from, double to) {
+        return Rms(rig.out, thrown + static_cast<size_t>(from * kRate), thrown + static_cast<size_t>(to * kRate));
+    };
+    const double first = window(0.53, 0.74), second = window(1.03, 1.24), third = window(1.53, 1.74);
+    CHECK(Db(first / level) > -14);  // 3 dB under A, and this song's lows (most of it) thinned out
+    CHECK(Db(first / level) < -3);
+    CHECK(Db(second / first) < -6);  // half, and thinner again
+    CHECK(Db(third / second) < -6);
+    CHECK(Db(second / first) > -12);
+    CHECK(window(0.3, 0.48) == 0);  // nothing between A and its first repeat
+    CHECK(Db(window(0.8, 0.98) / level) < -80);  // nor between repeats
+    rig.deck.SetGains({0, 0, 1, 1, 0, 0, 0, 0}, 1);  // the echo's return closed: silence, though it still rings
+    rig.Run(0.25);
+    CHECK(Rms(rig.out, rig.at - kRate / 8, rig.at) == 0);
+}
+
+TEST_CASE(AutoMixDeck_ALoopPlaysTheSameBarOverAndOverWithoutAClick) {
+    // A note of 101 Hz turns half a cycle in the half second looped, and the loop starts on its crest: joined end to
+    // start as they are, the wave would jump from trough to crest at each turn.
+    std::vector<float> a = Song(12, 9);
+    const std::vector<float> note = Tone(12, 101, 0.5);
+    for (size_t i = 0; i < a.size(); i++) a[i] = a[i] * 0.02f + note[i];
+    Rig rig(a);
+    rig.volume = 1;
+    const double from = 5 + 0.25 / 101;
+    rig.deck.SetLoop(from, 0.5);  // as the session does: before the deck finds Apple's sound
+    rig.Run(3.0);
+    REQUIRE(rig.Align().has_value());
+    CHECK(!rig.deck.LoopHeld());
+    rig.deck.SetGains({0, 1, 1, 1}, 1);
+    rig.Run(1.0);  // the second player, two seconds ahead, is through the loop
+    CHECK(rig.deck.LoopHeld());
+    rig.tailFlows = false;  // and is paused: the deck needs nothing more of it
+    rig.Run(3.5);
+    CHECK_NEAR(*rig.deck.Time(), 7.5, 0.02);  // A's time runs on through five turns of the loop
+    const size_t start = static_cast<size_t>(std::llround(from * kRate)), length = kRate / 2, seam = kRate / 50;
+    auto apples = [&](size_t frame, size_t channel) { return static_cast<double>(rig.sent[frame * 2 + channel]); };
+    CHECK(WorstError(rig.out, 4 * kRate, start + length - seam, apples) < 1e-5);  // A as it is up to the seam
+    auto firstTurn = [&](size_t frame, size_t channel) {
+        return static_cast<double>(rig.out[(start + (frame - start) % length) * 2 + channel]);
+    };
+    REQUIRE(rig.out.size() >= (start + 4 * length) * 2);
+    CHECK(WorstError(rig.out, start + length, start + 4 * length, firstTurn) == 0);  // then the same turn again
+    // The sound steps no more than A's own does into each turn, and hardly more across the seam that leads there.
+    auto steepest = [&](size_t from, size_t to) {
+        double worst = 0;
+        for (size_t i = from; i < to; i++) {
+            for (size_t c = 0; c < 2; c++) worst = std::max<double>(worst, std::abs(rig.out[i * 2 + c] - rig.out[(i - 1) * 2 + c]));
+        }
+        return worst;
+    };
+    const double own = steepest(4 * kRate + 1, start + length - seam);
+    for (size_t k = 1; k <= 3; k++) {
+        const size_t turn = start + k * length;
+        CHECK(steepest(turn, turn + 1) <= own);
+        CHECK(steepest(turn - seam, turn) < 1.3 * own);
+    }
+}
+
 TEST_CASE(AutoMixDeck_StandsStillWhenTheSecondPlayerStops) {
     Rig rig(Song(12, 6));
     rig.Run(3.0);

@@ -6,8 +6,9 @@
 // second player plays A again, a few seconds ahead, into a stream of its own, and that stream is the deck's: what
 // the second player writes there waits here, and what leaves in its place is the deck's copy of A, late by exactly
 // what it takes to be Apple's own A to the sample (Align). The deck's copy then replaces Apple's in a crossfade of
-// two identical sounds, Apple's player is free to move on to B, and the deck owns both songs apart: a volume and a
-// low shelf for each, and A's speed (TempoStretch), which the seconds of lead pay for.
+// two identical sounds, Apple's player is free to move on to B, and the deck owns both songs apart: a volume, a low
+// shelf and a filter for each, A's speed (TempoStretch), which the seconds of lead pay for, an echo of A and a loop
+// of A that it keeps once the second player has given it.
 //
 // Two streams are in step when Windows takes the same frames from both at the same time. It takes them in whole
 // periods, from every stream at once, so how far apart two streams are is a whole number of periods, known exactly
@@ -30,12 +31,18 @@ namespace ampify::automix {
 class TempoStretch;
 
 // 0..1 each. `main` is Apple's stream as it comes, `tail` the deck's copy of A; the lows are what is left of each
-// one's bass.
+// one's bass. The filters are how far each is filtered, 0 not at all: Apple's stream through a low-pass (B comes in
+// muffled), the deck's copy through a high-pass (A leaves thin). The echo takes the deck's A before its volume
+// (`echoSend`), so that it rings on once A is gone, and is heard at `echoReturn`.
 struct DeckGains {
     double main = 1;
     double tail = 0;
     double mainLow = 1;
     double tailLow = 1;
+    double mainFilter = 0;
+    double tailFilter = 0;
+    double echoSend = 0;
+    double echoReturn = 0;
 };
 
 struct DeckStep {
@@ -72,6 +79,12 @@ public:
 
     // A's speed moves from 1 at `from` (A's time) to `rate` at `first`, evenly in the listener's time, then stays.
     void SetStretch(double from, double first, double rate);
+    // An echo whose repeats come `delay` seconds apart, each `feedback` of the one before. After Open.
+    void SetEcho(double delay, double feedback);
+    // From `from` (A's time) on, the deck plays the `length` seconds of A there over and over, kept as the second
+    // player's sound of them comes in. After Open, before Align.
+    void SetLoop(double from, double length);
+    bool LoopHeld() const;  // all of the loop came in: nothing more of the second player's sound is needed
 
     // Reached in a straight line a fiftieth of a second from now, at the same instant in both streams. `volume` is
     // the user's volume now: the second player's sound waits a few seconds here, so the deck follows the slider.
@@ -101,6 +114,31 @@ private:
         void Clear();
     };
 
+    // A state-variable filter (Simper's), steady while its cutoff moves. It runs on every chunk once the deck plays
+    // A, whatever its amount, so its state is the music's; at 0 its sound is not used, and it comes in and goes out
+    // across one chunk, from the dry sound to its own: no click either way.
+    struct Sweep {
+        bool highPass = false;
+        double ic1[2] = {0, 0};
+        double ic2[2] = {0, 0};
+        void Run(float* stereo, size_t frames, double from, double to, int sampleRate);
+        void Clear();
+    };
+
+    // A delay line fed with the deck's A, and with its own repeats: a high-pass and a low-pass in the loop thin each
+    // repeat out a little more, so that they leave B's bass alone and fade like a tape echo's.
+    struct Echo {
+        std::vector<float> line;  // stereo, exactly the delay long
+        size_t at = 0;
+        double feedback = 0;
+        double low[2] = {0, 0};   // the low-pass's state
+        double base[2] = {0, 0};  // what the high-pass takes away
+        // Adds the echo to `out` (times `scale`), feeding it `in`; send and return move in a line over the chunk.
+        // True when what it added is not silence.
+        bool Run(const float* in, float* out, size_t frames, const DeckGains& from, const DeckGains& to, double scale,
+                 int sampleRate);
+    };
+
     // How Windows takes one stream: for its last blocks, the frames taken so far (counted from the stream's first
     // frame) and how far that is ahead of the clock.
     struct Feed {
@@ -126,6 +164,8 @@ private:
     DeckGains GainsAt(std::int64_t at) const;
     size_t UntilPoint(std::int64_t at, size_t frames) const;
     bool ReadTail(std::uint64_t from, size_t frames, float* out) const;
+    bool ReadSong(std::uint64_t from, size_t frames, float* out) const;
+    void KeepLoop();
     size_t UntilEvent(size_t frames);
     bool NextTail(size_t frames);
     void Measure(const float* stereo, std::uint64_t mainFrame, size_t frames, double scale);
@@ -162,6 +202,19 @@ private:
     std::vector<Point> m_curve;  // the gains over the second player's frames, straight lines between points
     LowShelf m_mainShelf;
     LowShelf m_tailShelf;
+    Sweep m_mainSweep;  // low-pass
+    Sweep m_tailSweep{true};
+    Echo m_echo;
+
+    // The loop: the second player's frames from a seam before it to its end, the seam blended into its last frames
+    // once all came in, so that the loop's end leads into its start as A led into it.
+    std::vector<float> m_loop;
+    double m_loopFrom = 0;          // A's time
+    size_t m_loopFrames = 0;        // 0: no loop
+    size_t m_loopSeam = 0;
+    std::int64_t m_loopAt = -1;     // the second player's frame where it starts, once aligned
+    size_t m_loopKept = 0;          // frames of m_loop filled
+    bool m_loopHeld = false;
 
     double m_residualError = 0;
     double m_residualPower = 0;

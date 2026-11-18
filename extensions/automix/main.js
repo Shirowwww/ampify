@@ -1,9 +1,12 @@
 // AutoMix: each song flows into the next, as in a DJ set. Apple's own analysis of both songs (beats, bars, phrases,
 // key, loudness, fades, vocals: the analysis Apple's AutoMix uses) picks where the next song comes in, at which bar of
 // it, and how long the two play together. The kernel (Ampify.automix) brings the current song to the next one's tempo
-// at its own pitch, keeps the two in step with a second player, crosses their volumes and hands the bass from one to
-// the other. Songs of one album that follow each other and classical music keep Apple's gapless playback; songs that
-// cannot share a tempo swap on a bar when both have a beat, and get a smooth crossfade otherwise.
+// at its own pitch, keeps the two in step with a second player, crosses their volumes, hands the bass from one to the
+// other and filters both. Songs of one album that follow each other and classical music keep Apple's gapless playback.
+// A song that stops on a hit is heard to its end, then the next one comes in at once or after a breath. Of songs with
+// a beat that cannot share a tempo, the current one leaves on an echo at the end of a phrase; the others get a
+// crossfade, over the song's own fade when it has one. A song that stops on a hit and shares the next one's tempo may
+// loop one of its last bars while the next one comes in on the beat.
 
 const CHECK_EVERY_MS = 1000;
 const PLAN_AHEAD_S = 45;          // a plan is handed to the kernel once its mix is this close
@@ -36,6 +39,25 @@ const MIN_SWAP_TAIL_S = 1;        // ...within these bounds (half a bar, 0.75 s 
 const MAX_SWAP_TAIL_S = 2;
 const OVER_FADE_GAIN = 0.7;       // the next song's volume once the current one starts fading out by itself
 const QUIET_BELOW_DB = 18;        // this far below the song's loudness: silence or a fade, not the music
+const BEAT_SWEEP = 0.35;          // in a mix on the beat the next song comes in muffled (5 kHz) and the current one
+                                  // leaves thinned (100 Hz)...
+const FADE_SWEEP = 0.4;           // ...a little more in a crossfade (4 kHz, 125 Hz)...
+const ECHO_SWEEP = 0.6;           // ...and the current song thins out to 300 Hz over the bar it leaves on, in an echo
+const ECHO_FEEDBACK = 0.5;        // each repeat of an echo half the one before
+const ECHO_DELAY = [0.3, 0.8];    // seconds between repeats: a beat of the current song, doubled or halved into this
+// A song that goes from its music to silence within one step of Apple's loudness curve stops on a hit, which rings on
+// a little past where its loudness drops. Most songs end on a fade of one to four seconds instead (seen on Apple's
+// French chart, 18/11/2026): a pause after each would sound like no AutoMix at all.
+const ABRUPT_S = 0.6;
+const HIT_RING_S = 0.3;
+const COLD_BREATH_S = 0.12;       // after a hit, a next song that starts strong comes in after this...
+const NATURAL_BREATH_S = 0.6;     // ...after this otherwise
+const CUT_MARGIN_S = 0.1;         // a song left to its end still leaves Apple's player this much of it
+const MIN_TRIM_S = 0.3;           // less silence than this to take away: Apple's gapless playback does as well
+const LOOP_ROOM_S = 1.1;          // the kernel wants the bar looped to end a second before the song does
+const MAX_LOOP_BARS = 4;          // a bar played more often than this gets old
+const LOOP_CANDIDATES = 4;        // the bar looped is one of the song's last four that can be
+const LOOP_VOCALS = 0.2;          // and is sung over less than this, or the singer stutters
 const MIN_DANCEABILITY = 0.15;    // Apple scores most rap 0.1 to 0.4: higher, hardly any pair mixes on the beat
 const TOKEN_MAX_AGE_MS = 5 * 24 * 3600 * 1000;
 const NO_MIX_GENRES = ["Classical", "Opera", "Spoken Word", "Audiobooks", "Comedy"];
@@ -49,8 +71,14 @@ function median(values) {
   return sorted[Math.floor(sorted.length / 2)];
 }
 
+// Apple's times in seconds, each one later than the one before: a time given twice or going back made a bar of no
+// length, whose echo delay was doubled for ever.
 function seconds(list) {
-  return Array.isArray(list) ? list.filter((v) => Number.isFinite(v)).map((v) => v / 1000) : [];
+  const times = [];
+  for (const value of Array.isArray(list) ? list : []) {
+    if (Number.isFinite(value) && !(value / 1000 <= times.at(-1))) times.push(value / 1000);
+  }
+  return times;
 }
 
 function barsOf(song) {
@@ -189,16 +217,31 @@ function phraseBars(song, bars) {
 }
 
 // The volumes and the lows of a mix on the beat, as [time, A, B, A's lows, B's lows]: the next song comes in without
-// its bass, takes it over around the middle, and the current song leaves once the next one is in full.
-function blendKeys(aStart, aEnd) {
+// its bass, takes it over around the middle, and the current song leaves once the next one is in full. With `sweep`,
+// two more numbers, how far each song is filtered: the next one comes in muffled and opens up as it takes the bass,
+// the current one thins out from there on.
+function blendKeys(aStart, aEnd, sweep = 0) {
   const at = (x) => aStart + (aEnd - aStart) * x;
-  return [
-    [aStart, 1, 0, 1, 0],
-    [at(BASS_SWAP[0]), 1, 0.7, 1, 0],
-    [at(BASS_SWAP[1]), 1, 0.9, 0, 1],
-    [at(0.8), 0.5, 1, 0, 1],
-    [aEnd, 0, 1, 0, 1],
+  const keys = [
+    [aStart, 1, 0, 1, 0, 0, sweep],
+    [at(BASS_SWAP[0]), 1, 0.7, 1, 0, 0, sweep / 3],
+    [at(BASS_SWAP[1]), 1, 0.9, 0, 1, 0, 0],
+    [at(0.8), 0.5, 1, 0, 1, sweep / 2, 0],
+    [aEnd, 0, 1, 0, 1, sweep, 0],
   ];
+  return sweep ? keys : keys.map((key) => key.slice(0, 5));
+}
+
+// A's bars and beats with its bar `i` played over and over after its first pass, for `turns` more bars.
+function loopedGrid(bars, beats, i, turns) {
+  const from = bars[i];
+  const length = bars[i + 1] - from;
+  const loopBars = bars.slice(0, i + 1);
+  for (let k = 1; k <= turns; k++) loopBars.push(from + k * length);
+  const inLoop = beats.filter((t) => t >= from && t < from + length);
+  const loopBeats = beats.filter((t) => t < from);
+  for (let k = 0; k <= turns; k++) loopBeats.push(...inLoop.map((t) => t + k * length));
+  return { bars: loopBars, beats: loopBeats, from, length };
 }
 
 function sameAlbumInOrder(a, b) {
@@ -258,20 +301,60 @@ function beatMix(a, b, spanA, spanB, options) {
   const counts = short && choices.some((count) => count <= SHORT_BARS)
     ? choices.filter((count) => count <= SHORT_BARS) : choices;
   const grids = { barsA, barsB, beatsA: beatsOf(a), beatsB: beatsOf(b), span: match.span };
-  for (const count of counts) {
-    const from = last - count;
-    if (from < 0) continue;
+  const sweep = options.can.has("filter") ? BEAT_SWEEP : 0;
+  const plain = (() => {
+    for (const count of counts) {
+      const from = last - count;
+      if (from < 0) continue;
+      for (const entry of entries) {
+        const fit = beatFit(a, grids, from, last, entry, options);
+        if (!fit) continue;
+        // Two singers at once for long sounds like a clash: then only the shortest mix.
+        const sings = vocalShare(a, fit.aStart, fit.aEnd) > 0.4;
+        const clash = sings && vocalShare(b, fit.bStart, fit.bStart + fit.length) > 0.4;
+        if (clash && count > 2 && counts.includes(2)) continue;
+        const plan = {
+          bStart: fit.bStart, keys: blendKeys(fit.aStart, fit.aEnd, sweep),
+          ...(fit.rate !== 1 ? { rate: fit.rate, rateFrom: fit.aStart - fit.ramp } : {}),
+        };
+        return { kind: "beat", bars: count, plan, sings };
+      }
+    }
+    return null;
+  })();
+  // A song that stops on a hit and would be mixed over its singer, shorter than the style wants or not at all, loops
+  // a bar without its singer instead, when that gives a longer mix or one without the singer.
+  if (options.can.has("loop") && spanA.silent - spanA.end < ABRUPT_S && (!plain || plain.sings || plain.bars < counts[0])) {
+    const looped = loopMix(a, grids, entries, counts, options, sweep);
+    if (looped && (!plain || plain.sings || looped.bars > plain.bars)) return looped;
+  }
+  return plain;
+}
+
+// Apple's measure looping, for a current song that stops on a hit: one of its last bars that the kernel can loop, one
+// without its singer, plays over and over while the next song comes in on the beat. The next song's first bars ride
+// on that groove rather than on the current song's last phrase, and the hit that would stop it dead never comes. A's
+// time runs on through the loop: the keys and the speed are those of the bar looped. Null when no such bar fits.
+function loopMix(a, grids, entries, counts, options, sweep) {
+  const { barsA, beatsA } = grids;
+  const candidates = [];
+  for (let k = barsA.length - 2; k >= 1 && candidates.length < LOOP_CANDIDATES; k--) {
+    if (barsA[k + 1] + LOOP_ROOM_S <= a.duration) candidates.push(k);
+  }
+  const i = candidates.find((k) => vocalShare(a, barsA[k], barsA[k + 1]) < LOOP_VOCALS);
+  if (i === undefined) return null;
+  for (const count of counts.filter((bars) => bars <= MAX_LOOP_BARS)) {
+    const looped = loopedGrid(barsA, beatsA, i, count + 1);
     for (const entry of entries) {
-      const fit = beatFit(a, grids, from, last, entry, options);
-      if (!fit) continue;
-      // Two singers at once for long sounds like a clash: then only the shortest mix.
-      const clash = vocalShare(a, fit.aStart, fit.aEnd) > 0.4 && vocalShare(b, fit.bStart, fit.bStart + fit.length) > 0.4;
-      if (clash && count > 2 && counts.includes(2)) continue;
+      const fit = beatFit(a, { ...grids, barsA: looped.bars, beatsA: looped.beats }, i, i + count, entry,
+                          { ...options, looped: true });
+      // The kernel lets go of the second player once it holds the bar: the room it wants is after the first key.
+      if (!fit || a.duration - fit.aStart < endRoom(fit.rate, fit.ramp, fit.length * fit.rate)) continue;
       const plan = {
-        bStart: fit.bStart, keys: blendKeys(fit.aStart, fit.aEnd),
+        bStart: fit.bStart, keys: blendKeys(fit.aStart, fit.aEnd, sweep), loop: { from: looped.from, length: looped.length },
         ...(fit.rate !== 1 ? { rate: fit.rate, rateFrom: fit.aStart - fit.ramp } : {}),
       };
-      return { kind: "beat", bars: count, plan };
+      return { kind: "loop", bars: count, plan };
     }
   }
   return null;
@@ -295,7 +378,7 @@ function beatFit(a, grids, from, last, entry, options) {
   const length = (aEnd - aStart) / rate;
   const ramp = rate !== 1 ? Math.min(RAMP_S, aStart - options.earliest) : 0;
   if (length > options.maxSeconds || aStart < options.earliest || (rate !== 1 && ramp < MIN_RAMP_S)) return null;
-  if (aEnd > a.duration - endRoom(rate, ramp, length * rate)) return null;
+  if (!options.looped && aEnd > a.duration - endRoom(rate, ramp, length * rate)) return null;
   const bStart = barsB[entry + across] - (barsA[from + middle] - aStart) / rate;
   if (bStart < 0) return null;
   if (worstBeatGap(beatsA, beatsB, aStart, rate, bStart, length) > MAX_BEAT_GAP_S) return null;
@@ -312,10 +395,75 @@ function crossfade(a, b, spanA, spanB, options) {
   const length = Math.min(options.maxSeconds, MAX_CROSSFADE_S, Math.max(MIN_CROSSFADE_S, wanted));
   const aStart = aEnd - length;
   if (!(aStart > options.earliest) || !(spanB.sound + length < b.duration)) return null;
+  // Filtered, the next song comes in muffled and opens up, fully once the current one fades by itself.
+  const sweep = options.can.has("filter") ? FADE_SWEEP : 0;
+  const key = (at, x, y, thin, muffled) => (sweep ? [at, x, y, 1, 1, thin * sweep, muffled * sweep] : [at, x, y]);
   const keys = fade > 0.5 && spanA.end - aStart >= 1
-    ? [[aStart, 1, 0], [spanA.end, 1, OVER_FADE_GAIN], [aEnd, 0, 1]]
-    : [[aStart, 1, 0], [aEnd, 0, 1]];
+    ? [key(aStart, 1, 0, 0, 1), key(spanA.end, 1, OVER_FADE_GAIN, 0.5, 0), key(aEnd, 0, 1, 1, 0)]
+    : [key(aStart, 1, 0, 0, 1), key(aEnd, 0, 1, 1, 0)];
   return { kind: "crossfade", bars: 0, plan: { bStart: spanB.sound, keys } };
+}
+
+// Seconds between an echo's repeats: a beat of the current song, doubled or halved until it is neither a stutter
+// nor a lag.
+function echoDelay(beat) {
+  let delay = beat;
+  while (delay < ECHO_DELAY[0]) delay *= 2;
+  while (delay > ECHO_DELAY[1]) delay /= 2;
+  return delay;
+}
+
+// An echo out, for songs with a beat that cannot share a tempo, as a DJ leaves a song at the end of a phrase: the
+// current song plays whole up to there, thinning out over its last bar; its last beat goes into an echo, and on the
+// bar the next song's first bar lands in full as the current one stops, its echo ringing on over the next song's
+// first bars, each repeat half the one before and thinner. A next song whose first bar comes too soon after its start
+// to be started unheard a beat before it takes the current song's first beat of the next bar instead, the current
+// song fading out over half of it. Null when the current song fades out by itself (a crossfade follows its fade).
+function echoSwap(a, b, spanA, spanB, options) {
+  const barsA = barsOf(a);
+  const barsB = barsOf(b);
+  if (beatless(a, b, barsA, barsB) || spanA.silent - spanA.end >= OWN_FADE_S) return null;
+  const bar = barLength(barsA, spanA.end);
+  // The current song may go on half a beat past the bar.
+  let last = barsA.findLastIndex((time) => time <= Math.min(spanA.end, a.duration - endRoom() - ECHO_DELAY[1] / 2));
+  const phraseEnd = phraseBars(a, barsA).filter((index) => index <= last).at(-1);
+  if (phraseEnd !== undefined && last - phraseEnd < 4) last = phraseEnd;
+  const first = barsB.findIndex((time) => time >= spanB.start - 0.05);
+  if (last < 0 || first < 0) return null;
+  const swapAt = barsA[last];
+  const entry = barsB[first];
+  const lead = Math.min(bar, entry);  // the next song plays unheard before its first bar, from its start at most
+  const aStart = swapAt - lead;
+  if (!(aStart > options.earliest) || !(entry + bar < b.duration)) return null;
+  const sweep = options.can.has("filter") ? ECHO_SWEEP : 0;
+  const delay = echoDelay(bar / 4);
+  const plan = (keys, echo) => ({ bStart: entry - lead, keys, echo: { ...echo, delay, feedback: ECHO_FEEDBACK } });
+  if (lead >= delay + 2 * SWAP_AHEAD_S) {
+    // The echo takes the beat before the bar, so that its first repeat lands on the bar as the song stops; the next
+    // song is in full a little before the bar, so its first beat is heard whole.
+    const cut = swapAt - SWAP_AHEAD_S;
+    const keys = [[aStart, 1, 0, 1, 0, 0, 0], [cut - SWAP_AHEAD_S, 1, 0, 1, 0, sweep, 0], [cut, 0, 1, 0, 1, sweep, 0]];
+    return { kind: "echo", bars: 0, plan: plan(keys, { from: swapAt - delay, to: cut }) };
+  }
+  const full = Math.max(aStart + SWAP_AHEAD_S, swapAt - SWAP_AHEAD_S);
+  const gone = swapAt + delay / 2;
+  const keys = [[aStart, 1, 0, 1, 0, 0, 0], [full, 1, 1, 0, 1, sweep / 2, 0], [gone, 0, 1, 0, 1, sweep, 0]];
+  return { kind: "echo", bars: 0, plan: plan(keys, { from: aStart, to: gone }) };
+}
+
+// The current song to its very end, then the next one from its first sound after a breath, Apple's player alone
+// moving from one to the other with the silences between them cut short: for a song that stops on a hit, its own
+// end. A cold cut into a next song that starts strong, a breath before one that starts softly. Null for a song that
+// fades, or when there is too little silence to take away for this to differ from Apple's gapless playback.
+function naturalEnd(a, b, spanA, spanB, options) {
+  if (!options.can.has("cut") || !(spanA.silent - spanA.end < ABRUPT_S)) return null;
+  const breath = spanB.start - spanB.sound < ABRUPT_S ? COLD_BREATH_S : NATURAL_BREATH_S;
+  const ended = Math.min(spanA.silent + HIT_RING_S, a.duration - CUT_MARGIN_S);
+  const ownSilence = Math.min(breath, spanB.sound);  // what of the breath is the next song's own silence
+  const at = Math.min(ended + breath - ownSilence, a.duration - CUT_MARGIN_S);
+  const bStart = spanB.sound - ownSilence;
+  if (!(at > options.earliest) || a.duration - at + bStart < MIN_TRIM_S) return null;
+  return { kind: "natural", bars: 0, plan: { bStart, keys: [[at, 1, 0], [at, 0, 1]] }, cold: breath === COLD_BREATH_S };
 }
 
 // A swap on a bar, for songs with a beat that cannot share a tempo. The current song plays whole, bass included, up
@@ -361,7 +509,10 @@ function inAtmos(song, atmosPlays) {
   return atmosPlays !== false && (song.attributes?.audioTraits ?? []).includes("atmos");
 }
 
-function planMix(a, b, options) {
+// `options.can` holds what the kernel can play beyond volumes, lows and speed (Ampify.automix.state().features): an
+// older one gets the plans it always took.
+function planMix(a, b, given) {
+  const options = { ...given, can: given.can ?? new Set() };
   if (options.style === "Off") return { kind: "none", why: "off" };
   if (inAtmos(a, options.atmosPlays)) return { kind: "none", why: "this song plays in Dolby Atmos" };
   if (inAtmos(b, options.atmosPlays)) return { kind: "none", why: "it plays in Dolby Atmos" };
@@ -369,9 +520,15 @@ function planMix(a, b, options) {
   if (noMixGenre(a) || noMixGenre(b)) return { kind: "none", why: "classical music or speech" };
   const spanA = musicalSpan(a);
   const spanB = musicalSpan(b);
-  const onTheBeat = options.style === "Crossfade only"
-    ? null : beatMix(a, b, spanA, spanB, options) ?? barSwap(a, b, spanA, spanB, options);
-  if (onTheBeat) return onTheBeat;
+  if (options.style !== "Crossfade only") {
+    const beat = beatMix(a, b, spanA, spanB, options);
+    if (beat) return beat;
+    // A hit is the song's own end. Otherwise two beats that cannot share a tempo leave on an echo.
+    const ending = naturalEnd(a, b, spanA, spanB, options);
+    if (ending) return ending;
+    const swap = options.can.has("echo") ? echoSwap(a, b, spanA, spanB, options) : barSwap(a, b, spanA, spanB, options);
+    if (swap) return swap;
+  }
   const fade = crossfade(a, b, spanA, spanB, options);
   if (!fade) return { kind: "none", why: "no room for a mix" };
   // Why not on the beat, for the log: the first thing in the way.
@@ -514,6 +671,7 @@ function options(state) {
     albums: Ampify.config.get("albums"),
     earliest: state.current.time + LATEST_S + 1,
     atmosPlays: knownAtmosPlays(),
+    can: new Set(Array.isArray(state.features) ? state.features : []),
   };
 }
 
@@ -592,7 +750,13 @@ function check() {
   decision.tries++;
   const result = Ampify.automix.schedule(decision.plan);
   decision.sent = result.ok;
-  const kinds = { beat: `${decision.bars} bars on the beat${speedNote(decision.plan.rate)}`, swap: "a swap on a bar" };
+  const kinds = {
+    beat: `${decision.bars} bars on the beat${speedNote(decision.plan.rate)}`,
+    loop: `${decision.bars} bars on the beat over this song's last bar, looped${speedNote(decision.plan.rate)}`,
+    swap: "a swap on a bar",
+    echo: "an echo out on a bar",
+    natural: decision.cold ? "this song to its last hit, then a cold cut" : "this song to its last hit, then a breath",
+  };
   const what = kinds[decision.kind] ?? (decision.why ? `a crossfade (${decision.why})` : "a crossfade");
   Ampify.log(result.ok
     ? `Mix into "${decision.title}" at ${minutes(decision.plan.keys[0][0])}: ${what}, from its ${minutes(decision.plan.bStart)}`

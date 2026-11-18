@@ -42,8 +42,9 @@ period. A second page lists the new releases of the artists you play.</td>
 </tr>
 <tr>
 <td valign="top"><img src="extensions/automix/preview.jpg" alt="Two songs overlapping as one fades into the other"><br>
-<b>AutoMix.</b> Each song flows into the next like a DJ set: on the beat when the tempos are close, a swap on a bar
-or a crossfade when they are not. It is young and still getting better; switch it on in Settings > Ampify.</td>
+<b>AutoMix.</b> Each song flows into the next like a DJ set: on the beat when the tempos are close, otherwise an echo
+out on a bar, the song's own ending with a breath, or a crossfade. It is young and still getting better; switch it on
+in Settings > Ampify.</td>
 <td valign="top"><img src="docs/assets/screens/settings-card.png" alt="Ampify's settings page in Apple Music, Sound and extensions tab"><br>
 <b>Everything in Apple Music's settings.</b> Five tabs and a search box. Move the playback bar to the top, the bottom
 or the centre, and switch on an A-B loop, a sleep timer, global shortcuts, or an Atmos leveler that plays Dolby Atmos
