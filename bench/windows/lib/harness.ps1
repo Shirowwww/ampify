@@ -438,7 +438,7 @@ function Get-KernelState {
     }
 }
 
-# Apple Music crashes recorded by Windows since $Since, as simple objects (Id, Time, Message).
+# Apple Music crashes recorded by Windows since $Since, as simple objects (Id, Time, Message, Fault).
 # Callers wrap it in @(...): a comma here would put the array inside a second array, and the count would be wrong.
 function Get-AppCrashEvents {
     param([datetime]$Since)
@@ -448,17 +448,31 @@ function Get-AppCrashEvents {
         if ($record.Id -notin 1000, 1001, 1002) { continue }
         $message = [string]$record.Message
         if ($message -notmatch 'AppleMusic\.exe|AMPLibraryAgent\.exe') { continue }
-        $crashes += [pscustomobject]@{ Id = $record.Id; Time = $record.TimeCreated; Message = $message }
+        $crashes += [pscustomobject]@{ Id = $record.Id; Time = $record.TimeCreated; Message = $message; Fault = (Get-FaultSummary $record) }
     }
     return $crashes
 }
 
-# Readable summary of the crashes: event id and start of the message, to know what crashed.
+# An Application Error (event 1000) in a few words, read from its fields rather than from its text, which Windows
+# words in its own language: the process (its id, to find it in attach.log), the module, the offset and the code.
+function Get-FaultSummary {
+    param($Record)
+    $fields = @($Record.Properties | ForEach-Object { [string]$_.Value })
+    if ($Record.Id -ne 1000 -or $fields.Count -lt 9) { return '' }
+    # The process id field holds the number itself (the message writes it in hexadecimal).
+    return "$($fields[0]) (process $($fields[8])) in $($fields[3]) +$($fields[7]), code $($fields[6])"
+}
+
+# Readable summary of the crashes: when, which process, where; the start of the message for the other events.
 function Format-CrashEvents {
     param([object[]]$Events)
     $lines = @()
     foreach ($crash in $Events) {
-        if ($lines.Count -ge 2) { break }
+        if ($lines.Count -ge 3) { break }
+        if ($crash.Fault) {
+            $lines += "$($crash.Time.ToString('HH:mm:ss.fff')) $($crash.Fault)"
+            continue
+        }
         $text = [string]$crash.Message -replace '\s+', ' '
         $lines += "id $($crash.Id): " + $text.Substring(0, [Math]::Min(240, $text.Length))
     }
