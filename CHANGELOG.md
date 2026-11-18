@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 1.5.5 (2026-11-18)
+
+AutoMix can now leave a song on an echo, on its own ending or on a looped bar, its fades keep time again, and two bugs
+are fixed.
 
 - AutoMix 1.2.0 has new ways to go from one song to the next, picked from Apple's analysis of the two songs:
   - An echo out, for songs with a beat that cannot share a tempo: the current song thins out over its last bar, its
