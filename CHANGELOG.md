@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.4 (2026-11-18)
+
+Two crashes when Apple Music closes are fixed.
+
+- Apple Music could crash as it closed. When it exits, Apple Music shuts its interface down first, then runs the work
+  still waiting on its interface thread, and a timer of Ampify's top bar asked the closed window for its content
+  there. Ampify now sees the interface end and leaves it alone from that moment, for every timer and queued task.
+- With Sing's voice model loaded, AMPLibraryAgent.exe crashed each time Apple Music closed. Nothing was lost, but
+  Windows recorded a crash every time. Sing no longer frees the model while the process ends.
+
 ## 1.5.3 (2026-11-18)
 
 Word-by-word lyrics now fill smoothly, a click on an album of your library can open its tracks right in the grid as
