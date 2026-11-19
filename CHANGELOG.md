@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.5.7 (2026-11-19)
+
+Word-by-word lyrics keep to the song again: the fill no longer steps back, and it takes over at once when the lyrics
+panel opens.
+
+- Apple Music gives the song's position about once a second, and Ampify read each value a little late, by a delay that
+  drifted and then fell back. Each fall moved the word-by-word fill back by up to a quarter of a second, every few
+  seconds, while Apple's words rose ahead of it. Ampify now keeps counting through a value read late: the fill stays
+  within about 50 ms of Apple's timing and never steps back.
+- Closing and reopening the lyrics panel left Apple's own fill on screen for up to 15 seconds before Ampify's took
+  over. It now takes over within a second or two.
+- Each line of the lyrics is matched by the start time Apple gives it, so two lines of the same length in a row are
+  never mixed up.
+
 ## 1.5.6 (2026-11-19)
 
 Sing can now keep the singer alone, its button is in the full-screen player, and a change of volume is heard at once.
