@@ -105,6 +105,21 @@ TEST_CASE(LyricsFill_AHostIsMatchedToTheLatestLineOfItsSizeThatIsStillUnderWay) 
     CHECK(!LineOfHost(lyrics, 2, false, 2000));
 }
 
+// "One more time" sung three times: the times alone take the next line as soon as it is about to start, and a row
+// Apple rebuilds then would fill again from its start. The start Apple gave the row's line settles which it is.
+TEST_CASE(LyricsFill_AHostIsMatchedByTheStartAppleGaveItsLine) {
+    ampify::Lyrics lyrics;
+    lyrics.synced = true;
+    lyrics.lines.push_back(Line(1000, 3000, {Word(1000, 2000), Word(2000, 3000)}));
+    lyrics.lines.push_back(Line(3000, 5000, {Word(3000, 4000), Word(4000, 5000)}));
+    lyrics.lines.push_back(Line(5000, 7000, {Word(5000, 6000), Word(6000, 7000)}));
+    CHECK(LineOfHost(lyrics, 2, false, 2800) == std::optional<size_t>{1});  // by the times: the next one
+    CHECK(LineOfHost(lyrics, 2, false, 2800, 1000) == std::optional<size_t>{0});
+    CHECK(LineOfHost(lyrics, 2, false, 4900, 5000) == std::optional<size_t>{2});
+    CHECK(!LineOfHost(lyrics, 3, false, 2800, 1000));  // the line Apple names has another size: Apple's own
+    CHECK(LineOfHost(lyrics, 2, false, 2800, 99000) == std::optional<size_t>{1});  // no line starts there: by times
+}
+
 TEST_CASE(LyricsFill_ALineIsUnderWayFromJustBeforeItUntilAMomentAfter) {
     CHECK(!ampify::LineUnderway(1000, 2000, 0));
     CHECK(ampify::LineUnderway(1000, 2000, 500));    // about to start

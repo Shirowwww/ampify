@@ -21,6 +21,10 @@ namespace {
 constexpr int64_t kSecondsBelow = 20'000;
 constexpr int64_t kTicksFrom = 36'000'000;
 
+// Apple's position is read every kPlayerPeriod (250 ms), late by up to that much plus the extension thread's delays.
+constexpr int64_t kLateReadMs = 400;
+constexpr int64_t kCountGivenBackMs = 2;  // per value read late: a count that ran ahead comes back unseen
+
 constexpr int kArtworkSize = 1000;
 constexpr size_t kMaxArtworkCodeLength = 8;
 constexpr char kDefaultCropCode[] = "bb";
@@ -264,7 +268,11 @@ int64_t PositionClock::Next(const std::string& track, bool playing, int64_t repo
     m_playing = playing;
     if (reportedMs > 0 && reportedMs != m_lastReported) {
         m_lastReported = reportedMs;
-        m_baseMs = reportedMs;
+        const int64_t counted = Position(nowMs);
+        const int64_t behind = counted - reportedMs;
+        const bool readLate = m_fromApple && Moving(nowMs) && behind > 0 && behind <= kLateReadMs;
+        // A value read late stays below the count: the count goes on, giving back a few ms in case it ran ahead.
+        m_baseMs = readLate ? counted - std::min(behind, kCountGivenBackMs) : reportedMs;
         m_learntMs = nowMs;
         m_fromApple = true;
     }

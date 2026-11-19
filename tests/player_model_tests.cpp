@@ -573,10 +573,30 @@ TEST_CASE(PositionClock_MovesOnBetweenApplesUpdates) {
     CHECK(clock.Next("a", true, 30000, 200000, 1000) == 30000);
     CHECK(clock.Next("a", true, 30000, 200000, 1500) == 30500);
     CHECK(clock.Moving(1500));
-    CHECK(clock.Next("a", true, 31000, 200000, 2030) == 31000);
+    CHECK(clock.Next("a", true, 31000, 200000, 2030) == 31028);  // read 30 ms late: the count goes on, 2 ms given back
     CHECK(clock.Next("b", true, 0, 200000, 3000) == 0);         // a new song starts at 0
     CHECK(clock.Next("b", true, 1990, 2000, 4000) == 1990);
     CHECK(clock.Next("b", true, 1990, 2000, 4800) == 2000);     // never past the song's end
+}
+
+// Apple's value is read up to a read late (every 250 ms), and the delay drifts as the two rhythms slide past each
+// other: taken as is, the clock would step back by up to a read at each slide (issue #5, the lyrics fill jumping
+// back). A value behind the count by less than a late read is the count read late: the count goes on.
+TEST_CASE(PositionClock_NeverStepsBackForAValueReadLate) {
+    ampify::PositionClock clock;
+    CHECK(clock.Next("a", true, 30000, 200000, 1000) == 30000);  // read on time
+    const int64_t late = clock.Next("a", true, 31000, 200000, 2240);  // the next second, read 240 ms late
+    CHECK(late <= 31240);
+    CHECK(late >= 31230);  // at most a few ms given back
+    CHECK(clock.Next("a", true, 32000, 200000, 3020) > late);
+    CHECK(clock.Next("a", true, 33000, 200000, 4000) >= 33000);  // on time again: on the song
+}
+
+TEST_CASE(PositionClock_FollowsAJumpBackFurtherThanALateRead) {
+    ampify::PositionClock clock;
+    CHECK(clock.Next("a", true, 30000, 200000, 1000) == 30000);
+    CHECK(clock.Next("a", true, 29000, 200000, 2000) == 29000);  // moved back by a second in Apple Music
+    CHECK(clock.Next("a", true, 29500, 200000, 3000) == 29500);  // half a second back: a jump too, not a late read
 }
 
 TEST_CASE(PositionClock_StopsWhenApplesPositionStallsOrPauses) {

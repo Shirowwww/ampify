@@ -42,9 +42,11 @@ double EdgeAt(std::span<const FillKey> path, double atMs);
 // moment after it ends.
 bool LineUnderway(int64_t startMs, int64_t endMs, int64_t positionMs);
 
-// The line of `lyrics` that a host of `wordCount` words shows while the song is at `positionMs`: the latest line
-// started (or about to) whose words for that host (main or background) number `wordCount` and that has not long
-// ended. nullopt when none fits: the host is then left to Apple.
-std::optional<size_t> LineOfHost(const Lyrics& lyrics, size_t wordCount, bool background, int64_t positionMs);
+// The line of `lyrics` that a host of `wordCount` words shows while the song is at `positionMs`. With `appleStartMs`,
+// the start Apple gave the host's line, the line that starts there (lines sung twice in a row stay apart); without it,
+// or when no line starts there, the latest line started (or about to) whose words for that host (main or background)
+// number `wordCount` and that has not long ended. nullopt when none fits: the host is then left to Apple.
+std::optional<size_t> LineOfHost(const Lyrics& lyrics, size_t wordCount, bool background, int64_t positionMs,
+                                 std::optional<int64_t> appleStartMs = std::nullopt);
 
 }  // namespace ampify

@@ -24,8 +24,10 @@
 #include <string>
 #include <vector>
 
+#include "../core/amp_abi.hpp"
 #include "../core/lyrics_fill.hpp"
 #include "../core/now_playing.hpp"
+#include "winrt_abi.hpp"
 #include "xaml_chrome.hpp"
 
 #include <windows.h>  // last: its macros would rename members of the projection headers above
@@ -42,10 +44,10 @@ namespace dispatching = winrt::Microsoft::UI::Dispatching;
 
 constexpr auto kTick = std::chrono::milliseconds(100);
 // The trees are walked again often only while something is missing or the song just changed: each walk is a few ms.
-constexpr auto kHostSearchEvery = std::chrono::seconds(1);   // while Apple builds a new song's lines
+constexpr auto kHostSearchEvery = std::chrono::seconds(1);   // while Apple builds its lines
 constexpr auto kHostCheckEvery = std::chrono::seconds(15);   // once they stand
-constexpr auto kSongSettles = std::chrono::seconds(5);
-constexpr auto kViewSearchEvery = std::chrono::seconds(3);   // while no lyrics view shows
+constexpr auto kLinesSettle = std::chrono::seconds(5);
+constexpr auto kViewSearchEvery = std::chrono::seconds(1);   // while no lyrics view shows (a walk is ~4 ms)
 constexpr auto kViewCheckEvery = std::chrono::seconds(15);   // while one does
 constexpr std::size_t kViewSearchLimit = 8000;  // elements walked in a window to find its lyrics views
 constexpr std::size_t kHostSearchLimit = 4000;  // elements walked in a lyrics view to find its hosts
@@ -257,9 +259,33 @@ std::optional<size_t> WordCount(const std::vector<FoundRow>& found) {
     return count;
 }
 
+// The KaraokeLyricsLine a host stands in, or null.
+xaml::DependencyObject LineOf(const xaml::DependencyObject& host) {
+    xaml::DependencyObject at = host;
+    for (int depth = 0; at && depth < kLineSearchDepth; ++depth) {
+        if (winrt::get_class_name(at) == kLineClass) return at;
+        at = media::VisualTreeHelper::GetParent(at);
+    }
+    return nullptr;
+}
+
+// The start Apple bound the host's line to, or nullopt.
+std::optional<int64_t> AppleStartOf(const xaml::DependencyObject& host) {
+    xaml::DependencyObject line = LineOf(host);
+    if (!line) return std::nullopt;
+    rt::Ref unknown(winrt::detach_abi(line.as<winrt::Windows::Foundation::IUnknown>()));
+    rt::Ref view;
+    int64_t ticks = -1;  // Windows.Foundation.TimeSpan, 100 ns
+    if (!rt::Query(unknown, rt::GuidOf(amp::kIidKaraokeLyricsLineView), view) ||
+        FAILED(rt::CallSlot(view, amp::kKaraokeLyricsLineViewStart, &ticks)) || ticks < 0) {
+        return std::nullopt;
+    }
+    return TicksToMs(ticks);
+}
+
 // The line of the song a main host's rows show: Apple masks the main rows of the line being sung only.
-std::optional<size_t> MainLine(size_t count, const NowPlaying& now, int64_t tick) {
-    std::optional<size_t> index = LineOfHost(*now.lyrics, count, false, now.PositionAt(tick));
+std::optional<size_t> MainLine(const controls::Border& border, size_t count, const NowPlaying& now, int64_t tick) {
+    std::optional<size_t> index = LineOfHost(*now.lyrics, count, false, now.PositionAt(tick), AppleStartOf(border));
     thread_local std::string notedTrack;  // a follower per interface thread
     if (!index && notedTrack != now.trackKey) {
         notedTrack = now.trackKey;
@@ -272,7 +298,7 @@ std::optional<size_t> MainLine(size_t count, const NowPlaying& now, int64_t tick
 bool Bind(Host& host, std::vector<FoundRow>& found, const NowPlaying& now, int64_t tick, std::optional<size_t> index) {
     std::optional<size_t> count = WordCount(found);
     if (!count) return false;
-    if (!host.background) index = MainLine(*count, now, tick);
+    if (!host.background) index = MainLine(host.border.get(), *count, now, tick);  // Follow holds the border
     if (!index || *index >= now.lyrics->lines.size()) return false;
     const LyricLine& line = now.lyrics->lines[*index];
     std::vector<LyricWord> words = WordsOfHost(line, host.background);
@@ -347,8 +373,10 @@ struct View {
     winrt::weak_ref<xaml::FrameworkElement> element;
     std::vector<Host> hosts;
     std::chrono::steady_clock::time_point nextSearch{};
-    std::chrono::steady_clock::time_point songAt{};  // when the song last changed: Apple builds its lines then
+    // When Apple last built its lines: a new song, or the view shown again (the pane reopened rebuilds them).
+    std::chrono::steady_clock::time_point builtAt{};
     std::string trackKey;
+    bool shown = false;
     int lastBound = -1;  // the index of the main host bound last, -1 before any
 };
 
@@ -357,7 +385,7 @@ struct Follower {
     dispatching::DispatcherQueue queue{nullptr};
     dispatching::DispatcherQueueTimer timer{nullptr};
     std::vector<View> views;
-    std::chrono::steady_clock::time_point nextViewSearch{};
+    std::chrono::steady_clock::time_point lastViewSearch{};
 };
 
 template <typename Match>
@@ -372,12 +400,8 @@ void Walk(const xaml::DependencyObject& root, std::size_t limit, Match&& match) 
 
 // The line a host stands in, by identity, or null.
 void* LineKeyOf(const xaml::DependencyObject& host) {
-    xaml::DependencyObject at = host;
-    for (int depth = 0; at && depth < kLineSearchDepth; ++depth) {
-        if (winrt::get_class_name(at) == kLineClass) return winrt::get_abi(at.as<winrt::Windows::Foundation::IUnknown>());
-        at = media::VisualTreeHelper::GetParent(at);
-    }
-    return nullptr;
+    xaml::DependencyObject line = LineOf(host);
+    return line ? winrt::get_abi(line.as<winrt::Windows::Foundation::IUnknown>()) : nullptr;
 }
 
 void FindHosts(View& view, const xaml::FrameworkElement& element) {
@@ -485,8 +509,10 @@ void TickFollower(Follower& follower) {
         xaml::FrameworkElement element = view.element.get();
         shown = shown || (element && element.IsLoaded() && element.ActualHeight() > 0);
     }
-    if (clock >= follower.nextViewSearch) {
-        follower.nextViewSearch = clock + (shown ? kViewCheckEvery : kViewSearchEvery);
+    // A view that hides is gone for good: Apple builds a new one when its pane opens again.
+    const auto every = shown ? kViewCheckEvery : kViewSearchEvery;
+    if (clock - follower.lastViewSearch >= every) {
+        follower.lastViewSearch = clock;
         FindViews(follower);
     }
     const int64_t tick = Tick();
@@ -494,15 +520,17 @@ void TickFollower(Follower& follower) {
         xaml::FrameworkElement element = view.element.get();
         if (!element || !element.IsLoaded() || element.ActualHeight() <= 0) {
             for (Host& host : view.hosts) Release(host);
+            view.shown = false;
             continue;
         }
-        if (view.trackKey != now.trackKey) {
+        if (view.trackKey != now.trackKey || !view.shown) {
             view.trackKey = now.trackKey;
-            view.songAt = clock;
+            view.shown = true;
+            view.builtAt = clock;
             view.nextSearch = clock;
         }
         if (clock >= view.nextSearch) {
-            const bool settling = view.hosts.empty() || clock - view.songAt < kSongSettles;
+            const bool settling = view.hosts.empty() || clock - view.builtAt < kLinesSettle;
             view.nextSearch = clock + (settling ? kHostSearchEvery : kHostCheckEvery);
             FindHosts(view, element);
         }

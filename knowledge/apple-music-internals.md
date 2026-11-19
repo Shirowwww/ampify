@@ -67,7 +67,7 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   playing: a first look at the position was made on a PC where every stream stalled (see "Songs stuck at 0:00"
   below) and concluded wrongly that the position never moves. So a clock must not count time Apple has not shown:
   `PositionClock` (`src/core/player_model.cpp`) counts on from the last value that changed, for two seconds at
-  most. The lyrics view also tells the position: `KaraokeLyricsView` → `get_ViewModel` → `CurrentLine` →
+  most, and does not step back for a value read late (see "What the lyrics fill keeps to" below). The lyrics view also tells the position: `KaraokeLyricsView` → `get_ViewModel` → `CurrentLine` →
   `StartTime`, the line Apple lights up (used when Apple's value is 0; slots in `src/core/amp_abi.hpp`). Apple's
   views are bound with `x:Bind`: `DataContext` is empty all the way up, and the models come from each view's own
   `get_ViewModel`. Identifiers and slots: read the `GuidAttribute` and the method order of the interface from the
@@ -107,6 +107,18 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   virtualized: a song's 90 hosts stand in the view at once. Opening the full-screen player or the mini player left a
   single `KaraokeLyricsView` to follow, its height changing: Apple seems to move the same view between them. Ampify's `apple.lyricsFill` gives each row's mask a gradient of its own,
   moved by a key-frame animation along the TTML word times (`src/win/lyrics_fill.cpp`, `src/core/lyrics_fill.cpp`).
+- **What the lyrics fill keeps to (1.1792, measured 2026-11-19, issue #5 again).** Apple's own karaoke clock (the view
+  model's `CurrentTime`, slot 7, a TimeSpan) also moves only once a second (every ~1020 ms). Ampify reads Apple's
+  position every 250 ms, so each new value arrives 0 to 250 ms late, and the delay slides slowly as the two rhythms
+  drift, then falls back: taken as is, the clock stepped back by ~230 ms at each fall, every 30 s on one PC and every
+  few seconds on a user's, and the fill jumped back with it while Apple's words (which rise as they are sung) ran
+  ahead of it. `PositionClock` now keeps counting when a new value is behind the count by less than a late read
+  (400 ms): measured against Apple's `CurrentTime`, the clock stays within -54 to +15 ms instead of -243 to 0. Each
+  line's view (`AMP.UI.Views.KaraokeLyricsLine`, `IKaraokeLyricsLine` `{BB160C7B-E826-523B-A5F9-1A44A4C0861B}`,
+  `get_Start` slot 22, a TimeSpan) gives the start Apple bound it to, the same ms as the TTML: the fill matches rows to
+  lines by it, so two lines of the same size in a row stay apart. Closing the lyrics pane drops its view; reopening it
+  builds a new one with new lines, so the fill looks for views every second while none shows (a walk is ~4 ms) and
+  for lines at once when a view shows again; before, it took up to 15 s, Apple's own fill showing meanwhile.
 - **How Apple fills a word (1.1792.39942, issue #5, read 2026-11-16, not yet traced live).** Each word of a line is an
   `IKaraokeLyricsWord` (`{291C0608-078A-5CA2-BF99-7BA6EB1548EB}`): `Begin` and `End` in ms (Int32, slots 14 and 16),
   `WordId` (slot 18) and `Position`, a float with a setter (slots 8 and 9), most likely the fill the view draws. The

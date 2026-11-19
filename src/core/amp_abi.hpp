@@ -59,6 +59,10 @@ inline constexpr char kIidKaraokeLyricsViewModel[] = "A454EA99-2DC3-540F-883A-05
 inline constexpr int kKaraokeLyricsViewModelCurrentLine = 6;
 inline constexpr char kIidKaraokeLyricsLine[] = "AD6B009B-E221-5827-8A3B-85DC8B27DD87";
 inline constexpr int kKaraokeLyricsLineStartTime = 17;
+// The view of one line (AMP.UI.Views.KaraokeLyricsLine, a control) gives the start Apple bound it to, a TimeSpan:
+// what tells apart a line sung twice in a row (apple.lyricsFill). AMP.UI.Views.winmd 1.1792.
+inline constexpr char kIidKaraokeLyricsLineView[] = "BB160C7B-E826-523B-A5F9-1A44A4C0861B";
+inline constexpr int kKaraokeLyricsLineViewStart = 22;
 
 // AMP.UI.Controls.IVolumeControl (AMP.UI.Controls.winmd 1.1792): Level, a double, is the position of Apple's volume
 // slider. Apple binds it both ways: setting it on the control makes Apple's own code set the player volume, and its
@@ -356,6 +360,7 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.UI.Views.IKaraokeLyricsView", "get_ViewModel", kKaraokeLyricsViewViewModel},
     {"AMP.Services.CommonModels.IKaraokeLyricsViewModel", "get_CurrentLine", kKaraokeLyricsViewModelCurrentLine},
     {"AMP.Services.CommonModels.IKaraokeLyricsLine", "get_StartTime", kKaraokeLyricsLineStartTime},
+    {"AMP.UI.Views.IKaraokeLyricsLine", "get_Start", kKaraokeLyricsLineViewStart},
     {"AMP.UI.Controls.IScrubberControlStatics", "get_ThumbVisibilityProperty", slot::kScrubberThumbVisibilityProperty},
     {"AMP.UI.Controls.IScrubberControlStatics", "get_TrackHeightProperty", slot::kScrubberTrackHeightProperty},
     {"AMP.UI.Controls.IScrubberControlStatics", "get_TrackRectRadiusProperty", slot::kScrubberTrackRectRadiusProperty},
