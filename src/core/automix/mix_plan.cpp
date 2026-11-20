@@ -106,8 +106,6 @@ double MostLead(const MixPlan& plan) { return LeadFor(plan) + kHoldMargin; }
 
 double HoldFor(const MixPlan& plan) { return MostLead(plan) + Kept(plan); }
 
-double RoomAfter(const MixPlan& plan) { return HoldFor(plan) - Eaten(plan); }
-
 std::string Check(const MixPlan& plan, double aDuration, double bDuration) {
     if (plan.next.empty()) return "the plan names no next song";
     if (plan.keys.size() < 2) return "a plan needs two keys or more";
@@ -140,10 +138,12 @@ std::string Check(const MixPlan& plan, double aDuration, double bDuration) {
     // A loop needs the second player only until it has the loop: A may end long before the mix does.
     const bool loops = Loops(plan);
     if (aDuration > 0 && last.at >= aDuration && !loops) return "the mix goes past the end of the song";
-    if (aDuration > 0 && !cut && !loops && aDuration - last.at < RoomAfter(plan)) {
+    // The deck plays A up to the last key from what the second player gave before its pause; a stretch reads further.
+    const double endRoom = kGhostEndMargin + (Stretches(plan) ? kStretchLatency : 0);
+    if (aDuration > 0 && !cut && !loops && aDuration - last.at < endRoom) {
         return "the mix ends too close to the end of the song";
     }
-    if (aDuration > 0 && loops && aDuration - first.at < RoomAfter(plan)) {
+    if (aDuration > 0 && loops && aDuration - first.at < kGhostEndMargin) {
         return "the mix starts too close to the end of the song";
     }
     if (bDuration > 0 && NextTimeAt(plan, last.at) >= bDuration) return "the next song would end during the mix";

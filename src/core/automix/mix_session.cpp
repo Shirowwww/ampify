@@ -20,8 +20,6 @@ constexpr double kStallSeconds = 1.5;   // a player not moving for this long: pa
 constexpr double kSwitchMargin = 0.5;   // Apple's player still on A this long after the switch point: it will not
 constexpr double kMaxSwitchDelay = 0.25;  // a later start of B is a stall, not the player's usual delay
 constexpr double kSwitchSlack = 0.2;      // Apple's player on B this long before the switch point: the user skipped
-// A playing second player keeps its stream about a second past the end of the song: counted as half a second.
-constexpr double kGhostEndMargin = 0.5;
 constexpr double kCutArmLead = 3;      // a cut arms Apple's player this long before, so B is sought where it starts
 constexpr double kCutArmSafety = 0.5;  // and no later than this before
 
@@ -349,6 +347,15 @@ void MixSession::TickLocked(double now) {
     if (Audible(phase) && Loops(m_plan) && m_ghostOn && !m_ghostQuiet && m_decks.LoopHeld()) {
         m_decks.QuietGhost();
         m_ghostQuiet = true;
+    }
+    // Nor may it reach the end of A while the deck still needs what it gave: paused a little before, its stream goes
+    // on and the deck plays out what it holds, A's last seconds included.
+    if (m_ghostOn && !m_ghostQuiet && m_aDuration > 0 && phase != Phase::Preparing) {
+        const std::optional<double> ghost = m_decks.GhostTime();
+        if (ghost && *ghost >= m_aDuration - kGhostEndMargin) {
+            m_decks.QuietGhost();
+            m_ghostQuiet = true;
+        }
     }
     switch (phase) {
         case Phase::Waiting:

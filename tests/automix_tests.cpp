@@ -44,6 +44,7 @@ public:
     double stoppedAt = -1;  // the test's clock at the last StopGhost
     double heldBack = 0;    // what Sing holds back after the deck
     int quiets = 0;         // QuietGhost calls
+    double quietAt = -1;    // the second player's time at the last one
     int drops = 0;          // DropHeldBack calls
     bool loopHeld = false;  // the deck keeps all of the plan's loop
     std::vector<double> gainClock;  // the test's clock at every SetGains
@@ -90,7 +91,10 @@ public:
         stoppedAt = t;
     }
     double SoundHeldBack() override { return heldBack; }
-    void QuietGhost() override { quiets++; }
+    void QuietGhost() override {
+        quiets++;
+        quietAt = GhostTime().value_or(-1);
+    }
     void DropHeldBack() override { drops++; }
     bool LoopHeld() override { return loopHeld; }
     std::optional<DeckStep> Align() override {
@@ -278,10 +282,14 @@ TEST_CASE(AutoMix_CheckRefusesPlansThatCannotBePlayed) {
     plan.keys.back().at = 170;
     CHECK(!Check(plan, 200, 200).empty());  // longer than a minute
     CHECK(!Check(Plan(), 105, 200).empty());  // A ends during the mix
-    // The second player runs ahead of what is heard: A must go on for a while after the mix, or it is through A first.
-    CHECK_NEAR(RoomAfter(Plan()), 3.0, 1e-9);
-    CHECK(!Check(Plan(), 110.9, 200).empty());
-    CHECK(Check(Plan(), 111, 200).empty());
+    // The second player runs ahead of what is heard and is paused a little before A's end: the mix may end there.
+    CHECK(!Check(Plan(), 108 + kGhostEndMargin - 0.01, 200).empty());
+    CHECK(Check(Plan(), 108 + kGhostEndMargin + 0.01, 200).empty());
+    plan = Plan();
+    plan.rate = 1.03;
+    plan.rateFrom = 92;
+    CHECK(!Check(plan, 108 + kGhostEndMargin + 0.01, 200).empty());  // the stretch reads A a little further on
+    CHECK(Check(plan, 108 + kGhostEndMargin + 0.4, 200).empty());
     CHECK(!Check(Plan(), 200, 35).empty());   // B ends during the mix
     plan = Plan();
     plan.next.clear();
@@ -543,6 +551,20 @@ TEST_CASE(AutoMix_TheNextSongsLateStartIsLearnedAndMadeUpFor) {
     CHECK(std::abs(session.GetStatus().switchLagMs) <= 1.5);
 }
 
+TEST_CASE(AutoMix_AMixCanEndWithTheSongOnItsLastHit) {
+    // The second player plays A two seconds ahead of what is heard: through A, it would stop, and its stream with the
+    // deck's sound in it. Paused a little before A's end, its stream goes on and the deck plays what it holds, so a
+    // mix may end with A instead of 3 s before (20/11/2026: a song's last hit was never heard).
+    FakeDecks decks;
+    MixSession session(decks);
+    const double aEnds = 108 + kGhostEndMargin + 0.01;
+    REQUIRE(session.Start(Plan(), aEnds, 200).empty());
+    Run(session, decks, 60);
+    CHECK(session.GetStatus().phase == Phase::Done);
+    CHECK(decks.quiets == 1);
+    CHECK(decks.quietAt >= aEnds - kGhostEndMargin - 0.05 && decks.quietAt < aEnds - kGhostEndMargin + 0.05);
+}
+
 TEST_CASE(AutoMix_ASecondPlayerWhoseSoundEscapesTheDeckEndsTheMixAtOnce) {
     // The second player can move to a stream the deck cannot take (another rate, 20/11/2026): from then on what it
     // plays is not the deck's. Before the mix is heard it is called off at once; during it, A leaves as on a failure.
@@ -777,7 +799,7 @@ TEST_CASE(AutoMix_ASecondPlayerTooFarAheadOfASlowedSongIsSentAgain) {
     CHECK(status.reason == "the second player could not be put in step");
     CHECK(status.seeks > 1);
     CHECK(decks.NothingHeard());
-    CHECK(RoomAfter(plan) > RoomAfter(Plan()) + 1.3);
+    CHECK(HoldFor(plan) > HoldFor(Plan()) + 1.3);
 }
 
 TEST_CASE(AutoMix_ACopyFoundAgainTooCloseIsNeverHeard) {

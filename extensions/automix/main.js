@@ -21,7 +21,7 @@ const SHORT_BARS = 4;
 const MAX_BEAT_GAP_S = 0.025;     // two beats further apart than this are heard as two hits: the mix is not on the beat
 const RAMP_S = 8;                 // the current song reaches its new speed over this long, before the mix
 const MIN_RAMP_S = 4;
-const END_ROOM_S = 3.1;           // the kernel wants 3 s of the current song after a mix...
+const END_ROOM_S = 0.4;           // the kernel wants 0.3 s of the current song after a mix...
 const STRETCH_ROOM_S = 0.3;       // ...and this much more after a stretched one
 const BASS_SWAP = [0.45, 0.55];   // where in a mix the bass goes from the current song to the next
 const PHRASE_SCORE = 600;         // Apple's structure scores every beat: a phrase starts where it gives this or more
@@ -255,11 +255,10 @@ function noMixGenre(song) {
   return (song.attributes?.genreNames ?? []).some((genre) => NO_MIX_GENRES.includes(genre));
 }
 
-// Seconds of the current song a mix must leave after it: the kernel's second player runs ahead of what is heard, more
-// so under a slowed song, and stops once it is through the song. `ramp` and `mix` are seconds of the song at most.
-function endRoom(rate = 1, ramp = 0, mix = 0) {
-  const carried = 2 * ramp / (1 + rate) + mix / rate;
-  return END_ROOM_S + (rate === 1 ? 0 : STRETCH_ROOM_S) + Math.max(0, 1 - rate) * carried;
+// Seconds of the current song a mix must leave after it: the kernel's second player, ahead of what is heard, is paused
+// that long before the song's end, and the stretch of a song played at another speed reads a little further.
+function endRoom(rate = 1) {
+  return END_ROOM_S + (rate === 1 ? 0 : STRETCH_ROOM_S);
 }
 
 // Why two songs cannot be put together on their beats, or "" when they can: both need bars and a beat to hear.
@@ -286,7 +285,7 @@ function beatMix(a, b, spanA, spanB, options) {
   const match = tempoMatch(barLength(barsA, spanA.end), barLength(barsB, spanB.start));
   if (!(Math.abs(match.rate - 1) <= MAX_STRETCH)) return null;
   const rate = Math.abs(match.rate - 1) > NO_STRETCH ? match.rate : 1;
-  const latest = Math.min(spanA.end, a.duration - endRoom(rate, RAMP_S, options.maxSeconds * rate));
+  const latest = Math.min(spanA.end, a.duration - endRoom(rate));
   let last = barsA.length - 1;
   while (last > 0 && barsA[last] > latest) last--;
   const phraseEnd = phraseBars(a, barsA).filter((bar) => bar <= last).at(-1);
@@ -349,7 +348,7 @@ function loopMix(a, grids, entries, counts, options, sweep) {
       const fit = beatFit(a, { ...grids, barsA: looped.bars, beatsA: looped.beats }, i, i + count, entry,
                           { ...options, looped: true });
       // The kernel lets go of the second player once it holds the bar: the room it wants is after the first key.
-      if (!fit || a.duration - fit.aStart < endRoom(fit.rate, fit.ramp, fit.length * fit.rate)) continue;
+      if (!fit || a.duration - fit.aStart < endRoom(fit.rate)) continue;
       const plan = {
         bStart: fit.bStart, keys: blendKeys(fit.aStart, fit.aEnd, sweep), loop: { from: looped.from, length: looped.length },
         ...(fit.rate !== 1 ? { rate: fit.rate, rateFrom: fit.aStart - fit.ramp } : {}),
@@ -378,7 +377,7 @@ function beatFit(a, grids, from, last, entry, options) {
   const length = (aEnd - aStart) / rate;
   const ramp = rate !== 1 ? Math.min(RAMP_S, aStart - options.earliest) : 0;
   if (length > options.maxSeconds || aStart < options.earliest || (rate !== 1 && ramp < MIN_RAMP_S)) return null;
-  if (!options.looped && aEnd > a.duration - endRoom(rate, ramp, length * rate)) return null;
+  if (!options.looped && aEnd > a.duration - endRoom(rate)) return null;
   const bStart = barsB[entry + across] - (barsA[from + middle] - aStart) / rate;
   if (bStart < 0) return null;
   if (worstBeatGap(beatsA, beatsB, aStart, rate, bStart, length) > MAX_BEAT_GAP_S) return null;

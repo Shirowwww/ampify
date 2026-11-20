@@ -77,6 +77,10 @@ inline constexpr double kMaxEchoFeedback = 0.9;
 inline constexpr double kMinLoopSeconds = 0.2;
 inline constexpr double kMaxLoopSeconds = 8;
 inline constexpr double kLoopRoom = 1;  // seconds of A after the loop: the second player is paused before its end
+// The second player plays A ahead of what is heard: through A, it would stop, and its stream with the deck's sound in
+// it (about a second past the song's end). It is paused this long before A's end and the deck plays what it holds:
+// a mix that needs the deck may end this close to A's end.
+inline constexpr double kGhostEndMargin = 0.3;
 
 // The volumes when A is at `at`: those of the first key before it and of the last key after it. Between two keys the
 // squared gains move along a smoothstep, so a crossfade keeps its power and starts and stops without a corner; the
@@ -116,9 +120,6 @@ double LeadFor(const MixPlan& plan);
 double MostLead(const MixPlan& plan);
 // How much of the second player's sound the deck must be able to hold, in seconds.
 double HoldFor(const MixPlan& plan);
-// Seconds of A there must be after the last key: the second player, that far ahead of what is heard by then at
-// most, stops feeding the deck once it is through the song.
-double RoomAfter(const MixPlan& plan);
 
 // Why the plan cannot be played, or empty. The durations are the songs' lengths in seconds, 0 when unknown.
 std::string Check(const MixPlan& plan, double aDuration, double bDuration);

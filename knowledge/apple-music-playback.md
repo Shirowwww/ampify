@@ -125,7 +125,10 @@ by recording the default output (WASAPI loopback) while a song was mixed into it
 - The second player's stream stops about a second after it reaches the end of the song, and the deck only sends
   sound out through that stream. A mix ending 0.25 s before the end of the song, with the second player 1.98 s
   ahead, failed 0.3 s before its last key ("the second player stopped"); ending 3.1 s before the end it played out.
-  Hence `RoomAfter` (`src/core/automix/mix_plan.cpp`): a plan must leave the song that long after its last key.
+  Until 20/11/2026 a plan had to leave the song that long after its last key (`RoomAfter`), so no mix ever reached a
+  song's last three seconds. Since, the kernel pauses the second player `kGhostEndMargin` (0.3 s) before the end of
+  the song, whatever the phase, and a plan may end that close to it (0.6 s for a stretched song, whose stretch reads
+  0.3 s ahead): the deck plays out what it holds through the paused stream (next point).
 - A **paused** second player keeps its stream: Windows goes on taking silent blocks from it (2.82 s of them counted
   after `AVCFPlayerPause`, 18/11/2026), so the deck can still send sound out after the second player stops giving
   any. Measured with Sing's Studio (2.8 s held back) on a mix ending 3.15 s before the end of the song: playing on, the
