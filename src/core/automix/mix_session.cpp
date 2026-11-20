@@ -287,6 +287,8 @@ void MixSession::TickReady(double now, double aTime) {
         }
     }
     if (aTime < takeAt) return;
+    // The last look can be a quarter of a second old: a measure that came in since is read before deciding.
+    if (std::isnan(m_status.copyErrorDb)) m_status.copyErrorDb = m_decks.CopyErrorDb();
     // Only a copy measured to be Apple's own sound goes on air. A search can land on the wrong beat at another level
     // (0.29 s off and 1.5 dB under at a match of 0.81, 20/11/2026): until the measure that follows it, or when no
     // measure can be made, nothing proves the copy, and A's end at the wrong level is what the mix would start with.

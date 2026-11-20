@@ -34,6 +34,7 @@ public:
     double copyError = -60;
     double foundAgainLead = -1;  // from 0 on: the next search finds a copy in step, this far ahead
     double foundAgainError = -60;  // and the copy error the deck then measures
+    double measuredFrom = 0;       // the deck has no measure of its copy before this test time
     double ghostStartClock = 0, ghostAnchorClock = 0, ghostAnchorTime = 0;
     std::vector<double> latencies = {0.096, 0.102, 0.105, 0.1001, 0.0996};
     size_t seekCount = 0;
@@ -117,7 +118,7 @@ public:
         if (since < ramp) return from + since + (plan.rate - 1) * since * since / (2 * ramp);
         return plan.keys.front().at + (since - ramp) * plan.rate;
     }
-    double CopyErrorDb() override { return aligned ? copyError : NAN; }
+    double CopyErrorDb() override { return aligned && t >= measuredFrom ? copyError : NAN; }
     std::optional<double> SwitchGap() override {  // what the streams show of it
         return switched ? std::optional<double>(bLate - MixSession::kUnseenDelay) : std::nullopt;
     }
@@ -715,6 +716,18 @@ TEST_CASE(AutoMix_ACopyNeverMeasuredIsNeverHeard) {
     CHECK(status.reason == "the second player's copy could not be checked");
     CHECK(decks.rewinds == 1);
     CHECK(decks.NothingHeard());
+}
+
+// The session reads the deck's measure four times a second: one that came in since its last look is read again when
+// the mix is due, rather than calling off a copy the deck has just checked.
+TEST_CASE(AutoMix_ACopyMeasuredJustBeforeTheMixIsHeard) {
+    FakeDecks decks;
+    decks.measuredFrom = 19.695;  // A at 99.695: the deck's first measure comes a few ms before the mix is due
+    MixSession session(decks);
+    REQUIRE(session.Start(Plan(), 200, 200).empty());
+    Run(session, decks, 30);
+    CHECK(session.GetStatus().phase != Phase::Failed);
+    CHECK(!decks.NothingHeard());
 }
 
 TEST_CASE(AutoMix_ACopyFoundAgainButNotMeasuredYetIsNeverHeard) {
