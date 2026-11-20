@@ -417,6 +417,8 @@ private:
         Mode effective = wish.mode;
         std::string reason;
         if (wish.mode == Mode::Studio && !StudioUsable(reason)) effective = reason.empty() ? Mode::Off : Mode::Light;
+        // Light asked for because Studio was too slow here (the extension's automatic quality): it still says why.
+        if (wish.mode == Mode::Light && m_studio.failed && m_studio.reason == kTooSlow) reason = m_studio.reason;
         if (effective != Mode::Studio && m_studioOn) StopStudio();
         if (effective == Mode::Studio && !m_studioOn) StartStudio();
         detail::WantStereo(wish.mode != Mode::Off);  // after StopStudio: its jump lands on the stereo version
