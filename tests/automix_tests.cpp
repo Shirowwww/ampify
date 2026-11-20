@@ -27,6 +27,7 @@ public:
     bool switched = false;
     double switchClock = 0;
     double bLate = MixSession::kSwitchDelay;  // how far behind its point B comes in: Apple's player, as measured
+    double switchStall = 0;  // Apple's player stuck this long at A's end before it moves on to B
     bool ghostOn = false;
     bool captured = true;  // the second player's stream is seen
     bool silent = false;   // nothing to recognise: Align finds nothing
@@ -40,6 +41,9 @@ public:
     size_t seekCount = 0;
     int aligns = 0;
     std::vector<DeckGains> gains;  // every SetGains
+    std::vector<std::pair<double, DeckGains>> ahead;  // the last SetGainsAhead
+    double aheadHeard = -1;                           // the deck's A then
+    std::vector<double> nudges;                       // every Nudge
     int stops = 0;
     double stoppedAt = -1;  // the test's clock at the last StopGhost
     double heldBack = 0;    // what Sing holds back after the deck
@@ -52,11 +56,12 @@ public:
     double ATime() const { return aOrigin + t; }
 
     std::optional<double> MainTime() override {
-        if (armed && !switched && ATime() >= armEnd) {
+        if (armed && !switched && ATime() >= armEnd + switchStall) {
             switched = true;
-            switchClock = armEnd - aOrigin;
+            switchClock = armEnd - aOrigin + switchStall;
         }
         if (switched) return armAt + (t - switchClock) - bLate;
+        if (armed && ATime() >= armEnd) return armEnd;  // stuck at A's end
         return ATime();
     }
     std::string NextItem() override { return switched ? std::string() : next; }
@@ -129,6 +134,15 @@ public:
     void SetGains(const DeckGains& set) override {
         gains.push_back(set);
         gainClock.push_back(t);
+    }
+    bool Nudge(double seconds) override {
+        nudges.push_back(seconds);
+        return true;
+    }
+    void SetGainsAhead(const std::vector<std::pair<double, DeckGains>>& points) override {
+        SetGains(points.front().second);
+        ahead = points;
+        aheadHeard = HeardTime().value_or(-1);
     }
     bool ArmSwitch(double aEnd, double bAt) override {
         armed = true;
@@ -551,6 +565,23 @@ TEST_CASE(AutoMix_TheNextSongsLateStartIsLearnedAndMadeUpFor) {
     CHECK(std::abs(session.GetStatus().switchLagMs) <= 1.5);
 }
 
+TEST_CASE(AutoMix_ANextSongThatStartsWithSilenceOfItsOwnDoesNotMoveTheDelayMadeUpFor) {
+    // Apple's player starts B 60 ms late at each switch; a next song that starts with 55 ms of silence of its own
+    // looks 55 ms later still (20/11/2026). The mixes after it still make up for 60 ms and B comes in on its beat,
+    // where an average of the delays seen had it 16 ms early.
+    FakeDecks decks;
+    MixSession session(decks);
+    for (const double late : {0.060, 0.060, 0.060, 0.115, 0.060}) {
+        decks.Reset();
+        decks.bLate = late;
+        REQUIRE(session.Start(Plan(), 200, 200).empty());
+        Run(session, decks, decks.t + 60);
+        REQUIRE(session.GetStatus().phase == Phase::Done);
+    }
+    CHECK_NEAR(decks.armAt, 30.060, 0.0015);
+    CHECK(std::abs(session.GetStatus().switchLagMs) <= 1.5);
+}
+
 TEST_CASE(AutoMix_AMixCanEndWithTheSongOnItsLastHit) {
     // The second player plays A two seconds ahead of what is heard: through A, it would stop, and its stream with the
     // deck's sound in it. Paused a little before A's end, its stream goes on and the deck plays what it holds, so a
@@ -563,6 +594,47 @@ TEST_CASE(AutoMix_AMixCanEndWithTheSongOnItsLastHit) {
     CHECK(session.GetStatus().phase == Phase::Done);
     CHECK(decks.quiets == 1);
     CHECK(decks.quietAt >= aEnds - kGhostEndMargin - 0.05 && decks.quietAt < aEnds - kGhostEndMargin + 0.05);
+}
+
+TEST_CASE(AutoMix_TheDeckHasTheNextKeyWhereItFallsBeforeTheThreadCouldStall) {
+    // Inside Apple's player the mix's thread can stall for a fifth of a second (20/11/2026). During a mix the deck is
+    // given the plan's gains for the next moments at each tick, the next key exactly where it falls: a key within a
+    // stall lands on time.
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(Plan(), 200, 200).empty());  // A gone and B full at 108
+    Run(session, decks, 27.9);                          // A at 107.9
+    REQUIRE(session.GetStatus().phase == Phase::Mixing);
+    bool found = false;
+    for (const auto& [seconds, set] : decks.ahead) {
+        if (std::abs(decks.aheadHeard + seconds - 108) < 1e-6) found = set.main == 1 && set.tail == 0;
+    }
+    CHECK(found);
+    double last = 0;
+    for (const auto& [seconds, set] : decks.ahead) last = std::max(last, seconds);
+    CHECK(last >= 0.7);  // longer than a stall
+}
+
+TEST_CASE(AutoMix_ANextSongLateOnTheBeatSetsTheStretchedOldSongBack) {
+    // A switch a few passes late (+30 ms on a beat mix, 20/11/2026) cannot be foreseen. Once B plays it is measured,
+    // and A, stretched on the beat, is set back by as much; a mix at A's own speed is left alone.
+    FakeDecks decks;
+    decks.bLate = MixSession::kSwitchDelay + 0.03;
+    MixPlan plan = Plan();
+    plan.rate = 1.03;
+    plan.rateFrom = 92;
+    MixSession session(decks);
+    REQUIRE(session.Start(plan, 200, 200).empty());
+    Run(session, decks, 60);
+    CHECK(session.GetStatus().phase == Phase::Done);
+    REQUIRE(decks.nudges.size() == 1);
+    CHECK_NEAR(decks.nudges.front(), 0.03, 1e-6);
+    FakeDecks plain;
+    plain.bLate = MixSession::kSwitchDelay + 0.03;
+    MixSession plainSession(plain);
+    REQUIRE(plainSession.Start(Plan(), 200, 200).empty());
+    Run(plainSession, plain, 60);
+    CHECK(plain.nudges.empty());
 }
 
 TEST_CASE(AutoMix_ASecondPlayerWhoseSoundEscapesTheDeckEndsTheMixAtOnce) {
@@ -579,6 +651,18 @@ TEST_CASE(AutoMix_ASecondPlayerWhoseSoundEscapesTheDeckEndsTheMixAtOnce) {
         Run(session, decks, 60);
         CHECK(decks.ApplesAlone());
     }
+}
+
+TEST_CASE(AutoMix_ApplesPlayerStuckAtTheSwitchIsWaitedFor) {
+    // Apple's player can stall half a second right at the switch (0.52 s on 20/11/2026), A held at its end. The deck's
+    // copy plays on meanwhile: what tells that Apple's player did not switch is Apple's own A going past its end.
+    FakeDecks decks;
+    decks.switchStall = 0.6;
+    MixSession session(decks);
+    REQUIRE(session.Start(Plan(), 200, 200).empty());
+    Run(session, decks, 60);
+    CHECK(session.GetStatus().phase == Phase::Done);
+    CHECK(session.GetStatus().reason.empty());
 }
 
 TEST_CASE(AutoMix_TheSecondPlayerStartsOnlyShortlyBeforeTheMix) {

@@ -26,6 +26,8 @@ constexpr double kQuiet = 1e-8;          // mean square under which there is not
 constexpr size_t kChunk = 256;           // frames mixed at once: curves and speed move in steps this long
 constexpr double kWarmSeconds = 0.5;     // the stretch runs this long at normal speed before it is heard
 constexpr double kBlendSeconds = 0.05;   // then replaces the plain copy within this
+constexpr double kNudgeSeconds = 1;      // a nudge sets A back over this long: 3 % slower for 30 ms
+constexpr double kMostNudge = 0.25;      // seconds a nudge may move A: further, the stretch would read backwards
 constexpr double kLowHz = 150;           // the shelf that takes a song's bass away
 constexpr double kLowFloor = 0.0316;     // -30 dB: "no lows"
 // The sweeps: A's high-pass from 20 Hz (amount 0) to 2 kHz (1), B's low-pass from 20 kHz down to 400 Hz, evenly
@@ -43,7 +45,9 @@ constexpr double kMeasureSeconds = 0.25;
 constexpr double kMaxSpeed = 1.2;
 constexpr double kMaxPadSeconds = 0.2;   // of empty frames at the start of a stream: more is the song's own silence
 constexpr double kGainSeconds = 0.02;   // new gains are reached this far ahead of what both streams have written
-constexpr size_t kCurvePoints = 48;      // of the gains: half a second at the session's pace, streams 20 ms apart
+// Of the gains: up to 0.8 s given ahead (thirty points at most) and a third of a second behind at the session's pace,
+// for streams 20 ms apart.
+constexpr size_t kCurvePoints = 64;
 // A stream's first blocks are written before Windows takes anything: they say nothing of how it is taken.
 constexpr std::uint64_t kPreRollBlocks = 8;
 
@@ -494,6 +498,16 @@ void MixDeck::SetStretch(double from, double first, double rate) {
     m_rampFrames = wanted ? static_cast<std::uint64_t>(std::llround(2 * (first - from) / (1 + rate) * sampleRate)) : 0;
 }
 
+bool MixDeck::Nudge(double seconds) {
+    std::lock_guard<std::mutex> guard(m_lock);
+    if (!m_open || m_state != Stretch::On || !std::isfinite(seconds)) return false;
+    const double left = m_nudgeLeft + seconds * m_rate;  // with the one still under way
+    if (std::abs(left) > kMostNudge * m_rate) return false;
+    m_nudgeLeft = left;
+    m_nudgeStep = m_nudgeLeft / (kNudgeSeconds * m_rate);
+    return true;
+}
+
 void MixDeck::SetEcho(double delay, double feedback) {
     int sampleRate = 0;
     {
@@ -536,11 +550,18 @@ bool MixDeck::LoopHeld() const {
 }
 
 void MixDeck::SetGains(const DeckGains& gains, double volume) {
+    {
+        std::lock_guard<std::mutex> guard(m_lock);
+        m_volume = volume;
+        if (!m_open || SameGains(m_curve.back().gains, gains)) return;
+    }
+    SetGainsAhead({{kGainSeconds, gains}}, volume);
+}
+
+void MixDeck::SetGainsAhead(const std::vector<std::pair<double, DeckGains>>& points, double volume) {
     std::lock_guard<std::mutex> guard(m_lock);
     m_volume = volume;
-    if (!m_open) return;
-    const Point last = m_curve.back();
-    if (SameGains(last.gains, gains)) return;
+    if (!m_open || points.empty()) return;
     // From where neither stream has written yet, so that both play the very same line.
     const std::int64_t written = std::max(static_cast<std::int64_t>(m_tailSent),
                                           static_cast<std::int64_t>(m_mainFrames) + m_apart);
@@ -554,7 +575,10 @@ void MixDeck::SetGains(const DeckGains& gains, double volume) {
     } else if (m_curve.back().at < written) {
         m_curve.push_back({written, reached});
     }
-    m_curve.push_back({written + std::max<std::int64_t>(1, std::llround(kGainSeconds * m_rate)), gains});
+    for (const auto& [seconds, gains] : points) {
+        const std::int64_t at = written + std::max<std::int64_t>(1, std::llround(seconds * m_rate));
+        if (at > m_curve.back().at) m_curve.push_back({at, gains});
+    }
     if (m_curve.size() > kCurvePoints) {
         m_curve.erase(m_curve.begin(), m_curve.begin() + static_cast<std::ptrdiff_t>(m_curve.size() - kCurvePoints));
     }
@@ -655,6 +679,7 @@ size_t MixDeck::UntilEvent(size_t frames) {
         m_stretch->Reset();
         m_feed = static_cast<std::uint64_t>(m_cursor) + static_cast<std::uint64_t>(m_stretch->Latency());
         m_feedDebt = 0;
+        m_nudgeLeft = m_nudgeStep = 0;
         m_state = Stretch::Warming;
     }
     if (m_state == Stretch::Warming) {
@@ -669,6 +694,16 @@ size_t MixDeck::UntilEvent(size_t frames) {
 
 // The next `frames` of the deck's copy of A, into m_dry. False, with silence, when the second player's sound is
 // not there: the reading waits where it is.
+// A nudge under way: the frames the stretch is given less of (more of, when negative) for this block, over its second
+// as many frames go out (Nudge).
+double MixDeck::TakeNudge(size_t frames) {
+    if (m_state != Stretch::On || m_nudgeLeft == 0) return 0;
+    const double step = m_nudgeLeft > 0 ? std::min(m_nudgeStep * frames, m_nudgeLeft)
+                                        : std::max(m_nudgeStep * frames, m_nudgeLeft);
+    m_nudgeLeft -= step;
+    return step;
+}
+
 bool MixDeck::NextTail(size_t frames) {
     auto starved = [&] {
         std::fill_n(m_dry.begin(), frames * 2, 0.0f);
@@ -687,7 +722,7 @@ bool MixDeck::NextTail(size_t frames) {
                                 : 1.0;
         speed = 1 + (m_rateTo - 1) * done;
     }
-    const double owed = frames * speed + m_feedDebt;
+    const double owed = frames * speed + m_feedDebt - TakeNudge(frames);
     const size_t take = static_cast<size_t>(owed);
     if (take * 2 > m_in.size() || !ReadSong(m_feed, take, m_in.data())) return starved();
     // Read before the stretch is fed: starved, it must not be given the same sound twice.

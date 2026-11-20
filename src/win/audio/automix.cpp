@@ -542,6 +542,18 @@ public:
 
     void SetGains(const automix::DeckGains& gains) override { g_deck.SetGains(gains, detail::LastPlayerVolume()); }
 
+    void SetGainsAhead(const std::vector<std::pair<double, automix::DeckGains>>& points) override {
+        g_deck.SetGainsAhead(points, detail::LastPlayerVolume());
+    }
+
+    bool Nudge(double seconds) override {
+        const bool done = g_deck.Nudge(seconds);
+        if (done) {
+            Note("AutoMix: the old song set " + detail::Fixed(seconds * 1000, 1) + " ms back to meet the next one's beat");
+        }
+        return done;
+    }
+
     bool ArmSwitch(double aEnd, double bAt) override {
         void* queue = g_queue.load();
         if (!queue || !m_target || !m_source) return false;

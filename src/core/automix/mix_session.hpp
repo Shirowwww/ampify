@@ -17,6 +17,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "mix_deck.hpp"
 #include "mix_plan.hpp"
@@ -42,6 +44,8 @@ public:
     // Seconds between A's last sample and B's first in Apple's player, counted in samples; none until it is known.
     virtual std::optional<double> SwitchGap() = 0;
     virtual void SetGains(const DeckGains& gains) = 0;
+    // The gains along the next moments, each at its seconds from now (MixDeck::SetGainsAhead).
+    virtual void SetGainsAhead(const std::vector<std::pair<double, DeckGains>>& points) = 0;
     virtual bool ArmSwitch(double aEnd, double bAt) = 0;  // A stops at aEnd and B takes over at bAt, gaplessly
     // Undoes ArmSwitch: A gets its own end back. With rewindNext, B goes back to its start, even if it already plays
     // (the user skipped to it before the switch).
@@ -55,6 +59,8 @@ public:
     virtual bool LoopHeld() { return false; }  // the deck keeps all of the plan's loop
     // What is held back of A goes at once, after a short fade: the user moved on (a pause, a skip, a seek).
     virtual void DropHeldBack() {}
+    // A set `seconds` further back (on, when negative) over a second, at the same pitch: MixDeck::Nudge.
+    virtual bool Nudge(double seconds) { return false; }
 };
 
 enum class Phase { Idle, Waiting, Preparing, Aligning, Ready, TakingOver, Mixing, Recovering, Done, Failed };
@@ -107,6 +113,7 @@ public:
 private:
     void Enter(Phase phase, double now);
     void Gain(const DeckGains& gains);
+    void GainAhead(double heard);  // the plan's gains from A's time `heard` on, for the next moments
     void Fail(const std::string& reason, double now, bool quick = false);
     void SeekNow(double aTime, double now);
     void TickLocked(double now);
@@ -139,7 +146,7 @@ private:
     double m_wantedLead = 0;  // what the last seek aimed for
     double m_latency = 0.1;   // how far behind its target a seek lands, learned
     double m_switchDelay = kSwitchDelay;  // how late Apple's player starts B after the switch, learned
-    int m_switchDelaySamples = 0;
+    std::vector<double> m_switchDelays;   // the last ones measured, oldest first
     double m_armedDelay = 0;  // the delay B was sought for in this plan
     double m_lastCheck = 0;
     double m_lastA = NAN;

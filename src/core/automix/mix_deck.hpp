@@ -80,6 +80,10 @@ public:
 
     // A's speed moves from 1 at `from` (A's time) to `rate` at `first`, evenly in the listener's time, then stays.
     void SetStretch(double from, double first, double rate);
+    // A falls `seconds` further behind (goes that far on, when negative) over the next second, at the same pitch:
+    // Apple's player started B that much later than made up for, which shows only once B plays. Only once A's speed
+    // moved (SetStretch): a copy played as recorded would jump. False when it cannot.
+    bool Nudge(double seconds);
     // An echo whose repeats come `delay` seconds apart, each `feedback` of the one before. After Open.
     void SetEcho(double delay, double feedback);
     // From `from` (A's time) on, the deck plays the `length` seconds of A there over and over, kept as the second
@@ -90,6 +94,10 @@ public:
     // Reached in a straight line a fiftieth of a second from now, at the same instant in both streams. `volume` is
     // the user's volume now: the second player's sound waits a few seconds here, so the deck follows the slider.
     void SetGains(const DeckGains& gains, double volume);
+    // The gains along the next moments instead, each `first` seconds from now (in order), in straight lines from one
+    // to the next: the mix's thread can stall inside Apple's player (0.37 s on 20/11/2026), and what it gave ahead
+    // plays on meanwhile. What a later call gives replaces what is still ahead.
+    void SetGainsAhead(const std::vector<std::pair<double, DeckGains>>& points, double volume);
 
     std::optional<double> Time() const;  // A's time the deck plays; empty until Align, frozen while it starves
     double TailSeconds() const;          // how much of the second player's sound came in since Open
@@ -170,6 +178,7 @@ private:
     bool ReadSong(std::uint64_t from, size_t frames, float* out) const;
     void KeepLoop();
     size_t UntilEvent(size_t frames);
+    double TakeNudge(size_t frames);
     bool NextTail(size_t frames);
     void Measure(const float* stereo, std::uint64_t mainFrame, size_t frames, double scale);
 
@@ -232,6 +241,8 @@ private:
     std::uint64_t m_rampDone = 0;
     std::uint64_t m_feed = 0;  // the frame the stretch takes next, its latency ahead of m_cursor
     double m_feedDebt = 0;     // the part of a frame it is owed
+    double m_nudgeLeft = 0;    // frames of A the stretch is still to be given less of (more of, when negative)
+    double m_nudgeStep = 0;    // less of them for each frame it gives, until none are left
     std::vector<float> m_dry;
     std::vector<float> m_wet;
     std::vector<float> m_in;

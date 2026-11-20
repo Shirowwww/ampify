@@ -54,9 +54,15 @@ studio mode's delay is not taken off their position.
 
 - **A switch at an exact point**: `AVCFPlayerItemSetForwardPlaybackEndTime(current, tA)` and a seek of the next item
   to `tB`. The queue moves on at `tA`, and the next song is heard **60 or 70 ms late** (see "Streams" for where the
-  time goes). AutoMix seeks the next song that much further, counts the delay in samples at each mix and keeps a
-  running mean: the next song then lands within 5 ms of its point (13 ms seen once), and the journal's figure is the
-  recording's (-4.98 ms said, -5.0 ms recorded). An invalid time (flags 0) as the end time removes it.
+  time goes). AutoMix seeks the next song that much further, counts the delay in samples at each mix and makes up for
+  the lower median of the last eight: the next song then lands within 5 ms of its point (13 ms seen once), and the
+  journal's figure is the recording's (-4.98 ms said, -5.0 ms recorded). An invalid time (flags 0) as the end time
+  removes it.
+- **Apple's player holds its lock 180 to 370 ms at a time** while it loads or switches (517 ms once, right at a
+  switch, 20/11/2026): a call into it from another thread (the song's time, the current item) waits that long. The
+  mix thread gives the deck its gains 0.8 s ahead (a point every 40 ms, and each key where it falls), which the deck
+  plays on its own, so a mix stays in step through such a stall; and Apple's song held at its end is not taken for a
+  missed switch before its time is 0.5 s past the switch point.
 - `AVCFPlayerItemSeekToTime` seeks with an infinite tolerance (`CoreMedia.dll` ordinal 718 as both tolerances, seen
   in its code); `AVCFPlayerItemSeekToTimeWithTolerance(item, time, before, after)` with zero tolerances is exact: the
   item starts on the very frame asked for.
@@ -105,6 +111,14 @@ by recording the default output (WASAPI loopback) while a song was mixed into it
   with a stretched song.
 - The two players' own clocks do not tell this delay: read at the switch they gave 18 to 59 ms for a delay that the
   recording showed fixed.
+- The same at 48 kHz (480 frames a pass), 20/11/2026, 15 switches: the new stream's first block 384 frames (8 ms)
+  after the old stream's last sample 13 times, 864 (18 ms) and 1344 (28 ms) once each, then 1057 empty frames (22 ms):
+  60.02 ms in all with the 30 ms not seen in the samples, now and then one or two passes more. A next song that starts
+  with digital silence of its own adds it to the count ("B.A.C": 55 ms more). The kernel makes up for the lower median
+  of the last eight delays, which one late switch or one silent start does not move; the mean it used before moved
+  by 16 ms after "B.A.C" and brought the next beat mix in that early. When the next song still lands 3 to 60 ms off
+  its point in a mix where the current song is stretched, the deck sets that song back or forward by as much, over a
+  second at the same pitch, so that the beats meet again.
 - The second player makes a new stream at its start, at each seek, and also **when it moves to another version of
   the song as it plays** (20/11/2026: from 48 to 96 kHz, seconds before the switch). Until then every new stream after
   the switch was armed counted as Apple's: that one, the song as decoded at full volume, played 19 dB over the music
@@ -216,7 +230,8 @@ by recording the default output (WASAPI loopback) while a song was mixed into it
   median and 22 ms in the worst tenth; a fifth of those pairs swap on a bar instead.
 - One switch of 16/11/2026 counted 200 ms instead of 60-70 (B 135 ms behind its point, "Newjack" into "Phantom",
   a variant named by a 64-digit hash rather than the usual short one). Not seen again yet: the learned delay only
-  adapts from the second mix of a session, so a stream that switches late puts the first mix off the beat.
+  adapts from the second mix of a session, so a stream that switches late puts the first mix off the beat. Since
+  20/11/2026 one such switch no longer moves the delay made up for in the mixes after it (the lower median above).
 
 ## Signatures (x64)
 

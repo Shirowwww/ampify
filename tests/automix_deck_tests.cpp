@@ -457,6 +457,22 @@ TEST_CASE(AutoMixDeck_KeepsUpWithGainsThatMoveFasterThanItsRamps) {
     CHECK(Rms(rig.out, cut + kRate / 20, rig.at) < 1e-6);  // gone within the ramp, not half a second later
 }
 
+TEST_CASE(AutoMixDeck_PlaysTheGainsGivenAheadWhenNoMoreCome) {
+    // The mix's thread can stall inside Apple's player (0.18 s on 20/11/2026): gains given for the next moments play
+    // on meanwhile, A gone where they say and not once the thread is back.
+    Rig rig(Song(12, 3), Song(12, 4));
+    rig.Run(3.0);
+    REQUIRE(rig.Align().has_value());
+    rig.deck.SetGains({0, 1, 1, 1}, rig.volume);  // the deck's A alone
+    rig.Run(0.5);
+    const size_t from = rig.at;
+    rig.deck.SetGainsAhead({{0.1, {0, 1, 1, 1}}, {0.12, {0, 0, 1, 1}}, {0.3, {0, 0, 1, 1}}}, rig.volume);
+    rig.Run(0.3);  // and nothing more
+    auto copy = [&rig](size_t frame, size_t channel) { return rig.volume * rig.a[frame * 2 + channel]; };
+    CHECK(WorstError(rig.out, from, from + kRate / 10 - kBlock, copy) < 1e-5);  // whole up to 0.1 s
+    CHECK(Rms(rig.out, from + kRate * 12 / 100 + kBlock, rig.at) < 1e-6);         // gone from 0.12 s
+}
+
 TEST_CASE(AutoMixDeck_TakesTheBassOfOneSongOnly) {
     // A is a bass note, B a higher one: with A's lows gone, B is all that is left.
     std::vector<float> a = Song(12, 5);
@@ -659,6 +675,54 @@ TEST_CASE(AutoMixStretch_AtNormalSpeedItGivesTheSoundBackLate) {
         power += in * in;
     }
     CHECK(Db(std::sqrt(error / power)) < -20);
+}
+
+TEST_CASE(AutoMixDeck_ANudgeSetsTheStretchedOldSongBackAtTheSamePitch) {
+    // Apple's player now and then starts the next song a pass or three late (+30 ms on a beat mix, 20/11/2026), as
+    // only shows once it plays: A, stretched anyway, is then set back by as much over a second, at the same pitch.
+    for (const double nudge : {0.03, -0.02}) {
+        Rig rig(Tone(30, 440, 0.5));
+        rig.lead = static_cast<size_t>(3.0 * kRate);
+        const std::vector<float> rustle = Song(30, 9);
+        for (size_t i = 0; i < rig.a.size(); i++) rig.a[i] += rustle[i] * 0.05f;
+        MixPlan plan;
+        plan.keys = {{14, 1, 0}, {24, 0, 1}};
+        plan.rate = 1.05;
+        plan.rateFrom = 8;
+        rig.Run(4.0);
+        REQUIRE(rig.Align().has_value());
+        CHECK(!rig.deck.Nudge(nudge));  // not while A plays as recorded: it would jump
+        rig.deck.SetStretch(plan.rateFrom, plan.keys.front().at, plan.rate);
+        rig.deck.SetGains({0, 1, 1, 1}, rig.volume);
+        rig.Run(SwitchTime(plan) - rig.ATime());
+        REQUIRE(rig.deck.Nudge(nudge));
+        const size_t from = rig.at;
+        rig.Run(4.0);
+        CHECK_NEAR(*rig.deck.Time(), 18.2 - nudge, 0.012);  // 4 s at 1.05, less the nudge
+        CHECK_NEAR(Pitch(rig.out, from, rig.at), 440, 2);
+    }
+}
+
+TEST_CASE(AutoMixDeck_ANudgeTheStretchCannotGiveIsRefused) {
+    // A nudge takes frames from what the stretch reads over a second: past a quarter of a second, it would read
+    // backwards. Refused, the stretched A plays on as planned.
+    Rig rig(Tone(30, 440, 0.5));
+    rig.lead = static_cast<size_t>(3.0 * kRate);
+    MixPlan plan;
+    plan.keys = {{14, 1, 0}, {24, 0, 1}};
+    plan.rate = 1.05;
+    plan.rateFrom = 8;
+    rig.Run(4.0);
+    REQUIRE(rig.Align().has_value());
+    rig.deck.SetStretch(plan.rateFrom, plan.keys.front().at, plan.rate);
+    rig.deck.SetGains({0, 1, 1, 1}, rig.volume);
+    rig.Run(SwitchTime(plan) - rig.ATime());
+    CHECK(!rig.deck.Nudge(2.0));
+    CHECK(!rig.deck.Nudge(-0.3));
+    REQUIRE(rig.deck.Nudge(0.2));
+    CHECK(!rig.deck.Nudge(0.1));  // with the one under way, more than a quarter of a second
+    rig.Run(4.0);
+    CHECK_NEAR(*rig.deck.Time(), 18.2 - 0.2, 0.012);
 }
 
 TEST_CASE(AutoMixDeck_PlaysTheOldSongFasterAtTheSamePitch) {

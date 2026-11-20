@@ -16,6 +16,12 @@ constexpr double kSeekSafety = 1.0;     // no seek of the second player closer t
 constexpr double kAlignSafety = 0.2;    // the deck must have found Apple's sound this long before it
 constexpr double kMaxLatency = 1.0;     // a seek that lands later than this tells nothing about the next one
 constexpr int kLatencyMemory = 8;
+constexpr double kMinNudge = 0.003;  // a B this close to its beat is left as it is
+constexpr double kMaxNudge = 0.06;   // further off, something else than Apple's player is at play: left alone
+// The plan's gains given ahead at this pace, this many: twice the longest stall seen (0.37 s, 20/11/2026, three
+// seconds after a switch, inside Apple's player). Keys and the echo's edges come exactly where they fall on top.
+constexpr double kAheadStep = 0.04;
+constexpr int kAheadSteps = 20;
 constexpr double kStallSeconds = 1.5;   // a player not moving for this long: paused or stuck
 constexpr double kSwitchMargin = 0.5;   // Apple's player still on A this long after the switch point: it will not
 constexpr double kMaxSwitchDelay = 0.25;  // a later start of B is a stall, not the player's usual delay
@@ -143,6 +149,34 @@ void MixSession::Gain(const DeckGains& gains) {
     m_decks.SetGains(gains);
 }
 
+// During a mix the deck gets the plan's gains for the next moments at each tick, each key and each edge of the echo
+// exactly where it falls: this thread can stall inside Apple's player (0.18 and 0.37 s on 20/11/2026), and a key
+// that came then landed that late.
+void MixSession::GainAhead(double heard) {
+    auto at = [this](double aTime) {
+        const Gains gains = GainsAt(m_plan.keys, aTime);
+        return DeckGains{gains.b,       gains.a,       gains.bLow, gains.aLow, gains.bFilter, gains.aFilter,
+                         EchoSendAt(m_plan, aTime), Echoes(m_plan) ? 1.0 : 0.0};
+    };
+    // From the first key on, A plays at the plan's speed: its time passes that much faster than the listener's.
+    const double speed = m_plan.rate;
+    std::vector<std::pair<double, DeckGains>> points;
+    for (int step = 0; step <= kAheadSteps; step++) {
+        const double seconds = step * kAheadStep;
+        points.push_back({seconds, at(heard + seconds * speed)});
+    }
+    std::vector<double> edges;
+    for (const GainKey& key : m_plan.keys) edges.push_back(key.at);
+    if (Echoes(m_plan)) edges.insert(edges.end(), {m_plan.echo.from, m_plan.echo.to});
+    for (const double edge : edges) {
+        const double seconds = (edge - heard) / speed;
+        if (seconds > 0 && seconds < kAheadSteps * kAheadStep) points.push_back({seconds, at(edge)});
+    }
+    std::sort(points.begin(), points.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+    m_gains = points.front().second;
+    m_decks.SetGainsAhead(points);
+}
+
 bool MixSession::SwitchedOnPlan() {
     if (!m_decks.MainOnNext()) return false;
     // A's time: Apple's player leaves A at the first key. A deck that lost its place no longer tells it: the last
@@ -221,16 +255,25 @@ void MixSession::SeekNow(double aTime, double now) {
 }
 
 // Apple's player leaves a silence between A's last sample and B's first: B was sought m_armedDelay further to make
-// up for it. The deck counts that silence in samples; the status keeps what was not made up for.
+// up for it. The deck counts that silence in samples; the status keeps what was not made up for. A next song that
+// starts with silence of its own adds it to the count (55 ms on 20/11/2026, where Apple's player took 60 ms at each
+// switch): what is made up for is the lower median of the last delays, which one such song does not move.
 void MixSession::LearnSwitchDelay() {
     const std::optional<double> gap = m_decks.SwitchGap();
     if (!gap) return;
     m_lagMeasured = true;
     const double delay = *gap + kUnseenDelay;
-    m_status.switchLagMs = (delay - m_armedDelay) * 1000;
+    const double lag = delay - m_armedDelay;
+    m_status.switchLagMs = lag * 1000;
+    // Apple's player now and then takes a pass or three more than usual, which no learning foresees (+30 ms on a
+    // beat mix, 20/11/2026). On the beat, A, stretched anyway, is set back as much to meet B's beat.
+    if (Stretches(m_plan) && std::abs(lag) >= kMinNudge && std::abs(lag) <= kMaxNudge) m_decks.Nudge(lag);
     if (!(delay >= 0 && delay < kMaxSwitchDelay)) return;
-    m_switchDelay = (m_switchDelay * m_switchDelaySamples + delay) / (m_switchDelaySamples + 1);
-    m_switchDelaySamples = std::min(m_switchDelaySamples + 1, kLatencyMemory);
+    m_switchDelays.push_back(delay);
+    if (m_switchDelays.size() > static_cast<size_t>(kLatencyMemory)) m_switchDelays.erase(m_switchDelays.begin());
+    std::vector<double> sorted = m_switchDelays;
+    std::sort(sorted.begin(), sorted.end());
+    m_switchDelay = sorted[(sorted.size() - 1) / 2];
 }
 
 // A's time at which the deck's copy starts to replace Apple's.
@@ -331,7 +374,6 @@ void MixSession::TickLocked(double now) {
             return Fail("the second player stopped", now, true);
         }
     }
-    const double first = m_plan.keys.front().at;
     const double takeAt = TakeAt();
     std::optional<double> a = m_decks.MainTime();  // A until the switch, then B
     if (a) {
@@ -398,8 +440,9 @@ void MixSession::TickLocked(double now) {
             Gain({1 - p, p, 1, 1});
             if (p < 1) return;
             if (m_decks.MainOnNext()) return Enter(Phase::Mixing, now);
-            std::optional<double> heard = m_decks.HeardTime();
-            if (heard && *heard > first + kSwitchMargin) return Fail("Apple's player did not switch", now);
+            // Apple's own A past its end tells that it did not switch. The deck's copy plays on through a stall of
+            // Apple's player right at the switch (0.52 s on 20/11/2026), while Apple's A is held at its end.
+            if (a && *a > SwitchTime(m_plan) + kSwitchMargin) return Fail("Apple's player did not switch", now);
             return;
         }
         case Phase::Mixing: {
@@ -408,9 +451,7 @@ void MixSession::TickLocked(double now) {
                 std::optional<double> heard = m_decks.HeardTime();  // A's time, carried by the deck
                 if (!heard) return;
                 if (!m_lagMeasured) LearnSwitchDelay();
-                Gains gains = GainsAt(m_plan.keys, *heard);
-                Gain({gains.b, gains.a, gains.bLow, gains.aLow, gains.bFilter, gains.aFilter, EchoSendAt(m_plan, *heard),
-                      Echoes(m_plan) ? 1.0 : 0.0});
+                GainAhead(*heard);
                 if (*heard < m_plan.keys.back().at) return;
             }
             if (!HeldBackPlayed(now)) return FadeEcho(now);
