@@ -356,6 +356,12 @@ void ClaimTailStream(IAudioClient* client, void* render, const StreamFormat* for
              (format ? std::to_string(format->sampleRate) + " Hz" : std::string("not stereo float")) +
              ") cannot go through the deck, kept silent");
     }
+    if (usable) {
+        // Where it came from, for the journal: the second player's start, a seek, or another version of the song.
+        const std::string when = g_appleNext.load() ? ", " + Fixed(g_appleFrom.load() - SteadyNow(), 2) +
+                                                          " s before the switch's time" : "";
+        Note("AutoMix: the second player's stream " + std::to_string(slot + 1) + when);
+    }
     TailStream& tail = g_tailStreams[slot];
     tail.mute = !usable;
     tail.rate = usable ? format->sampleRate : 0;

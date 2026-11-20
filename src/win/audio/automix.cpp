@@ -421,6 +421,17 @@ public:
     void Songs(void* current, void* next) {
         Hold(m_source, current);
         Hold(m_target, next);
+        m_plannedSource = m_source;
+        m_plannedTarget = m_target;
+    }
+
+    // From Apple's threads: what an item Apple's queue lets go of is to the plan, for the journal and the mix.
+    // `current` is the item the queue played just before.
+    enum class Role { Next, Playing, MixedOut, Later };
+    Role RoleOf(const void* item, const void* current) const {
+        if (!item || item == m_plannedTarget.load()) return Role::Next;
+        if (item != m_plannedSource.load()) return Role::Later;
+        return current == m_plannedTarget.load() ? Role::MixedOut : Role::Playing;
     }
 
     std::optional<double> MainTime() override {
@@ -606,6 +617,8 @@ private:
     void* m_ghost = nullptr;
     void* m_ghostItem = nullptr;
     void* m_armedItem = nullptr;
+    std::atomic<const void*> m_plannedSource{nullptr};  // m_source and m_target as Apple's threads see them,
+    std::atomic<const void*> m_plannedTarget{nullptr};  // only to compare
     std::atomic<void*> m_switchItem{nullptr};  // m_armedItem as Apple's threads see it, only to compare
     std::atomic<double> m_switchEnd{0};         // the end it was given
 };
@@ -690,6 +703,18 @@ public:
     }
 
     bool AtSwitch() const { return m_decks.AtArmedEnd(); }  // from Apple's threads too
+
+    // Apple's queue let go of `item` (`current`: the item it played just before). Only the mix's own songs end it: a
+    // later one, or the old song once the next one plays, takes nothing from it.
+    void Removed(const void* item, const void* current) {
+        if (!m_running.load()) return;
+        using Role = AvcfDecks::Role;
+        const Role role = m_decks.RoleOf(item, current);
+        static constexpr const char* kNames[] = {"the next song", "the song playing", "the song mixed out",
+                                                 "a later song"};
+        Note(std::string("AutoMix: Apple's queue let go of ") + kNames[static_cast<int>(role)]);
+        if (role == Role::Next || role == Role::Playing) Interrupt("the queue changed");
+    }
 
 private:
     static void Report(const automix::Status& status) {
@@ -1010,9 +1035,10 @@ void* __cdecl Advance_Hook(void* a, void* b, void* c, void* d, void* e, void* f,
 Generic_t g_remove = nullptr;
 void* __cdecl Remove_Hook(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h) {
     Adopt(a);  // `a` is the queue player
-    const bool playing = b && detail::CurrentSong() == b;  // `b` is the item
+    const void* current = detail::CurrentSong();
+    const bool playing = b && current == b;  // `b` is the item
     void* result = g_remove(a, b, c, d, e, f, g, h);
-    Instance().Interrupt("the queue changed");
+    Instance().Removed(b, current);
     if (playing) detail::SingSeeked();
     return result;
 }
