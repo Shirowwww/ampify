@@ -2,7 +2,7 @@
   "$schema": "../../schemas/manifest.schema.json",
   "id": "sing",
   "name": "Sing",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "kind": "extension",
   "author": "Shirowwww",
   "description": "A karaoke mode: a microphone button on the playback bar turns the singer's voice down, or all the way off, while the music plays on, with a Light quality and a Studio quality that uses the graphics card.",

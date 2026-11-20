@@ -45,6 +45,7 @@ const char* ReasonName(audio::SingReason reason) {
         case audio::SingReason::ModelFailed: return "model-failed";
         case audio::SingReason::DolbyAtmos: return "dolby-atmos";
         case audio::SingReason::AutoMixMixing: return "automix-mixing";
+        case audio::SingReason::TooSlow: return "too-slow";
         default: return "none";
     }
 }

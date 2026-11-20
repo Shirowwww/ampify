@@ -15,6 +15,7 @@ Ampify.i18n.define({
     off: "Off", downloading: "Downloading {percent} %", getting: "Getting ready", running: "On · {quality}",
     noGpu: "Studio needs a graphics card", downloadFailed: "The download failed", modelFailed: "Studio could not start",
     failed: "Sing could not start", atmos: "Not available for Dolby Atmos songs", automix: "Paused while AutoMix mixes",
+    tooSlow: "Studio is too slow on this PC, Light plays instead",
   },
   fr: {
     label: "Chanter", karaoke: "Karaoké", solo: "Voix seule", music: "Musique", voice: "Voix du chanteur", light: "Léger", studio: "Studio", quality: "Qualité",
@@ -27,6 +28,7 @@ Ampify.i18n.define({
     noGpu: "Studio demande une carte graphique", downloadFailed: "Le téléchargement a échoué",
     modelFailed: "Studio n'a pas pu démarrer", failed: "Chanter n'a pas pu démarrer",
     atmos: "Indisponible pour les morceaux Dolby Atmos", automix: "En pause pendant un mix AutoMix",
+    tooSlow: "Studio est trop lent sur ce PC, Léger prend le relais",
   },
   de: {
     label: "Singen", karaoke: "Karaoke", solo: "Nur Gesang", music: "Musik", voice: "Stimme des Sängers", light: "Leicht", studio: "Studio", quality: "Qualität",
@@ -39,6 +41,7 @@ Ampify.i18n.define({
     noGpu: "Studio braucht eine Grafikkarte", downloadFailed: "Der Download ist fehlgeschlagen",
     modelFailed: "Studio konnte nicht starten", failed: "Singen konnte nicht starten",
     atmos: "Für Dolby-Atmos-Titel nicht verfügbar", automix: "Pausiert, während AutoMix mischt",
+    tooSlow: "Studio ist auf diesem PC zu langsam, Leicht übernimmt",
   },
   es: {
     label: "Cantar", karaoke: "Karaoke", solo: "Solo voz", music: "Música", voice: "Voz del cantante", light: "Ligero", studio: "Estudio", quality: "Calidad",
@@ -51,6 +54,7 @@ Ampify.i18n.define({
     noGpu: "Estudio necesita una tarjeta gráfica", downloadFailed: "La descarga falló",
     modelFailed: "Estudio no pudo iniciarse", failed: "Cantar no pudo iniciarse",
     atmos: "No disponible para canciones Dolby Atmos", automix: "En pausa mientras AutoMix mezcla",
+    tooSlow: "Estudio es demasiado lento en este PC, se usa Ligero",
   },
   pt: {
     label: "Cantar", karaoke: "Karaokê", solo: "Só a voz", music: "Música", voice: "Voz do cantor", light: "Leve", studio: "Estúdio", quality: "Qualidade",
@@ -63,6 +67,7 @@ Ampify.i18n.define({
     noGpu: "O Estúdio precisa de uma placa de vídeo", downloadFailed: "O download falhou",
     modelFailed: "O Estúdio não pôde iniciar", failed: "Cantar não pôde iniciar",
     atmos: "Indisponível para músicas Dolby Atmos", automix: "Em pausa enquanto o AutoMix mistura",
+    tooSlow: "O Estúdio é lento demais neste PC, o Leve assume",
   },
   ru: {
     label: "Петь", karaoke: "Караоке", solo: "Только голос", music: "Музыка", voice: "Голос певца", light: "Лёгкий", studio: "Студия", quality: "Качество",
@@ -75,6 +80,7 @@ Ampify.i18n.define({
     noGpu: "Для режима «Студия» нужна видеокарта", downloadFailed: "Не удалось загрузить",
     modelFailed: "Не удалось запустить «Студию»", failed: "Не удалось запустить режим пения",
     atmos: "Недоступно для песен Dolby Atmos", automix: "Пауза, пока AutoMix сводит песни",
+    tooSlow: "«Студия» слишком медленная на этом ПК, включён «Лёгкий»",
   },
   ja: {
     label: "歌う", karaoke: "カラオケ", solo: "ボーカルのみ", music: "音楽", voice: "歌手の声", light: "ライト", studio: "スタジオ", quality: "品質",
@@ -87,6 +93,7 @@ Ampify.i18n.define({
     noGpu: "スタジオにはグラフィックスカードが必要です", downloadFailed: "ダウンロードに失敗しました",
     modelFailed: "スタジオを開始できませんでした", failed: "歌うモードを開始できませんでした",
     atmos: "Dolby Atmos の曲では使えません", automix: "AutoMix のミックス中は一時停止",
+    tooSlow: "この PC ではスタジオが遅すぎるため、ライトで再生します",
   },
   zh: {
     label: "演唱", karaoke: "卡拉 OK", solo: "仅人声", music: "音乐", voice: "歌手人声", light: "轻量", studio: "录音室", quality: "质量",
@@ -99,6 +106,7 @@ Ampify.i18n.define({
     noGpu: "录音室需要显卡", downloadFailed: "下载失败",
     modelFailed: "录音室无法启动", failed: "演唱模式无法启动",
     atmos: "杜比全景声歌曲不可用", automix: "AutoMix 混音时暂停",
+    tooSlow: "录音室在这台电脑上太慢，已改用轻量",
   },
   it: {
     label: "Canta", karaoke: "Karaoke", solo: "Solo voce", music: "Musica", voice: "Voce del cantante", light: "Leggero", studio: "Studio", quality: "Qualità",
@@ -111,6 +119,7 @@ Ampify.i18n.define({
     noGpu: "Studio richiede una scheda grafica", downloadFailed: "Download non riuscito",
     modelFailed: "Studio non è partito", failed: "Canta non è partito",
     atmos: "Non disponibile per i brani Dolby Atmos", automix: "In pausa durante un mix AutoMix",
+    tooSlow: "Studio è troppo lento su questo PC, si usa Leggero",
   },
   ko: {
     label: "노래하기", karaoke: "노래방", solo: "보컬만", music: "음악", voice: "가수 목소리", light: "라이트", studio: "스튜디오", quality: "품질",
@@ -123,6 +132,7 @@ Ampify.i18n.define({
     noGpu: "스튜디오에는 그래픽 카드가 필요합니다", downloadFailed: "다운로드하지 못했습니다",
     modelFailed: "스튜디오를 시작하지 못했습니다", failed: "노래하기를 시작하지 못했습니다",
     atmos: "Dolby Atmos 곡에서는 사용할 수 없습니다", automix: "AutoMix가 믹스하는 동안 일시 중지",
+    tooSlow: "이 PC에서는 스튜디오가 너무 느려 라이트로 재생합니다",
   },
 });
 const t = (key, values) => Ampify.i18n.t(key, values);
@@ -187,7 +197,7 @@ function apply(state) {
 const TONES = { on: "#30A14E", off: "#8E8E93", warn: "#C26A00", error: "#D93025" };
 const REASONS = {
   "no-graphics-card": "noGpu", "download-failed": "downloadFailed", "model-failed": "modelFailed",
-  "dolby-atmos": "atmos", "automix-mixing": "automix",
+  "dolby-atmos": "atmos", "automix-mixing": "automix", "too-slow": "tooSlow",
 };
 
 // The line under the switch, in plain words, and how it looks. A reason beats the phase: it says why Sing is not on.

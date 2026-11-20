@@ -290,8 +290,11 @@ Ampify.audio.sing.onChange(fn)           // fn(state) when the state moves (poll
 - `installed` says whether the files Studio needs with the model asked are downloaded and checked (`null` where it
   cannot be told), and `downloadSize` how many bytes are still to download for it (0 once installed), fetched the
   first time Studio is asked for with that model.
-- `reason` says why Sing is not fully on: `none`, `no-graphics-card`, `download-failed`, `model-failed` or
-  `dolby-atmos`. `automix-mixing` is no longer given: Ampify 1.5.0 alone gave it, while AutoMix mixed.
+- `reason` says why Sing is not fully on: `none`, `no-graphics-card`, `download-failed`, `model-failed`,
+  `dolby-atmos` or `too-slow`. `automix-mixing` is no longer given: Ampify 1.5.0 alone gave it, while AutoMix mixed.
+  `too-slow`: the graphics card took longer than the model allows for most of its last windows, so the
+  voice would come back for a moment every hop; Light plays instead, until Studio is asked for again or the other
+  model is picked.
 - Sing works on Apple's stereo stream. While any mode is on, Apple's player is asked for the songs' stereo versions:
   at once while a stereo song plays or none does, otherwise from the next time Apple Music starts playing (its first
   song after it opens). A song already playing in Dolby Atmos is never switched under way: Apple Music then plays it

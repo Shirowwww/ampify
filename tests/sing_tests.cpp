@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "../src/core/sing/light_filter.hpp"
+#include "../src/core/sing/pace_watch.hpp"
 #include "../src/core/sing/real_fft.hpp"
 #include "../src/core/sing/resampler.hpp"
 #include "../src/core/sing/studio_stream.hpp"
@@ -919,6 +920,36 @@ TEST_CASE(Sing_StudioStreamHoldsTheDelayAndLessWhileItFillsAgain) {
     CHECK_NEAR(before, stream.Delay(), 1e-9);
     CHECK(atOnce == 0.0);
     CHECK_NEAR(stream.Held(), 0.5, 1e-3);
+}
+
+// A card that runs the precise model in 0.5 s a window keeps up with its hop of a second, yet each hop's vocals come
+// 0.2 s after their sound: measured on a stream run in real time (20/11/2026), the voice came back for 0.2 s every
+// second. The budget is what the delay leaves after two hops and the ahead, or the hop when that is shorter.
+TEST_CASE(Sing_EachModelHasTheRunBudgetItsDelayLeaves) {
+    CHECK_NEAR(kStandard.RunBudget(), 0.4, 1e-9);
+    CHECK_NEAR(kPrecise.RunBudget(), 0.3, 1e-9);
+}
+
+TEST_CASE(Sing_PaceWatchCallsAModelOverItsBudgetMostOfTheTimeTooSlow) {
+    PaceWatch watch(kPrecise.RunBudget());
+    for (int i = 0; i < 7; i++) watch.Add(0.5);
+    const bool tooSlowEarly = watch.TooSlow();
+    watch.Add(0.5);
+
+    CHECK(!tooSlowEarly);  // too few windows to tell
+    CHECK(watch.TooSlow());
+    watch.Clear();
+    CHECK(!watch.TooSlow());
+}
+
+TEST_CASE(Sing_PaceWatchForgivesAFewSlowWindows) {
+    PaceWatch watch(kStandard.RunBudget());
+    for (int i = 0; i < 20; i++) watch.Add(i % 3 == 0 ? 0.9 : 0.1);  // a busy moment now and then
+
+    CHECK(!watch.TooSlow());
+    watch.Add(std::nan(""));  // a time that cannot be read is counted against the card
+    for (int i = 0; i < 4; i++) watch.Add(0.6);
+    CHECK(watch.TooSlow());
 }
 
 TEST_CASE(Sing_StudioStreamFadesTheSongComingInWhenItWasNotPlaying) {

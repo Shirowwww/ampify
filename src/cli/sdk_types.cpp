@@ -122,7 +122,7 @@ type SingState = {
   phase: "off" | "downloading" | "loading" | "buffering" | "on" | "failed";
   progress: number;
   delay: number;
-  reason: "none" | "no-graphics-card" | "download-failed" | "model-failed" | "dolby-atmos" | "automix-mixing";
+  reason: "none" | "no-graphics-card" | "download-failed" | "model-failed" | "dolby-atmos" | "automix-mixing" | "too-slow";
   installed: boolean | null;
   downloadSize: number;
 };

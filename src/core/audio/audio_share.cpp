@@ -148,7 +148,7 @@ bool ReadSingStatus(const SharedAudio& block, SingStatus& out) {
     out.progress = FromMilli(block.singProgressMilli.load(std::memory_order_relaxed));
     out.delaySeconds = block.singDelayMs.load(std::memory_order_relaxed) / kMilli;
     out.studio = Checked(block.singStudio.load(std::memory_order_relaxed), SingStudio::No);
-    out.reason = Checked(block.singReason.load(std::memory_order_relaxed), SingReason::AutoMixMixing);
+    out.reason = Checked(block.singReason.load(std::memory_order_relaxed), SingReason::TooSlow);
     return true;
 }
 

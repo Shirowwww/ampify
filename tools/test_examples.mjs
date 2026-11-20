@@ -3584,6 +3584,8 @@ test("sing says in plain words how far it is", () => {
   assert.equal(status().text, "The download failed");
   fake.emit({ phase: "off", reason: "dolby-atmos" });
   assert.equal(status().text, "Not available for Dolby Atmos songs");
+  fake.emit({ mode: "light", phase: "on", reason: "too-slow" });
+  assert.equal(status().text, "Studio is too slow on this PC, Light plays instead", "a card too slow says so, not just On");
 });
 
 test("sing shows the voice in per cent and says what each quality does, and the download it needs", () => {

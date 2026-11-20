@@ -25,6 +25,13 @@ struct ModelSpec {
     double delaySeconds;    // holding the sound back this long: two hops, the ahead, a run and some margin
 
     constexpr size_t Chunk() const { return fftHop * (frames - 1); }  // samples a window covers
+    // Seconds one window may take: within a hop to keep up at all, and within what the delay leaves after the two
+    // hops and the ahead, or each hop's vocals come after its sound starts (StudioStream then plays that moment
+    // with the voice, once every hop). The standard model has 0.4 s, the precise one 0.3 s.
+    constexpr double RunBudget() const {
+        const double left = delaySeconds - 2 * hopSeconds - aheadSeconds;
+        return left < hopSeconds ? left : hopSeconds;
+    }
     constexpr size_t Plane() const { return bins * frames; }
     // [channel][bin][frame], channels L real, L imag, R real, R imag.
     constexpr size_t SpectrumSize() const { return 4 * Plane(); }

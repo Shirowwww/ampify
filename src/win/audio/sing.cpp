@@ -24,6 +24,7 @@
 
 #include "../../core/audio/audio_share.hpp"
 #include "../../core/sing/light_filter.hpp"
+#include "../../core/sing/pace_watch.hpp"
 #include "../../core/sing/studio_stream.hpp"
 #include "../../core/sing/vocal_splitter.hpp"
 #include "../../core/sing_pack.hpp"
@@ -288,10 +289,22 @@ void SingTailDrop() { FlushAll(TailStudios(), Fade::Held); }
 
 namespace {
 
+// The loaded model as the splitter runs it, telling whether a stream's step ran a window: only those are timed.
+struct WindowFlag final : core_sing::VocalModel {
+    explicit WindowFlag(core_sing::VocalModel& inner) : VocalModel(inner.spec), model(inner) {}
+    bool Run(const float* spectrum, float* vocals) override {
+        ran = true;
+        return model.Run(spectrum, vocals);
+    }
+    core_sing::VocalModel& model;
+    bool ran = false;
+};
+
 // What Sing's thread knows and tells the interface.
 struct Studio {
     int index = -1;  // of core_sing::kModels, while a model is loaded
     std::unique_ptr<sing::OrtVocalModel> model;
+    std::unique_ptr<WindowFlag> flag;  // around `model`, which the splitter runs through it
     std::unique_ptr<core_sing::VocalSplitter> splitter;
     std::atomic<bool> installing{false};    // ampify sing install runs
     std::atomic<bool> installEnded{false};  // it ended and nobody looked yet
@@ -303,6 +316,7 @@ struct Studio {
 };
 
 constexpr std::string_view kDownloadFailed = "download failed";
+constexpr std::string_view kTooSlow = "too slow on this computer";
 
 std::filesystem::path SingFolder() { return KitDirectory() / L"sing"; }
 
@@ -343,6 +357,7 @@ audio::SingReason ReasonCode(const std::string& reason) {
     if (reason.empty()) return audio::SingReason::None;
     if (reason == "dolby atmos") return audio::SingReason::DolbyAtmos;
     if (reason == kDownloadFailed) return audio::SingReason::DownloadFailed;
+    if (reason == kTooSlow) return audio::SingReason::TooSlow;
     if (reason.find("graphics card") != std::string::npos) return audio::SingReason::NoGraphicsCard;
     return audio::SingReason::ModelFailed;
 }
@@ -380,6 +395,7 @@ private:
     Mode m_wished = Mode::Off;
     int m_wishedModel = 0;
     std::chrono::steady_clock::time_point m_restingSince{};  // studio mode last asked for, or the model loaded
+    core_sing::PaceWatch m_pace{core_sing::kStandard.RunBudget()};  // the loaded model's windows, timed
     std::uint64_t m_missesNoted = 0;                         // the playing stream's misses already in the journal
     std::chrono::steady_clock::time_point m_missNotedAt{};
 
@@ -391,8 +407,9 @@ private:
         if (g_localMoveSeen.exchange(false, std::memory_order_relaxed)) {
             Note("Sing: Apple's local file player moved, studio mode starts again from there");
         }
-        if (wish.mode == Mode::Studio && m_wished != Mode::Studio && m_studio.reason == kDownloadFailed) {
-            m_studio.failed = false;  // asked again after a failed download: it is tried again
+        const bool retried = m_studio.reason == kDownloadFailed || m_studio.reason == kTooSlow;
+        if (wish.mode == Mode::Studio && m_wished != Mode::Studio && retried) {
+            m_studio.failed = false;  // asked again after a failed download or a slow card: it is tried again
             m_studio.reason.clear();
         }
         if (wish.model != m_wishedModel) SwitchModel(wish.model);
@@ -439,6 +456,7 @@ private:
 
     void UnloadModel() {
         m_studio.splitter.reset();
+        m_studio.flag.reset();
         m_studio.model.reset();
         m_studio.index = -1;
         for (ModelStudios* models : {&g_studios, &g_tailStudios}) {
@@ -521,7 +539,9 @@ private:
             Note("Sing: studio mode unavailable: " + why);
             return;
         }
-        m_studio.splitter = std::make_unique<core_sing::VocalSplitter>(*m_studio.model);
+        m_studio.flag = std::make_unique<WindowFlag>(*m_studio.model);
+        m_studio.splitter = std::make_unique<core_sing::VocalSplitter>(*m_studio.flag);
+        m_pace = core_sing::PaceWatch(spec.RunBudget());
         m_studio.index = m_wishedModel;
         const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
         Note("Sing: the " + std::string(spec.id) + " voice model is loaded and run once on the graphics card in " +
@@ -549,6 +569,7 @@ private:
             }
         }
         if (jump) detail::JumpInPlace(0);
+        m_pace.Clear();
         m_studioOn = true;
     }
 
@@ -573,10 +594,28 @@ private:
         for (Studios* studios : {&MainStudios(), &TailStudios()}) {
             for (auto& slot : *studios) {
                 core_sing::StudioStream* studio = slot.load(std::memory_order_acquire);
-                if (studio && studio->Work(*m_studio.splitter)) worked = true;
+                if (!studio) continue;
+                m_studio.flag->ran = false;
+                const auto started = std::chrono::steady_clock::now();
+                if (studio->Work(*m_studio.splitter)) worked = true;
+                if (m_studio.flag->ran) {
+                    m_pace.Add(std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count());
+                }
             }
         }
+        if (m_pace.TooSlow()) GiveUpStudio();
         return worked;
+    }
+
+    // The card cannot run the model within its budget: rather than the voice coming back every hop, light mode
+    // plays (the next Follow stops studio mode, going back by what was held) and the interface says why.
+    void GiveUpStudio() {
+        m_studio.failed = true;
+        m_studio.reason = std::string(kTooSlow);
+        Note("Sing: the " + std::string(Spec().id) + " model took more than " + Fixed(m_pace.Budget() * 1000, 0) +
+             " ms for most of its last " + std::to_string(core_sing::PaceWatch::kWindows) +
+             " windows: studio mode is too slow on this computer, light mode instead");
+        m_pace.Clear();
     }
 
     void PublishState(const SingWish& wish, Mode effective, const std::string& reason) {

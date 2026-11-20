@@ -66,7 +66,8 @@ enum class SingPhase : uint32_t { Off = 0, Downloading = 1, Loading = 2, Bufferi
 enum class SingModel : uint32_t { Standard = 0, Precise = 1 };
 enum class SingStudio : uint32_t { Unknown = 0, Yes = 1, No = 2 };  // can this PC run the studio quality
 enum class SingReason : uint32_t {
-    None = 0, NoGraphicsCard = 1, DownloadFailed = 2, ModelFailed = 3, DolbyAtmos = 4, AutoMixMixing = 5
+    None = 0, NoGraphicsCard = 1, DownloadFailed = 2, ModelFailed = 3, DolbyAtmos = 4, AutoMixMixing = 5,
+    TooSlow = 6
 };
 
 struct SingRequest {
