@@ -48,6 +48,9 @@ constexpr unsigned kUtf8 = 0x08000100;
 // Apple's stream for the next song is looked for from this long before the switch is due: the mix thread may read the
 // song's time late, Apple's player holding its lock up to 0.37 s (20/11/2026).
 constexpr double kAppleStreamEarly = 1.0;
+// Apple's queue moving on this close to the end a mix gave its song is the mix's switch: Apple's agent advances it
+// there itself now and then (20/11/2026, once in a dozen mixes), and a skip so late lands on the plan anyway.
+constexpr double kAdvanceAtEnd = 0.5;
 
 CMTime Seconds(double seconds) {
     return CMTime{static_cast<std::int64_t>(std::llround(seconds * 1e6)), 1000000, kTimeValid, 0};
@@ -443,6 +446,17 @@ public:
         return item.get() == m_target;
     }
 
+    // From Apple's threads: its player is on the song a switch is armed for, at the end it was given or past it.
+    bool AtArmedEnd() const {
+        void* armed = m_switchItem.load();
+        void* queue = g_queue.load();
+        if (!armed || !queue) return false;
+        Ref current(A().copyCurrentItem(queue));
+        if (current.item() != armed) return false;
+        const std::optional<double> time = ToSeconds(A().itemTime(current.item()));
+        return time && *time >= m_switchEnd.load() - kAdvanceAtEnd;
+    }
+
     double SoundHeldBack() override { return detail::SingLag(); }
 
     bool StartGhost(const automix::MixPlan& plan) override {
@@ -567,11 +581,14 @@ public:
         m_armedItem = const_cast<void*>(A().retain(m_source));
         SeekItemExactly(m_target, bAt);
         A().endTime(m_armedItem, Seconds(aEnd));
+        m_switchEnd = aEnd;
+        m_switchItem = m_armedItem;
         return true;
     }
 
     void Disarm(bool rewindNext) override {
         if (!m_armedItem) return;
+        m_switchItem = nullptr;
         A().endTime(m_armedItem, CMTime{0, 0, 0, 0});  // invalid: no end before the song's own
         if (rewindNext && m_target) SeekItemExactly(m_target, 0);
         A().release(m_armedItem);
@@ -589,6 +606,8 @@ private:
     void* m_ghost = nullptr;
     void* m_ghostItem = nullptr;
     void* m_armedItem = nullptr;
+    std::atomic<void*> m_switchItem{nullptr};  // m_armedItem as Apple's threads see it, only to compare
+    std::atomic<double> m_switchEnd{0};         // the end it was given
 };
 
 class WinAutoMix : public AutoMixHost {
@@ -627,6 +646,9 @@ public:
         void* current = const_cast<void*>(A().arrayAt(items.get(), 0));
         void* next = const_cast<void*>(A().arrayAt(items.get(), 1));
         if (NameOf(next) != plan.next) return "the next song changed";
+        // A song outside the catalog (id 0) leaves the queue player when its turn comes, for the player of local files:
+        // Apple changes its queue at the switch and the mix ends on a cut, seconds before the song's end (20/11/2026).
+        if (IdentityOf(next).catalogId == "0") return "the next song is not from Apple Music's catalog";
         // Dolby Atmos goes out as objects, not as a stereo stream the deck could mix into.
         if (detail::MainStreamRate() == 0) return "the sound does not go out as a stereo stream";
         std::string refused;
@@ -666,6 +688,8 @@ public:
     void Interrupt(const char* reason) {
         if (m_running.load()) m_interrupt = reason;
     }
+
+    bool AtSwitch() const { return m_decks.AtArmedEnd(); }  // from Apple's threads too
 
 private:
     static void Report(const automix::Status& status) {
@@ -971,6 +995,10 @@ CMTime __cdecl ItemTime_Hook(void* item) {
 Generic_t g_advance = nullptr;
 void* __cdecl Advance_Hook(void* a, void* b, void* c, void* d, void* e, void* f, void* g, void* h) {
     Adopt(a);  // `a` is the queue player
+    if (Instance().AtSwitch()) {
+        Note("AutoMix: Apple's queue moved on by itself at the switch");
+        return g_advance(a, b, c, d, e, f, g, h);
+    }
     AppleSeeks();
     void* result = g_advance(a, b, c, d, e, f, g, h);
     Instance().Interrupt("skipped");

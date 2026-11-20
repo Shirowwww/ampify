@@ -50,6 +50,10 @@ with no start after a reset is another place in a song. The leveler's journal sh
 player the leveler does not follow) ». Apple's clock for them is not read through `AVCFPlayerItemGetCurrentTime`, so
 studio mode's delay is not taken off their position.
 
+Such a song waits in the queue player's queue as an item like the others, its catalog id 0 (`adamid=0`), but when its
+turn comes Apple changes the queue and plays it with the player above (20/11/2026: a mix into one ended at the switch,
+"the queue changed", and the current song lost its last 6 s). AutoMix does not mix into a song outside the catalog.
+
 ## Works
 
 - **A switch at an exact point**: `AVCFPlayerItemSetForwardPlaybackEndTime(current, tA)` and a seek of the next item
@@ -58,6 +62,10 @@ studio mode's delay is not taken off their position.
   the lower median of the last eight: the next song then lands within 5 ms of its point (13 ms seen once), and the
   journal's figure is the recording's (-4.98 ms said, -5.0 ms recorded). An invalid time (flags 0) as the end time
   removes it.
+- At that end time the queue moves on by itself, and Apple's agent now and then calls
+  `AVCFQueuePlayerAdvanceToNextItem` as well, right then (once in a dozen mixes, 20/11/2026). Taken for the user's
+  skip, it ended the mix and sent the next song back to its start; the kernel takes an advance within 0.5 s of the end
+  it gave as the switch itself.
 - **Apple's player holds its lock 180 to 370 ms at a time** while it loads or switches (517 ms once, right at a
   switch, 20/11/2026): a call into it from another thread (the song's time, the current item) waits that long. The
   mix thread gives the deck its gains 0.8 s ahead (a point every 40 ms, and each key where it falls), which the deck
