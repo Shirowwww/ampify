@@ -118,11 +118,26 @@ struct TailStream {
     std::atomic<UINT32> frames{0};
     std::atomic<int> rate{0};
     std::atomic<std::uint64_t> number{0};
+    std::atomic<bool> mute{false};  // the deck cannot take it: silent, whatever the second player writes there
 };
 std::array<TailStream, detail::kTailStreamSlots> g_tailStreams;
 std::atomic<int> g_tailCount{0};        // slots in use: none outside a mix, so the hooks look no further
 std::atomic<bool> g_tailExpected{false};
 std::atomic<bool> g_tailMissed{false};  // a stream came that could not be taken: the second player must stay silent
+std::atomic<bool> g_appleNext{false};   // a switch is armed: one new stream is Apple's...
+std::atomic<double> g_appleFrom{0};     // ...from this time of the steady clock on
+
+double SteadyNow() { return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count(); }
+
+// Under g_streamLock, for a new render client while the second player's are expected: true once, for Apple's stream
+// of the next song, when it comes at about the switch. The log says how long after the switch could first come.
+bool TakeApplesNext() {
+    const double now = SteadyNow();
+    if (!g_appleNext.load() || now < g_appleFrom.load()) return false;
+    g_appleNext = false;
+    Note("AutoMix: a new stream " + Fixed(now - g_appleFrom.load(), 2) + " s into the switch's time, taken as Apple's");
+    return true;
+}
 
 // What goes out of the second player's stream gets the gain and the equalizer of Apple's, with a state of its own.
 audio::GainRamp g_tailRamp(audio::kStartSampleRate);
@@ -322,6 +337,35 @@ HRESULT STDMETHODCALLTYPE InitializeShared_Hook(IAudioClient* self, DWORD flags,
     return hr;
 }
 
+// Under g_streamLock: a new render client of the second player. One the deck cannot take (another rate) is kept
+// silent and the mix told: unseen, it would play the song as decoded, at full volume (see kTailStreamSlots).
+void ClaimTailStream(IAudioClient* client, void* render, const StreamFormat* format) {
+    const int slot = g_tailCount.load();
+    if (slot >= static_cast<int>(g_tailStreams.size())) {
+        g_tailMissed = true;
+        Note("AutoMix: one stream too many for the second player");
+        return;
+    }
+    const bool usable = format && format->sampleRate == g_meteredRate.load() && format->channels == 2 &&
+                        g_meteredRender.load() != nullptr;
+    if (usable) {
+        g_tailRamp.SetSampleRate(format->sampleRate);
+    } else {
+        g_tailMissed = true;
+        Note("AutoMix: the second player's new stream (" +
+             (format ? std::to_string(format->sampleRate) + " Hz" : std::string("not stereo float")) +
+             ") cannot go through the deck, kept silent");
+    }
+    TailStream& tail = g_tailStreams[slot];
+    tail.mute = !usable;
+    tail.rate = usable ? format->sampleRate : 0;
+    tail.buffer = nullptr;
+    tail.client = client;
+    tail.number = ++g_streamCount;
+    tail.render = render;
+    g_tailCount = slot + 1;
+}
+
 // The newest render client of an eligible stream becomes the metered one. Any other render client
 // request stops metering rather than risk reading with the wrong format.
 HRESULT STDMETHODCALLTYPE GetService_Hook(IAudioClient* self, REFIID riid, void** service) {
@@ -330,23 +374,10 @@ HRESULT STDMETHODCALLTYPE GetService_Hook(IAudioClient* self, REFIID riid, void*
 
     std::lock_guard<std::mutex> guard(g_streamLock);
     auto it = g_clientFormats.find(self);
-    if (g_tailExpected.load()) {
-        // The second player makes a stream when it starts and at each seek; Apple's player does the same, and its
-        // seeks call the expectation off first (automix.cpp).
-        const bool usable = it != g_clientFormats.end() && it->second.sampleRate == g_meteredRate.load() &&
-                            it->second.channels == 2 && g_meteredRender.load() != nullptr;
-        const int slot = g_tailCount.load();
-        if (!usable || slot >= static_cast<int>(g_tailStreams.size())) {
-            g_tailMissed = true;
-            return hr;
-        }
-        g_tailRamp.SetSampleRate(it->second.sampleRate);
-        g_tailStreams[slot].rate = it->second.sampleRate;
-        g_tailStreams[slot].buffer = nullptr;
-        g_tailStreams[slot].client = self;
-        g_tailStreams[slot].number = ++g_streamCount;
-        g_tailStreams[slot].render = *service;
-        g_tailCount = slot + 1;
+    // The second player makes a stream when it starts, at each seek and when it moves to another version of the song;
+    // Apple's player does the same at the switch, and its seeks call the expectation off first (automix.cpp).
+    if (g_tailExpected.load() && !TakeApplesNext()) {
+        ClaimTailStream(self, *service, it != g_clientFormats.end() ? &it->second : nullptr);
         return hr;
     }
     g_meteredRender.store(nullptr);
@@ -419,6 +450,7 @@ void ProcessStream(IAudioRenderClient* self, float* samples, UINT32 count) {
 // it must be heard, or nothing) leaves in its place, with the gain and the equalizer Apple's stream gets.
 DWORD ProcessTailStream(IAudioRenderClient* self, TailStream& tail, UINT32 frames, DWORD flags) {
     BYTE* data = tail.buffer.exchange(nullptr, std::memory_order_relaxed);
+    if (tail.mute.load(std::memory_order_relaxed)) return flags | AUDCLNT_BUFFERFLAGS_SILENT;
     if (frames > tail.frames.load(std::memory_order_relaxed)) data = nullptr;
     auto* samples = reinterpret_cast<float*>(data);
     const int rate = tail.rate.load(std::memory_order_relaxed);
@@ -815,12 +847,20 @@ std::string Fixed(double value, int decimals) {
 void ExpectTailStreams(bool expected) {
     std::lock_guard<std::mutex> guard(g_streamLock);
     g_tailExpected = expected;
+    g_appleNext = false;
+}
+
+void ExpectAppleStreamIn(double seconds) {
+    std::lock_guard<std::mutex> guard(g_streamLock);
+    g_appleFrom = SteadyNow() + seconds;
+    g_appleNext = true;
 }
 
 void ForgetTailStreams() {
     std::lock_guard<std::mutex> guard(g_streamLock);
     g_tailExpected = false;
     g_tailMissed = false;
+    g_appleNext = false;
     g_tailCount = 0;  // a render client's address may serve again: none is remembered past its mix
     for (TailStream& stream : g_tailStreams) {
         stream.render = nullptr;

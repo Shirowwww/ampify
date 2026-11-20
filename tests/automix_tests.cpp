@@ -543,6 +543,22 @@ TEST_CASE(AutoMix_TheNextSongsLateStartIsLearnedAndMadeUpFor) {
     CHECK(std::abs(session.GetStatus().switchLagMs) <= 1.5);
 }
 
+TEST_CASE(AutoMix_ASecondPlayerWhoseSoundEscapesTheDeckEndsTheMixAtOnce) {
+    // The second player can move to a stream the deck cannot take (another rate, 20/11/2026): from then on what it
+    // plays is not the deck's. Before the mix is heard it is called off at once; during it, A leaves as on a failure.
+    for (const double at : {17.0, 22.0}) {  // ready, then mixing
+        FakeDecks decks;
+        MixSession session(decks);
+        REQUIRE(session.Start(Plan(), 200, 200).empty());
+        Run(session, decks, at);
+        decks.captured = false;
+        Run(session, decks, at + 0.05);
+        CHECK(session.GetStatus().reason == "the second player's sound left the deck");
+        Run(session, decks, 60);
+        CHECK(decks.ApplesAlone());
+    }
+}
+
 TEST_CASE(AutoMix_TheSecondPlayerStartsOnlyShortlyBeforeTheMix) {
     FakeDecks decks;
     decks.aOrigin = 20;  // 80 s before the mix

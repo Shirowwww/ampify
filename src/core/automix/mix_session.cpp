@@ -316,6 +316,11 @@ void MixSession::TickLocked(double now) {
         Gain(kApplesAlone);
         return Enter(Phase::Failed, now);
     }
+    // The second player can move to a stream the deck cannot take (another rate, 20/11/2026): what it plays is no
+    // longer the deck's to give, and what the deck holds runs out.
+    if (m_ghostOn && phase >= Phase::Aligning && phase <= Phase::Mixing && !m_decks.GhostCaptured()) {
+        return Fail("the second player's sound left the deck", now);
+    }
     // While it is heard, the deck carries A: starved of the second player's sound, A falls silent and its time
     // stands still. Once all of it was given, A may end while what is held back plays out.
     if (Audible(phase) && m_endSince < 0) {

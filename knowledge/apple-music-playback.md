@@ -105,6 +105,11 @@ by recording the default output (WASAPI loopback) while a song was mixed into it
   with a stretched song.
 - The two players' own clocks do not tell this delay: read at the switch they gave 18 to 59 ms for a delay that the
   recording showed fixed.
+- The second player makes a new stream at its start, at each seek, and also **when it moves to another version of
+  the song as it plays** (20/11/2026: from 48 to 96 kHz, seconds before the switch). Until then every new stream after
+  the switch was armed counted as Apple's: that one, the song as decoded at full volume, played 19 dB over the music
+  for 7 s (issue #10). Since, a new stream is Apple's only once, from a second before the switch is due; any other is
+  the second player's, and one the deck cannot take (another rate) is kept silent and ends the mix.
 - The two players each resample a 44.1 kHz song to the stream's rate from where they started, so the second
   player's copy can lie up to half a sample from Apple's. On bright songs that is far over the whole band (copies
   half a sample apart differ by -7.5 dB at worst, 0.87 alike sample for sample) and close under a few kilohertz

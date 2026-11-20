@@ -49,10 +49,18 @@ bool AutoMixTail(float* samples, unsigned frames, int rate, bool silent, std::ui
 
 // The second player's streams (audio_hooks.cpp). While they are expected, every new render client is the second
 // player's: what it writes goes to AutoMixTail, what AutoMixTail leaves is what Windows gets, and it does not
-// become the stream Ampify meters. Apple's player makes a stream of its own at each song and at each seek, so they
-// are expected only while the second player starts and seeks.
-inline constexpr int kTailStreamSlots = 6;  // of one mix: one at the second player's start, one at each seek
+// become the stream Ampify meters. One the deck cannot take (another rate) is kept silent, never heard as it comes.
+// Apple's player makes a stream of its own at each song and at each seek, and the second player one when it starts,
+// at each seek and whenever it moves to another version of the song as it plays (20/11/2026: one at 96 kHz, taken
+// for Apple's, played the song 19 dB over it). Once a switch is armed, only the first new stream from about its time
+// on is Apple's (ExpectAppleStreamIn).
+// shortcut: a stream past the slots is not followed and plays as decoded until the mix's next tick ends the mix;
+// reuse the slots of streams that stopped if a mix ever makes that many (one at the start and per seek, up to 5).
+inline constexpr int kTailStreamSlots = 16;  // of one mix: the second player's start, each seek, other versions
 void ExpectTailStreams(bool expected);  // false: the ones seen are kept, a new stream is Apple's again
+// A switch is armed: the first new stream from `seconds` from now on is Apple's, for the next song; any other the
+// second player's, as before.
+void ExpectAppleStreamIn(double seconds);
 void ForgetTailStreams();               // the mix is over
 bool TailStreamsClaimed();              // one or more seen, and none that could not be taken
 int MainStreamRate();                   // the rate of Apple's stereo stream, 0 when there is none to mix into

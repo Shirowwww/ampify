@@ -13,6 +13,7 @@
 #include <windows.h>
 #include <mmdeviceapi.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -44,6 +45,9 @@ struct CMTime {
 
 constexpr std::uint32_t kTimeValid = 1;
 constexpr unsigned kUtf8 = 0x08000100;
+// Apple's stream for the next song is looked for from this long before the switch is due: the mix thread may read the
+// song's time late, Apple's player holding its lock up to 0.37 s (20/11/2026).
+constexpr double kAppleStreamEarly = 1.0;
 
 CMTime Seconds(double seconds) {
     return CMTime{static_cast<std::int64_t>(std::llround(seconds * 1e6)), 1000000, kTimeValid, 0};
@@ -544,8 +548,10 @@ public:
         Disarm(false);  // B is sought to its point just below
         Ref current(A().copyCurrentItem(queue));
         if (current.get() != m_source) return false;  // the plan's song is no longer the one playing
-        // The second player is where it must be and seeks no more: the next new stream is Apple's, for B.
-        detail::ExpectTailStreams(false);
+        // From about the switch on, the first new stream is Apple's, for B; any other still the second player's, which
+        // can move to another version of the song as it plays (20/11/2026: at 96 kHz, taken for Apple's, +19 dB).
+        const double left = aEnd - ToSeconds(A().itemTime(current.item())).value_or(aEnd);
+        detail::ExpectAppleStreamIn(std::max(0.0, left) - kAppleStreamEarly);
         m_armedItem = const_cast<void*>(A().retain(m_source));
         SeekItemExactly(m_target, bAt);
         A().endTime(m_armedItem, Seconds(aEnd));
