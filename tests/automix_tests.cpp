@@ -33,6 +33,7 @@ public:
     bool aligned = false;
     double copyError = -60;
     double foundAgainLead = -1;  // from 0 on: the next search finds a copy in step, this far ahead
+    double foundAgainError = -60;  // and the copy error the deck then measures
     double ghostStartClock = 0, ghostAnchorClock = 0, ghostAnchorTime = 0;
     std::vector<double> latencies = {0.096, 0.102, 0.105, 0.1001, 0.0996};
     size_t seekCount = 0;
@@ -95,7 +96,7 @@ public:
         aligns++;
         if (foundAgainLead >= 0) {
             aligned = true;
-            copyError = -60;
+            copyError = foundAgainError;
             return DeckStep{foundAgainLead, 1};
         }
         std::optional<double> ghost = GhostTime();
@@ -697,6 +698,38 @@ TEST_CASE(AutoMix_ACopyThatDriftedBeforeTheMixIsNeverHeard) {
     CHECK(status.phase == Phase::Failed);
     CHECK(status.reason == "the second player drifted");
     CHECK(decks.rewinds == 1);
+    CHECK(decks.NothingHeard());
+}
+
+// The deck's copy goes on air only once it was measured to be Apple's own sound. A search can land on the wrong
+// beat, at another level (seen on 20/11/2026: 0.29 s off and 1.5 dB under, at a match of 0.81): only the measure
+// that follows tells, and no measure is no proof.
+TEST_CASE(AutoMix_ACopyNeverMeasuredIsNeverHeard) {
+    FakeDecks decks;
+    decks.copyError = NAN;  // found, but never compared: a passage too quiet, or a copy the deck could not read back
+    MixSession session(decks);
+    REQUIRE(session.Start(Plan(), 200, 200).empty());
+    Run(session, decks, 60);
+    Status status = session.GetStatus();
+    CHECK(status.phase == Phase::Failed);
+    CHECK(status.reason == "the second player's copy could not be checked");
+    CHECK(decks.rewinds == 1);
+    CHECK(decks.NothingHeard());
+}
+
+TEST_CASE(AutoMix_ACopyFoundAgainButNotMeasuredYetIsNeverHeard) {
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(Plan(), 200, 200).empty());
+    Run(session, decks, 17);
+    REQUIRE(session.GetStatus().phase == Phase::Ready);
+    decks.copyError = 0;                         // the copy is not Apple's sound...
+    decks.foundAgainLead = LeadFor(Plan()) + 0.5;  // ...each search finds another place that fits the lead...
+    decks.foundAgainError = NAN;                 // ...which the deck has not measured yet when the mix is due
+    Run(session, decks, 60);
+    Status status = session.GetStatus();
+    CHECK(status.phase == Phase::Failed);
+    CHECK(decks.aligns > 1);
     CHECK(decks.NothingHeard());
 }
 

@@ -1,6 +1,7 @@
 #include "mix_session.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace ampify::automix {
 
@@ -286,6 +287,10 @@ void MixSession::TickReady(double now, double aTime) {
         }
     }
     if (aTime < takeAt) return;
+    // Only a copy measured to be Apple's own sound goes on air. A search can land on the wrong beat at another level
+    // (0.29 s off and 1.5 dB under at a match of 0.81, 20/11/2026): until the measure that follows it, or when no
+    // measure can be made, nothing proves the copy, and A's end at the wrong level is what the mix would start with.
+    if (std::isnan(m_status.copyErrorDb)) return Fail("the second player's copy could not be checked", now);
     if (m_status.copyErrorDb > kMaxCopyErrorDb) return Fail("the second player drifted", now);
     Enter(Phase::TakingOver, now);
 }
