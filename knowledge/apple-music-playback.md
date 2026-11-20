@@ -105,6 +105,13 @@ by recording the default output (WASAPI loopback) while a song was mixed into it
   with a stretched song.
 - The two players' own clocks do not tell this delay: read at the switch they gave 18 to 59 ms for a delay that the
   recording showed fixed.
+- The two players each resample a 44.1 kHz song to the stream's rate from where they started, so the second
+  player's copy can lie up to half a sample from Apple's. On bright songs that is far over the whole band (copies
+  half a sample apart differ by -7.5 dB at worst, 0.87 alike sample for sample) and close under a few kilohertz
+  (-21.6 dB at worst through two one-pole low-passes at 2.5 kHz), while a lost block or a wrong place is above 0 dB
+  in any band (six real songs resampled in a script, 20/11/2026). The deck therefore compares its copy under 2.5 kHz,
+  and looks for Apple's sound between the second player's samples too (eighths of a sample, a windowed sinc): found
+  that way, real copies match at 0.999 to 1.000 and their level is exact, where a match of 0.958 had set it 1.3 % low.
 - What this allows, measured on the recorded output: the second player's copy of the current song replaces Apple's
   to the sample (100 ms crossfade between the two streams, residual -15 to -27 dB from the two decoders); a song
   stretched by +6 % plays 1.060 times faster at the same pitch (+0 cent, -0.1 dB, no more clicks than the plain song)

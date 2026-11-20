@@ -48,6 +48,7 @@ struct DeckGains {
 struct DeckStep {
     double lead = 0;   // seconds the second player runs ahead of what the deck plays
     double match = 0;  // how alike the two copies are where they were compared, 1 for the same sound
+    double scale = 1;  // the second player's samples times this are Apple's
 };
 
 // One block of a stream, as its player hands it to Windows.
@@ -92,7 +93,9 @@ public:
 
     std::optional<double> Time() const;  // A's time the deck plays; empty until Align, frozen while it starves
     double TailSeconds() const;          // how much of the second player's sound came in since Open
-    double ResidualDb() const;           // the deck's copy against Apple's while both play A: -60 is the same sound
+    // The deck's copy against Apple's under a few kilohertz while both play A: -60 is the same sound, a wrong place or
+    // a lost block over 0, a level 3 dB off -11.
+    double ResidualDb() const;
     // Seconds between the last frame of Apple's stream for A and the first of its stream for B, as heard.
     std::optional<double> SwitchGap() const;
 

@@ -36,6 +36,52 @@ std::vector<float> Song(double seconds, unsigned seed) {
     return song;
 }
 
+// A bar of Song played over and over, each pass with noise of its own on top: alike from pass to pass, as a beat's
+// bars are, but never the same sound twice.
+std::vector<float> LoopedSong(double seconds, double bar, unsigned seed) {
+    const std::vector<float> pass = Song(bar, seed);
+    const size_t barFrames = pass.size() / 2;
+    const size_t frames = static_cast<size_t>(seconds * kRate);
+    std::vector<float> song(frames * 2);
+    unsigned state = seed * 7919u + 1;
+    for (size_t i = 0; i < frames; i++) {
+        for (size_t c = 0; c < 2; c++) {
+            state = state * 1664525u + 1013904223u;
+            const double noise = (state >> 8) / 8388608.0 - 1.0;
+            song[i * 2 + c] = static_cast<float>(pass[(i % barFrames) * 2 + c] + 0.07 * noise);
+        }
+    }
+    return song;
+}
+
+// Bright music: partials up to three quarters of the band, as loud high as low, each swelling at its own pace. Read
+// `delay` frames later, it is the same music exactly, as a second decoder that resamples it from another place gives
+// it: half a frame off, the two differ by 8 dB over the whole band.
+std::vector<float> Partials(double seconds, unsigned seed, double delay = 0) {
+    constexpr int kCount = 32;
+    struct Partial {
+        double hz, phase, swellHz, swellPhase;
+    };
+    unsigned state = seed;
+    auto next = [&state] {
+        state = state * 1664525u + 1013904223u;
+        return (state >> 8) / 16777216.0;
+    };
+    std::vector<Partial> partials(kCount);
+    for (Partial& p : partials) p = {100 * std::pow(90.0, next()), 2 * kPi * next(), 0.5 + 4 * next(), 2 * kPi * next()};
+    const size_t frames = static_cast<size_t>(seconds * kRate);
+    std::vector<float> song(frames * 2);
+    for (size_t i = 0; i < frames; i++) {
+        const double t = (static_cast<double>(i) - delay) / kRate;
+        double value = 0;
+        for (const Partial& p : partials) {
+            value += (0.6 + 0.4 * std::sin(2 * kPi * p.swellHz * t + p.swellPhase)) * std::sin(2 * kPi * p.hz * t + p.phase);
+        }
+        song[i * 2] = song[i * 2 + 1] = static_cast<float>(value * 0.05);
+    }
+    return song;
+}
+
 std::vector<float> Tone(double seconds, double hz, double level) {
     const size_t frames = static_cast<size_t>(seconds * kRate);
     std::vector<float> tone(frames * 2);
@@ -53,6 +99,7 @@ struct Rig {
     MixDeck deck;
     std::vector<float> a;
     std::vector<float> b;
+    std::vector<float> ghost;  // what the second player gives of A, when it is not A to the sample
     size_t lead = static_cast<size_t>(2.0 * kRate);
     double volume = 0.5;
     bool tailFlows = true;  // false: the second player has nothing to give, its blocks are silent
@@ -82,9 +129,10 @@ struct Rig {
 
     void TailBlock(size_t pass) {
         std::vector<float> block(kBlock * 2, 0.0f);
-        const bool has = tailFlows && (tailSong + kBlock) * 2 <= a.size();
+        const std::vector<float>& given = ghost.empty() ? a : ghost;
+        const bool has = tailFlows && (tailSong + kBlock) * 2 <= given.size();
         if (has) {
-            std::copy_n(a.begin() + static_cast<std::ptrdiff_t>(tailSong * 2), kBlock * 2, block.begin());
+            std::copy_n(given.begin() + static_cast<std::ptrdiff_t>(tailSong * 2), kBlock * 2, block.begin());
             tailSong += kBlock;
         }
         // written a little after Windows took its block, never at quite the same moment
@@ -210,6 +258,19 @@ TEST_CASE(AutoMixDeck_PutInStepAgainForgetsWhatItMeasuredBefore) {
     CHECK(rig.deck.ResidualDb() < -80);
 }
 
+TEST_CASE(AutoMixDeck_ACopyNoLongerReadIsNoLongerKnownToBeApples) {
+    // The second player stopped giving sound to the deck (20/11/2026: it moved to a stream of its own at another rate):
+    // once what it gave is played, the copy is not known to be Apple's sound any more, whatever was measured before.
+    Rig rig(Song(12, 1));
+    rig.Run(3.0);
+    REQUIRE(rig.Align().has_value());
+    rig.Run(0.5);
+    REQUIRE(rig.deck.ResidualDb() < -80);
+    rig.tailFlows = false;
+    rig.Run(2.5);
+    CHECK(std::isnan(rig.deck.ResidualDb()));
+}
+
 TEST_CASE(AutoMixDeck_ASilentSongGivesNothingToFind) {
     Rig rig(std::vector<float>(static_cast<size_t>(12 * kRate) * 2, 0.0f));
     rig.Run(3.0);
@@ -218,6 +279,47 @@ TEST_CASE(AutoMixDeck_ASilentSongGivesNothingToFind) {
     other.Run(3.0);
     // the second player far from where the clocks say: not found rather than found wrong
     CHECK(!other.deck.Align(4.0, other.ATime(), other.volume).has_value());
+}
+
+TEST_CASE(AutoMixDeck_APlaceThatOnlyLooksLikeApplesSoundIsNotTaken) {
+    // A beat loops every 0.29 s, with something new on each pass: one pass is much like the next (0.8 to 0.9 alike),
+    // never the same sound. The second player began 1.97 s into the song, two seconds ahead: until Apple's player has
+    // played a quarter of a second past that, Apple's sound is not in the second player's yet, but the next pass of
+    // the loop is (20/11/2026, a real search took it, 0.29 s off and 1.5 dB under).
+    Rig rig(LoopedSong(12, 0.29, 5));
+    rig.Run(2.1);
+    const std::optional<DeckStep> early = rig.Align(0.0);
+    CHECK(!early.has_value() || std::abs(early->lead - 2.0) < 0.011);
+    rig.Run(0.3);
+    const std::optional<DeckStep> step = rig.Align(0.0);
+    REQUIRE(step.has_value());
+    CHECK_NEAR(step->lead, 2.0, 0.011);
+    CHECK(step->match > 0.999);
+}
+
+TEST_CASE(AutoMixDeck_FindsApplesSoundHalfAFrameOffAtItsLevel) {
+    // Each player resamples the song to the stream's rate from where it began playing: Apple's sound can lie between
+    // two of the second player's frames. Bright music then matches at 0.92 frame for frame (0.87 seen in real songs,
+    // 20/11/2026), for a copy in step to a fiftieth of a millisecond.
+    Rig rig(Partials(8, 3));
+    rig.ghost = Partials(8, 3, 0.5);
+    rig.Run(3.0);
+    const std::optional<DeckStep> step = rig.Align();
+    REQUIRE(step.has_value());
+    CHECK_NEAR(step->lead, 2.0, 0.011);
+    CHECK(step->match > 0.99);
+    CHECK_NEAR(step->scale, rig.volume, 0.005);  // not the level of a copy that only half matches
+}
+
+TEST_CASE(AutoMixDeck_ACopyHalfAFrameOffIsMeasuredAsApplesSound) {
+    // Half a frame apart, two copies of bright music differ by 8 dB over the whole band, by far less under a few
+    // kilohertz; a lost block or a wrong place differs by more than 0 dB in any band.
+    Rig rig(Partials(8, 3));
+    rig.ghost = Partials(8, 3, 0.5);
+    rig.Run(3.0);
+    REQUIRE(rig.Align().has_value());
+    rig.Run(1.0);
+    CHECK(rig.deck.ResidualDb() < -15);
 }
 
 TEST_CASE(AutoMixDeck_TakingOverLeavesTheSoundUnchanged) {

@@ -15,7 +15,13 @@ constexpr double kHistorySeconds = 1.0;
 constexpr double kWindowSeconds = 0.25;  // of Apple's sound, looked for in the second player's
 constexpr double kSearchSeconds = 0.4;   // on each side of where the clocks say it is
 constexpr int kCoarseRate = 12000;       // the search runs on mono at about this rate, then at the stream's
-constexpr double kMinMatch = 0.8;
+// Apple's own sound in the second player's, read between frames where it lies (Between), matches at 0.99 and more; a
+// beat's next bar can match at 0.8 and more (0.807 seen on 20/11/2026, 0.29 s off and 1.5 dB under): below this, not
+// the same sound.
+constexpr double kMinMatch = 0.95;
+constexpr int kBetweenTaps = 16;         // frames on each side of a point read between two frames
+constexpr int kBetweenSteps = 8;         // points looked at from one frame to the next
+constexpr double kMeasureHz = 2500;      // the copy is compared with Apple's sound under this
 constexpr double kQuiet = 1e-8;          // mean square under which there is nothing to recognise
 constexpr size_t kChunk = 256;           // frames mixed at once: curves and speed move in steps this long
 constexpr double kWarmSeconds = 0.5;     // the stretch runs this long at normal speed before it is heard
@@ -79,8 +85,49 @@ Match BestOffset(const std::vector<float>& ref, const std::vector<float>& area, 
     return best;
 }
 
+// `area` from `offset` on, read `shift` frames later (at most half a frame either way): the sound between its frames,
+// by a Hann-windowed sinc whose gains add up to 1.
+void ReadBetween(const std::vector<float>& area, size_t offset, double shift, std::vector<float>& out) {
+    std::array<double, 2 * kBetweenTaps> weights{};
+    double sum = 0;
+    for (int m = -kBetweenTaps + 1; m <= kBetweenTaps; m++) {
+        const double u = shift - m;
+        const double sinc = u == 0 ? 1 : std::sin(std::numbers::pi * u) / (std::numbers::pi * u);
+        const double window = 0.5 * (1 + std::cos(std::numbers::pi * u / (kBetweenTaps + 1)));
+        weights[static_cast<size_t>(m + kBetweenTaps - 1)] = sinc * window;
+        sum += sinc * window;
+    }
+    for (double& weight : weights) weight /= sum;
+    for (size_t n = 0; n < out.size(); n++) {
+        const float* at = area.data() + offset + n - (kBetweenTaps - 1);
+        double value = 0;
+        for (size_t k = 0; k < weights.size(); k++) value += weights[k] * at[k];
+        out[n] = static_cast<float>(value);
+    }
+}
+
+// Each player resamples the song to the stream's rate from where it began playing: Apple's sound can lie between two
+// of the second player's frames. Half a frame off, bright music matches at 0.87 frame for frame (20/11/2026), and its
+// level comes out that much too low: the match and the level are those of the best point between frames.
+Match Between(const std::vector<float>& ref, const std::vector<float>& area, Match found) {
+    if (found.offset < kBetweenTaps || found.offset + ref.size() + kBetweenTaps > area.size()) return found;
+    const double refPower = Dot(ref.data(), ref.data(), ref.size());
+    std::vector<float> read(ref.size());
+    Match best = found;
+    for (int step = -kBetweenSteps / 2; step <= kBetweenSteps / 2; step++) {
+        if (step == 0) continue;
+        ReadBetween(area, found.offset, static_cast<double>(step) / kBetweenSteps, read);
+        const double power = Dot(read.data(), read.data(), read.size());
+        if (power <= 0 || refPower <= 0) continue;
+        const double dot = Dot(ref.data(), read.data(), read.size());
+        const double match = dot / std::sqrt(refPower * power);
+        if (match > best.match) best = {found.offset, match, dot / power};
+    }
+    return best;
+}
+
 // Where `ref` (Apple's sound) lies in `area` (the second player's): a first pass on thinned copies, then every
-// offset around its answer at the full rate.
+// offset around its answer at the full rate, then between frames around the best one.
 std::optional<Match> Find(const std::vector<float>& ref, const std::vector<float>& area, int sampleRate) {
     if (ref.empty() || area.size() < ref.size()) return std::nullopt;
     if (Dot(ref.data(), ref.data(), ref.size()) / static_cast<double>(ref.size()) < kQuiet) return std::nullopt;
@@ -92,7 +139,8 @@ std::optional<Match> Find(const std::vector<float>& ref, const std::vector<float
     if (coarse.match < 0) return std::nullopt;
     const size_t last = area.size() - ref.size();
     const size_t centre = coarse.offset * by;
-    const Match fine = BestOffset(ref, area, centre > 2 * by ? centre - 2 * by : 0, std::min(last, centre + 2 * by));
+    const Match fine = Between(
+        ref, area, BestOffset(ref, area, centre > 2 * by ? centre - 2 * by : 0, std::min(last, centre + 2 * by)));
     if (fine.match < kMinMatch) return std::nullopt;
     return fine;
 }
@@ -409,7 +457,7 @@ std::optional<DeckStep> MixDeck::Align(double leadHint, double aTime, double vol
                                (static_cast<std::int64_t>(refEnd) - static_cast<std::int64_t>(window));
     const std::int64_t heard = static_cast<std::int64_t>(m_tailSent) - apart;
     const std::int64_t lead = static_cast<std::int64_t>(m_tailFrames) - (heard + delay);
-    const DeckStep step{static_cast<double>(lead) / rate, found->match};
+    const DeckStep step{static_cast<double>(lead) / rate, found->match, found->scale};
     if (lead <= 0 || static_cast<size_t>(lead) >= m_hold) return step;
     m_delay = delay;
     m_apart = apart;
@@ -668,14 +716,31 @@ bool MixDeck::NextTail(size_t frames) {
 }
 
 // While Apple's player still plays A alone: how far the deck's copy is from it, for the journal and the session.
+// Under a few kilohertz only: the two players resample the song from places a fraction of a frame apart, and higher
+// up half a frame is far (bright music, 20/11/2026: -8 dB over the whole band, -22 dB under kMeasureHz), while a lost
+// block or a wrong place is over 0 dB in any band and a wrong level the same in all.
 void MixDeck::Measure(const float* stereo, std::uint64_t mainFrame, size_t frames, double scale) {
     const std::int64_t from = static_cast<std::int64_t>(mainFrame) + m_delay;
-    if (from < 0 || !ReadTail(static_cast<std::uint64_t>(from), frames, m_check.data())) return;
+    if (from < 0 || !ReadTail(static_cast<std::uint64_t>(from), frames, m_check.data())) {
+        // No copy to compare: the second player stopped giving sound (it moved to a stream of its own at another rate,
+        // 20/11/2026). What was measured before says nothing of what the deck would play now.
+        m_residualDb = NAN;
+        m_residualError = m_residualPower = 0;
+        m_residualFrames = 0;
+        return;
+    }
+    // Two one-pole low-passes, from rest at each chunk: Apple's sound and the difference go through the same ones.
+    const double coef = 1 - std::exp(-2 * std::numbers::pi * kMeasureHz / m_rate);
+    double main1 = 0, main2 = 0, error1 = 0, error2 = 0;
     for (size_t i = 0; i < frames; i++) {
         const double main = (stereo[i * 2] + stereo[i * 2 + 1]) * 0.5;
         const double tail = (m_check[i * 2] + m_check[i * 2 + 1]) * 0.5 * scale;
-        m_residualError += (main - tail) * (main - tail);
-        m_residualPower += main * main;
+        main1 += coef * (main - main1);
+        main2 += coef * (main1 - main2);
+        error1 += coef * (main - tail - error1);
+        error2 += coef * (error1 - error2);
+        m_residualError += error2 * error2;
+        m_residualPower += main2 * main2;
     }
     m_residualFrames += frames;
     if (m_residualFrames < static_cast<size_t>(kMeasureSeconds * m_rate)) return;
