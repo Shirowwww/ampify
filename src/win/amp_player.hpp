@@ -110,5 +110,8 @@ rt::Ref DescriptorFromJson(const std::string& json, std::string& failure);
 // IPlayer.StartOrQueueLibraryPlaybackAsync: plays `container` (an album of the library) from `start` (one of its
 // songs; empty for the first), shuffled or not. Its IAsyncAction, empty on failure.
 rt::Ref StartLibraryPlayback(const rt::Ref& container, const rt::Ref& start, bool shuffle, std::string& failure);
+// The same method with the QueueNext or QueueLater action: `song` (a song of the library) after the current one or
+// at the end of the queue, as Apple's Play Next and Play Later do. Its IAsyncAction, empty on failure.
+rt::Ref QueueLibrarySong(const rt::Ref& song, bool next, std::string& failure);
 
 }  // namespace ampify::win

@@ -559,7 +559,9 @@ rt::Ref DescriptorFromJson(const std::string& json, std::string& failure) {
     return typed;
 }
 
-rt::Ref StartLibraryPlayback(const rt::Ref& container, const rt::Ref& start, bool shuffle, std::string& failure) {
+namespace {
+
+rt::Ref LibraryPlayback(int action, const rt::Ref& container, const rt::Ref& start, bool shuffle, std::string& failure) {
     rt::Ref factory, created, args, operation;
     rt::GetActivationFactory(L"AMP.Services.StartOrQueuePlaybackArgs", rt::GuidOf(amp::kIidActivationFactory), factory);
     if (!factory || FAILED(rt::CallSlot(factory, slot::kActivateInstance, created.Put())) || !created ||
@@ -568,7 +570,7 @@ rt::Ref StartLibraryPlayback(const rt::Ref& container, const rt::Ref& start, boo
         return {};
     }
     rt::Ref items = rt::MakeVector(CollectionIids(amp::kIidsContentDescriptorCollections), std::vector<rt::Ref>{container});
-    HRESULT hr = rt::CallSlot(args, slot::kStartArgsPutAction, amp::kPlayOrQueueStartPlayback);
+    HRESULT hr = rt::CallSlot(args, slot::kStartArgsPutAction, action);
     if (SUCCEEDED(hr)) hr = rt::CallSlot(args, slot::kStartArgsPutItems, items.Get());
     if (SUCCEEDED(hr) && start) hr = rt::CallSlot(args, slot::kStartArgsPutStartItem, start.Get());
     if (SUCCEEDED(hr)) {
@@ -586,6 +588,16 @@ rt::Ref StartLibraryPlayback(const rt::Ref& container, const rt::Ref& start, boo
         return {};
     }
     return operation;
+}
+
+}  // namespace
+
+rt::Ref StartLibraryPlayback(const rt::Ref& container, const rt::Ref& start, bool shuffle, std::string& failure) {
+    return LibraryPlayback(amp::kPlayOrQueueStartPlayback, container, start, shuffle, failure);
+}
+
+rt::Ref QueueLibrarySong(const rt::Ref& song, bool next, std::string& failure) {
+    return LibraryPlayback(next ? amp::kPlayOrQueueQueueNext : amp::kPlayOrQueueQueueLater, song, {}, false, failure);
 }
 
 }  // namespace ampify::win

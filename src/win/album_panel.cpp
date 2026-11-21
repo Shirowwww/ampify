@@ -36,6 +36,7 @@ constexpr wchar_t kPlayGlyph[] = L"";
 constexpr wchar_t kShuffleGlyph[] = L"";
 constexpr wchar_t kCloseGlyph[] = L"";
 constexpr wchar_t kOpenGlyph[] = L"";
+constexpr wchar_t kSpeakerGlyph[] = L"\xE767";  // Volume: the song that plays
 // The text colour's alpha for the panel's background, a row under the pointer and the row picked.
 constexpr uint8_t kPanelAlpha = 0x10;
 constexpr uint8_t kHoverAlpha = 0x14;
@@ -100,6 +101,29 @@ controls::Button GlyphButton(const wchar_t* glyph, const std::wstring& name, std
     return button;
 }
 
+// A track's right-click menu, Apple's entries for a song of an album (issue #7).
+controls::MenuFlyout TrackMenu(int index, const AlbumPanelActions& actions, const std::function<void()>& play) {
+    controls::MenuFlyout menu;
+    auto add = [&menu](const std::wstring& text, std::function<void()> run) {
+        controls::MenuFlyoutItem entry;
+        entry.Text(winrt::hstring(text));
+        entry.Click([run = std::move(run)](auto&&, auto&&) {
+            if (run) run();
+        });
+        menu.Items().Append(entry);
+    };
+    add(Text("album.play"), play);
+    if (actions.queue) {
+        add(Text("album.playNext"), [actions, index] { actions.queue(index, true); });
+        add(Text("album.playLater"), [actions, index] { actions.queue(index, false); });
+    }
+    if (actions.open) {
+        menu.Items().Append(controls::MenuFlyoutSeparator());
+        add(Text("album.open"), actions.open);
+    }
+    return menu;
+}
+
 // Which row is picked, shared by the rows of one panel.
 struct Picked {
     controls::Grid row{nullptr};
@@ -123,8 +147,12 @@ controls::Grid TrackRow(const AlbumPanelTrack& track, int index, const AlbumPane
         row.ColumnDefinitions().Append(column);
     }
 
-    controls::TextBlock number = Label(track.number, 13, kDim);
+    // The track's number, or a speaker for the song that plays (issue #7).
+    const double markerOpacity = track.playing ? 1.0 : kDim;
+    xaml::FrameworkElement number = track.playing ? xaml::FrameworkElement(Glyph(kSpeakerGlyph, 13))
+                                                  : xaml::FrameworkElement(Label(track.number, 13, kDim));
     number.HorizontalAlignment(xaml::HorizontalAlignment::Center);
+    number.VerticalAlignment(xaml::VerticalAlignment::Center);
     auto play = [actions, index] {
         if (actions.play) actions.play(index, false);
     };
@@ -138,7 +166,9 @@ controls::Grid TrackRow(const AlbumPanelTrack& track, int index, const AlbumPane
     names.Orientation(controls::Orientation::Horizontal);
     names.Spacing(10);
     names.VerticalAlignment(xaml::VerticalAlignment::Center);
-    names.Children().Append(Label(track.title, 14));
+    controls::TextBlock name = Label(track.title, 14);
+    if (track.playing) name.FontWeight(winrt::Microsoft::UI::Text::FontWeights::SemiBold());
+    names.Children().Append(name);
     if (!track.artist.empty()) names.Children().Append(Label(track.artist, 14, kDim));
     controls::Grid::SetColumn(names, 1);
     row.Children().Append(names);
@@ -148,8 +178,8 @@ controls::Grid TrackRow(const AlbumPanelTrack& track, int index, const AlbumPane
     controls::Grid::SetColumn(duration, 2);
     row.Children().Append(duration);
 
-    auto show = [number, start](bool under) {
-        number.Opacity(under ? 0 : kDim);
+    auto show = [number, start, markerOpacity](bool under) {
+        number.Opacity(under ? 0 : markerOpacity);
         start.Opacity(under ? 1 : 0);
     };
     auto background = [row, clear, hover, pick, picked](bool under) {
@@ -174,6 +204,7 @@ controls::Grid TrackRow(const AlbumPanelTrack& track, int index, const AlbumPane
         args.Handled(true);
         play();
     });
+    row.ContextFlyout(TrackMenu(index, actions, play));
     xaml::Automation::AutomationProperties::SetName(row, winrt::hstring(track.title));
     return row;
 }

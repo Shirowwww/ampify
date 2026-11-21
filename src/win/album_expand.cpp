@@ -5,6 +5,7 @@
 
 #include <winrt/Microsoft.UI.Composition.h>
 #include <winrt/Microsoft.UI.Dispatching.h>
+#include <winrt/Microsoft.UI.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.Peers.h>
 #include <winrt/Microsoft.UI.Xaml.Automation.Provider.h>
 #include <winrt/Microsoft.UI.Xaml.Controls.Primitives.h>
@@ -32,6 +33,7 @@
 #include "../core/i18n.hpp"
 #include "../core/library/album_tracks.hpp"
 #include "../core/amp_abi.hpp"
+#include "../core/now_playing.hpp"
 #include "album_panel.hpp"
 #include "amp_item.hpp"
 #include "amp_player.hpp"
@@ -67,6 +69,7 @@ constexpr size_t kItemSearchLimit = 200;
 constexpr double kGap = 12;        // between the panel and the rows above and below it
 constexpr double kTileMargin = 6;  // Apple's GridViewItem margin: the panel lines up with the covers
 constexpr auto kSlide = std::chrono::milliseconds(260);
+constexpr float kClickSlop = 6;  // a press and release further apart than this (px) are a drag, not a click
 
 std::atomic<bool> g_wanted{false};
 
@@ -95,6 +98,7 @@ struct Open {
     AlbumPanelModel model;  // title, subtitle and cover from the tile; the rest from the library
     std::wstring tileArtist;
     std::vector<LibraryTrack> tracks;
+    std::string playingKey;  // the song playing when the list was built: another one rebuilds it
     bool waiting = false;  // the library file was still being read
     xaml::FrameworkElement panel{nullptr};
     double height = 0;
@@ -108,8 +112,15 @@ struct State {
     winrt::weak_ref<controls::GridView> grid;
     bool attached = false;
     bool clickWasEnabled = true;
-    winrt::Windows::Foundation::IInspectable tapped{nullptr};  // the handlers, boxed as AddHandler takes them
+    winrt::Windows::Foundation::IInspectable pressed{nullptr};  // the handlers, boxed as AddHandler takes them
+    winrt::Windows::Foundation::IInspectable released{nullptr};
     winrt::Windows::Foundation::IInspectable keys{nullptr};
+    winrt::Windows::Foundation::IInspectable wheel{nullptr};
+    // The tile a left press fell on, and where in the window; the click toggled last, to let a double click be.
+    winrt::weak_ref<controls::GridViewItem> pressedTile;
+    winrt::Windows::Foundation::Point pressedAt{};
+    winrt::weak_ref<controls::GridViewItem> clickedTile;
+    uint64_t clickedTick = 0;
     controls::ItemsWrapGrid wrap{nullptr};
     controls::ScrollViewer scroller{nullptr};
     controls::Canvas overlay{nullptr};
@@ -205,10 +216,9 @@ std::shared_ptr<const std::vector<LibraryTrack>> LibraryTracks(bool& waiting) {
 std::wstring Wide(const std::string& text) { return FromUtf8(text); }
 
 std::wstring Subtitle(const Open& open) {
-    std::wstring line = open.tileArtist;
-    if (open.tracks.empty()) return line;
+    if (open.tracks.empty()) return open.tileArtist;
     const LibraryTrack& first = open.tracks.front();
-    if (line.empty()) line = Wide(first.albumArtist.empty() ? first.artist : first.albumArtist);
+    std::wstring line = Wide(AlbumArtistOf(open.tracks, ToUtf8(open.tileArtist)));
     if (!first.genre.empty()) line += L" · " + Wide(first.genre);
     if (first.year) line += L" · " + std::to_wstring(first.year);
     return line;
@@ -231,9 +241,13 @@ void FillModel(Open& open) {
                                      : open.tracks.front().albumArtist.empty() ? open.tracks.front().artist
                                                                                : open.tracks.front().albumArtist;
     const bool discs = DiscCount(open.tracks) > 1;
+    const NowPlaying now = CurrentNowPlaying();
+    open.playingKey = now.trackKey;
+    const std::optional<size_t> playing = PlayingTrackIndex(open.tracks, now.title, now.album);
     uint32_t lastDisc = 0;
     for (const LibraryTrack& track : open.tracks) {
         AlbumPanelTrack row;
+        row.playing = playing && *playing == open.model.tracks.size();
         if (discs && DiscOf(track) != lastDisc) {
             lastDisc = DiscOf(track);
             row.section = Wide(i18n::Text("album.disc", {{"number", std::to_string(lastDisc)}}));
@@ -251,6 +265,7 @@ void Reflow();
 void Reveal(State& state);
 void OpenPage(int index);
 void Play(int track, bool shuffle);
+void Queue(int track, bool next);
 
 int Columns(const State& state, double& itemWidth, double& itemHeight) {
     itemWidth = state.wrap.ItemWidth();
@@ -310,6 +325,12 @@ void BuildPanel(State& state, bool animate) {
     actions.play = [](int track, bool shuffle) {
         try {
             Play(track, shuffle);
+        } catch (...) {
+        }
+    };
+    actions.queue = [](int track, bool next) {
+        try {
+            Queue(track, next);
         } catch (...) {
         }
     };
@@ -508,6 +529,30 @@ void Play(int track, bool shuffle) {
     if (!StartLibraryPlayback(open.descriptor, start, shuffle, failure)) Note("Album click: Apple did not play the album: " + failure);
 }
 
+// Play Next or Play Later from a track's right-click menu (issue #7).
+void Queue(int track, bool next) {
+    Open& open = TheState().open;
+    if (open.index < 0 || track < 0 || static_cast<size_t>(track) >= open.tracks.size()) return;
+    std::string failure;
+    rt::Ref song = DescriptorFromJson(SongDescriptorJson(open.id.database, open.tracks[track].persistentId), failure);
+    if (!song) return Note("Album click: the track cannot be queued: " + failure);
+    if (!QueueLibrarySong(song, next, failure)) Note("Album click: Apple did not queue the track: " + failure);
+}
+
+// The panel lies over the grid, not in it: the wheel over it scrolls the grid as it does anywhere else (issue #7).
+void OnWheel(const winrt::Windows::Foundation::IInspectable&, const xaml::Input::PointerRoutedEventArgs& args) {
+    try {
+        State& state = TheState();
+        if (!state.scroller) return;
+        const int32_t delta = args.GetCurrentPoint(nullptr).Properties().MouseWheelDelta();
+        if (delta == 0) return;
+        state.scroller.ChangeView(nullptr, state.scroller.VerticalOffset() - delta, nullptr);
+        args.Handled(true);
+    } catch (...) {
+        // A handler runs inside Apple Music's XAML frame: nothing may escape it.
+    }
+}
+
 // ---- The grid ----
 
 bool ModifierDown() { return (GetKeyState(VK_CONTROL) & 0x8000) || (GetKeyState(VK_SHIFT) & 0x8000); }
@@ -533,14 +578,39 @@ void Toggle(const controls::GridViewItem& item) {
     Expand(item, index);
 }
 
-void OnTapped(const winrt::Windows::Foundation::IInspectable&, const xaml::Input::TappedRoutedEventArgs& args) {
+// A click is a left press and release on a tile, not a Tapped: a tile partly out of view scrolls in under the
+// pressed pointer, and WinUI then raises no Tapped. Where the pointer stands in the window tells a click from a drag.
+void OnPressed(const winrt::Windows::Foundation::IInspectable&, const xaml::Input::PointerRoutedEventArgs& args) {
     try {
         State& state = TheState();
+        state.pressedTile = nullptr;
         auto grid = state.grid.get();
         if (!grid || !g_wanted.load() || ModifierDown()) return;  // Ctrl or Shift: Apple's multiple selection
-        Toggle(TileOf(args.OriginalSource(), grid));
+        auto point = args.GetCurrentPoint(nullptr);
+        if (!point.Properties().IsLeftButtonPressed()) return;
+        auto tile = TileOf(args.OriginalSource(), grid);
+        if (!tile) return;
+        state.pressedTile = winrt::make_weak(tile);
+        state.pressedAt = point.Position();
     } catch (...) {
         // A handler runs inside Apple Music's XAML frame: nothing may escape it.
+    }
+}
+
+void OnReleased(const winrt::Windows::Foundation::IInspectable&, const xaml::Input::PointerRoutedEventArgs& args) {
+    try {
+        State& state = TheState();
+        auto tile = state.pressedTile.get();
+        state.pressedTile = nullptr;
+        if (!tile || !g_wanted.load() || ModifierDown()) return;
+        winrt::Windows::Foundation::Point at = args.GetCurrentPoint(nullptr).Position();
+        if (std::hypot(at.X - state.pressedAt.X, at.Y - state.pressedAt.Y) > kClickSlop) return;
+        const uint64_t now = GetTickCount64();
+        if (tile == state.clickedTile.get() && now - state.clickedTick < GetDoubleClickTime()) return;  // its second click
+        state.clickedTile = winrt::make_weak(tile);
+        state.clickedTick = now;
+        Toggle(tile);
+    } catch (...) {
     }
 }
 
@@ -599,7 +669,8 @@ void Detach() {
     state.open = Open{};
     if (auto grid = state.grid.get()) {
         grid.IsItemClickEnabled(state.clickWasEnabled);
-        grid.RemoveHandler(xaml::UIElement::TappedEvent(), state.tapped);
+        grid.RemoveHandler(xaml::UIElement::PointerPressedEvent(), state.pressed);
+        grid.RemoveHandler(xaml::UIElement::PointerReleasedEvent(), state.released);
         grid.RemoveHandler(xaml::UIElement::KeyDownEvent(), state.keys);
     }
     if (state.wrap) {
@@ -643,11 +714,15 @@ bool Attach(const controls::GridView& grid) {
     state.wrapMargin = wrap.Margin();
     state.clickWasEnabled = grid.IsItemClickEnabled();
     grid.IsItemClickEnabled(false);
-    state.tapped = winrt::box_value(xaml::Input::TappedEventHandler(&OnTapped));
+    state.pressed = winrt::box_value(xaml::Input::PointerEventHandler(&OnPressed));
+    state.released = winrt::box_value(xaml::Input::PointerEventHandler(&OnReleased));
     state.keys = winrt::box_value(xaml::Input::KeyEventHandler(&OnKey));
-    grid.AddHandler(xaml::UIElement::TappedEvent(), state.tapped, true);
+    grid.AddHandler(xaml::UIElement::PointerPressedEvent(), state.pressed, true);
+    grid.AddHandler(xaml::UIElement::PointerReleasedEvent(), state.released, true);
     grid.AddHandler(xaml::UIElement::KeyDownEvent(), state.keys, true);
     state.overlay.AddHandler(xaml::UIElement::KeyDownEvent(), state.keys, true);  // Escape from the panel's buttons
+    state.wheel = winrt::box_value(xaml::Input::PointerEventHandler(&OnWheel));
+    state.overlay.AddHandler(xaml::UIElement::PointerWheelChangedEvent(), state.wheel, true);
     state.layoutToken = wrap.LayoutUpdated([](auto&&, auto&&) {
         try {
             Reflow();
@@ -673,6 +748,13 @@ void KeepAlbumExpand(Journal& journal) noexcept {
         state.journal = &journal;
         auto grid = state.grid.get();
         if (state.attached && (!g_wanted.load() || !grid || !grid.IsLoaded())) Detach();
+        // Another song plays: the open list moves its speaker to it.
+        if (state.attached && state.open.index >= 0 && state.open.panel &&
+            CurrentNowPlaying().trackKey != state.open.playingKey) {
+            state.open.playingKey = CurrentNowPlaying().trackKey;
+            BuildPanel(state, false);
+            Reflow();
+        }
         if (!g_wanted.load() || state.attached) return;
         const auto now = std::chrono::steady_clock::now();
         if (now < state.nextSearch) return;

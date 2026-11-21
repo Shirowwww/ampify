@@ -2,7 +2,7 @@
 // The panel apple.albumClick opens under an album of the library grid (win/album_expand.cpp): the cover, the album's
 // name, artist and year, Play, Shuffle and Open album buttons, and its track list in one or two columns, as iTunes
 // showed it. A track plays the album from there on a double-click, or on its number, which turns into a play button
-// under the pointer. Built in code, in the grid's own text colour and font, so a theme reaches it as it reaches the grid.
+// under the pointer; a right-click offers Play, Play Next, Play Later and Open album. The song playing shows a speaker. Built in code, in the grid's own text colour and font, so a theme reaches it as it reaches the grid.
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -21,6 +21,7 @@ struct AlbumPanelTrack {
     std::wstring title;
     std::wstring artist;  // shown only when it differs from the album's
     std::wstring duration;
+    bool playing = false;  // the song Apple plays now: a speaker in its number's place
 };
 
 struct AlbumPanelModel {
@@ -33,6 +34,7 @@ struct AlbumPanelModel {
 
 struct AlbumPanelActions {
     std::function<void(int track, bool shuffle)> play;  // track -1: from the start
+    std::function<void(int track, bool next)> queue;    // Play Next, or Play Later
     std::function<void()> open;                         // the album's page
     std::function<void()> close;
 };

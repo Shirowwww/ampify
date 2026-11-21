@@ -15,6 +15,8 @@ namespace ampify {
 
 struct NowPlaying {
     std::string trackKey;  // TrackKey of the snapshot
+    std::string title;     // the song's, as Apple shows it; the library album panel finds it by them
+    std::string album;
     bool playing = false;
     bool moving = false;  // playing and heard moving: false while the song loads or its stream stalls
     int64_t positionMs = 0;

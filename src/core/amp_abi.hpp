@@ -134,6 +134,8 @@ inline constexpr char kIidStartOrQueuePlaybackArgs[] = "73EE8EAC-46B3-529D-96DF-
 inline constexpr char kIidActivationFactory[] = "00000035-0000-0000-C000-000000000046";
 // PlayOrQueueCommand.StartPlayback and ShuffleMode (Off 0, Tracks 1).
 inline constexpr int kPlayOrQueueStartPlayback = 0;
+inline constexpr int kPlayOrQueueQueueNext = 1;
+inline constexpr int kPlayOrQueueQueueLater = 2;
 inline constexpr int kShuffleOff = 0;
 inline constexpr int kShuffleTracks = 1;
 inline constexpr const char* kIidsUInt64Collections[] = {

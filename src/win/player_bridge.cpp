@@ -217,6 +217,10 @@ void PlayerBridge::LogCover(const AmpReading& apple) {
 void PlayerBridge::PublishFeed(const PlayerSnapshot& snapshot) {
     NowPlaying now;
     now.trackKey = TrackKey(snapshot);
+    if (snapshot.track) {
+        now.title = snapshot.track->title;
+        now.album = snapshot.track->album;
+    }
     now.playing = snapshot.playing;
     now.positionMs = snapshot.positionMs;
     now.atMs = static_cast<int64_t>(GetTickCount64());

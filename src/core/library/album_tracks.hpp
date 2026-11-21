@@ -39,4 +39,13 @@ inline uint32_t DiscOf(const LibraryTrack& track) { return track.discNumber == 0
 // How many discs those tracks come from; 0 for none.
 size_t DiscCount(std::span<const LibraryTrack> tracks);
 
+// The one of an album's tracks Apple is playing, found by the title and album Apple shows (its player knows the
+// song by its catalog id, which the library file does not hold); nullopt when none or more than one match.
+std::optional<size_t> PlayingTrackIndex(std::span<const LibraryTrack> tracks, std::string_view title,
+                                        std::string_view album);
+
+// The artist an album is by: its album artist when the file names one, which a compilation's tile replaces with
+// "Various Artists" (issue #7), else `shown`, else its first track's artist.
+std::string AlbumArtistOf(std::span<const LibraryTrack> tracks, std::string_view shown);
+
 }  // namespace ampify

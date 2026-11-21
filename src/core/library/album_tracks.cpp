@@ -73,4 +73,22 @@ size_t DiscCount(std::span<const LibraryTrack> tracks) {
     return discs.size();
 }
 
+std::optional<size_t> PlayingTrackIndex(std::span<const LibraryTrack> tracks, std::string_view title,
+                                        std::string_view album) {
+    if (title.empty()) return std::nullopt;
+    std::optional<size_t> found;
+    for (size_t i = 0; i < tracks.size(); i++) {
+        if (tracks[i].title != title || (!album.empty() && tracks[i].album != album)) continue;
+        if (found) return std::nullopt;  // the same title twice on the album: which one plays is not known
+        found = i;
+    }
+    return found;
+}
+
+std::string AlbumArtistOf(std::span<const LibraryTrack> tracks, std::string_view shown) {
+    if (!tracks.empty() && !tracks.front().albumArtist.empty()) return tracks.front().albumArtist;
+    if (!shown.empty()) return std::string(shown);
+    return tracks.empty() ? std::string() : tracks.front().artist;
+}
+
 }  // namespace ampify

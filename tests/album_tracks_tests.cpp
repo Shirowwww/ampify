@@ -74,3 +74,27 @@ TEST_CASE(AlbumTracks_PutsEachDiscAfterThePreviousOne) {
     CHECK(ampify::DiscCount(ampify::TracksOfAlbum(library, 50)) == 2);
     CHECK(ampify::DiscCount({}) == 0);
 }
+
+// Issue #7: the panel marks the song that plays, which Apple's player names by title and album only.
+TEST_CASE(AlbumTracks_FindsTheSongThatPlaysByItsTitleAndAlbum) {
+    std::vector<ampify::LibraryTrack> album = {Track(1, 50, 1, "Intro"), Track(2, 50, 2, "Stay Gold"),
+                                               Track(3, 50, 3, "Outro")};
+    for (ampify::LibraryTrack& track : album) track.album = "Map of the Soul: 7";
+    CHECK(ampify::PlayingTrackIndex(album, "Stay Gold", "Map of the Soul: 7") == std::optional<size_t>(1));
+    CHECK(!ampify::PlayingTrackIndex(album, "Stay Gold", "Another album").has_value());
+    CHECK(!ampify::PlayingTrackIndex(album, "", "Map of the Soul: 7").has_value());
+    album.push_back(Track(4, 50, 4, "Intro"));
+    album.back().album = "Map of the Soul: 7";
+    CHECK(!ampify::PlayingTrackIndex(album, "Intro", "Map of the Soul: 7").has_value());  // twice: unknown which
+}
+
+// Issue #7: a compilation's tile says "Various Artists"; the album's own artist wins when the file names one.
+TEST_CASE(AlbumTracks_NamesACompilationAfterItsAlbumArtist) {
+    std::vector<ampify::LibraryTrack> album = {Track(1, 50, 1, "Mixed"), Track(2, 50, 2, "Unmixed")};
+    album[0].artist = "Some Producer";
+    CHECK(ampify::AlbumArtistOf(album, "Various Artists") == "Various Artists");
+    CHECK(ampify::AlbumArtistOf(album, "") == "Some Producer");
+    album[0].albumArtist = "James Grant & Jody Wisternoff";
+    CHECK(ampify::AlbumArtistOf(album, "Various Artists") == "James Grant & Jody Wisternoff");
+    CHECK(ampify::AlbumArtistOf({}, "Various Artists") == "Various Artists");
+}
