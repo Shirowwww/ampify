@@ -38,6 +38,11 @@ std::vector<FillKey> RowFillPath(std::span<const LyricWord> words, std::span<con
 // after. 0 for an empty path.
 double EdgeAt(std::span<const FillKey> path, double atMs);
 
+// With Show Pronunciation, Apple draws a line's romaji as rows of their own in the line's host, in a smaller type,
+// each under the row it spells. Which rows of these heights (top to bottom) are pronunciation: the ones clearly
+// shorter than the tallest.
+std::vector<bool> PronunciationRows(std::span<const double> heights);
+
 // True while a line from `startMs` to `endMs` may be on show as the one sung: from a little before it starts to a
 // moment after it ends.
 bool LineUnderway(int64_t startMs, int64_t endMs, int64_t positionMs);

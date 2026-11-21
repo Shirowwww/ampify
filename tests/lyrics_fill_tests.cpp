@@ -120,6 +120,19 @@ TEST_CASE(LyricsFill_AHostIsMatchedByTheStartAppleGaveItsLine) {
     CHECK(LineOfHost(lyrics, 2, false, 2800, 99000) == std::optional<size_t>{1});  // no line starts there: by times
 }
 
+TEST_CASE(LyricsFill_PronunciationRowsAreTheShorterOnes) {
+    using Rows = std::vector<bool>;
+    const std::vector<double> sung = {38, 38};
+    CHECK(ampify::PronunciationRows(sung) == (Rows{false, false}));  // no pronunciation shown
+    const std::vector<double> romaji = {38, 21, 38, 21};             // each sung row with its romaji under it
+    CHECK(ampify::PronunciationRows(romaji) == (Rows{false, true, false, true}));
+    const std::vector<double> close = {38, 35};  // a row of other letters, a little shorter: still sung
+    CHECK(ampify::PronunciationRows(close) == (Rows{false, false}));
+    CHECK(ampify::PronunciationRows(std::vector<double>{}).empty());
+    const std::vector<double> flat = {0, 0};  // not laid out yet
+    CHECK(ampify::PronunciationRows(flat) == (Rows{false, false}));
+}
+
 TEST_CASE(LyricsFill_ALineIsUnderWayFromJustBeforeItUntilAMomentAfter) {
     CHECK(!ampify::LineUnderway(1000, 2000, 0));
     CHECK(ampify::LineUnderway(1000, 2000, 500));    // about to start

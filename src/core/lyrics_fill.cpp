@@ -12,6 +12,7 @@ constexpr int64_t kLineAheadMs = 600;
 constexpr int64_t kLineAfterMs = 1500;
 constexpr int64_t kSameStartMs = 5;  // Apple's line start (100 ns) and the TTML's (ms) read from the same text
 constexpr double kHoldMs = 1;  // the edge holds at a word's end until 1 ms before the next word, then jumps
+constexpr double kPronunciationShare = 0.8;  // romaji rows are about 0.6 of a sung row's height
 
 // Adds a key after the last: one at the same time (or earlier, words that overlap) moves that time's edge instead.
 void Push(std::vector<FillKey>& path, double atMs, double edge) {
@@ -66,6 +67,14 @@ double EdgeAt(std::span<const FillKey> path, double atMs) {
         }
     }
     return path.back().edge;
+}
+
+std::vector<bool> PronunciationRows(std::span<const double> heights) {
+    std::vector<bool> spoken(heights.size(), false);
+    const double tallest = heights.empty() ? 0 : *std::max_element(heights.begin(), heights.end());
+    if (!(tallest > 0)) return spoken;
+    for (size_t i = 0; i < heights.size(); i++) spoken[i] = heights[i] < tallest * kPronunciationShare;
+    return spoken;
 }
 
 bool LineUnderway(int64_t startMs, int64_t endMs, int64_t positionMs) {

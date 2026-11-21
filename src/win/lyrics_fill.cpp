@@ -94,6 +94,7 @@ struct Host {
     bool background = false;
     void* lineKey = nullptr;  // the KaraokeLyricsLine the host stands in, by identity: pairs main and background hosts
     std::vector<Row> rows;    // bound while Apple sings the host's line, empty otherwise
+    std::vector<comp::SpriteVisual> shown;  // every row the host showed when bound, Apple's own included
     std::optional<size_t> line;  // the line of the song the rows are bound to
     int64_t lineStartMs = 0;
     int64_t lineEndMs = 0;
@@ -107,6 +108,7 @@ struct FoundRow {
     comp::CompositionMaskBrush mask{nullptr};
     comp::CompositionLinearGradientBrush source{nullptr};
     std::vector<WordSpan> spans;
+    bool spoken = false;  // a pronunciation row (romaji), under the sung row it spells
 };
 
 comp::ContainerVisual PastWrappers(comp::ContainerVisual layer) {
@@ -164,6 +166,10 @@ std::vector<FoundRow> RowsOf(const controls::Border& host) {
     }
     std::stable_sort(rows.begin(), rows.end(),
                      [](const FoundRow& a, const FoundRow& b) { return a.sprite.Offset().y < b.sprite.Offset().y; });
+    std::vector<double> heights;
+    for (const FoundRow& row : rows) heights.push_back(row.sprite.Size().y);
+    const std::vector<bool> spoken = PronunciationRows(heights);
+    for (size_t i = 0; i < rows.size(); i++) rows[i].spoken = spoken[i];
     return rows;
 }
 
@@ -245,8 +251,9 @@ void GiveBack(Row& row) {
     if (row.mask && row.mask.Source() == row.ours) row.mask.Source(row.apple);
 }
 
-// The words the rows hold, or nullopt when a row is not drawn as Apple's are expected to be.
-std::optional<size_t> WordCount(const std::vector<FoundRow>& found) {
+// The words the sung rows (or the pronunciation rows) hold, or nullopt when a row is not drawn as Apple's are
+// expected to be.
+std::optional<size_t> WordCount(const std::vector<FoundRow>& found, bool spoken = false) {
     size_t count = 0;
     for (const FoundRow& row : found) {
         if (!ShapedAsApples(row.source)) {
@@ -254,7 +261,7 @@ std::optional<size_t> WordCount(const std::vector<FoundRow>& found) {
             if (!noted.exchange(true)) Note("Apple's gradient is not the four stops expected: Apple's own fill");
             return std::nullopt;
         }
-        count += row.spans.size();
+        if (row.spoken == spoken) count += row.spans.size();
     }
     return count;
 }
@@ -283,31 +290,44 @@ std::optional<int64_t> AppleStartOf(const xaml::DependencyObject& host) {
     return TicksToMs(ticks);
 }
 
+// Each row as "words@height", top to bottom: what a line Ampify could not match was drawn as.
+std::string RowShapes(const std::vector<FoundRow>& found) {
+    std::string shapes;
+    for (const FoundRow& row : found) {
+        if (!shapes.empty()) shapes += ", ";
+        shapes += std::to_string(row.spans.size()) + "@" + std::to_string(static_cast<int>(row.sprite.Size().y));
+        if (row.spoken) shapes += " pronunciation";
+    }
+    return shapes;
+}
+
+// Why a host's rows (or part of them) were left to Apple, once per song on each interface thread.
+void NoteLeftToApple(const NowPlaying& now, const std::string& why) {
+    thread_local std::string notedTrack;
+    if (notedTrack == now.trackKey) return;
+    notedTrack = now.trackKey;
+    Note(why);
+}
+
 // The line of the song a main host's rows show: Apple masks the main rows of the line being sung only.
-std::optional<size_t> MainLine(const controls::Border& border, size_t count, const NowPlaying& now, int64_t tick) {
+std::optional<size_t> MainLine(const controls::Border& border, const std::vector<FoundRow>& found, size_t count,
+                               const NowPlaying& now, int64_t tick) {
     std::optional<size_t> index = LineOfHost(*now.lyrics, count, false, now.PositionAt(tick), AppleStartOf(border));
     thread_local std::string notedTrack;  // a follower per interface thread
     if (!index && notedTrack != now.trackKey) {
         notedTrack = now.trackKey;
-        Note("a line of " + std::to_string(count) + " words matches no line of the song: Apple's own fill");
+        Note("a line of " + std::to_string(count) + " words (rows " + RowShapes(found) +
+             ") matches no line of the song: Apple's own fill");
     }
     return index;
 }
 
-// Lays line `index` on the host's rows, or leaves them to Apple. True when Ampify drives them.
-bool Bind(Host& host, std::vector<FoundRow>& found, const NowPlaying& now, int64_t tick, std::optional<size_t> index) {
-    std::optional<size_t> count = WordCount(found);
-    if (!count) return false;
-    if (!host.background) index = MainLine(host.border.get(), *count, now, tick);  // Follow holds the border
-    if (!index || *index >= now.lyrics->lines.size()) return false;
-    const LyricLine& line = now.lyrics->lines[*index];
-    std::vector<LyricWord> words = WordsOfHost(line, host.background);
-    if (words.size() != *count) return false;
-    host.line = index;
-    host.lineStartMs = line.startMs;
-    host.lineEndMs = line.endMs;
+// Lays `words` on the host's sung rows, or on its pronunciation rows, in order.
+void BindRows(Host& host, std::vector<FoundRow>& found, bool spoken, const std::vector<LyricWord>& words,
+              const LyricLine& line, const NowPlaying& now, int64_t tick) {
     size_t first = 0;
     for (FoundRow& row : found) {
+        if (row.spoken != spoken) continue;
         std::span<const LyricWord> rowWords(words.data() + first, row.spans.size());
         first += row.spans.size();
         std::vector<FillKey> path = RowFillPath(rowWords, row.spans, line.startMs);
@@ -317,19 +337,49 @@ bool Bind(Host& host, std::vector<FoundRow>& found, const NowPlaying& now, int64
         row.mask.Source(bound.ours);
         host.rows.push_back(std::move(bound));
     }
+}
+
+// Lays line `index` on the host's rows, or leaves them to Apple. True when Ampify drives them. The pronunciation rows
+// spell the sung words one for one in Apple's lyrics (issue #5): they follow the same times, or stay Apple's.
+bool Bind(Host& host, std::vector<FoundRow>& found, const NowPlaying& now, int64_t tick, std::optional<size_t> index) {
+    std::optional<size_t> count = WordCount(found);
+    if (!count) return false;
+    if (!host.background) index = MainLine(host.border.get(), found, *count, now, tick);  // Follow holds the border
+    if (!index || *index >= now.lyrics->lines.size()) return false;
+    const LyricLine& line = now.lyrics->lines[*index];
+    std::vector<LyricWord> words = WordsOfHost(line, host.background);
+    if (words.size() != *count) {
+        NoteLeftToApple(now, "rows of " + std::to_string(*count) + " words (" + RowShapes(found) + ") for a line of " +
+                                 std::to_string(words.size()) + ": Apple's own fill");
+        return false;
+    }
+    host.line = index;
+    host.lineStartMs = line.startMs;
+    host.lineEndMs = line.endMs;
+    BindRows(host, found, false, words, line, now, tick);
+    const size_t spoken = WordCount(found, true).value_or(0);
+    if (spoken == words.size()) {
+        BindRows(host, found, true, words, line, now, tick);
+    } else if (spoken > 0) {
+        NoteLeftToApple(now, "pronunciation rows of " + std::to_string(spoken) + " words (" + RowShapes(found) +
+                                 ") for a line of " + std::to_string(words.size()) + ": Apple fills them");
+    }
+    host.shown.clear();
+    for (const FoundRow& row : found) host.shown.push_back(row.sprite);
     return !host.rows.empty();
 }
 
 void Release(Host& host) {
     for (Row& row : host.rows) GiveBack(row);
     host.rows.clear();
+    host.shown.clear();
     host.line.reset();
 }
 
-bool SameRows(const std::vector<FoundRow>& found, const std::vector<Row>& rows) {
-    if (found.size() != rows.size()) return false;
+bool SameRows(const std::vector<FoundRow>& found, const Host& host) {
+    if (found.size() != host.shown.size()) return false;
     for (size_t i = 0; i < found.size(); i++) {
-        if (found[i].sprite != rows[i].sprite) return false;
+        if (found[i].sprite != host.shown[i]) return false;
     }
     return true;
 }
@@ -338,7 +388,7 @@ bool SameRows(const std::vector<FoundRow>& found, const std::vector<Row>& rows) 
 // a background host the line its main host sings.
 bool StillBound(const Host& host, const std::vector<FoundRow>& found, const NowPlaying& now, int64_t tick,
                 const Host* main) {
-    if (!SameRows(found, host.rows)) return false;
+    if (!SameRows(found, host)) return false;
     if (host.background) return main && main->line == host.line;
     return LineUnderway(host.lineStartMs, host.lineEndMs, now.PositionAt(tick));
 }
