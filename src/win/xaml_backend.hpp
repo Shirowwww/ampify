@@ -204,6 +204,11 @@ private:
     // The brush Ampify keeps for an application resource, recoloured to `color`; IsOwnBrush tells one of them.
     winrt::Microsoft::UI::Xaml::Media::SolidColorBrush OwnBrush(const std::string& key, winrt::Windows::UI::Color color);
     bool IsOwnBrush(const winrt::Windows::Foundation::IInspectable& value) const;
+    // A gradient of the app's resources (a focused text box's border) recoloured to `color` in a copy Ampify keeps per
+    // key: only its stops in Apple's accent change. Empty when no stop holds the accent.
+    std::optional<winrt::Microsoft::UI::Xaml::Media::LinearGradientBrush> OwnGradient(
+        const std::string& key, const winrt::Windows::Foundation::IInspectable& current, winrt::Windows::UI::Color color);
+    std::vector<winrt::Windows::UI::Color> AppAccentColours();
 
     // An object Ampify made from a value (a gradient, an image or acrylic brush, a transform, a shadow) reads back as
     // that value while the element still holds it: the next tick then finds the value in place and writes nothing.
@@ -395,6 +400,12 @@ private:
     std::string m_captionNote;
     std::map<std::string, theme::Value> m_addedKeys;  // keys added on top of the theme dictionaries, with the value before
     std::map<std::string, winrt::Microsoft::UI::Xaml::Media::SolidColorBrush> m_ownBrushes;  // OwnBrush, by key
+    struct OwnGradientBrush {
+        winrt::Microsoft::UI::Xaml::Media::LinearGradientBrush brush{nullptr};
+        std::vector<winrt::Microsoft::UI::Xaml::Media::GradientStop> accentStops;
+        winrt::Windows::UI::Color color{};
+    };
+    std::map<std::string, OwnGradientBrush> m_ownGradients;  // OwnGradient, by key
     std::map<std::wstring, winrt::Microsoft::UI::Xaml::FrameworkElement> m_standIns;  // StandIn, by class and name
     std::set<void*> m_standInIds;  // the same, for the walk to leave them out
     bool m_resourcesDirty = false;  // a resource changed: {ThemeResource} references must be resolved again

@@ -1530,6 +1530,7 @@ TEST_CASE(Theme_ControlsFollowTheAccent) {
     CHECK(ResourceValue(only, "AccentFillColorDisabledBrush") == "#590A84FF");
     CHECK(ResourceValue(only, "NavigationViewSelectionIndicatorForeground") == "#FF0A84FF");
     CHECK(ResourceValue(only, "ButtonAccentTextFillColorPrimaryBrush") == "#FF99CCFF");
+    CHECK(ResourceValue(only, "TextControlBorderBrushFocused") == "#FF0A84FF");  // the search box's focus line
 
     // A key the theme names stays its own.
     th::Theme own = Load(files, {"Own", nullptr, {}});

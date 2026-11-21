@@ -111,6 +111,7 @@ void DefineAccentControls(Colours& colours, const std::set<std::string>& owned) 
         {"AccentFillColorDisabledBrush", kAccent, kDisabled},
         {"AccentFillColorSelectedTextBackgroundBrush", kAccent, 1.0},
         {"TextControlSelectionHighlightColor", kAccent, 1.0},
+        {"TextControlBorderBrushFocused", kAccent, 1.0},  // a gradient: only its accent line takes it
         {"ListViewItemSelectionIndicatorBrush", kAccent, 1.0},
         {"ListViewItemSelectionIndicatorPointerOverBrush", kHover, 1.0},
         {"ListViewItemSelectionIndicatorPressedBrush", kPressed, 1.0},

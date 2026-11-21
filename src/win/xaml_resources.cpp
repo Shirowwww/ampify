@@ -81,6 +81,67 @@ media::SolidColorBrush XamlTreeBackend::OwnBrush(const std::string& key, ColorVa
     return brush;
 }
 
+// Apple Music's accent shades (its own blue, not Windows'), as they were before a theme wrote any of them.
+std::vector<ColorValue> XamlTreeBackend::AppAccentColours() {
+    static constexpr std::string_view kKeys[] = {
+        "AccentFillColorDefault",  "AccentFillColorDefaultBrush", "SystemAccentColor",
+        "SystemAccentColorLight1", "SystemAccentColorLight2",     "SystemAccentColorLight3",
+        "SystemAccentColorDark1",  "SystemAccentColorDark2",      "SystemAccentColorDark3"};
+    std::vector<ColorValue> colours;
+    for (std::string_view key : kKeys) {
+        auto added = m_addedKeys.find(std::string(key));
+        std::optional<theme::Value> value = added != m_addedKeys.end() ? std::optional{added->second} : ReadResource(key);
+        if (!value || value->kind != theme::ValueKind::Color) continue;
+        if (std::optional<ColorValue> colour = ColorFromText(value->text)) colours.push_back(*colour);
+    }
+    return colours;
+}
+
+// WinUI draws a focused text box's border with a gradient (accent on the bottom two pixels, grey above) whose stops
+// it read once, at load: a plain colour in its place would paint the whole frame, so the copy keeps the gradient.
+std::optional<media::LinearGradientBrush> XamlTreeBackend::OwnGradient(const std::string& key, const IInspectable& current,
+                                                                       ColorValue color) {
+    if (auto own = m_ownGradients.find(key); own != m_ownGradients.end()) {
+        for (media::GradientStop& stop : own->second.accentStops) {
+            if (stop.Color() != color) stop.Color(color);
+        }
+        own->second.color = color;
+        return own->second.brush;
+    }
+    auto apple = current ? current.try_as<media::LinearGradientBrush>() : nullptr;
+    if (!apple) return std::nullopt;
+    media::LinearGradientBrush copy;
+    copy.MappingMode(apple.MappingMode());
+    copy.StartPoint(apple.StartPoint());
+    copy.EndPoint(apple.EndPoint());
+    copy.SpreadMethod(apple.SpreadMethod());
+    copy.ColorInterpolationMode(apple.ColorInterpolationMode());
+    copy.Opacity(apple.Opacity());
+    if (media::Transform transform = apple.RelativeTransform()) {
+        auto scale = transform.try_as<media::ScaleTransform>();
+        if (!scale) return std::nullopt;  // a shape this copy would not keep
+        media::ScaleTransform flip;
+        flip.ScaleX(scale.ScaleX());
+        flip.ScaleY(scale.ScaleY());
+        flip.CenterX(scale.CenterX());
+        flip.CenterY(scale.CenterY());
+        copy.RelativeTransform(flip);
+    }
+    std::vector<ColorValue> accents = AppAccentColours();
+    OwnGradientBrush own{copy, {}, color};
+    for (const media::GradientStop& stop : apple.GradientStops()) {
+        const bool accent = std::find(accents.begin(), accents.end(), stop.Color()) != accents.end();
+        media::GradientStop mine;
+        mine.Offset(stop.Offset());
+        mine.Color(accent ? color : stop.Color());
+        if (accent) own.accentStops.push_back(mine);
+        copy.GradientStops().Append(mine);
+    }
+    if (own.accentStops.empty()) return std::nullopt;
+    m_ownGradients.emplace(key, std::move(own));
+    return copy;
+}
+
 // The known colour keys the application holds. Its dictionaries are not enumerated: that realised every deferred
 // resource out of its context, and Apple Music crashed at the next theme change (0xc000027b, ERROR_NOT_FOUND stowed in
 // Microsoft.UI.Xaml.dll; 4 launches out of 4 with the inspector on, 31/10). Looking up a known key is safe.
@@ -107,6 +168,11 @@ std::optional<theme::Value> XamlTreeBackend::ReadResource(std::string_view key) 
         value = resources.Lookup(winrt::box_value(name));
     } catch (...) {
         return std::nullopt;  // a resource Apple Music cannot give out of its context: read as absent
+    }
+    // Our copy of a gradient reads as the colour written into it, like our brushes: nothing to write on the next tick.
+    if (auto own = m_ownGradients.find(std::string(key));
+        own != m_ownGradients.end() && ComIdentity(own->second.brush) == ComIdentity(value)) {
+        return theme::Value{theme::ValueKind::Color, ColourText(own->second.color)};
     }
     if (auto solid = value.try_as<media::SolidColorBrush>()) return theme::Value{theme::ValueKind::Color, ColourText(solid.Color())};
     // A Color resource reads as a colour too: an opaque handle would differ on every tick and be written again.
@@ -141,7 +207,18 @@ bool XamlTreeBackend::WriteResource(std::string_view key, const theme::Value& va
     if (value.kind == theme::ValueKind::Color) {
         std::optional<ColorValue> color = ColorFromText(value.text);
         if (!color) return false;
-        object = OwnBrush(keyText, *color);
+        IInspectable current{nullptr};
+        try {
+            if (resources.HasKey(name)) current = resources.Lookup(name);
+        } catch (...) {
+        }
+        if (m_ownGradients.count(keyText) || (current && current.try_as<media::LinearGradientBrush>())) {
+            std::optional<media::LinearGradientBrush> gradient = OwnGradient(keyText, current, *color);
+            if (!gradient) return false;  // left as Apple drew it rather than a frame filled with the accent
+            object = *gradient;
+        } else {
+            object = OwnBrush(keyText, *color);
+        }
     } else if (value.kind == theme::ValueKind::Opaque) {
         object = Restore(value);
     }

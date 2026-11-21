@@ -869,6 +869,7 @@ constexpr std::string_view kColourKeys[] = {
     "TextBoxForegroundThemeBrush",
     "TextBoxPlaceholderTextThemeBrush",
     "TextControlBorderBrush",
+    "TextControlBorderBrushFocused",
     "TextControlButtonBorderBrush",
     "TextControlElevationBorderBrush",
     "TextControlElevationBorderFocusedBrush",
