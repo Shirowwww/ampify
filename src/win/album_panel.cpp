@@ -41,6 +41,9 @@ constexpr wchar_t kSpeakerGlyph[] = L"\xE767";  // Volume: the song that plays
 constexpr uint8_t kPanelAlpha = 0x10;
 constexpr uint8_t kHoverAlpha = 0x14;
 constexpr uint8_t kPickedAlpha = 0x26;
+// In the album's colours, the header's buttons: their fill at rest and under the pointer.
+constexpr uint8_t kButtonAlpha = 0x1A;
+constexpr uint8_t kButtonHoverAlpha = 0x2C;
 constexpr double kDim = 0.6;
 
 std::wstring Text(const char* key) { return std::wstring(winrt::to_hstring(i18n::Text(key))); }
@@ -50,6 +53,27 @@ media::SolidColorBrush Tint(const media::Brush& text, uint8_t alpha) {
     if (auto solid = text.try_as<media::SolidColorBrush>()) color = solid.Color();
     color.A = alpha;
     return media::SolidColorBrush(color);
+}
+
+media::SolidColorBrush Solid(const Rgb& color) {
+    return media::SolidColorBrush(winrt::Windows::UI::Color{0xFF, color.r, color.g, color.b});
+}
+
+// The panel's buttons in the album's colours. Theirs come from the app's theme, which need not read on the album's
+// background; a button looks these keys up from itself to the panel before the theme (lightweight styling).
+void PaintButtons(const xaml::ResourceDictionary& resources, const media::Brush& text) {
+    auto put = [&resources](const wchar_t* key, const media::Brush& brush) {
+        resources.Insert(winrt::box_value(winrt::hstring(key)), brush);
+    };
+    for (const wchar_t* key : {L"ButtonForeground", L"ButtonForegroundPointerOver", L"ButtonForegroundPressed"}) {
+        put(key, text);
+    }
+    put(L"ButtonBackground", Tint(text, kButtonAlpha));
+    put(L"ButtonBackgroundPointerOver", Tint(text, kButtonHoverAlpha));
+    put(L"ButtonBackgroundPressed", Tint(text, kHoverAlpha));
+    for (const wchar_t* key : {L"ButtonBorderBrush", L"ButtonBorderBrushPointerOver", L"ButtonBorderBrushPressed"}) {
+        put(key, Tint(text, 0));
+    }
 }
 
 controls::TextBlock Label(const std::wstring& text, double size, double opacity = 1.0) {
@@ -255,7 +279,9 @@ xaml::FrameworkElement Cover(const media::ImageSource& artwork) {
 }  // namespace
 
 xaml::FrameworkElement MakeAlbumPanel(const AlbumPanelModel& model, const AlbumPanelActions& actions,
-                                      const media::Brush& text, double width) {
+                                      const media::Brush& gridText, double width) {
+    // In the album's colours, its text colour stands for the grid's everywhere: rows under the pointer, the row picked.
+    const media::Brush text = model.colors ? media::Brush(Solid(model.colors->text)) : gridText;
     controls::Grid layout;
     for (double column : {kArtwork, kGutter, -1.0}) {
         controls::ColumnDefinition definition;
@@ -306,8 +332,18 @@ xaml::FrameworkElement MakeAlbumPanel(const AlbumPanelModel& model, const AlbumP
     panel.Width(width);
     panel.Padding(xaml::ThicknessHelper::FromUniformLength(kPadding));
     panel.CornerRadius(xaml::CornerRadiusHelper::FromUniformRadius(10));
-    panel.Background(Tint(text, kPanelAlpha));
-    panel.Child(layout);
+    if (model.colors) {
+        panel.Background(Solid(model.colors->background));
+        // Text and glyphs take their colour from the nearest presenter up the tree; buttons, from the keys painted.
+        controls::ContentPresenter painted;
+        painted.Foreground(text);
+        painted.Content(layout);
+        panel.Child(painted);
+        PaintButtons(panel.Resources(), text);
+    } else {
+        panel.Background(Tint(text, kPanelAlpha));
+        panel.Child(layout);
+    }
     xaml::Automation::AutomationProperties::SetName(panel, winrt::hstring(model.title));
     return panel;
 }

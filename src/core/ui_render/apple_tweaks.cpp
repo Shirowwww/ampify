@@ -68,7 +68,9 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.lyricsBefore = LyricLinesOf(ChoiceOf(settings, kLyricsBeforeKey));
     tweaks.lyricsAfter = LyricLinesOf(ChoiceOf(settings, kLyricsAfterKey));
     tweaks.lyricsFill = ChoiceOf(settings, kLyricsFillKey) == "smooth";
-    tweaks.albumExpand = ChoiceOf(settings, kAlbumClickKey) == "expand";
+    const std::string albumClick = ChoiceOf(settings, kAlbumClickKey);
+    tweaks.albumExpand = albumClick == "expand" || albumClick == "colors";
+    tweaks.albumColors = albumClick == "colors";
     tweaks.playbarOrder = ParseOrder(settings.Get(kPlaybarOrderKey).value_or(""));
     tweaks.sidebarEntriesOrder = ParseOrder(settings.Get(kSidebarEntriesOrderKey).value_or(""));
     return tweaks;

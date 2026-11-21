@@ -173,23 +173,10 @@ void XamlTreeBackend::SampleArtwork(const controls::Image& image, const std::str
                     try {
                         if (read != AsyncStatus::Completed) return done(std::nullopt, key);
                         auto buffer = operation.GetResults();
-                        size_t width = static_cast<size_t>(target.PixelWidth());
-                        size_t height = static_cast<size_t>(target.PixelHeight());
-                        if (buffer.Length() != width * height * 4) return done(std::nullopt, key);
-                        // BGRA with premultiplied alpha, to the straight RGBA the extractor reads.
-                        std::vector<uint8_t> rgba(buffer.Length());
-                        const uint8_t* bgra = buffer.data();
-                        for (size_t i = 0; i < rgba.size(); i += 4) {
-                            uint8_t alpha = bgra[i + 3];
-                            auto straight = [alpha](uint8_t channel) {
-                                return alpha ? static_cast<uint8_t>(std::min(255, channel * 255 / alpha)) : uint8_t{0};
-                            };
-                            rgba[i] = straight(bgra[i + 2]);
-                            rgba[i + 1] = straight(bgra[i + 1]);
-                            rgba[i + 2] = straight(bgra[i]);
-                            rgba[i + 3] = alpha;
-                        }
-                        std::optional<ExtractedColors> colors = ExtractColors(rgba.data(), rgba.size(), width, height);
+                        const size_t width = static_cast<size_t>(target.PixelWidth());
+                        const size_t height = static_cast<size_t>(target.PixelHeight());
+                        std::optional<ExtractedColors> colors =
+                            ExtractColorsFromBgra(buffer.data(), buffer.Length(), width, height);
                         if (!colors) return done(std::nullopt, key);
                         done(ArtworkVariables(*colors), key);
                     } catch (...) {

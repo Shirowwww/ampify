@@ -910,6 +910,7 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     CHECK(set.topbarSearch);
     CHECK(!set.lyricsFill);
     CHECK(set.albumExpand);
+    CHECK(!set.albumColors);
     CHECK(!set.playerControls);
     CHECK(!set.sharpArtwork);
     CHECK(!set.textMarquee);
@@ -925,6 +926,11 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     CHECK(odd.notifications == NotificationRule::Apple);
     CHECK(odd.player == PlayerMode::Window);  // 1.3.3's "above the taskbar", now a button in the player
     CHECK(!odd.closeToTray);
+
+    settings.Set("apple.albumClick", "Colors");  // the track list in the album's colours (issue #7)
+    AppleTweaks colored = ReadAppleTweaks(settings);
+    CHECK(colored.albumExpand);
+    CHECK(colored.albumColors);
 }
 
 TEST_CASE(UiRender_KitUpdateInstallsOnItsOwnUnlessToldOtherwise) {
@@ -1107,7 +1113,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     CHECK(card("apple.lyricsBefore").value == "all" && card("apple.lyricsBefore").options.size() == 7);
     CHECK(card("apple.lyricsAfter").value == "all" && card("apple.lyricsAfter").options.size() == 7);
     CHECK(card("apple.lyricsFill").value == "smooth" && card("apple.lyricsFill").options.size() == 2);
-    CHECK(card("apple.albumClick").value == "page" && card("apple.albumClick").options.size() == 2);
+    CHECK(card("apple.albumClick").value == "page" && card("apple.albumClick").options.size() == 3);
     CHECK(card("apple.artwork").value == "sharp");
     CHECK(card("apple.marquee").value == "hover");
     CHECK(SidebarChoice(kit).value == "open");  // on the Look tab, beside the playback bar

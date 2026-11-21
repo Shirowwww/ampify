@@ -42,9 +42,21 @@ struct ExtractedColors {
 std::optional<ExtractedColors> ExtractColors(const uint8_t* rgba, size_t size, size_t width, size_t height,
                                              size_t maxColors = 16);
 
+// The same from BGRA with premultiplied alpha, as XAML's RenderTargetBitmap hands its pixels.
+std::optional<ExtractedColors> ExtractColorsFromBgra(const uint8_t* bgra, size_t size, size_t width, size_t height,
+                                                     size_t maxColors = 16);
+
 // The theme variables of an artwork: art-1 its most common colour, art-2 its vibrant one, art-3 its dark vibrant one
 // (for backgrounds), and art-text black or white, whichever reads best on art-1. Values are "#rrggbb"; art-1-hex,
 // art-2-hex and art-3-hex hold the same without "#", for a colour with an alpha.
 std::map<std::string, std::string> ArtworkVariables(const ExtractedColors& colors);
+
+// An album's panel in its own colours, as iTunes 11 opened an album: the artwork's most common colour behind, and for
+// the text the most common of its colours that reads on it at 7:1, or else black or white, whichever reads better.
+struct AlbumColors {
+    Rgb background;
+    Rgb text;
+};
+AlbumColors AlbumPanelColors(const ExtractedColors& colors);
 
 }  // namespace ampify

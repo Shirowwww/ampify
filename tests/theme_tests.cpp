@@ -6453,6 +6453,37 @@ TEST_CASE(Artwork_VariablesGiveReadableText) {
     CHECK(r < 120 && g < 110);
 }
 
+TEST_CASE(Artwork_BgraPremultipliedReadsAsStraightRgba) {
+    // Two pixels of the same red: opaque, and at half alpha (premultiplied, so its channels are halved).
+    const uint8_t bgra[] = {0, 0, 200, 255, 0, 0, 100, 128};
+    std::optional<ampify::ExtractedColors> colors = ampify::ExtractColorsFromBgra(bgra, sizeof bgra, 2, 1);
+    CHECK(colors.has_value());
+    CHECK(colors->prominent.r >= 195 && colors->prominent.g == 0 && colors->prominent.b == 0);
+    CHECK(!ampify::ExtractColorsFromBgra(bgra, sizeof bgra, 3, 1).has_value());  // the size does not match
+}
+
+TEST_CASE(AlbumPanel_TakesTheArtworksColourWhenItReads) {
+    ampify::ExtractedColors navy;
+    navy.prominent = {20, 30, 70};
+    navy.palette = {{{20, 30, 70}, 900}, {{60, 70, 110}, 300}, {{250, 210, 120}, 120}};
+    ampify::AlbumColors colors = ampify::AlbumPanelColors(navy);
+    CHECK(colors.background == (ampify::Rgb{20, 30, 70}));
+    CHECK(colors.text == (ampify::Rgb{250, 210, 120}));  // the cover's own gold, not a plain white
+}
+
+TEST_CASE(AlbumPanel_FallsBackToBlackOrWhite) {
+    ampify::ExtractedColors pale;  // nothing of the artwork reads on its own background
+    pale.prominent = {235, 230, 220};
+    pale.palette = {{{235, 230, 220}, 900}, {{200, 190, 180}, 100}};
+    pale.lightVibrant = pale.vibrant = pale.darkVibrant = {210, 200, 190};
+    CHECK(ampify::AlbumPanelColors(pale).text == (ampify::Rgb{0, 0, 0}));
+    ampify::ExtractedColors dark;
+    dark.prominent = {15, 15, 20};
+    dark.palette = {{{15, 15, 20}, 900}, {{40, 40, 45}, 100}};
+    dark.lightVibrant = dark.vibrant = dark.darkVibrant = {50, 50, 60};
+    CHECK(ampify::AlbumPanelColors(dark).text == (ampify::Rgb{255, 255, 255}));
+}
+
 TEST_CASE(Artwork_LumaAndSaturationArePlainNumbers) {
     ampify::ExtractedColors grey;
     grey.prominent = {128, 128, 128};

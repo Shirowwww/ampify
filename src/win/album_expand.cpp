@@ -13,9 +13,11 @@
 #include <winrt/Microsoft.UI.Xaml.Hosting.h>
 #include <winrt/Microsoft.UI.Xaml.Input.h>
 #include <winrt/Microsoft.UI.Xaml.Media.h>
+#include <winrt/Microsoft.UI.Xaml.Media.Imaging.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.Numerics.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.System.h>
 
 #include <atomic>
@@ -70,8 +72,10 @@ constexpr double kGap = 12;        // between the panel and the rows above and b
 constexpr double kTileMargin = 6;  // Apple's GridViewItem margin: the panel lines up with the covers
 constexpr auto kSlide = std::chrono::milliseconds(260);
 constexpr float kClickSlop = 6;  // a press and release further apart than this (px) are a drag, not a click
+constexpr int kColorSample = 48;  // px: the tile's cover is read this small for the album's colours
 
 std::atomic<bool> g_wanted{false};
+std::atomic<bool> g_colors{false};
 
 // The library file's tracks, read on a worker thread and kept until the file changes. Never destroyed.
 struct Library {
@@ -100,6 +104,7 @@ struct Open {
     std::vector<LibraryTrack> tracks;
     std::string playingKey;  // the song playing when the list was built: another one rebuilds it
     bool waiting = false;  // the library file was still being read
+    bool readingColors = false;  // the panel waits for its album's colours before it opens
     xaml::FrameworkElement panel{nullptr};
     double height = 0;
     comp::CompositionPropertySet place{nullptr};  // "Base": the panel's top at a scroll of 0
@@ -365,6 +370,7 @@ void RefreshOpen() {
         auto tracks = LibraryTracks(waiting);
         state.open.waiting = waiting;
         if (tracks) state.open.tracks = TracksOfAlbum(*tracks, state.open.id.persistent);
+        if (state.open.readingColors) return;  // the panel opens with its colours, tracks included
         BuildPanel(state, false);
         Reflow();
         Reveal(state);
@@ -463,6 +469,53 @@ void Collapse() {
     Reflow();
 }
 
+// The panel opens and the rows below make room for it.
+void Show(State& state) {
+    BuildPanel(state, true);
+    Reflow();
+    Reveal(state);
+}
+
+// apple.albumClick = colors: the tile's cover is read small and the panel opens in the album's colours, a frame or two
+// later. If the reading fails, it opens in the grid's colours. The album must still be the open one by then.
+void ShowInColors(State& state, const controls::Image& cover) {
+    state.open.readingColors = true;
+    const int index = state.open.index;
+    const winrt::Windows::Foundation::IUnknown item = state.open.item;
+    auto finish = [queue = cover.DispatcherQueue(), index, item](std::optional<AlbumColors> colors) {
+        TryEnqueueUi(queue, [index, item, colors] {
+            State& state = TheState();
+            Open& open = state.open;
+            if (open.index != index || open.item != item || !open.readingColors) return;
+            open.readingColors = false;
+            open.model.colors = colors;
+            Show(state);
+        });
+    };
+    try {
+        using winrt::Windows::Foundation::AsyncStatus;
+        xaml::Media::Imaging::RenderTargetBitmap target;
+        auto rendering = target.RenderAsync(cover, kColorSample, kColorSample);
+        rendering.Completed([target, finish](auto const&, AsyncStatus status) {
+            if (status != AsyncStatus::Completed) return finish(std::nullopt);
+            target.GetPixelsAsync().Completed([target, finish](auto const& operation, AsyncStatus read) {
+                try {
+                    if (read != AsyncStatus::Completed) return finish(std::nullopt);
+                    auto pixels = operation.GetResults();
+                    std::optional<ExtractedColors> colors =
+                        ExtractColorsFromBgra(pixels.data(), pixels.Length(), static_cast<size_t>(target.PixelWidth()),
+                                              static_cast<size_t>(target.PixelHeight()));
+                    finish(colors ? std::optional<AlbumColors>(AlbumPanelColors(*colors)) : std::nullopt);
+                } catch (...) {
+                    finish(std::nullopt);
+                }
+            });
+        });
+    } catch (...) {
+        finish(std::nullopt);
+    }
+}
+
 void Expand(const controls::GridViewItem& item, int index) {
     State& state = TheState();
     rt::Ref model = ModelOf(item);
@@ -481,7 +534,8 @@ void Expand(const controls::GridViewItem& item, int index) {
     if (rt::Query(model, rt::GuidOf(amp::kIidTitledComponent), titled)) {
         open.model.title = Wide(rt::ReadString(titled, amp::slot::kTitledTitle));
     }
-    if (auto image = FindNamed<controls::Image>(item, kArtworkName, kItemSearchLimit)) open.model.artwork = image.Source();
+    controls::Image cover = FindNamed<controls::Image>(item, kArtworkName, kItemSearchLimit);
+    if (cover) open.model.artwork = cover.Source();
     if (auto subtitle = FindNamed<controls::TextBlock>(item, kSubtitleName, kItemSearchLimit)) {
         open.tileArtist = subtitle.Text().c_str();
     }
@@ -490,9 +544,8 @@ void Expand(const controls::GridViewItem& item, int index) {
     open.waiting = waiting;
     if (tracks) open.tracks = TracksOfAlbum(*tracks, id->persistent);
     state.open = std::move(open);
-    BuildPanel(state, true);
-    Reflow();
-    Reveal(state);
+    if (g_colors.load() && cover && cover.Source()) return ShowInColors(state, cover);
+    Show(state);
 }
 
 // Apple's own click on a tile: its page. The grid's ItemClick is given back for the time of the automation peer's
@@ -740,7 +793,10 @@ bool Attach(const controls::GridView& grid) {
 
 }  // namespace
 
-void SetAlbumExpand(bool expand) noexcept { g_wanted.store(expand); }
+void SetAlbumExpand(bool expand, bool colors) noexcept {
+    g_colors.store(colors);
+    g_wanted.store(expand);
+}
 
 void KeepAlbumExpand(Journal& journal) noexcept {
     try {

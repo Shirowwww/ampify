@@ -41,7 +41,7 @@ constexpr AppleTweak kTweaks[] = {
     {[](const uirender::AppleTweaks& t, Journal&) { SetSharpArtwork(t.sharpArtwork); }, nullptr},
     {[](const uirender::AppleTweaks& t, Journal&) { SetLyricsWindow(t.lyricsBefore, t.lyricsAfter); }, nullptr},
     {[](const uirender::AppleTweaks& t, Journal&) { SetLyricsFill(t.lyricsFill); }, KeepLyricsFill},
-    {[](const uirender::AppleTweaks& t, Journal&) { SetAlbumExpand(t.albumExpand); }, KeepAlbumExpand},
+    {[](const uirender::AppleTweaks& t, Journal&) { SetAlbumExpand(t.albumExpand, t.albumColors); }, KeepAlbumExpand},
     {[](const uirender::AppleTweaks& t, Journal&) { SetPlaybarOrder(t.playbarOrder); },
      [](Journal&) noexcept { KeepPlaybarOrder(); }},
     {[](const uirender::AppleTweaks& t, Journal&) { SetSidebarAddedOrder(t.sidebarEntriesOrder); },

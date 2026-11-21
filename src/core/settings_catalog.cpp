@@ -108,7 +108,9 @@ const std::vector<KitSetting>& Fixed() {
         Choice(kLyricsFillKey, "tweaks.lyricsFill", "tweaks.lyricsFillHelp",
                     {{"smooth", "tweaks.lyricsFill.smooth"}, {"apple", "tweaks.lyricsFill.apple"}}),
         Choice(kAlbumClickKey, "tweaks.albumClick", "tweaks.albumClickHelp",
-                    {{"page", "tweaks.albumClick.page"}, {"expand", "tweaks.albumClick.expand"}}),
+                    {{"page", "tweaks.albumClick.page"},
+                     {"expand", "tweaks.albumClick.expand"},
+                     {"colors", "tweaks.albumClick.colors"}}),
         Choice(kEntryKey, "entry.title", "entry.help", {{"sidebar", "entry.sidebar"}, {"header", "entry.header"}}),
         Text("language", "the Windows language"),
     };

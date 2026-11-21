@@ -262,21 +262,69 @@ std::optional<ExtractedColors> ExtractColors(const uint8_t* rgba, size_t size, s
     return out;
 }
 
+std::optional<ExtractedColors> ExtractColorsFromBgra(const uint8_t* bgra, size_t size, size_t width, size_t height,
+                                                     size_t maxColors) {
+    if (!bgra || size != width * height * 4) return std::nullopt;
+    std::vector<uint8_t> rgba(size);
+    for (size_t i = 0; i < size; i += 4) {
+        const uint8_t alpha = bgra[i + 3];
+        auto straight = [alpha](uint8_t channel) {
+            return alpha ? static_cast<uint8_t>(std::min(255, channel * 255 / alpha)) : uint8_t{0};
+        };
+        rgba[i] = straight(bgra[i + 2]);
+        rgba[i + 1] = straight(bgra[i + 1]);
+        rgba[i + 2] = straight(bgra[i]);
+        rgba[i + 3] = alpha;
+    }
+    return ExtractColors(rgba.data(), rgba.size(), width, height, maxColors);
+}
+
+namespace {
+
 // Relative luminance under which white text has a contrast of 7:1: (1 + 0.05) / (L + 0.05) >= 7.
 constexpr double kDarkestForWhiteText = 0.1;
+// The contrast an artwork's own colour needs to be an album panel's text: its dimmed lines still read.
+constexpr double kPanelTextContrast = 7.0;
+
+// Relative luminance (WCAG): above the middle grey, black text reads better than white.
+double LuminanceOf(const Rgb& c) {
+    auto linear = [](uint8_t channel) {
+        double v = channel / 255.0;
+        return v <= 0.03928 ? v / 12.92 : std::pow((v + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b);
+}
+
+// WCAG contrast ratio, from 1 (the same) to 21 (black on white).
+double ContrastOf(const Rgb& a, const Rgb& b) {
+    const double x = LuminanceOf(a), y = LuminanceOf(b);
+    return (std::max(x, y) + 0.05) / (std::min(x, y) + 0.05);
+}
+
+}  // namespace
+
+AlbumColors AlbumPanelColors(const ExtractedColors& colors) {
+    const Rgb black{0, 0, 0}, white{255, 255, 255};
+    AlbumColors out{colors.prominent, black};
+    if (ContrastOf(white, out.background) > ContrastOf(black, out.background)) out.text = white;
+    std::vector<Rgb> candidates;
+    for (const Swatch& swatch : colors.palette) candidates.push_back(swatch.color);
+    for (const Rgb& named : {colors.lightVibrant, colors.vibrant, colors.darkVibrant}) candidates.push_back(named);
+    for (const Rgb& candidate : candidates) {
+        if (ContrastOf(candidate, out.background) >= kPanelTextContrast) {
+            out.text = candidate;
+            break;
+        }
+    }
+    return out;
+}
 
 std::map<std::string, std::string> ArtworkVariables(const ExtractedColors& colors) {
-    // Relative luminance (WCAG): above the middle grey, black text reads better than white.
-    auto linear = [](uint8_t channel) {
-        double c = channel / 255.0;
-        return c <= 0.03928 ? c / 12.92 : std::pow((c + 0.055) / 1.055, 2.4);
-    };
-    auto luminanceOf = [&](const Rgb& c) { return 0.2126 * linear(c.r) + 0.7152 * linear(c.g) + 0.0722 * linear(c.b); };
     const Rgb& base = colors.prominent;
-    double luminance = luminanceOf(base);
+    double luminance = LuminanceOf(base);
     // art-3 sits under white text: darkened until white reads on it at 7:1 or more, whatever the artwork.
     Rgb dark = colors.darkVibrant;
-    while (luminanceOf(dark) > kDarkestForWhiteText) {
+    while (LuminanceOf(dark) > kDarkestForWhiteText) {
         dark = {static_cast<uint8_t>(dark.r * 9 / 10), static_cast<uint8_t>(dark.g * 9 / 10), static_cast<uint8_t>(dark.b * 9 / 10)};
     }
     std::map<std::string, std::string> variables = {{"art-1", base.Hex()},

@@ -12,8 +12,9 @@
 
 namespace ampify::win {
 
-// On (expand) or off (Apple's page), applied at the next tick of the main window's tweaks. Any thread.
-void SetAlbumExpand(bool expand) noexcept;
+// On (expand) or off (Apple's page), applied at the next tick of the main window's tweaks; `colors` paints the panel
+// in its album's colours (apple.albumClick = colors), from the next album opened. Any thread.
+void SetAlbumExpand(bool expand, bool colors) noexcept;
 
 // Finds the library's album grid in the main window and takes or gives back its click. Called at each tick of the
 // main window's tweaks; cheap while nothing changes.

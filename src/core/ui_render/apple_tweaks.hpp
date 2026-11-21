@@ -61,6 +61,8 @@ struct AppleTweaks {
     bool lyricsFill = true;
     // A click on an album of the library opens its track list in the grid (win/album_expand.cpp). Off by default.
     bool albumExpand = false;
+    // That track list in the album's own colours, as iTunes 11 showed it (apple.albumClick = colors).
+    bool albumColors = false;
     // The buttons at the right of the playback bar, in the order chosen on the settings page (win/user_order.cpp).
     std::vector<std::string> playbarOrder;
     // The entries Ampify adds under the sidebar's own, in the order chosen there too.
