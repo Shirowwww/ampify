@@ -1,5 +1,56 @@
 # Changelog
 
+## 1.5.8 (2026-11-22)
+
+AutoMix no longer plays the end of a song too loud, calls off fewer mixes and can mix a song up to its last half
+second. An album can open in its own colours, the album panel is easier to use, the romaji of Japanese lyrics fill
+word by word, and Sing says when the graphics card is too slow for Studio.
+
+### Extensions
+
+- AutoMix no longer plays the end of a song too loud (#10). Two causes are fixed:
+  - When its search for Apple's sound took long, the second player's copy of the song could go on air before it was
+    compared with what Apple played, so a copy found at the wrong spot could start the mix at the wrong level. The
+    mix now starts only on a copy measured to match, and is skipped otherwise: Apple plays on as usual.
+  - Just before a mix, the second player could move to another version of the song, at a higher sample rate, and
+    open a new sound stream that Ampify took for Apple's. That song then played as decoded, at full volume, until the
+    mix ended: 19 dB over the music with Apple Music's volume at 20 %. A new stream now counts as Apple's only when the
+    switch to the next song is due, and one the mix cannot use is kept silent and ends the mix.
+- AutoMix calls off fewer mixes:
+  - Its two players resample a song from slightly different points, so its copy of the song can lie up to half a
+    sample from Apple's. On bright songs that looked like a wrong copy, and the mix was called off. AutoMix now also
+    looks for Apple's sound between samples, and compares the two below 2.5 kHz.
+  - Apple's player sometimes stops answering for up to half a second, often right at the switch to the next song. A
+    switch delayed that way was taken for a failed one; AutoMix now waits until the song is half a second past its
+    end. The mix also gets its volumes ahead of time, so it stays in step through such a pause.
+  - Apple Music sometimes moves its queue on by itself right at the switch. AutoMix took that for a skip, stopped the
+    mix and started the next song from its beginning. It now counts as the switch.
+  - A mix into a song that is not in Apple Music's catalog, such as a local file, cut the current song seconds before
+    its end, because Apple plays those songs with another player. AutoMix no longer plans one.
+- A mix had to end at least three seconds before the end of the current song, so the last seconds of a song that
+  stops dead were never part of one. It can now run to less than half a second from the end.
+- On the beat, the next song lands on its point more often. One late switch, or a next song that starts with a moment
+  of silence, no longer shifts the timing of the mixes after it. When the switch still comes a few milliseconds late
+  in a mix where the current song is sped up or slowed down, that song is moved back into step over a second, at the
+  same pitch.
+- Sing: on a graphics card that takes longer than the model allows for each window, the singer's voice came back for
+  a moment every second, in karaoke and in vocals-only mode alike (#9). Sing now times the model and, when it keeps
+  falling behind, plays Light instead and says so: "Studio is too slow on this PC, Light plays instead". Studio is
+  tried again when it is picked again or when the other model is chosen.
+- `Ampify.audio.sing` gives the new reason `too-slow` (see the extension API).
+
+### Other
+
+- An album can open in its own colours (#7). "Click on an album" has a third choice, "Shows its tracks, in the album's
+  colours": the panel takes the cover's most common colour as its background and, for its text, one of the cover's
+  colours that reads on it, or black or white, as iTunes 11 did.
+- The album panel of Library > Albums scrolls with the mouse wheel, shows a speaker on the song that plays, names a
+  compilation after its album artist, and opens in one click on a tile that is partly out of view (#7). A right-click
+  on one of its tracks offers Play, Play Next, Play Later and Open album.
+- With Show Pronunciation, the romaji under Japanese lyrics fill smoothly with the words they spell, instead of the
+  whole line falling back to Apple's stepped fill (#5).
+- The accent colour now reaches the focus line of the search box and other text boxes (#11).
+
 ## 1.5.7 (2026-11-19)
 
 Word-by-word lyrics keep to the song again: the fill no longer steps back, and it takes over at once when the lyrics
