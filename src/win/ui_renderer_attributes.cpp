@@ -306,7 +306,13 @@ void XamlRenderer::Setters::Slider(Mounted& mounted, const RenderNode& node, con
 void XamlRenderer::Setters::TextField(Mounted& mounted, const RenderNode& node, const Context&) {
     auto box = mounted.control.as<controls::TextBox>();
     winrt::hstring value = Wide(node.Text("value"));
-    if (node.Has("value") && box.Text() != value) {
+    // A value the user typed comes back from the extension a moment later, often after more keys: the box already
+    // showed it, so it is never set again. Only a value the extension made itself (cleared, rewritten) is applied.
+    auto& unrendered = mounted.callbacks->unrendered;
+    auto typed = std::find(unrendered.begin(), unrendered.end(), Json(Utf8(value)).Dump());
+    bool fromUser = typed != unrendered.end();
+    if (fromUser) unrendered.erase(unrendered.begin(), std::next(typed));
+    if (node.Has("value") && !fromUser && box.Text() != value) {
         mounted.callbacks->echo = Json(Utf8(value)).Dump();
         box.Text(value);
     }

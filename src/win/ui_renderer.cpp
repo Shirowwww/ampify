@@ -194,14 +194,26 @@ void XamlRenderer::Apply(Mounted& mounted, const Patch& patch, const StyleProbe&
     PlaceChildren(mounted, node);  // a child's align, valign or grow may change without any move
 }
 
+// Only what changed leaves or enters the panel. Clearing it took every child out of the tree, and a text box that had
+// the focus lost it: typing in a search whose list emptied stopped after a letter.
 void XamlRenderer::Rewrite(Mounted& mounted) {
     controls::Panel host = mounted.host;
     if (!host) return;
-    auto children = host.Children();
-    children.Clear();
+    std::vector<xaml::UIElement> wanted;
     for (const Mounted& child : mounted.children) {
-        if (xaml::FrameworkElement element = child.outer) children.Append(element);
+        if (child.outer) wanted.push_back(child.outer);
     }
+    auto children = host.Children();
+    for (uint32_t i = children.Size(); i-- > 0;) {
+        if (std::find(wanted.begin(), wanted.end(), children.GetAt(i)) == wanted.end()) children.RemoveAt(i);
+    }
+    for (uint32_t i = 0; i < wanted.size(); ++i) {
+        if (i < children.Size() && children.GetAt(i) == wanted[i]) continue;
+        uint32_t at = 0;
+        if (children.IndexOf(wanted[i], at)) children.RemoveAt(at);
+        children.InsertAt(i, wanted[i]);
+    }
+    while (children.Size() > wanted.size()) children.RemoveAt(children.Size() - 1);
 }
 
 }  // namespace ampify::win

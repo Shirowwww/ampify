@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cmath>
 #include <cwchar>
+#include <deque>
 #include <limits>
 #include <utility>
 #include <winrt/Microsoft.UI.Dispatching.h>
@@ -311,6 +312,7 @@ using namespace playing_views;
 
 // What an event handler needs, shared with the handlers so they never hold the renderer itself.
 struct XamlRenderer::Callbacks {
+    static constexpr std::size_t kMaxUnrendered = 64;
     std::string elementId;
     int onClick = 0;
     int onChange = 0;
@@ -319,6 +321,9 @@ struct XamlRenderer::Callbacks {
     // The value the renderer last set itself, as JSON. WinUI may report such a change after the renderer has returned
     // (Toggled and TextChanged can arrive late): that echo is dropped once, so the extension only hears the user.
     mutable std::string echo;
+    // Values the user gave that the extension has not rendered back yet, oldest first. A render carrying one of them
+    // is behind the control: a text box set to it would lose the keys typed since and put the caret at the start.
+    mutable std::deque<std::string> unrendered;
 
     void Fire(bool click, const std::string& valueJson) const noexcept {
         try {
@@ -334,6 +339,10 @@ struct XamlRenderer::Callbacks {
             if (!click) echo.clear();
             int id = click ? onClick : onChange;
             if (id <= 0 || !sink) return;
+            if (!click) {
+                unrendered.push_back(valueJson);
+                if (unrendered.size() > kMaxUnrendered) unrendered.pop_front();
+            }
             sink(UiEvent{elementId, id, click, valueJson});
         } catch (...) {
             // A handler runs inside Apple Music's XAML frame: nothing may escape it.
