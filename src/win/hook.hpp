@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <string>
+#include <vector>
 
 namespace ampify::win {
 
@@ -28,6 +29,22 @@ size_t HookImportEverywhere(const char* dll, const char* function, void* replace
 // HookImportEverywhere, and the same for every module loaded afterwards (a loader notification). Returns how many
 // entries were replaced now. Never undone: meant for hooks that stay for the life of the process.
 size_t HookImportFromNowOn(const char* dll, const char* function, void* replacement, void** original);
+
+// The modules of `listed` still loaded, each held by one more reference while this object lives, so that none is
+// freed while its import table is read: Windows' audio stack frees codecs while the kernel starts. A module freed
+// after it was listed is left out. Taking and dropping references asks the loader: never under the hook lock.
+class HeldModules {
+public:
+    explicit HeldModules(const std::vector<HMODULE>& listed);
+    ~HeldModules();
+    HeldModules(const HeldModules&) = delete;
+    HeldModules& operator=(const HeldModules&) = delete;
+
+    const std::vector<HMODULE>& modules() const { return m_modules; }
+
+private:
+    std::vector<HMODULE> m_modules;
+};
 
 // Full path of the module that holds `address`. Empty when there is none. Not under the hook lock: it asks the loader.
 std::string ModuleOf(const void* address);

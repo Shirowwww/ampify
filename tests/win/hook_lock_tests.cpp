@@ -66,3 +66,39 @@ TEST_CASE(Hook_VtableHookNeverDeadlocksWithALoadingDll) {
     CHECK(placed == kRounds);
     CHECK(original == reinterpret_cast<void*>(&Answer));
 }
+
+// Windows' audio stack frees codecs while the kernel starts: one freed after the modules were listed is left out
+// instead of read (reading it crashed AMPLibraryAgent), and the modules held meanwhile are let go afterwards.
+TEST_CASE(Hook_HeldModulesLeaveOutAModuleFreedAfterTheListing) {
+    const wchar_t* dll = UnloadedSystemDll();
+    CHECK(dll != nullptr);
+    if (!dll) return;
+    HMODULE freed = LoadLibraryExW(dll, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    CHECK(freed != nullptr);
+    if (!freed) return;
+    FreeLibrary(freed);
+    CHECK(GetModuleHandleW(dll) == nullptr);
+    HMODULE kernel = GetModuleHandleW(L"kernel32.dll");
+
+    const ampify::win::HeldModules held({freed, kernel});
+
+    CHECK(held.modules() == std::vector<HMODULE>{kernel});
+}
+
+TEST_CASE(Hook_HeldModulesLetTheirModulesGo) {
+    const wchar_t* dll = UnloadedSystemDll();
+    CHECK(dll != nullptr);
+    if (!dll) return;
+    HMODULE module = LoadLibraryExW(dll, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    CHECK(module != nullptr);
+    if (!module) return;
+
+    {
+        const ampify::win::HeldModules held({module});
+        CHECK(held.modules().size() == 1);
+        FreeLibrary(module);
+        CHECK(GetModuleHandleW(dll) == module);  // still held
+    }
+
+    CHECK(GetModuleHandleW(dll) == nullptr);
+}

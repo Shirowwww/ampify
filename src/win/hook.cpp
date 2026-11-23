@@ -222,6 +222,25 @@ bool HookVtableEntry(void** entry, void* replacement, void** original, std::stri
     return true;
 }
 
+HeldModules::HeldModules(const std::vector<HMODULE>& listed) {
+    m_modules.reserve(listed.size());  // no allocation below, so every reference taken reaches the destructor
+    for (HMODULE module : listed) {
+        HMODULE held = nullptr;
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCWSTR>(module), &held)) {
+            continue;  // freed since it was listed
+        }
+        if (held == module) {
+            m_modules.push_back(held);
+        } else {
+            FreeLibrary(held);  // freed, and the address now lies inside another module, which was not listed
+        }
+    }
+}
+
+HeldModules::~HeldModules() {
+    for (HMODULE module : m_modules) FreeLibrary(module);
+}
+
 namespace {
 
 // Every module loaded now. Modules can load between two calls, so it asks again until the list fits.
@@ -243,8 +262,9 @@ std::vector<HMODULE> LoadedModules() {
 }
 
 size_t PatchEveryModule(const char* dll, const char* function, void* replacement, void** original, void* exported) {
+    const HeldModules held(LoadedModules());  // declared first, so the modules are let go once g_lock is released
     std::vector<HMODULE> allowed;
-    for (HMODULE module : LoadedModules()) {
+    for (HMODULE module : held.modules()) {
         if (!ProtectedPath(module)) allowed.push_back(module);
     }
 
