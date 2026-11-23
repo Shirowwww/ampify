@@ -109,6 +109,7 @@ struct FoundRow {
     comp::CompositionLinearGradientBrush source{nullptr};
     std::vector<WordSpan> spans;
     bool spoken = false;  // a pronunciation row (romaji), under the sung row it spells
+    float top = 0;        // where the row starts in the host, the offset of its layer included
 };
 
 comp::ContainerVisual PastWrappers(comp::ContainerVisual layer) {
@@ -149,12 +150,8 @@ std::vector<WordSpan> SpansOf(const comp::CompositionVisualSurface& surface, flo
     return spans;
 }
 
-// The rows of a host Apple is singing now, top to bottom; none while it draws the line plainly.
-std::vector<FoundRow> RowsOf(const controls::Border& host) {
-    std::vector<FoundRow> rows;
-    auto root = xaml::Hosting::ElementCompositionPreview::GetElementChildVisual(host).try_as<comp::ContainerVisual>();
-    comp::ContainerVisual layer = PastWrappers(root);
-    if (!layer) return rows;
+// The masked rows among a layer's children, each with its top in the host (`shift`: the layer's own offset).
+void AddRowsOf(const comp::ContainerVisual& layer, float shift, std::vector<FoundRow>& rows) {
     for (const comp::Visual& child : layer.Children()) {
         auto sprite = child.try_as<comp::SpriteVisual>();
         auto mask = sprite ? sprite.Brush().try_as<comp::CompositionMaskBrush>() : nullptr;
@@ -162,10 +159,25 @@ std::vector<FoundRow> RowsOf(const controls::Border& host) {
         auto surface = words ? words.Surface().try_as<comp::CompositionVisualSurface>() : nullptr;
         auto source = mask ? mask.Source().try_as<comp::CompositionLinearGradientBrush>() : nullptr;
         if (!surface || !source) continue;
-        rows.push_back({sprite, mask, source, SpansOf(surface, sprite.Size().x)});
+        rows.push_back({sprite, mask, source, SpansOf(surface, sprite.Size().x), false, shift + sprite.Offset().y});
     }
-    std::stable_sort(rows.begin(), rows.end(),
-                     [](const FoundRow& a, const FoundRow& b) { return a.sprite.Offset().y < b.sprite.Offset().y; });
+}
+
+// The rows of a host Apple is singing now, top to bottom; none while it draws the line plainly. With Show
+// Pronunciation, Apple puts the romaji either among the sung rows or, in a narrow pane, in a layer of their own
+// beside the sung rows' layer (issue #5): the rows of each layer are read then.
+std::vector<FoundRow> RowsOf(const controls::Border& host) {
+    std::vector<FoundRow> rows;
+    auto root = xaml::Hosting::ElementCompositionPreview::GetElementChildVisual(host).try_as<comp::ContainerVisual>();
+    comp::ContainerVisual layer = PastWrappers(root);
+    if (!layer) return rows;
+    AddRowsOf(layer, 0, rows);
+    if (rows.empty()) {
+        for (const comp::Visual& child : layer.Children()) {
+            if (auto inner = child.try_as<comp::ContainerVisual>()) AddRowsOf(inner, inner.Offset().y, rows);
+        }
+    }
+    std::stable_sort(rows.begin(), rows.end(), [](const FoundRow& a, const FoundRow& b) { return a.top < b.top; });
     std::vector<double> heights;
     for (const FoundRow& row : rows) heights.push_back(row.sprite.Size().y);
     const std::vector<bool> spoken = PronunciationRows(heights);
@@ -309,6 +321,14 @@ void NoteLeftToApple(const NowPlaying& now, const std::string& why) {
     Note(why);
 }
 
+// That the romaji rows follow the sung words, once per song on each interface thread: a report then shows it.
+void NotePronunciationFilled(const NowPlaying& now, const std::vector<FoundRow>& found) {
+    thread_local std::string notedTrack;
+    if (notedTrack == now.trackKey) return;
+    notedTrack = now.trackKey;
+    Note("pronunciation rows filled with the sung words (rows " + RowShapes(found) + ")");
+}
+
 // The line of the song a main host's rows show: Apple masks the main rows of the line being sung only.
 std::optional<size_t> MainLine(const controls::Border& border, const std::vector<FoundRow>& found, size_t count,
                                const NowPlaying& now, int64_t tick) {
@@ -360,6 +380,7 @@ bool Bind(Host& host, std::vector<FoundRow>& found, const NowPlaying& now, int64
     const size_t spoken = WordCount(found, true).value_or(0);
     if (spoken == words.size()) {
         BindRows(host, found, true, words, line, now, tick);
+        NotePronunciationFilled(now, found);
     } else if (spoken > 0) {
         NoteLeftToApple(now, "pronunciation rows of " + std::to_string(spoken) + " words (" + RowShapes(found) +
                                  ") for a line of " + std::to_string(words.size()) + ": Apple fills them");
