@@ -5,53 +5,63 @@ const { h, useState, useEffect } = Ampify.React;
 
 Ampify.i18n.define({
   en: { sound: "The sound", tempo: "Tempo", key: "Key", mood: "Mood", major: "major", minor: "minor", happy: "Happy", calm: "Calm", sad: "Melancholic", tense: "Intense",
+        energy: "Energy", dance: "Danceability", acoustic: "Acoustic", vocals: "Vocals", loudness: "Loudness",
         label: "Song panel", lyrics: "Lyrics", noLyrics: "No lyrics for this song yet", artist: "About the artist",
         credits: "Credits", next: "Next in queue", nothing: "Nothing is playing", performer: "Performed by",
         composer: "Written by", albumArtist: "Album artist", inLibrary: "{count} songs in your library",
         plays: "{count} plays", top: "Most played: {title}", empty: "Nothing after this song" },
   fr: { sound: "Le son", tempo: "Tempo", key: "Tonalité", mood: "Humeur", major: "majeur", minor: "mineur", happy: "Joyeux", calm: "Paisible", sad: "Mélancolique", tense: "Intense",
+        energy: "Énergie", dance: "Dansant", acoustic: "Acoustique", vocals: "Chant", loudness: "Niveau sonore",
         label: "Panneau du morceau", lyrics: "Paroles", noLyrics: "Pas encore de paroles pour ce morceau",
         artist: "À propos de l'artiste", credits: "Crédits", next: "À suivre", nothing: "Rien en lecture",
         performer: "Interprété par", composer: "Écrit par", albumArtist: "Artiste de l'album",
         inLibrary: "{count} morceaux dans votre bibliothèque", plays: "{count} écoutes", top: "Le plus écouté : {title}",
         empty: "Rien après ce morceau" },
   de: { sound: "Der Klang", tempo: "Tempo", key: "Tonart", mood: "Stimmung", major: "Dur", minor: "Moll", happy: "Fröhlich", calm: "Ruhig", sad: "Melancholisch", tense: "Intensiv",
+        energy: "Energie", dance: "Tanzbarkeit", acoustic: "Akustisch", vocals: "Gesang", loudness: "Lautheit",
         label: "Titelleiste", lyrics: "Songtext", noLyrics: "Noch kein Songtext für diesen Titel",
         artist: "Über den Künstler", credits: "Mitwirkende", next: "Als Nächstes", nothing: "Nichts wird abgespielt",
         performer: "Gespielt von", composer: "Geschrieben von", albumArtist: "Album-Künstler",
         inLibrary: "{count} Titel in deiner Mediathek", plays: "{count}-mal gehört", top: "Am meisten gehört: {title}", empty: "Nichts nach diesem Titel" },
   es: { sound: "El sonido", tempo: "Tempo", key: "Tonalidad", mood: "Ánimo", major: "mayor", minor: "menor", happy: "Alegre", calm: "Tranquilo", sad: "Melancólico", tense: "Intenso",
+        energy: "Energía", dance: "Bailable", acoustic: "Acústico", vocals: "Voz", loudness: "Sonoridad",
         label: "Panel de la canción", lyrics: "Letra", noLyrics: "Aún no hay letra para esta canción",
         artist: "Sobre el artista", credits: "Créditos", next: "A continuación", nothing: "No se reproduce nada",
         performer: "Interpretada por", composer: "Escrita por", albumArtist: "Artista del álbum",
         inLibrary: "{count} canciones en tu biblioteca", plays: "{count} reproducciones", top: "La más escuchada: {title}",
         empty: "Nada después de esta canción" },
   pt: { sound: "O som", tempo: "Andamento", key: "Tom", mood: "Clima", major: "maior", minor: "menor", happy: "Alegre", calm: "Calmo", sad: "Melancólico", tense: "Intenso",
+        energy: "Energia", dance: "Dançante", acoustic: "Acústico", vocals: "Voz", loudness: "Intensidade",
         label: "Painel da música", lyrics: "Letra", noLyrics: "Ainda não há letra para esta música",
         artist: "Sobre o artista", credits: "Créditos", next: "A seguir", nothing: "Nada está tocando",
         performer: "Interpretada por", composer: "Escrita por", albumArtist: "Artista do álbum",
         inLibrary: "{count} músicas na sua biblioteca", plays: "{count} reproduções", top: "A mais ouvida: {title}", empty: "Nada depois desta música" },
   ru: { sound: "Звучание", tempo: "Темп", key: "Тональность", mood: "Настроение", major: "мажор", minor: "минор", happy: "Радостное", calm: "Спокойное", sad: "Грустное", tense: "Напряжённое",
+        energy: "Энергия", dance: "Танцевальность", acoustic: "Акустичность", vocals: "Вокал", loudness: "Громкость",
         label: "Панель песни", lyrics: "Текст", noLyrics: "Для этой песни пока нет текста", artist: "Об исполнителе",
         credits: "Авторы", next: "Далее", nothing: "Ничего не играет", performer: "Исполняет", composer: "Автор",
         albumArtist: "Исполнитель альбома", inLibrary: "Песен в медиатеке: {count}", plays: "Прослушиваний: {count}", top: "Чаще всего: {title}",
         empty: "После этой песни ничего нет" },
   ja: { sound: "サウンド", tempo: "テンポ", key: "キー", mood: "ムード", major: "メジャー", minor: "マイナー", happy: "明るい", calm: "穏やか", sad: "切ない", tense: "激しい",
+        energy: "エネルギー", dance: "ダンス度", acoustic: "アコースティック", vocals: "ボーカル", loudness: "ラウドネス",
         label: "曲パネル", lyrics: "歌詞", noLyrics: "この曲の歌詞はまだありません", artist: "アーティストについて",
         credits: "クレジット", next: "次に再生", nothing: "再生していません", performer: "演奏", composer: "作詞・作曲",
         albumArtist: "アルバムアーティスト", inLibrary: "ライブラリに {count} 曲", plays: "{count} 回再生", top: "最も再生：{title}",
         empty: "この曲の後には何もありません" },
   zh: { sound: "声音", tempo: "速度", key: "调性", mood: "情绪", major: "大调", minor: "小调", happy: "欢快", calm: "平静", sad: "忧伤", tense: "激昂",
+        energy: "能量", dance: "舞曲感", acoustic: "原声度", vocals: "人声", loudness: "响度",
         label: "歌曲面板", lyrics: "歌词", noLyrics: "这首歌暂时没有歌词", artist: "关于艺人", credits: "制作人员",
         next: "接下来播放", nothing: "没有在播放", performer: "演唱", composer: "词曲", albumArtist: "专辑艺人",
         inLibrary: "资料库中有 {count} 首歌", plays: "播放 {count} 次", top: "最常播放：{title}", empty: "这首歌之后没有内容" },
   it: { sound: "Il suono", tempo: "Tempo", key: "Tonalità", mood: "Umore", major: "maggiore", minor: "minore", happy: "Allegro", calm: "Calmo", sad: "Malinconico", tense: "Intenso",
+        energy: "Energia", dance: "Ballabilità", acoustic: "Acustico", vocals: "Voce", loudness: "Intensità",
         label: "Pannello del brano", lyrics: "Testi", noLyrics: "Ancora nessun testo per questo brano",
         artist: "Info sull'artista", credits: "Crediti", next: "Prossimi in coda", nothing: "Non è in riproduzione nulla",
         performer: "Eseguito da", composer: "Scritto da", albumArtist: "Artista dell'album",
         inLibrary: "{count} brani nella tua libreria", plays: "{count} riproduzioni", top: "Il più ascoltato: {title}",
         empty: "Nulla dopo questo brano" },
   ko: { sound: "사운드", tempo: "템포", key: "조성", mood: "분위기", major: "장조", minor: "단조", happy: "밝음", calm: "차분함", sad: "슬픔", tense: "격렬함",
+        energy: "에너지", dance: "댄스 지수", acoustic: "어쿠스틱", vocals: "보컬", loudness: "음량",
         label: "곡 패널", lyrics: "가사", noLyrics: "이 곡의 가사가 아직 없습니다",
         artist: "아티스트 정보", credits: "크레딧", next: "다음 곡", nothing: "재생 중인 곡이 없습니다",
         performer: "연주", composer: "작곡", albumArtist: "앨범 아티스트",
@@ -264,17 +274,57 @@ function keyName(key) {
   return language === "ja" || language === "zh" ? note + mode : note + " " + mode;
 }
 
-function SoundCard({ analysis }) {
+// Apple gives no tempo for some songs (rap, often), but always its beat grid: the tempo is read from it then.
+function tempoOf(analysis) {
   const bpm = analysis.bpm && Math.round(analysis.bpm.main);
-  const key = keyName(analysis.key && analysis.key.main);
-  const mood = analysis.mood;
-  const facts = [];
-  if (bpm > 0) facts.push(h(Fact, { key: "t", label: t("tempo"), value: bpm + " BPM" }));
-  if (key) facts.push(h(Fact, { key: "k", label: t("key"), value: key }));
-  if (mood) facts.push(h(Fact, { key: "m", label: t("mood"), value: t(mood) }));
+  if (bpm > 0) return bpm;
+  const beats = analysis.beats && analysis.beats.beatsInMilliseconds;
+  if (!Array.isArray(beats) || beats.length < 8) return null;
+  const gaps = beats.slice(1).map((at, i) => at - beats[i]).filter((gap) => gap > 0).sort((a, b) => a - b);
+  const median = gaps[Math.floor(gaps.length / 2)];
+  return median > 0 ? Math.round(60000 / median) : null;
+}
+
+// "54%", or "54 %" in French.
+const percentText = (value) => (Ampify.i18n.language === "fr" ? value + " %" : value + "%");
+const percent = (part) => (part && part.main >= 0 && part.main <= 1 ? percentText(Math.round(part.main * 100)) : null);
+
+// The share of the song where Apple hears a voice (its faintest stretches left out).
+function vocalsOf(analysis, durationMs) {
+  const parts = analysis.vocalActivity;
+  if (!Array.isArray(parts) || !(durationMs > 0)) return null;
+  const sung = parts.filter((part) => part.strength !== "very-low")
+    .reduce((sum, part) => sum + Math.max(0, part.endInMilliseconds - part.startInMilliseconds), 0);
+  return percentText(Math.round(Math.min(1, sung / durationMs) * 100));
+}
+
+function loudnessOf(analysis) {
+  const value = analysis.loudness && analysis.loudness.main && analysis.loudness.main.value;
+  return Number.isFinite(value) ? Math.round(value) + " LUFS" : null;
+}
+
+// Each fact the card can show, its setting first: what the song lacks is left out.
+const SOUND_FACTS = [
+  ["sound-tempo", "tempo", (analysis) => { const bpm = tempoOf(analysis); return bpm ? bpm + " BPM" : null; }],
+  ["sound-key", "key", (analysis) => keyName(analysis.key && analysis.key.main)],
+  ["sound-mood", "mood", (analysis) => (analysis.mood ? t(analysis.mood) : null)],
+  ["sound-energy", "energy", (analysis) => percent(analysis.energy)],
+  ["sound-dance", "dance", (analysis) => percent(analysis.danceability)],
+  ["sound-acoustic", "acoustic", (analysis) => percent(analysis.acousticness)],
+  ["sound-vocals", "vocals", vocalsOf],
+  ["sound-loudness", "loudness", loudnessOf],
+];
+// Two equal columns, aligned from one row to the next: three were too narrow for a long mood ("Mélancolique" broke
+// in the middle of the word), and facts at their own widths no longer lined up once a second row came.
+const FACT_COLUMNS = 2;
+
+function SoundCard({ analysis, durationMs }) {
+  const facts = SOUND_FACTS.filter(([setting]) => shows(setting))
+    .map(([setting, label, read]) => ({ setting, label, value: read(analysis, durationMs) }))
+    .filter((fact) => fact.value)
+    .map((fact) => h(Fact, { key: fact.setting, label: t(fact.label), value: fact.value }));
   if (facts.length === 0) return null;
-  // Side by side at their own widths: in equal columns a long mood ("Mélancolique") broke in the middle of the word.
-  return h(Card, { title: t("sound") }, h("row", { gap: 24 }, facts));
+  return h(Card, { title: t("sound") }, h("grid", { columns: FACT_COLUMNS, gap: 12 }, facts));
 }
 
 function QueueCard({ items }) {
@@ -312,7 +362,7 @@ function SongPanel() {
     h("image", { src: "artwork", fit: "cover", cornerRadius: 8, width: SIDE - 24, height: SIDE - 24,
                  label: track.album || track.title }),
     h(Header, { track, song }),
-    shows("sound") && analysis ? h(SoundCard, { analysis }) : null,
+    shows("sound") && analysis ? h(SoundCard, { analysis, durationMs: player && player.durationMs }) : null,
     shows("lyrics") ? h("stack", { background: lyricsTint, cornerRadius: 12, padding: 16, gap: 8, height: LYRICS_HEIGHT },
       h("text", { text: t("lyrics"), size: 15, weight: 700, color: TEXT }),
       // A line clicked: the song goes there.
