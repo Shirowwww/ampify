@@ -830,6 +830,7 @@ const SHOWCASE_HEIGHT = 360;  // the picture at the top of a detail page
 const TILE_SIZE = 160;        // the icon tile of a detail page without a picture
 const DETAIL_WIDTH = 1000;    // as wide as Apple's settings rows: a wider page leaves the eye far from the buttons
 const SETTINGS_GLYPH = "";  // Settings, in Segoe Fluent Icons
+const DETAILS_GLYPH = "";  // Info, in Segoe Fluent Icons
 
 const STATUS_HEIGHT = 34;     // two caption lines, as a card's description
 
@@ -983,7 +984,10 @@ function MainAction({ item, activeTheme, busy, act, open }) {
 function ItemCard({ item, activeTheme, busy, act, open, previewHeight }) {
   const meta = [kindLabel(item), item.author && t("by", { author: item.author }), item.version && "v" + item.version]
     .filter(Boolean).join(" · ");
-  const state = stateOf(item, activeTheme);
+  // The button already says whether an element is on: the card writes its state only when it tells more (a theme, an
+  // update, a broken copy). "Activé" beside "Désactiver" pushed Details out of the card in French.
+  const toggles = item.kind !== "theme" && item.installed && item.installed.valid && !item.update;
+  const state = toggles ? "" : stateOf(item, activeTheme);
   const count = item.permissions.length;
   // Every line keeps its height, so the buttons of a row of cards line up.
   // The whole card opens the element's page, and lights up under the pointer; its buttons keep their own clicks.
@@ -1002,7 +1006,8 @@ function ItemCard({ item, activeTheme, busy, act, open, previewHeight }) {
         ? h(ButtonTertiary, { icon: SETTINGS_GLYPH, tooltip: t("action.settingsOf", { name: item.name }),
                               onClick: () => openItem(item, "", true) })
         : null,
-      h(ButtonTertiary, { label: t("action.details"), onClick: open })));
+      // An icon, as the settings one: in French "Désactiver", a gear and "Détails" did not fit a card of three.
+      h(ButtonTertiary, { icon: DETAILS_GLYPH, tooltip: t("action.details"), onClick: open })));
 }
 
 // The status line keeps its height, written or not, and never grows past two lines: a line that came and went would

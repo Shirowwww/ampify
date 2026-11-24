@@ -1848,8 +1848,9 @@ const cardOf = (page, name) =>
   allNodes(page.tree).find((node) => node.type === "card" && textsOf(node).includes(name));
 const cardTitled = (page, title) => allNodes(page.tree).find((node) => node.type === "card" && node.title === title);
 const abilitiesOf = (page) => textsOf(cardTitled(page, "What it can do"));
+// By its label, or by its tooltip for a button that only shows an icon (a card's Details).
 function buttonIn(node, label) {
-  const found = allNodes(node).find((child) => child.type === "button" && child.label === label);
+  const found = allNodes(node).find((child) => child.type === "button" && (child.label ?? child.tooltip) === label);
   assert.ok(found, `a button "${label}" is shown`);
   return found;
 }

@@ -6,6 +6,7 @@
 
 #include "ui_renderer.hpp"
 #include "ui_renderer_playing.hpp"
+#include "../core/i18n.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -108,6 +109,7 @@ inline void ShowSliderValue(const controls::Slider& slider) {
     wchar_t number[32];
     std::swprintf(number, 32, L"%g", value);
     std::wstring shown = number + unit;
+    if (i18n::UsesDecimalComma()) std::replace(shown.begin(), shown.end(), L'.', L',');  // 1,25 in French
     std::wstring text = label.empty() ? shown : label + L" · " + shown;
     slider.Header(winrt::box_value(winrt::hstring(text)));
 }
