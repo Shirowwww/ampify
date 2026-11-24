@@ -643,6 +643,19 @@ TEST_CASE(PositionClock_NeverStepsBackForAValueReadLate) {
     CHECK(clock.Next("a", true, 33000, 200000, 4000) >= 33000);  // on time again: on the song
 }
 
+// At another speed (Ampify.player.setRate) the song moves on that much faster or slower between Apple's updates: counted
+// at 1, the lyrics fill fell behind for a second, then jumped.
+TEST_CASE(PositionClock_CountsAtThePlayersSpeed) {
+    ampify::PositionClock clock;
+    CHECK(clock.Next("a", true, 30000, 200000, 1000, 1.25) == 30000);
+    CHECK(clock.Next("a", true, 30000, 200000, 1800, 1.25) == 31000);
+    CHECK(clock.Next("a", true, 31250, 200000, 2000, 1.25) == 31250);  // Apple's next second: where the count is
+    CHECK(clock.Next("a", true, 31250, 200000, 2400, 1.25) == 31750);
+    ampify::PositionClock slow;
+    CHECK(slow.Next("a", true, 30000, 200000, 1000, 0.5) == 30000);
+    CHECK(slow.Next("a", true, 30000, 200000, 2000, 0.5) == 30500);
+}
+
 TEST_CASE(PositionClock_FollowsAJumpBackFurtherThanALateRead) {
     ampify::PositionClock clock;
     CHECK(clock.Next("a", true, 30000, 200000, 1000) == 30000);

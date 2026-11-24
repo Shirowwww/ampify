@@ -296,10 +296,18 @@ PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit) {
 }
 
 int64_t PositionClock::Next(const std::string& track, bool playing, int64_t reportedMs, int64_t durationMs,
-                            int64_t nowMs) {
+                            int64_t nowMs, double rate) {
     if (track != m_track) {
         *this = PositionClock();
         m_track = track;
+    }
+    if (rate != m_rate) {
+        // What was counted at the old speed is kept; the new one counts from now.
+        if (Moving(nowMs)) {
+            m_baseMs = Position(nowMs);
+            m_learntMs = nowMs;
+        }
+        m_rate = rate;
     }
     if (!playing && m_playing) {
         m_baseMs = Position(nowMs);  // paused: the clock keeps what it counted
@@ -333,12 +341,13 @@ bool PositionClock::Moving(int64_t nowMs) const {
 }
 
 int64_t PositionClock::Position(int64_t nowMs) const {
-    return ExtrapolatePosition(m_baseMs, m_learntMs, nowMs, Moving(nowMs));
+    return ExtrapolatePosition(m_baseMs, m_learntMs, nowMs, Moving(nowMs), m_rate);
 }
 
-PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading) {
+PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading, double rate) {
     PlayerSnapshot snapshot;
     snapshot.source = "smtc";
+    snapshot.rate = rate;
     snapshot.playing = reading.status == kSmtcPlaying;
     if (reading.title.empty() && reading.artist.empty()) return snapshot;
     // Apple Music 1.7's stopped entry ("Not Playing", translated): a title alone, no artist, no length, not playing.
@@ -352,7 +361,7 @@ PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading) {
     // Extrapolated in ticks, then rounded to ms once.
     const bool started = position > 0 || reading.now - reading.lastUpdated <= MsToTicks(kPositionStallMs);
     position = ExtrapolatePosition(position, reading.lastUpdated, reading.now,
-                                   snapshot.playing && reading.lastUpdated > 0 && started);
+                                   snapshot.playing && reading.lastUpdated > 0 && started, rate);
     if (length > 0) position = std::min(position, length);
     snapshot.positionMs = TicksToMs(position);
     snapshot.durationMs = TicksToMs(length);

@@ -39,7 +39,7 @@ bool PlayerWatcher::Moved(const PlayerSnapshot& snapshot, int64_t nowMs) const {
     // The length became known, or Windows replaced the previous track's length; rounding drift is not a change.
     if (snapshot.durationMs > 0 && std::llabs(snapshot.durationMs - m_durationMs) > kSeekToleranceMs) return true;
     if (nowMs < 0 || m_polledAtMs < 0) return false;
-    int64_t expected = ExtrapolatePosition(m_positionMs, m_polledAtMs, nowMs, snapshot.playing);
+    int64_t expected = ExtrapolatePosition(m_positionMs, m_polledAtMs, nowMs, snapshot.playing, snapshot.rate);
     return std::llabs(snapshot.positionMs - expected) > kSeekToleranceMs;
 }
 

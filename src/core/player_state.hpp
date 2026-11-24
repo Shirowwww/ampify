@@ -6,6 +6,7 @@
 // src/core/now_playing.*, the elements through PlayerJson) share these definitions instead of each writing its own.
 
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -45,6 +46,7 @@ struct PlayerSnapshot {
     // Apple has lyrics for the current track and the kernel holds them. Not shown to elements: it drives the
     // "lyricschange" event (src/core/player_watch.*), and Ampify.player.lyrics() gives the lyrics themselves.
     bool lyricsAvailable = false;
+    double rate = 1;  // Apple's player speed (Ampify.player.setRate): the position moves on at it
 };
 
 enum class PlayerCommand { Play, Pause, Next, Previous, Seek };
@@ -70,9 +72,11 @@ constexpr int64_t MsToTicks(int64_t ms) { return ms * kTicksPerMs; }
 inline constexpr int64_t kPositionStallMs = 2000;
 inline constexpr int64_t kSeekToleranceMs = 3000;
 
-// A position read at `at`, moved on to `now` (one clock, one unit) while it is heard moving; never moved back.
-constexpr int64_t ExtrapolatePosition(int64_t position, int64_t at, int64_t now, bool moving) {
-    return moving && now > at ? position + (now - at) : position;
+// A position read at `at`, moved on to `now` (one clock, one unit) at the player's speed while it is heard moving;
+// never moved back.
+inline int64_t ExtrapolatePosition(int64_t position, int64_t at, int64_t now, bool moving, double rate = 1) {
+    if (!moving || now <= at) return position;
+    return position + static_cast<int64_t>(std::llround(static_cast<double>(now - at) * rate));
 }
 
 // The player state as Ampify.player.state() returns it, as the player events carry it and as GET /status gives it.

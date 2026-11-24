@@ -344,6 +344,23 @@ TEST_CASE(PlayerWatcher_StateChangesWhenTheLengthBecomesKnownOrAfterASeek) {
     CHECK(watcher.Poll(at(false, 5'000, 163'000)).empty());
 }
 
+// At twice the speed, eight seconds of play move the song on by sixteen: playing on, not a seek.
+TEST_CASE(PlayerWatcher_TakesASpedUpSongForPlayNotASeek) {
+    auto at = [](int64_t positionMs, double rate) {
+        ampify::PlayerSnapshot snapshot = Snap("a", false);
+        snapshot.playing = true;
+        snapshot.positionMs = positionMs;
+        snapshot.durationMs = 163'000;
+        snapshot.rate = rate;
+        return snapshot;
+    };
+    ampify::PlayerWatcher watcher;
+    watcher.Poll(at(10'000, 2), 1000);
+    CHECK(watcher.Poll(at(26'000, 2), 9000).empty());
+    auto seek = watcher.Poll(at(26'000, 1), 17'000);  // back at 1, and still: someone held it there
+    CHECK(seek.size() == 1 && seek[0] == "statechange");
+}
+
 TEST_CASE(PlayerLyrics_ReturnsTheParsedLyricsToAnElementThatMayRead) {
     LyricsFakeHost host;
     host.raw = ampify::RawLyrics{kWordTtml, "", "en"};
@@ -461,6 +478,9 @@ TEST_CASE(NowPlaying_MovesOnWhileHeardAndKeepsTheLyricsOfItsTrack) {
     now.atMs = 1000;
     CHECK(now.PositionAt(1500) == 10500);
     CHECK(now.PositionAt(900) == 10000);
+    now.rate = 1.5;  // Apple's player at another speed: the karaoke keeps up with it
+    CHECK(now.PositionAt(1500) == 10750);
+    now.rate = 1;
     now.moving = false;  // Apple says playing, but the song loads or stalls: the karaoke waits
     CHECK(now.PositionAt(5000) == 10000);
 

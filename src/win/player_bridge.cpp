@@ -9,6 +9,7 @@
 #include "../core/settings_catalog.hpp"
 #include "../core/ui_watchdog.hpp"
 #include "amp_player.hpp"
+#include "audio/audio_sharing.hpp"
 #include "player_buttons.hpp"
 #include "smtc_session.hpp"
 #include "ui_thread.hpp"
@@ -152,7 +153,7 @@ PlayerSnapshot PlayerBridge::Snapshot() {
     if (apple) {
         snapshot = FromApple(*apple, smtc ? &*smtc : nullptr);
     } else if (smtc) {
-        snapshot = SnapshotFromSmtc(*smtc);
+        snapshot = SnapshotFromSmtc(*smtc, SharedPlaybackRate());
     }
 
     if (snapshot.source != m_lastSource) {
@@ -180,11 +181,13 @@ void PlayerBridge::LearnTimeUnit(const AmpReading& apple, const SmtcReading* smt
 PlayerSnapshot PlayerBridge::FromApple(const AmpReading& apple, const SmtcReading* smtc) {
     LearnTimeUnit(apple, smtc);
     PlayerSnapshot snapshot = SnapshotFromAmp(apple, m_unit);
+    snapshot.rate = SharedPlaybackRate();
     if (snapshot.track) {
         const bool appleGave = snapshot.positionMs > 0;
         const int64_t now = static_cast<int64_t>(GetTickCount64());
         snapshot.positionMs =
-            m_clock.Next(TrackKey(snapshot), snapshot.playing, snapshot.positionMs, snapshot.durationMs, now);
+            m_clock.Next(TrackKey(snapshot), snapshot.playing, snapshot.positionMs, snapshot.durationMs, now,
+                         snapshot.rate);
         if (!appleGave) FollowLyricsLine(snapshot, now);
         if (smtc) FillArtistAlbumFromSmtc(*snapshot.track, *smtc);
     }
@@ -224,6 +227,7 @@ void PlayerBridge::PublishFeed(const PlayerSnapshot& snapshot) {
     now.playing = snapshot.playing;
     now.positionMs = snapshot.positionMs;
     now.atMs = static_cast<int64_t>(GetTickCount64());
+    now.rate = snapshot.rate;
     now.moving = snapshot.playing && (snapshot.source != "apple" || m_clock.Moving(now.atMs));
     if (now.trackKey != m_feedKey) {
         m_feedKey = now.trackKey;

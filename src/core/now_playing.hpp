@@ -21,10 +21,12 @@ struct NowPlaying {
     bool moving = false;  // playing and heard moving: false while the song loads or its stream stalls
     int64_t positionMs = 0;
     int64_t atMs = 0;                      // steady clock, in ms, when positionMs was read
+    double rate = 1;                       // Apple's player speed
     std::shared_ptr<const Lyrics> lyrics;  // of trackKey, null until Apple has them
 
-    // The position at `nowMs` on the same clock as atMs: it moves on while the song is heard moving.
-    int64_t PositionAt(int64_t nowMs) const { return ExtrapolatePosition(positionMs, atMs, nowMs, moving); }
+    // The position at `nowMs` on the same clock as atMs: it moves on at the player's speed while the song is heard
+    // moving.
+    int64_t PositionAt(int64_t nowMs) const { return ExtrapolatePosition(positionMs, atMs, nowMs, moving, rate); }
 };
 
 void PublishNowPlaying(NowPlaying now);

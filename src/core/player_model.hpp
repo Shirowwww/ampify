@@ -134,8 +134,10 @@ PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit);
 // Without Apple's value, a seek or the line Apple's lyrics view lights up (src/win/player_bridge.cpp) is counted on.
 class PositionClock {
 public:
-    // The position to report for `track` at `nowMs` (any steady clock in ms), given what Apple reported.
-    int64_t Next(const std::string& track, bool playing, int64_t reportedMs, int64_t durationMs, int64_t nowMs);
+    // The position to report for `track` at `nowMs` (any steady clock in ms), given what Apple reported, counted on at
+    // the player's `rate` between Apple's updates.
+    int64_t Next(const std::string& track, bool playing, int64_t reportedMs, int64_t durationMs, int64_t nowMs,
+                 double rate = 1);
     // A seek made through Ampify, or the line Apple's lyrics view lights up.
     void Seeked(int64_t positionMs, int64_t nowMs);
     // The song is heard moving: playing, and its position learnt lately (what the karaoke counts on with).
@@ -150,10 +152,11 @@ private:
     int64_t m_lastReported = 0;  // Apple's last value, to tell when it changes
     bool m_fromApple = false;    // the base is Apple's value (renewed every second), not a seek or a line
     bool m_playing = false;
+    double m_rate = 1;
 };
 // The position moves on between two SMTC updates while playing: it is extrapolated to `now`, and kept within the
 // track.
-PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading);
+PlayerSnapshot SnapshotFromSmtc(const SmtcReading& reading, double rate = 1);
 
 // SMTC's length in ms of the track titled `title`, what settles the unit of Apple's times; nullopt when SMTC shows
 // another track or no length.
