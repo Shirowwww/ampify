@@ -64,8 +64,13 @@ constexpr wchar_t kViewClass[] = L"AMP.UI.Views.KaraokeLyricsView";
 constexpr wchar_t kMainHost[] = L"WordByWordHost";
 constexpr wchar_t kBackgroundHost[] = L"BackgroundWordByWordHost";
 constexpr wchar_t kEdge[] = L"Edge";
+constexpr wchar_t kHalf[] = L"Half";
+// The soft edge's width, in heights of its row: the colour turns from sung to unsung over about the height of the
+// letters (a Hangul syllable, two Latin letters), so the romaji's smaller type gets a narrower one.
+constexpr float kSoftEdgeRowHeights = 0.6f;
 
 std::atomic<bool> g_smooth{true};
+std::atomic<bool> g_softEdge{false};
 std::atomic<Journal*> g_journal{nullptr};
 
 void Note(const std::string& line) {
@@ -185,12 +190,15 @@ std::vector<FoundRow> RowsOf(const controls::Border& host) {
     return rows;
 }
 
-// Apple's gradient: four stops, the sung colour up to the edge and the unsung one after it.
+// Apple's gradient: four stops, the sung colour up to the edge and the unsung one after it (ShapedAsAppleFill).
 bool ShapedAsApples(const comp::CompositionLinearGradientBrush& brush) {
-    auto stops = brush.ColorStops();
-    if (stops.Size() != 4) return false;
-    return stops.GetAt(0).Offset() == 0 && stops.GetAt(3).Offset() == 1 &&
-           std::fabs(stops.GetAt(1).Offset() - stops.GetAt(2).Offset()) < 1e-4f;
+    std::vector<FillStop> stops;
+    for (const comp::CompositionColorGradientStop& stop : brush.ColorStops()) {
+        const winrt::Windows::UI::Color c = stop.Color();
+        stops.push_back({stop.Offset(), static_cast<uint32_t>(c.A) << 24 | static_cast<uint32_t>(c.R) << 16 |
+                                            static_cast<uint32_t>(c.G) << 8 | c.B});
+    }
+    return ShapedAsAppleFill(stops);
 }
 
 void CopyColours(const comp::CompositionLinearGradientBrush& from, const comp::CompositionLinearGradientBrush& to) {
@@ -203,8 +211,9 @@ void CopyColours(const comp::CompositionLinearGradientBrush& from, const comp::C
 }
 
 // Ampify's gradient for a row: Apple's colours and direction, its two middle stops following the "Edge" of a
-// property set, which a key-frame animation moves along `path`.
-Row MakeRow(const FoundRow& found, const std::vector<FillKey>& path, int64_t lineStartMs) {
+// property set, which a key-frame animation moves along `path`. With a soft edge they stand `half` (a part of the row)
+// on either side of it, kept within the row so the stops stay in order.
+Row MakeRow(const FoundRow& found, const std::vector<FillKey>& path, int64_t lineStartMs, float half) {
     comp::Compositor compositor = found.sprite.Compositor();
     Row row;
     row.sprite = found.sprite;
@@ -218,16 +227,19 @@ Row MakeRow(const FoundRow& found, const std::vector<FillKey>& path, int64_t lin
     row.ours.MappingMode(found.source.MappingMode());
     auto appleStops = found.source.ColorStops();
     const float start = static_cast<float>(path.front().edge);
-    const float offsets[] = {0.0f, start, start, 1.0f};
+    const float offsets[] = {0.0f, std::clamp(start - half, 0.0f, 1.0f), std::clamp(start + half, 0.0f, 1.0f), 1.0f};
     for (uint32_t i = 0; i < 4; i++) {
         row.ours.ColorStops().Append(compositor.CreateColorGradientStop(offsets[i], appleStops.GetAt(i).Color()));
     }
     row.edge = compositor.CreatePropertySet();
     row.edge.InsertScalar(kEdge, start);
-    auto follow = compositor.CreateExpressionAnimation(L"fill.Edge");
-    follow.SetReferenceParameter(L"fill", row.edge);
-    row.ours.ColorStops().GetAt(1).StartAnimation(L"Offset", follow);
-    row.ours.ColorStops().GetAt(2).StartAnimation(L"Offset", follow);
+    row.edge.InsertScalar(kHalf, half);
+    auto sung = compositor.CreateExpressionAnimation(L"Clamp(fill.Edge - fill.Half, 0, 1)");
+    auto unsung = compositor.CreateExpressionAnimation(L"Clamp(fill.Edge + fill.Half, 0, 1)");
+    sung.SetReferenceParameter(L"fill", row.edge);
+    unsung.SetReferenceParameter(L"fill", row.edge);
+    row.ours.ColorStops().GetAt(1).StartAnimation(L"Offset", sung);
+    row.ours.ColorStops().GetAt(2).StartAnimation(L"Offset", unsung);
     auto move = compositor.CreateScalarKeyFrameAnimation();
     auto linear = compositor.CreateLinearEasingFunction();
     for (const FillKey& key : path) {
@@ -342,17 +354,25 @@ std::optional<size_t> MainLine(const controls::Border& border, const std::vector
     return index;
 }
 
+// The soft edge's width on a row, as a part of the row's width; 0 for Apple's crisp edge.
+float SoftWidthOf(const FoundRow& row, bool softEdge) {
+    const winrt::Windows::Foundation::Numerics::float2 size = row.sprite.Size();
+    return softEdge && size.x > 0 ? kSoftEdgeRowHeights * size.y / size.x : 0.0f;
+}
+
 // Lays `words` on the host's sung rows, or on its pronunciation rows, in order.
 void BindRows(Host& host, std::vector<FoundRow>& found, bool spoken, const std::vector<LyricWord>& words,
-              const LyricLine& line, const NowPlaying& now, int64_t tick) {
+              const LyricLine& line, const NowPlaying& now, int64_t tick, bool softEdge) {
     size_t first = 0;
     for (FoundRow& row : found) {
         if (row.spoken != spoken) continue;
         std::span<const LyricWord> rowWords(words.data() + first, row.spans.size());
         first += row.spans.size();
-        std::vector<FillKey> path = RowFillPath(rowWords, row.spans, line.startMs);
+        const float width = SoftWidthOf(row, softEdge);
+        std::vector<FillKey> path =
+            RowFillPath(rowWords, width > 0 ? SoftSpans(row.spans, width) : row.spans, line.startMs);
         if (path.empty()) continue;
-        Row bound = MakeRow(row, path, line.startMs);
+        Row bound = MakeRow(row, path, line.startMs, width / 2);
         Sync(bound, now, tick, true);
         row.mask.Source(bound.ours);
         host.rows.push_back(std::move(bound));
@@ -361,7 +381,8 @@ void BindRows(Host& host, std::vector<FoundRow>& found, bool spoken, const std::
 
 // Lays line `index` on the host's rows, or leaves them to Apple. True when Ampify drives them. The pronunciation rows
 // spell the sung words one for one in Apple's lyrics (issue #5): they follow the same times, or stay Apple's.
-bool Bind(Host& host, std::vector<FoundRow>& found, const NowPlaying& now, int64_t tick, std::optional<size_t> index) {
+bool Bind(Host& host, std::vector<FoundRow>& found, const NowPlaying& now, int64_t tick, std::optional<size_t> index,
+          bool softEdge) {
     std::optional<size_t> count = WordCount(found);
     if (!count) return false;
     if (!host.background) index = MainLine(host.border.get(), found, *count, now, tick);  // Follow holds the border
@@ -376,10 +397,10 @@ bool Bind(Host& host, std::vector<FoundRow>& found, const NowPlaying& now, int64
     host.line = index;
     host.lineStartMs = line.startMs;
     host.lineEndMs = line.endMs;
-    BindRows(host, found, false, words, line, now, tick);
+    BindRows(host, found, false, words, line, now, tick, softEdge);
     const size_t spoken = WordCount(found, true).value_or(0);
     if (spoken == words.size()) {
-        BindRows(host, found, true, words, line, now, tick);
+        BindRows(host, found, true, words, line, now, tick, softEdge);
         NotePronunciationFilled(now, found);
     } else if (spoken > 0) {
         NoteLeftToApple(now, "pronunciation rows of " + std::to_string(spoken) + " words (" + RowShapes(found) +
@@ -418,7 +439,7 @@ bool StillBound(const Host& host, const std::vector<FoundRow>& found, const NowP
 // Apple draws the line plainly again, rebuilt it, or the song left the line. Apple keeps background rows masked all
 // along: they follow their line's main host (`main`), bound only while it is. A host found idle waits kIdleMs before
 // it is read again, unless `hot` (near the line sung last).
-void Follow(Host& host, const NowPlaying& now, int64_t tick, const Host* main, bool hot) {
+void Follow(Host& host, const NowPlaying& now, int64_t tick, const Host* main, bool hot, bool softEdge) {
     controls::Border border = host.border.get();
     if (!border || (host.background && (!main || !main->line))) return Release(host);
     if (host.rows.empty() && tick < host.retryAt) return;
@@ -428,7 +449,7 @@ void Follow(Host& host, const NowPlaying& now, int64_t tick, const Host* main, b
         found = RowsOf(border);  // read again: the rows showed Ampify's gradient
     }
     if (host.rows.empty()) {
-        const bool bound = !found.empty() && Bind(host, found, now, tick, main ? main->line : std::nullopt);
+        const bool bound = !found.empty() && Bind(host, found, now, tick, main ? main->line : std::nullopt, softEdge);
         if (!bound) host.retryAt = tick + (!found.empty() ? kRetryMs : hot ? 0 : kIdleMs);
         return;
     }
@@ -457,6 +478,7 @@ struct Follower {
     dispatching::DispatcherQueueTimer timer{nullptr};
     std::vector<View> views;
     std::chrono::steady_clock::time_point lastViewSearch{};
+    bool softEdge = false;  // the edge the rows were bound with: a change binds them again
 };
 
 template <typename Match>
@@ -506,17 +528,17 @@ const Host* MainOf(const View& view, const Host& background) {
 }
 
 // Main hosts first, then the background ones beside them, which follow their main host.
-void FollowHosts(View& view, const NowPlaying& now, int64_t tick) {
+void FollowHosts(View& view, const NowPlaying& now, int64_t tick, bool softEdge) {
     const int last = view.lastBound;
     for (size_t i = 0; i < view.hosts.size(); i++) {
         Host& host = view.hosts[i];
         if (host.background) continue;
         const int at = static_cast<int>(i);
-        Follow(host, now, tick, nullptr, last < 0 || (at >= last - kHotBefore && at <= last + kHotAfter));
+        Follow(host, now, tick, nullptr, last < 0 || (at >= last - kHotBefore && at <= last + kHotAfter), softEdge);
         if (!host.rows.empty()) view.lastBound = at;
     }
     for (Host& host : view.hosts) {
-        if (host.background) Follow(host, now, tick, MainOf(view, host), false);
+        if (host.background) Follow(host, now, tick, MainOf(view, host), false, softEdge);
     }
 }
 
@@ -574,6 +596,10 @@ void ReleaseAll(Follower& follower) {
 void TickFollower(Follower& follower) {
     NowPlaying now = CurrentNowPlaying();
     if (!g_smooth.load() || !WordTimed(now)) return ReleaseAll(follower);
+    if (const bool soft = g_softEdge.load(); soft != follower.softEdge) {
+        ReleaseAll(follower);
+        follower.softEdge = soft;
+    }
     const auto clock = std::chrono::steady_clock::now();
     bool shown = false;
     for (const View& view : follower.views) {
@@ -605,7 +631,7 @@ void TickFollower(Follower& follower) {
             view.nextSearch = clock + (settling ? kHostSearchEvery : kHostCheckEvery);
             FindHosts(view, element);
         }
-        FollowHosts(view, now, tick);
+        FollowHosts(view, now, tick, follower.softEdge);
     }
 }
 
@@ -641,7 +667,10 @@ void EnsureFollower(const dispatching::DispatcherQueue& queue) {
 
 }  // namespace
 
-void SetLyricsFill(bool smooth) noexcept { g_smooth.store(smooth); }
+void SetLyricsFill(bool smooth, bool softEdge) noexcept {
+    g_smooth.store(smooth);
+    g_softEdge.store(softEdge);
+}
 
 void KeepLyricsFill(Journal& journal) noexcept {
     try {

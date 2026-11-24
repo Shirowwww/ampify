@@ -10,8 +10,9 @@
 
 namespace ampify::win {
 
-// On (smooth) or off (Apple's own steps), applied at the next tick of each window's follower. Any thread.
-void SetLyricsFill(bool smooth) noexcept;
+// On (smooth) or off (Apple's own steps), with Apple's crisp edge or a soft one, applied at the next tick of each
+// window's follower. Any thread.
+void SetLyricsFill(bool smooth, bool softEdge) noexcept;
 
 // Starts the follower of the main window's thread, which also follows the full-screen player and starts the mini
 // player's on that window's own thread. Called at each tick of the main window's tweaks; cheap once started.

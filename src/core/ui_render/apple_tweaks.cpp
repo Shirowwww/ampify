@@ -67,7 +67,9 @@ AppleTweaks ReadAppleTweaks(const Settings& settings) {
     tweaks.topbarSearch = ChoiceOf(settings, kTopbarKey) == "search";
     tweaks.lyricsBefore = LyricLinesOf(ChoiceOf(settings, kLyricsBeforeKey));
     tweaks.lyricsAfter = LyricLinesOf(ChoiceOf(settings, kLyricsAfterKey));
-    tweaks.lyricsFill = ChoiceOf(settings, kLyricsFillKey) == "smooth";
+    const std::string lyricsFill = ChoiceOf(settings, kLyricsFillKey);
+    tweaks.lyricsFill = lyricsFill != "apple";
+    tweaks.lyricsSoftEdge = lyricsFill == "soft";
     const std::string albumClick = ChoiceOf(settings, kAlbumClickKey);
     tweaks.albumExpand = albumClick == "expand" || albumClick == "colors";
     tweaks.albumColors = albumClick == "colors";

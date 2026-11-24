@@ -102,11 +102,15 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   that hidden container), source a `CompositionLinearGradientBrush`, relative, (0,0) to (1,0), four stops: sung colour
   at 0 and at the edge, unsung colour at the edge and at 1. Apple writes the edge's static offset at each word's start
   (the word's left edge, within 100 ms of the song's position) and moves it between with an animation of its own,
-  which a read never shows. When the line ends Apple draws it plainly again (the masked sprite goes). Background
+  which a read never shows. Paused, Apple spreads that edge over the word instead (middle stops apart, the two colours
+  still in pairs; seen 2026-11-24 behind Ampify's gradient). When the line ends Apple draws it plainly again (the masked sprite goes). Background
   vocals (`BackgroundWordByWordHost`) keep the masked structure all along, whatever line is sung. Lines are not
   virtualized: a song's 90 hosts stand in the view at once. Opening the full-screen player or the mini player left a
   single `KaraokeLyricsView` to follow, its height changing: Apple seems to move the same view between them. Ampify's `apple.lyricsFill` gives each row's mask a gradient of its own,
   moved by a key-frame animation along the TTML word times (`src/win/lyrics_fill.cpp`, `src/core/lyrics_fill.cpp`).
+  With `soft`, the two middle stops stand half a soft width on either side of that edge (0.6 of the row's height, so
+  the romaji get a narrower one), each clamped to 0..1 in its expression so the four stops stay in order; each word's
+  span is widened by that half on both sides, and never starts before the previous one ends.
 - **What the lyrics fill keeps to (1.1792, measured 2026-11-19, issue #5 again).** Apple's own karaoke clock (the view
   model's `CurrentTime`, slot 7, a TimeSpan) also moves only once a second (every ~1020 ms). Ampify reads Apple's
   position every 250 ms, so each new value arrives 0 to 250 ms late, and the delay slides slowly as the two rhythms

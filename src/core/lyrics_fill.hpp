@@ -26,6 +26,17 @@ struct FillKey {
     double edge = 0;
 };
 
+// One stop of a row's gradient: where it stands (0 to 1) and its colour, as 0xAARRGGBB.
+struct FillStop {
+    double offset = 0;
+    uint32_t argb = 0;
+};
+
+// Whether a row's gradient is drawn as Apple's word-by-word fill: four stops from 0 to 1, the sung colour up to the
+// edge and the unsung one after it. Apple keeps its edge crisp while it sings (the middle stops together), and spreads
+// it over the word in other states, paused for one, with its two colours still in pairs: that is Apple's fill too.
+bool ShapedAsAppleFill(std::span<const FillStop> stops);
+
 // The words of `line` that one of Apple's hosts draws: the main vocals, or the background ones.
 std::vector<LyricWord> WordsOfHost(const LyricLine& line, bool background);
 
@@ -33,6 +44,12 @@ std::vector<LyricWord> WordsOfHost(const LyricLine& line, bool background);
 // first word's left edge, crosses each word while it is sung, holds at its right edge until the next word starts and
 // jumps there. Times are from `lineStartMs`, never negative and rising; never empty when `words` is not.
 std::vector<FillKey> RowFillPath(std::span<const LyricWord> words, std::span<const WordSpan> spans, int64_t lineStartMs);
+
+// With a soft edge (apple.lyricsFill = soft, as the iPhone app draws it), the colour turns from sung to unsung over
+// `width` (a part of the row) centred on the edge. The spans the edge then crosses: each word widened by half that
+// width on both sides, so it starts wholly unsung and ends wholly sung, and none starting before the previous one ends,
+// so the edge never steps back across a space narrower than the soft part.
+std::vector<WordSpan> SoftSpans(std::span<const WordSpan> spans, double width);
 
 // Where the edge of `path` stands `atMs` after the line's start: linear between keys, the first before them, the last
 // after. 0 for an empty path.

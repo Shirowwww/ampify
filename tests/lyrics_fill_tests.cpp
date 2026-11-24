@@ -75,6 +75,50 @@ TEST_CASE(LyricsFill_ARowWaitsForItsFirstWordAndTimesNeverGoBack) {
     CHECK(Near(EdgeAt({}, 10), 0.0));
 }
 
+// apple.lyricsFill = soft: the colour turns from sung to unsung over a width centred on the edge.
+TEST_CASE(LyricsFill_ASoftEdgeStartsBeforeEachWordAndEndsPastIt) {
+    std::vector<WordSpan> spans{{0.1, 0.3}, {0.6, 0.9}};
+    std::vector<WordSpan> soft = ampify::SoftSpans(spans, 0.1);
+    CHECK(soft.size() == 2);
+    if (soft.size() != 2) return;
+    CHECK(Near(soft[0].from, 0.05));  // the whole soft edge before the first word: nothing lit early
+    CHECK(Near(soft[0].to, 0.35));    // and past its end: the word sung whole
+    CHECK(Near(soft[1].from, 0.55));
+    CHECK(Near(soft[1].to, 0.95));
+    CHECK(ampify::SoftSpans({}, 0.1).empty());
+}
+
+TEST_CASE(LyricsFill_ASoftEdgeNeverGoesBackBetweenCloseWords) {
+    // A space narrower than the soft edge: the next word starts where the edge stands, it does not step back.
+    std::vector<LyricWord> words{Word(0, 400), Word(400, 800)};
+    std::vector<WordSpan> spans{{0.0, 0.48}, {0.52, 1.0}};
+    std::vector<WordSpan> soft = ampify::SoftSpans(spans, 0.2);
+    CHECK(Near(soft[1].from, soft[0].to));
+    std::vector<FillKey> path = RowFillPath(words, soft, 0);
+    for (size_t i = 1; i < path.size(); i++) CHECK(path[i].edge >= path[i - 1].edge);
+    CHECK(EdgeAt(path, 0) + 0.1 <= 0.0 + 1e-9);   // the first word wholly unsung before it starts
+    CHECK(EdgeAt(path, 800) - 0.1 >= 1.0 - 1e-9);  // the last wholly sung at its end
+}
+
+TEST_CASE(LyricsFill_ApplesGradientIsKnownWhetherItsEdgeIsCrispOrSpread) {
+    using Stops = std::vector<ampify::FillStop>;
+    constexpr uint32_t kSung = 0xD8FFFFFF;
+    constexpr uint32_t kUnsung = 0x3FFFFFFF;
+    const Stops crisp{{0, kSung}, {0.4, kSung}, {0.4, kUnsung}, {1, kUnsung}};
+    CHECK(ampify::ShapedAsAppleFill(crisp));
+    // Paused, Apple spreads its edge over the word, behind Ampify's gradient: still Apple's, Ampify takes it again.
+    const Stops spread{{0, kSung}, {0.891, kSung}, {0.975, kUnsung}, {1, kUnsung}};
+    CHECK(ampify::ShapedAsAppleFill(spread));
+    const Stops fadedEnds{{0, 0}, {0.1, kSung}, {0.9, kSung}, {1, 0}};  // not a sung and an unsung colour
+    CHECK(!ampify::ShapedAsAppleFill(fadedEnds));
+    const Stops backwards{{0, kSung}, {0.6, kSung}, {0.4, kUnsung}, {1, kUnsung}};
+    CHECK(!ampify::ShapedAsAppleFill(backwards));
+    const Stops three{{0, kSung}, {0.5, kUnsung}, {1, kUnsung}};
+    CHECK(!ampify::ShapedAsAppleFill(three));
+    const Stops shifted{{0.1, kSung}, {0.4, kSung}, {0.4, kUnsung}, {1, kUnsung}};
+    CHECK(!ampify::ShapedAsAppleFill(shifted));
+}
+
 TEST_CASE(LyricsFill_BackgroundVocalsAreTheirOwnHost) {
     ampify::Lyrics lyrics = ampify::ParseTtml(
         "<tt><body><div><p begin=\"1\" end=\"3\"><span begin=\"1\" end=\"2\">Main</span> <span begin=\"2\" end=\"3\">line</span>"

@@ -59,6 +59,8 @@ struct AppleTweaks {
     int lyricsAfter = -1;
     // Word-by-word lyrics lit at the screen's pace rather than in Apple's steps (win/lyrics_fill.cpp). On by default.
     bool lyricsFill = true;
+    // That fill with a soft edge, as the iPhone app draws it, rather than Apple's crisp one (apple.lyricsFill = soft).
+    bool lyricsSoftEdge = false;
     // A click on an album of the library opens its track list in the grid (win/album_expand.cpp). Off by default.
     bool albumExpand = false;
     // That track list in the album's own colours, as iTunes 11 showed it (apple.albumClick = colors).

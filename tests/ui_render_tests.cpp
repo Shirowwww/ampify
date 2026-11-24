@@ -912,6 +912,7 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     CHECK(!none.sidebarOnHover);                // the sidebar as Apple Music shows it
     CHECK(!none.topbarSearch);                  // the search field stays in the sidebar unless asked
     CHECK(none.lyricsFill);                     // word-by-word lyrics lit smoothly (issue #5)
+    CHECK(!none.lyricsSoftEdge);                // with Apple's crisp edge
     CHECK(!none.albumExpand);                   // a click on an album opens its page, as in Apple Music (issue #7)
 
     settings.Set("apple.notifications", "Background");
@@ -927,6 +928,7 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     AppleTweaks set = ReadAppleTweaks(settings);
     CHECK(set.topbarSearch);
     CHECK(!set.lyricsFill);
+    CHECK(!set.lyricsSoftEdge);
     CHECK(set.albumExpand);
     CHECK(!set.albumColors);
     CHECK(!set.playerControls);
@@ -949,6 +951,11 @@ TEST_CASE(UiRender_AppleTweaksReadTheirValuesAndFallBackToApplesBehaviour) {
     AppleTweaks colored = ReadAppleTweaks(settings);
     CHECK(colored.albumExpand);
     CHECK(colored.albumColors);
+
+    settings.Set("apple.lyricsFill", "Soft");  // smooth, with the iPhone app's soft edge (issue #5)
+    AppleTweaks soft = ReadAppleTweaks(settings);
+    CHECK(soft.lyricsFill);
+    CHECK(soft.lyricsSoftEdge);
 }
 
 TEST_CASE(UiRender_KitUpdateInstallsOnItsOwnUnlessToldOtherwise) {
@@ -1130,7 +1137,7 @@ TEST_CASE(UiRender_AppleTweaksAreWrittenOnlyWithAKnownValue) {
     // Every lyrics line by default, as Apple shows them, or 0 to 5 of them on each side of the sung one.
     CHECK(card("apple.lyricsBefore").value == "all" && card("apple.lyricsBefore").options.size() == 7);
     CHECK(card("apple.lyricsAfter").value == "all" && card("apple.lyricsAfter").options.size() == 7);
-    CHECK(card("apple.lyricsFill").value == "smooth" && card("apple.lyricsFill").options.size() == 2);
+    CHECK(card("apple.lyricsFill").value == "smooth" && card("apple.lyricsFill").options.size() == 3);
     CHECK(card("apple.albumClick").value == "page" && card("apple.albumClick").options.size() == 3);
     CHECK(card("apple.artwork").value == "sharp");
     CHECK(card("apple.marquee").value == "hover");

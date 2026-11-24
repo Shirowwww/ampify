@@ -1,6 +1,7 @@
 #include "lyrics_fill.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 namespace ampify {
@@ -13,6 +14,7 @@ constexpr int64_t kLineAfterMs = 1500;
 constexpr int64_t kSameStartMs = 5;  // Apple's line start (100 ns) and the TTML's (ms) read from the same text
 constexpr double kHoldMs = 1;  // the edge holds at a word's end until 1 ms before the next word, then jumps
 constexpr double kPronunciationShare = 0.8;  // romaji rows are about 0.6 of a sung row's height
+constexpr double kSameOffset = 1e-4;  // Apple's crisp edge: its two middle stops at the same place
 
 // Adds a key after the last: one at the same time (or earlier, words that overlap) moves that time's edge instead.
 void Push(std::vector<FillKey>& path, double atMs, double edge) {
@@ -25,6 +27,13 @@ void Push(std::vector<FillKey>& path, double atMs, double edge) {
 }
 
 }  // namespace
+
+bool ShapedAsAppleFill(std::span<const FillStop> stops) {
+    if (stops.size() != 4 || stops[0].offset != 0 || stops[3].offset != 1) return false;
+    if (std::fabs(stops[1].offset - stops[2].offset) < kSameOffset) return true;
+    const bool inOrder = stops[1].offset >= 0 && stops[1].offset <= stops[2].offset && stops[2].offset <= 1;
+    return inOrder && stops[0].argb == stops[1].argb && stops[2].argb == stops[3].argb;
+}
 
 std::vector<LyricWord> WordsOfHost(const LyricLine& line, bool background) {
     std::vector<LyricWord> words;
@@ -54,6 +63,17 @@ std::vector<FillKey> RowFillPath(std::span<const LyricWord> words, std::span<con
         }
     }
     return path;
+}
+
+std::vector<WordSpan> SoftSpans(std::span<const WordSpan> spans, double width) {
+    const double half = std::max(width, 0.0) / 2;
+    std::vector<WordSpan> soft;
+    soft.reserve(spans.size());
+    for (const WordSpan& span : spans) {
+        const double from = soft.empty() ? span.from - half : std::max(span.from - half, soft.back().to);
+        soft.push_back({from, std::max(span.to + half, from)});
+    }
+    return soft;
 }
 
 double EdgeAt(std::span<const FillKey> path, double atMs) {
