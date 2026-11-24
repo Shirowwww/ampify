@@ -100,6 +100,9 @@ rt::Ref QueuedArtwork(uint64_t itemId);
 void ForgetQueuedArtworkForTests();
 // Starts removing one entry (IPlayQueue.DeletePlayQueueItemsAsync): its IAsyncAction, empty on failure.
 rt::Ref StartAppleQueueRemove(uint64_t itemId, std::string& failure);
+// Starts moving one entry right before `anchorId` (IPlayQueue.MovePlayQueueItemsAsync): its IAsyncAction, empty on
+// failure.
+rt::Ref StartAppleQueueMove(uint64_t itemId, uint64_t anchorId, std::string& failure);
 
 // Library playback (knowledge/apple-music-queue.md), on the interface thread too; an item's descriptor comes from
 // ContentDescriptorOf (amp_item.hpp).

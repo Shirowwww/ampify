@@ -52,6 +52,15 @@ Also learned: the queue panel's drag data (`IPlayQueueViewModel.SerializeDragDat
 entries' ids, such as `[11906]`, under the identifier `PlayQueueViewDragData`. `InsertItemsIntoPlayQueue` takes it, so it
 moves entries of the queue; it does not add catalog songs.
 
+## Moving entries
+
+`IPlayQueue.MovePlayQueueItemsAsync(IVector<UInt64> entries, UInt64 anchor)` (slot 14, next to the deletion) moves
+entries still to come, and Apple's queue panel follows at once. The entries go right **before** the anchor entry:
+moving each entry of a list after the previous one, as if the anchor meant "after", reverses the list (seen on
+screen, 24/11/2026). The queue Ampify reads right after a move may still show the old order, so anchors are never
+worked out from positions read between moves: `Ampify.player.queue.move(id, beforeId)` keeps Apple's meaning, and an
+order is laid out by moving each of its entries before its last one.
+
 ## Playing an album of the library
 
 The same method does play library items (checked in 1.1792 on 2026-11-18): `Action` StartPlayback, `Items` an

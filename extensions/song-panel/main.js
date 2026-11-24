@@ -4,45 +4,55 @@
 const { h, useState, useEffect } = Ampify.React;
 
 Ampify.i18n.define({
-  en: { label: "Song panel", lyrics: "Lyrics", noLyrics: "No lyrics for this song yet", artist: "About the artist",
+  en: { sound: "The sound", tempo: "Tempo", key: "Key", mood: "Mood", major: "major", minor: "minor", happy: "Happy", calm: "Calm", sad: "Melancholic", tense: "Intense",
+        label: "Song panel", lyrics: "Lyrics", noLyrics: "No lyrics for this song yet", artist: "About the artist",
         credits: "Credits", next: "Next in queue", nothing: "Nothing is playing", performer: "Performed by",
         composer: "Written by", albumArtist: "Album artist", inLibrary: "{count} songs in your library",
         plays: "{count} plays", top: "Most played: {title}", empty: "Nothing after this song" },
-  fr: { label: "Panneau du morceau", lyrics: "Paroles", noLyrics: "Pas encore de paroles pour ce morceau",
+  fr: { sound: "Le son", tempo: "Tempo", key: "Tonalité", mood: "Humeur", major: "majeur", minor: "mineur", happy: "Joyeux", calm: "Paisible", sad: "Mélancolique", tense: "Intense",
+        label: "Panneau du morceau", lyrics: "Paroles", noLyrics: "Pas encore de paroles pour ce morceau",
         artist: "À propos de l'artiste", credits: "Crédits", next: "À suivre", nothing: "Rien en lecture",
         performer: "Interprété par", composer: "Écrit par", albumArtist: "Artiste de l'album",
         inLibrary: "{count} morceaux dans votre bibliothèque", plays: "{count} écoutes", top: "Le plus écouté : {title}",
         empty: "Rien après ce morceau" },
-  de: { label: "Titelleiste", lyrics: "Songtext", noLyrics: "Noch kein Songtext für diesen Titel",
+  de: { sound: "Der Klang", tempo: "Tempo", key: "Tonart", mood: "Stimmung", major: "Dur", minor: "Moll", happy: "Fröhlich", calm: "Ruhig", sad: "Melancholisch", tense: "Intensiv",
+        label: "Titelleiste", lyrics: "Songtext", noLyrics: "Noch kein Songtext für diesen Titel",
         artist: "Über den Künstler", credits: "Mitwirkende", next: "Als Nächstes", nothing: "Nichts wird abgespielt",
         performer: "Gespielt von", composer: "Geschrieben von", albumArtist: "Album-Künstler",
         inLibrary: "{count} Titel in deiner Mediathek", plays: "{count}-mal gehört", top: "Am meisten gehört: {title}", empty: "Nichts nach diesem Titel" },
-  es: { label: "Panel de la canción", lyrics: "Letra", noLyrics: "Aún no hay letra para esta canción",
+  es: { sound: "El sonido", tempo: "Tempo", key: "Tonalidad", mood: "Ánimo", major: "mayor", minor: "menor", happy: "Alegre", calm: "Tranquilo", sad: "Melancólico", tense: "Intenso",
+        label: "Panel de la canción", lyrics: "Letra", noLyrics: "Aún no hay letra para esta canción",
         artist: "Sobre el artista", credits: "Créditos", next: "A continuación", nothing: "No se reproduce nada",
         performer: "Interpretada por", composer: "Escrita por", albumArtist: "Artista del álbum",
         inLibrary: "{count} canciones en tu biblioteca", plays: "{count} reproducciones", top: "La más escuchada: {title}",
         empty: "Nada después de esta canción" },
-  pt: { label: "Painel da música", lyrics: "Letra", noLyrics: "Ainda não há letra para esta música",
+  pt: { sound: "O som", tempo: "Andamento", key: "Tom", mood: "Clima", major: "maior", minor: "menor", happy: "Alegre", calm: "Calmo", sad: "Melancólico", tense: "Intenso",
+        label: "Painel da música", lyrics: "Letra", noLyrics: "Ainda não há letra para esta música",
         artist: "Sobre o artista", credits: "Créditos", next: "A seguir", nothing: "Nada está tocando",
         performer: "Interpretada por", composer: "Escrita por", albumArtist: "Artista do álbum",
         inLibrary: "{count} músicas na sua biblioteca", plays: "{count} reproduções", top: "A mais ouvida: {title}", empty: "Nada depois desta música" },
-  ru: { label: "Панель песни", lyrics: "Текст", noLyrics: "Для этой песни пока нет текста", artist: "Об исполнителе",
+  ru: { sound: "Звучание", tempo: "Темп", key: "Тональность", mood: "Настроение", major: "мажор", minor: "минор", happy: "Радостное", calm: "Спокойное", sad: "Грустное", tense: "Напряжённое",
+        label: "Панель песни", lyrics: "Текст", noLyrics: "Для этой песни пока нет текста", artist: "Об исполнителе",
         credits: "Авторы", next: "Далее", nothing: "Ничего не играет", performer: "Исполняет", composer: "Автор",
         albumArtist: "Исполнитель альбома", inLibrary: "Песен в медиатеке: {count}", plays: "Прослушиваний: {count}", top: "Чаще всего: {title}",
         empty: "После этой песни ничего нет" },
-  ja: { label: "曲パネル", lyrics: "歌詞", noLyrics: "この曲の歌詞はまだありません", artist: "アーティストについて",
+  ja: { sound: "サウンド", tempo: "テンポ", key: "キー", mood: "ムード", major: "メジャー", minor: "マイナー", happy: "明るい", calm: "穏やか", sad: "切ない", tense: "激しい",
+        label: "曲パネル", lyrics: "歌詞", noLyrics: "この曲の歌詞はまだありません", artist: "アーティストについて",
         credits: "クレジット", next: "次に再生", nothing: "再生していません", performer: "演奏", composer: "作詞・作曲",
         albumArtist: "アルバムアーティスト", inLibrary: "ライブラリに {count} 曲", plays: "{count} 回再生", top: "最も再生：{title}",
         empty: "この曲の後には何もありません" },
-  zh: { label: "歌曲面板", lyrics: "歌词", noLyrics: "这首歌暂时没有歌词", artist: "关于艺人", credits: "制作人员",
+  zh: { sound: "声音", tempo: "速度", key: "调性", mood: "情绪", major: "大调", minor: "小调", happy: "欢快", calm: "平静", sad: "忧伤", tense: "激昂",
+        label: "歌曲面板", lyrics: "歌词", noLyrics: "这首歌暂时没有歌词", artist: "关于艺人", credits: "制作人员",
         next: "接下来播放", nothing: "没有在播放", performer: "演唱", composer: "词曲", albumArtist: "专辑艺人",
         inLibrary: "资料库中有 {count} 首歌", plays: "播放 {count} 次", top: "最常播放：{title}", empty: "这首歌之后没有内容" },
-  it: { label: "Pannello del brano", lyrics: "Testi", noLyrics: "Ancora nessun testo per questo brano",
+  it: { sound: "Il suono", tempo: "Tempo", key: "Tonalità", mood: "Umore", major: "maggiore", minor: "minore", happy: "Allegro", calm: "Calmo", sad: "Malinconico", tense: "Intenso",
+        label: "Pannello del brano", lyrics: "Testi", noLyrics: "Ancora nessun testo per questo brano",
         artist: "Info sull'artista", credits: "Crediti", next: "Prossimi in coda", nothing: "Non è in riproduzione nulla",
         performer: "Eseguito da", composer: "Scritto da", albumArtist: "Artista dell'album",
         inLibrary: "{count} brani nella tua libreria", plays: "{count} riproduzioni", top: "Il più ascoltato: {title}",
         empty: "Nulla dopo questo brano" },
-  ko: { label: "곡 패널", lyrics: "가사", noLyrics: "이 곡의 가사가 아직 없습니다",
+  ko: { sound: "사운드", tempo: "템포", key: "조성", mood: "분위기", major: "장조", minor: "단조", happy: "밝음", calm: "차분함", sad: "슬픔", tense: "격렬함",
+        label: "곡 패널", lyrics: "가사", noLyrics: "이 곡의 가사가 아직 없습니다",
         artist: "아티스트 정보", credits: "크레딧", next: "다음 곡", nothing: "재생 중인 곡이 없습니다",
         performer: "연주", composer: "작곡", albumArtist: "앨범 아티스트",
         inLibrary: "보관함에 곡 {count}개", plays: "{count}회 재생", top: "가장 많이 들은 곡: {title}",
@@ -159,6 +169,21 @@ function useCoverColors(trackKey) {
   return colors;
 }
 
+// Apple's analysis of the song (tempo, key, mood), when Ampify has Ampify.music and the song is in the catalog.
+function useAnalysis(catalogId) {
+  const [analysis, setAnalysis] = useState(null);
+  useEffect(() => {
+    setAnalysis(null);
+    if (!catalogId || !Ampify.music) return undefined;
+    let live = true;
+    Ampify.music.analysis(catalogId)
+      .then((items) => { if (live) setAnalysis(items[catalogId] || null); })
+      .catch((error) => Ampify.log("analysis not read: " + error));
+    return () => { live = false; };
+  }, [catalogId]);
+  return analysis;
+}
+
 function useQueue(trackId) {
   const [items, setItems] = useState([]);
   useEffect(() => {
@@ -212,6 +237,46 @@ function CreditsCard({ track, song }) {
   return h(Card, { title: t("credits") }, facts);
 }
 
+// Note names as each language writes them: do, ré, mi in the Romance languages and Russian, letters elsewhere.
+const SOLFEGE = {
+  fr: ["Do", "Ré", "Mi", "Fa", "Sol", "La", "Si"], es: ["Do", "Re", "Mi", "Fa", "Sol", "La", "Si"],
+  pt: ["Dó", "Ré", "Mi", "Fá", "Sol", "Lá", "Si"], it: ["Do", "Re", "Mi", "Fa", "Sol", "La", "Si"],
+  ru: ["До", "Ре", "Ми", "Фа", "Соль", "Ля", "Си"],
+};
+const LETTERS = "CDEFGAB";
+const ACCIDENTALS = { "#": "♯", "♯": "♯", "b": "♭", "♭": "♭" };
+
+// "A" and "major" -> "La majeur", "A major", "A-Dur", "Aメジャー"...; null when Apple gave no usable key.
+function keyName(key) {
+  const found = key && /^([A-Ga-g])([#♯b♭]?)$/.exec(String(key.tonic || "").trim());
+  if (!found || (key.mode !== "major" && key.mode !== "minor")) return null;
+  const language = Ampify.i18n.language;
+  const letter = found[1].toUpperCase();
+  const accidental = ACCIDENTALS[found[2]] || "";
+  const mode = t(key.mode);
+  if (language === "de") {
+    // German: H for B, B for B flat, a small letter for a minor key.
+    const note = letter === "B" ? (accidental === "♭" ? "B" : "H" + accidental) : letter + accidental;
+    return (key.mode === "minor" ? note.toLowerCase() : note) + "-" + mode;
+  }
+  const names = SOLFEGE[language];
+  const note = (names ? names[LETTERS.indexOf(letter)] : letter) + accidental;
+  return language === "ja" || language === "zh" ? note + mode : note + " " + mode;
+}
+
+function SoundCard({ analysis }) {
+  const bpm = analysis.bpm && Math.round(analysis.bpm.main);
+  const key = keyName(analysis.key && analysis.key.main);
+  const mood = analysis.mood;
+  const facts = [];
+  if (bpm > 0) facts.push(h(Fact, { key: "t", label: t("tempo"), value: bpm + " BPM" }));
+  if (key) facts.push(h(Fact, { key: "k", label: t("key"), value: key }));
+  if (mood) facts.push(h(Fact, { key: "m", label: t("mood"), value: t(mood) }));
+  if (facts.length === 0) return null;
+  // Side by side at their own widths: in equal columns a long mood ("Mélancolique") broke in the middle of the word.
+  return h(Card, { title: t("sound") }, h("row", { gap: 24 }, facts));
+}
+
 function QueueCard({ items }) {
   const rows = items.length === 0
     ? [h("text", { key: "none", text: t("empty"), size: 13, color: FAINT })]
@@ -232,6 +297,7 @@ function SongPanel() {
   const trackKey = track ? track.id + track.queueItemId : "";
   const queue = useQueue(trackKey);
   const colors = useCoverColors(trackKey);
+  const analysis = useAnalysis(track && track.catalogId);
   if (!track) return h("text", { text: t("nothing"), size: 14, color: SOFT });
   // The song's colour over the whole card (Ampify gives a panel's root background to its card), from bright at the
   // top to deep at the bottom.
@@ -246,6 +312,7 @@ function SongPanel() {
     h("image", { src: "artwork", fit: "cover", cornerRadius: 8, width: SIDE - 24, height: SIDE - 24,
                  label: track.album || track.title }),
     h(Header, { track, song }),
+    shows("sound") && analysis ? h(SoundCard, { analysis }) : null,
     shows("lyrics") ? h("stack", { background: lyricsTint, cornerRadius: 12, padding: 16, gap: 8, height: LYRICS_HEIGHT },
       h("text", { text: t("lyrics"), size: 15, weight: 700, color: TEXT }),
       // A line clicked: the song goes there.

@@ -175,6 +175,19 @@ struct PlayerNatives : ScriptBridge {
         return Answer(ctx, ext, "queue.remove", [&](QueueHost& queue) { return queue.RemoveFromQueue(id); });
     }
 
+    // native.queueMove(itemId, beforeItemId): the entry goes right before the other one.
+    AMPIFY_NATIVE(QueueMove) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "player.control", &failure)) return failure;
+        std::string id = String(ctx, argc, argv, 0).value_or("");
+        std::string before = String(ctx, argc, argv, 1).value_or("");
+        if (!IsValidQueueId(id) || !IsValidQueueId(before)) {
+            return Throw(ctx, "TypeError", "queue.move expects the ids of two queue entries");
+        }
+        return Answer(ctx, ext, "queue.move", [&](QueueHost& queue) { return queue.MoveInQueue(id, before); });
+    }
+
     template <class Call>
     static JSValue Answer(JSContext* ctx, ScriptExtension* ext, const char* what, Call call) {
         QueueHost* queue = HostOf(ext).Capability<QueueHost>();
@@ -200,6 +213,7 @@ void DefinePlayer(api::NativeScope& scope) {
     scope.Function("queueList", PlayerNatives::QueueList, 0);
     scope.Function("queueAdd", PlayerNatives::QueueAdd, 2);
     scope.Function("queueRemove", PlayerNatives::QueueRemove, 1);
+    scope.Function("queueMove", PlayerNatives::QueueMove, 2);
 }
 
 }  // namespace ampify::natives

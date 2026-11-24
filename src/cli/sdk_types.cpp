@@ -167,6 +167,21 @@ type ExtractedColors = {
   VIBRANT_NON_ALARMING: string;
   palette: { color: string; population: number }[];
 };
+type Mood = "happy" | "calm" | "sad" | "tense";
+type SongParts<T> = { beginning: T; main: T; ending: T };
+type SongAnalysis = {
+  bpm?: SongParts<number> & { percentDeviation: number };
+  key?: SongParts<{ tonic: string; mode: "major" | "minor" }>;
+  loudness?: SongParts<{ value: number; peak: number; range: number }>;
+  energy?: SongParts<number>;
+  valence?: SongParts<number>;
+  danceability?: SongParts<number>;
+  acousticness?: SongParts<number>;
+  melodicness?: SongParts<number>;
+  beats?: { beatsInMilliseconds: number[]; barsInMilliseconds: number[] };
+  vocalActivity?: { startInMilliseconds: number; endInMilliseconds: number; strength: string }[];
+  mood: Mood | null;
+};
 type FontRole = { family: string; weight: number; size: number; fromTheme: boolean };
 
 // 5.9: Ampify.React, Ampify.ReactDOM, Ampify.hooks and Ampify.components.
@@ -295,6 +310,7 @@ declare const Ampify: {
       list(): QueueState;
       add(catalogId: string | number, options?: { position?: "next" | "last" }): boolean;  // false on Windows for now
       remove(itemId: string | number): boolean;
+      move(itemId: string | number, beforeItemId: string | number): boolean;  // right before the other entry
     };
   };
 
@@ -421,6 +437,11 @@ declare const Ampify: {
     extract(pixels: ArrayLike<number> | ArrayBuffer, width: number, height: number): ExtractedColors;
     fromArtwork(url: string): Promise<ExtractedColors>;  // an artwork address of Apple Music, such as track.artwork
     playing(): Promise<ExtractedColors | null>;           // the cover playing now (permission player.read)
+  };
+  // Apple's audio analysis of catalog songs (permission player.read): Apple's own attributes, plus Ampify's mood.
+  music: {
+    analysis(catalogIds: string | string[], options?: { storefront?: string }): Promise<Record<string, SongAnalysis>>;
+    mood(analysis: SongAnalysis | null, part?: "beginning" | "main" | "ending"): Mood | null;
   };
   fonts: {
     roles(): Record<string, FontRole>;

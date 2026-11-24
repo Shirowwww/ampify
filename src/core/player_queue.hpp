@@ -66,6 +66,13 @@ struct QueueHost {
     virtual QueueResult AddToQueue(const std::string& trackId, QueuePosition position) = 0;
     // `itemId` is a QueueItem::id.
     virtual QueueResult RemoveFromQueue(const std::string& itemId) = 0;
+    // Moves the entry `itemId` right before the entry `beforeItemId`, both still to come, as Apple's queue moves
+    // entries. Both are QueueItem::id. A host that cannot answers why.
+    virtual QueueResult MoveInQueue(const std::string& itemId, const std::string& beforeItemId) {
+        (void)itemId;
+        (void)beforeItemId;
+        return {false, "moving queue entries is not supported by this host"};
+    }
 };
 
 // "history", "current", "next-added", "next", "autoplay", "unknown".

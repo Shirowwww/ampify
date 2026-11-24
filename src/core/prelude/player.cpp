@@ -169,6 +169,11 @@ const char kPlayer[] = R"AMPIFYJS(
       remove(itemId) {
         return native.queueRemove(queueId(itemId, "queue.remove expects the id of a queue entry"));
       },
+      // Puts an entry still to come right before another entry to come, as Apple's own queue moves them.
+      move(itemId, beforeItemId) {
+        return native.queueMove(queueId(itemId, "queue.move expects the id of a queue entry"),
+                                queueId(beforeItemId, "queue.move expects the id of the entry to go before"));
+      },
     }),
   };
 

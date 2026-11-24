@@ -185,6 +185,7 @@ Ampify.player.queue.list()  // -> { available, complete, source, reason,
 //                                   items: [{ id, title, artist, album, durationMs, section, catalogId, artwork }] }
 Ampify.player.queue.add(catalogId, { position: "next" | "last" })  // [preview] answers false for now
 Ampify.player.queue.remove(itemId)                                 // [preview]
+Ampify.player.queue.move(itemId, beforeItemId)                     // [preview] the entry goes right before the other (1.6)
 ```
 
 - `track.id` is computed from title, artist and album (`t-` and 16 characters), the same whatever the source.
@@ -216,7 +217,22 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
   `player.appleCommands = 1`, play, pause, next and previous use Apple's player first.
 - `queue.list()` gives Apple's "Up Next" by `section` (`history`, `current`, `next-added`, `next`, `autoplay`), 500
   entries at most. Apple Music builds its queue the first time that panel opens; before that, only the current track,
-  with `complete: false` and the reason. `queue.remove(id)` removes an entry still to come.
+  with `complete: false` and the reason. `queue.remove(id)` removes an entry still to come. `queue.move(id, beforeId)`
+  puts an entry still to come right before another entry to come, as Apple's own queue moves them, and waits for
+  Apple's queue to confirm, up to 3 s (Ampify 1.6, `player.control`). Moved one after the other, entries keep their
+  order: moving each entry of an order before its last one lays the whole order out. `queue.list()` may show the old
+  order for a moment after a move: work from ids, not from positions read in between.
+- `Ampify.music.analysis(ids)` gives Apple's own audio analysis of catalog songs (`track.catalogId`, a queue entry's
+  `catalogId`; one id or a list, the first 250 kept), as Apple's web player gets it: no account, no network permission, the kernel asks
+  `amp-api.music.apple.com` with the token music.apple.com gives every visitor, in the storefront of `Ampify.locale`
+  (`{ storefront: "fr" }` to choose), then in the US one for the songs missing there. Each song has, as Apple writes
+  them: `bpm` (`beginning`, `main`, `ending`, `percentDeviation`), `key` (`{ tonic: "A", mode: "major" }` per part),
+  `loudness` (`{ value, peak, range }` per part, dB), `energy`, `valence`, `danceability`, `acousticness`,
+  `melodicness` (0 to 1 per part), `beats` (`beatsInMilliseconds`, `barsInMilliseconds`: the whole beat and bar grid),
+  `vocalActivity` (`[{ startInMilliseconds, endInMilliseconds, strength }]`, strength `very-low` to `very-high`), and
+  `mood`, Ampify's reading of the main valence and energy (`Ampify.music.mood`: happy or calm above the middle valence,
+  tense or sad below, the first of each pair the livelier). A song Apple has not analysed is missing from the answer;
+  the promise rejects with the reason when Apple cannot be reached. Answers are kept for the process.
 - `queue.add` answers `false`: Apple's player ignores the songs handed to it
   ([knowledge/apple-music-queue.md](../../knowledge/apple-music-queue.md)).
 - Shuffle and repeat press Apple's own buttons of the main window, so Apple Music keeps one state, and read them back.
@@ -572,6 +588,8 @@ Ampify.color.extract(pixels, width, height)         // RGBA pixels -> PROMINENT,
                                                     //   DESATURATED, VIBRANT_NON_ALARMING, palette
 Ampify.color.fromArtwork(url) -> Promise<colors>    // an https://*.mzstatic.com artwork, same keys
 Ampify.color.playing() -> Promise<colors | null>    // the cover playing now, library songs too (player.read)
+Ampify.music.analysis(catalogIds) -> Promise<{ [id]: analysis }>   // Apple's audio analysis of songs (player.read, 1.6)
+Ampify.music.mood(analysis, part?) -> "happy" | "calm" | "sad" | "tense" | null
 Ampify.fonts.roles() -> { [role]: { family, weight, size, fromTheme } }
 Ampify.fonts.style(name) -> { role, family, weight, size, fromTheme } | null
 Ampify.lyrics.current() -> Promise<lyrics | null>   // player.lyrics() as a promise, permission player.read

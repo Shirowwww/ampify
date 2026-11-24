@@ -68,6 +68,7 @@ public:
     QueueSnapshot Queue() override;
     QueueResult AddToQueue(const std::string& trackId, QueuePosition position) override;
     QueueResult RemoveFromQueue(const std::string& itemId) override;
+    QueueResult MoveInQueue(const std::string& itemId, const std::string& beforeItemId) override;
 
     // Apple's lyrics of the current track, from Apple's player only (SMTC has none).
     std::optional<RawLyrics> Lyrics() override;

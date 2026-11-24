@@ -84,7 +84,7 @@ const Expected kMembers[] = {
                "setVolume:f1=setVolume,setRate:f1=setRate,rate:f0=rate,skipForward:f1=skipForward,skipBack:f1=skipBack,progress:f0=progress,"
                "formatTime:f1=formatTime,muted:f0=muted,setMute:f1=setMute,toggleMute:f0=toggleMute,"
                "increaseVolume:f1=increaseVolume,decreaseVolume:f1=decreaseVolume,lyrics:f0=lyrics,artwork:f0=artwork,"
-               "queue:object!{list:f0=list,add:f2=add,remove:f1=remove}}"},
+               "queue:object!{list:f0=list,add:f2=add,remove:f1=remove,move:f2=move}}"},
     {"audio", "object!{setGainDb:f1=setGainDb,onFrame:f1=onFrame,analyze:f0=analyze,loudness:f0=loudness,"
               "volume:f0=volume,eq:object!{setBand:f2=setBand,preset:f1=preset,reset:f0=reset,bands:f0=bands,"
               "presets:f0=presets},sing:object!{set:f1=set,state:f0=state,onChange:f1=onChange}}"},
@@ -97,6 +97,7 @@ const Expected kMembers[] = {
     {"uri", "object!{parse:f1=parse,build:f3=build,isSong:f1=isSong,isAlbum:f1=isAlbum,isPlaylist:f1=isPlaylist,"
             "isArtist:f1=isArtist,isStation:f1=isStation}"},  // the predicates added in kitApi 1.x
     {"color", "object!{extract:f3=extract,fromArtwork:f1=fromArtwork,playing:f0=playing}"},
+    {"music", "object!{analysis:f1=analysis,mood:f2=mood}"},
     {"fonts", "object!{roles:f0=roles,style:f1=style}"},
     // setLabel, setActive, setDisabled, playbar.mark, readout and onHover, panel.onClose, the removes, popup.show and
     // close, title.get and reset, miniPlayer added in kitApi 1.x, compatible additions

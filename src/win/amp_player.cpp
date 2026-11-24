@@ -510,6 +510,19 @@ rt::Ref QueuedArtwork(uint64_t itemId) {
 
 void ForgetQueuedArtworkForTests() { StoreQueueArtworks({}, 0); }
 
+rt::Ref StartAppleQueueMove(uint64_t itemId, uint64_t anchorId, std::string& failure) {
+    rt::Ref queue = CurrentPlayQueue(failure);
+    if (!queue) return {};
+    rt::Ref ids = rt::MakeVector(CollectionIids(amp::kIidsUInt64Collections), std::vector<uint64_t>{itemId});
+    rt::Ref operation;
+    HRESULT hr = rt::CallSlot(queue, slot::kPlayQueueMove, ids.Get(), anchorId, operation.Put());
+    if (FAILED(hr) || !operation) {
+        failure = "MovePlayQueueItemsAsync failed (code " + HresultText(hr) + ")";
+        return {};
+    }
+    return operation;
+}
+
 rt::Ref StartAppleQueueRemove(uint64_t itemId, std::string& failure) {
     rt::Ref queue = CurrentPlayQueue(failure);
     if (!queue) return {};

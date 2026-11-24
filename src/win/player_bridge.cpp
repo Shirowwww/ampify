@@ -424,4 +424,44 @@ QueueResult PlayerBridge::RemoveFromQueue(const std::string& itemId) {
     return {true, ""};
 }
 
+QueueResult PlayerBridge::MoveInQueue(const std::string& itemId, const std::string& beforeItemId) {
+    std::string failure;
+    bool cut = false;
+    std::optional<std::vector<AmpQueueEntry>> entries = AppleQueue(failure, cut);
+    if (!entries) return {false, "the queue cannot be changed: " + failure};
+    const AmpQueueEntry* entry = nullptr;
+    const AmpQueueEntry* before = nullptr;
+    for (const AmpQueueEntry& candidate : *entries) {
+        if (std::to_string(candidate.id) == itemId) entry = &candidate;
+        if (std::to_string(candidate.id) == beforeItemId) before = &candidate;
+    }
+    std::string where = cut ? "the first " + std::to_string(kMaxQueueEntries) + " entries of the queue" : "the queue";
+    if (!entry) return {false, "no entry " + itemId + " in " + where};
+    if (!before) return {false, "no entry " + beforeItemId + " in " + where};
+    auto toCome = [](const AmpQueueEntry& e) {
+        QueueSection section = QueueSectionFromKind(e.sectionKind);
+        return section == QueueSection::NextAdded || section == QueueSection::Next || section == QueueSection::Autoplay;
+    };
+    if (!toCome(*entry) || !toCome(*before)) return {false, "only entries still to come can be moved, or moved before"};
+    if (entry->id == before->id) return {true, ""};
+
+    // Apple puts the entries it moves right before its anchor (seen on screen, 24/11/2026). Only ids are passed:
+    // the order read just after a move may still be the old one.
+    struct Start {
+        rt::Ref operation;
+        std::string failure;
+    };
+    auto start = std::make_shared<Start>();
+    uint64_t id = entry->id;
+    uint64_t anchor = before->id;
+    if (!OnInterfaceThread([start, id, anchor] { start->operation = StartAppleQueueMove(id, anchor, start->failure); })) {
+        return {false, "Apple Music's interface thread did not answer"};
+    }
+    if (!start->operation) return {false, start->failure};
+    if (!rt::Wait(start->operation, kQueueChangeTimeoutMs)) {
+        return {false, "Apple's queue did not confirm the move within 3 s"};
+    }
+    return {true, ""};
+}
+
 }  // namespace ampify::win

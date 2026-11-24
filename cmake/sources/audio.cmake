@@ -17,9 +17,11 @@ list(APPEND AMPIFY_CORE_SOURCES
     src/core/prelude/audio_analysis.cpp
     src/core/prelude/audio_sing.cpp
     src/core/prelude/color.cpp
+    src/core/prelude/music.cpp
     src/core/natives/audio_analysis.cpp
     src/core/natives/sing.cpp
-    src/core/natives/color.cpp)
+    src/core/natives/color.cpp
+    src/core/natives/music.cpp)
 
 list(APPEND AMPIFY_TESTS_SOURCES
     tests/audio_tests.cpp

@@ -258,6 +258,9 @@ inline constexpr int kLyricsLanguage = 15;
 // IAsyncAction.
 inline constexpr int kPlayQueueStaticsCurrent = 6;
 inline constexpr int kPlayQueueSections = 9;
+// MovePlayQueueItemsAsync(IVector<UInt64> entries, UInt64 anchor) -> IAsyncAction, read from AMP.Services.winmd 1.1792:
+// the entries go right before the anchor entry (seen on screen, 24/11/2026).
+inline constexpr int kPlayQueueMove = 14;
 inline constexpr int kPlayQueueDelete = 15;
 
 // AMP.Services.IPlayQueueSection (get_SectionKind is an Int32) and, in CommonModels, IComponentModelContainer,
@@ -347,6 +350,7 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.CommonModels.ILyricsInfo", "GetLanguage", slot::kLyricsLanguage},
     {"AMP.Services.IPlayQueueStatics", "get_Current", slot::kPlayQueueStaticsCurrent},
     {"AMP.Services.IPlayQueue", "get_Sections", slot::kPlayQueueSections},
+    {"AMP.Services.IPlayQueue", "MovePlayQueueItemsAsync", slot::kPlayQueueMove},
     {"AMP.Services.IPlayQueue", "DeletePlayQueueItemsAsync", slot::kPlayQueueDelete},
     {"AMP.Services.IPlayQueueSection", "get_SectionKind", slot::kSectionKind},
     {"AMP.Services.CommonModels.IComponentModelContainer", "get_Items", slot::kContainerItems},

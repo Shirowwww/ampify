@@ -29,6 +29,7 @@ extern const char kUi[];
 extern const char kAudioAnalysis[];
 extern const char kAudioSing[];
 extern const char kColor[];
+extern const char kMusic[];
 extern const char kReact[];
 extern const char kCrypto[];
 extern const char kI18n[];
@@ -59,6 +60,7 @@ void DefineAudioAnalysis(api::NativeScope& scope);
 void StopAudioAnalysis(ScriptExtension& extension);
 void DefineAudioSing(api::NativeScope& scope);
 void DefineColor(api::NativeScope& scope);
+void DefineMusic(api::NativeScope& scope);
 void DefineReact(api::NativeScope& scope);
 void DefineCrypto(api::NativeScope& scope);
 void DefineI18n(api::NativeScope& scope);
@@ -106,6 +108,7 @@ const ApiModule kModules[] = {
     {"icons", prelude::kIcons, nullptr, nullptr, nullptr},
     {"uri", prelude::kUri, nullptr, nullptr, nullptr},
     {"color", prelude::kColor, natives::DefineColor, nullptr, nullptr},
+    {"music", prelude::kMusic, natives::DefineMusic, nullptr, nullptr},
     {"fonts", prelude::kFonts, natives::DefineFonts, nullptr, nullptr},
     {"timers", prelude::kTimers, natives::DefineTimers, nullptr, nullptr},
     {"console", prelude::kConsole, nullptr, nullptr, nullptr},

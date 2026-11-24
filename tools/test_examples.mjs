@@ -3456,6 +3456,148 @@ test("hi-res-badge leaves 48 kHz, AAC and Dolby Atmos to Apple, and trusts Apple
   assert.deepEqual(fake.world.badges.at(-1), null, "nothing playing");
 });
 
+// Queue flow ships with Ampify, in extensions/: it reorders Apple's queue from Apple's analysis of the songs.
+function fakeQueueFlow({ items, analyses, state, refuseMoves = false, refuseAfter = Infinity, music = true }) {
+  const dir = join(examples, "..", "extensions", "queue-flow");
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+  const granted = new Set(manifest.permissions ?? []);
+  const used = new Set();
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+    used.add(permission);
+  };
+  const world = { items: structuredClone(items), moves: [], notes: [], labels: [], active: [], click: null,
+                  handlers: { trackchange: [] }, asked: [], refuseAfter };
+  // Apple's queue: an entry moved goes right before the other one.
+  const move = (id, before) => {
+    need("player.control");
+    if (refuseMoves || world.moves.length >= world.refuseAfter) return false;
+    world.moves.push([id, before]);
+    const list = world.items;
+    const from = list.findIndex((item) => item.id === id);
+    const [entry] = list.splice(from, 1);
+    list.splice(list.findIndex((item) => item.id === before), 0, entry);
+    return true;
+  };
+  const ampify = {
+    i18n: { define: () => {}, t: (key, values) => key + (values && values.count !== undefined ? ":" + values.count : "") },
+    log: () => {},
+    notify: (note) => (need("notifications"), world.notes.push(note.text)),
+    player: {
+      state: () => (need("player.read"), structuredClone(state)),
+      on: (event, fn) => (need("player.read"), world.handlers[event].push(fn)),
+      queue: { list: () => (need("player.read"), { items: structuredClone(world.items) }), move },
+    },
+    ui: {
+      playbar: { addButton: (options) => (need("ui.playbar"), (world.click = options.onClick), 7) },
+      setLabel: (id, label) => world.labels.push(label),
+      setActive: (id, on) => world.active.push(on),
+    },
+  };
+  if (music) {
+    ampify.music = { analysis: async (ids) => (need("player.read"), world.asked.push(...ids),
+                                               Object.fromEntries(ids.filter((id) => analyses[id]).map((id) => [id, analyses[id]]))) };
+  }
+  const context = { Ampify: ampify };
+  runIn(readFileSync(join(dir, "main.js"), "utf-8"), context);
+  return { world, context, used, manifest };
+}
+
+// A song as Apple's analysis describes it, the same at both ends.
+const analysed = (bpm, tonic, mode, energy) => ({
+  bpm: { beginning: bpm, main: bpm, ending: bpm },
+  key: { beginning: { tonic, mode }, main: { tonic, mode }, ending: { tonic, mode } },
+  energy: { beginning: energy, main: energy, ending: energy },
+  loudness: { beginning: { value: -10 }, main: { value: -10 }, ending: { value: -10 } },
+  vocalActivity: [],
+});
+
+test("queue-flow reads tempos and keys as a DJ does", () => {
+  const { context } = fakeQueueFlow({ items: [], analyses: {}, state: { track: null } });
+  assert.equal(context.tempoGap(120, 60), 0, "half tempo counts as the same");
+  assert.ok(Math.abs(context.tempoGap(100, 108) - 0.08) < 1e-9);
+  assert.deepEqual({ ...context.camelot({ tonic: "C", mode: "major" }) }, { number: 8, minor: false });
+  assert.deepEqual({ ...context.camelot({ tonic: "A", mode: "minor" }) }, { number: 8, minor: true });
+  assert.deepEqual({ ...context.camelot({ tonic: "F#", mode: "major" }) }, { number: 2, minor: false });
+  assert.equal(context.camelot({ tonic: "H", mode: "major" }), null);
+  const c = context.camelot({ tonic: "C", mode: "major" });
+  assert.equal(context.keyDistance(c, context.camelot({ tonic: "G", mode: "major" })), 1);
+  assert.equal(context.keyDistance(c, context.camelot({ tonic: "A", mode: "minor" })), 1, "the relative minor");
+  assert.equal(context.keyDistance(c, context.camelot({ tonic: "F#", mode: "major" })), 6);
+});
+
+test("queue-flow sorts the songs to come by tempo and key, then puts the queue back", async () => {
+  const items = [
+    { id: "1", section: "current", catalogId: "100", durationMs: 200000 },
+    { id: "2", section: "next", catalogId: "200", durationMs: 200000 },
+    { id: "3", section: "next", catalogId: "300", durationMs: 200000 },
+    { id: "4", section: "next", catalogId: "400", durationMs: 200000 },
+    { id: "5", section: "autoplay", catalogId: "500", durationMs: 200000 },
+  ];
+  const analyses = {
+    100: analysed(120, "C", "major", 0.5),
+    200: analysed(90, "F#", "major", 0.9),   // far from everything
+    300: analysed(122, "G", "major", 0.55),  // right after the current song
+    400: analysed(124, "D", "major", 0.6),   // then this one
+  };
+  const fake = fakeQueueFlow({ items, analyses, state: { track: { catalogId: "100" }, durationMs: 200000 } });
+  fake.world.click();
+  await settle();
+  await settle();
+  assert.deepEqual(fake.world.items.map((item) => item.id), ["1", "3", "4", "2", "5"], "autoplay is left alone");
+  assert.deepEqual([...fake.world.asked].sort(), ["100", "200", "300", "400"]);
+  assert.equal(fake.world.notes.at(-1), "sorted:3");
+  assert.equal(fake.world.active.at(-1), true);
+  assert.equal(fake.world.labels.at(-1), "restore");
+
+  fake.world.click();
+  await settle();
+  await settle();
+  assert.deepEqual(fake.world.items.map((item) => item.id), ["1", "2", "3", "4", "5"]);
+  assert.equal(fake.world.notes.at(-1), "restored");
+  assert.equal(fake.world.active.at(-1), false);
+  assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+});
+
+test("queue-flow can put back a sort Apple stopped halfway", async () => {
+  const items = ["current", "next", "next", "next", "next"].map((section, i) => ({ id: String(i + 1), section, catalogId: String(i + 1) }));
+  const analyses = { 1: analysed(120, "C", "major", 0.5), 2: analysed(90, "F#", "major", 0.9),
+                     3: analysed(122, "G", "major", 0.55), 4: analysed(124, "D", "major", 0.6), 5: analysed(126, "A", "major", 0.6) };
+  const fake = fakeQueueFlow({ items, analyses, state: { track: { catalogId: "1" }, durationMs: 200000 }, refuseAfter: 1 });
+  fake.world.click();
+  await settle();
+  await settle();
+  assert.match(fake.world.notes.at(-1), /^failed/);
+  assert.notDeepEqual(fake.world.items.map((item) => item.id), ["1", "2", "3", "4", "5"], "one move went through");
+  assert.equal(fake.world.labels.at(-1), "restore");
+  fake.world.refuseAfter = Infinity;
+  fake.world.click();
+  await settle();
+  await settle();
+  assert.deepEqual(fake.world.items.map((item) => item.id), ["1", "2", "3", "4", "5"]);
+  assert.equal(fake.world.notes.at(-1), "restored");
+});
+
+test("queue-flow says why when there is too little to sort, Apple refuses, or Ampify is too old", async () => {
+  const few = fakeQueueFlow({ items: [{ id: "1", section: "current" }, { id: "2", section: "next" }], analyses: {},
+                             state: { track: null } });
+  few.world.click();
+  await settle();
+  assert.equal(few.world.notes.at(-1), "nothing");
+
+  const items = ["current", "next", "next", "next"].map((section, i) => ({ id: String(i + 1), section, catalogId: "" }));
+  const refused = fakeQueueFlow({ items, analyses: {}, state: { track: null }, refuseMoves: true });
+  refused.world.click();
+  await settle();
+  await settle();
+  assert.match(refused.world.notes.at(-1), /^failed/);
+  assert.equal(refused.world.active.at(-1), false);
+
+  const old = fakeQueueFlow({ items, analyses: {}, state: { track: null }, music: false });
+  old.world.click();
+  assert.equal(old.world.notes.at(-1), "old");
+});
+
 // Explicit or clean ships with Ampify, in extensions/: it skips the version of a song the user does not want.
 function fakeExplicitFilter(keep) {
   const dir = join(examples, "..", "extensions", "explicit-filter");

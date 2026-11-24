@@ -68,6 +68,7 @@ struct QueueFakeHost : ampify::test::FakeHost, ampify::QueueHost {
     ampify::QueueSnapshot queue;
     std::vector<std::string> added;    // "id|next" or "id|last"
     std::vector<std::string> removed;
+    std::vector<std::string> moved;
     bool accept = true;
 
     ampify::QueueSnapshot Queue() override { return queue; }
@@ -77,6 +78,10 @@ struct QueueFakeHost : ampify::test::FakeHost, ampify::QueueHost {
     }
     ampify::QueueResult RemoveFromQueue(const std::string& itemId) override {
         removed.push_back(itemId);
+        return {accept, accept ? "" : "not now"};
+    }
+    ampify::QueueResult MoveInQueue(const std::string& itemId, const std::string& beforeItemId) override {
+        moved.push_back(itemId + "<" + beforeItemId);
         return {accept, accept ? "" : "not now"};
     }
     void* QueryCapability(std::string_view name) override {
@@ -546,6 +551,8 @@ TEST_CASE(PlayerQueue_ListNeedsPlayerReadAndWritesNeedPlayerControl) {
         try { Ampify.player.queue.add("x", { position: "first" }); } catch (e) { Ampify.log("pos " + e.name); }
         try { Ampify.player.queue.add(); } catch (e) { Ampify.log("noid " + e.name); }
         try { Ampify.player.queue.remove("a b"); } catch (e) { Ampify.log("badid " + e.name); }
+        Ampify.log("move " + Ampify.player.queue.move("9", "7"));
+        try { Ampify.player.queue.move("9"); } catch (e) { Ampify.log("nobefore " + e.name); }
     )");
     CHECK(writer->Start());
     CHECK(f.Logged("[qwrite] add true"));
