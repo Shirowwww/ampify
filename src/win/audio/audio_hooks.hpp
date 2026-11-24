@@ -47,6 +47,10 @@ public:
     virtual void StreamRate(int sampleRate) = 0;
     virtual void ObjectRate(int sampleRate) = 0;
 
+    // True while the policy gains the sound (the leveler switched on): each new spatial stream then fades in from its
+    // first frame, before the policy's gain for it comes. Any thread.
+    virtual bool Leveling() = 0;
+
     // Stereo samples before the gain, with the player volume `playerVolume` already in them.
     virtual void FeedStream(const float* samples, size_t frames, float playerVolume) = 0;
     // The spatial objects of one update pass, before the gain and the slider volume: power per frame and peak.

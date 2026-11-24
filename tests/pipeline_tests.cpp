@@ -131,6 +131,23 @@ TEST_CASE(ObjectPass_NewStreamFadesItsGainIn) {
     CHECK_NEAR(wet[kRate * 9 / 10], 2.0 * dry[kRate * 9 / 10], 1e-3);  // and at the full gain after it
 }
 
+TEST_CASE(ObjectPass_WithTheLevelerOnANewStreamFadesInBeforeItsGainComes) {
+    // An Atmos song after a stereo one: its stream opens at unity, and the leveler's gain comes a poll later, once it
+    // knows the song is Atmos. The renderer's loud start is in those first frames: they fade in all the same.
+    constexpr size_t kRate = 48000;
+    std::vector<float> dry(kRate, 0.1f);
+    std::vector<float> wet = dry;
+    ampify::audio::ObjectPass pass(kRate, true);
+    for (size_t start = 0; start < wet.size(); start += 480) {
+        ampify::audio::ObjectBuffer buffer{&wet, wet.data() + start};
+        pass.Process(std::span(&buffer, 1), 480, start < kRate * 3 / 10 ? 1.0 : 2.0);
+    }
+
+    CHECK(wet[kRate / 10] < 0.5f * dry[kRate / 10]);                 // held down though no gain is asked yet
+    CHECK(wet[kRate * 6 / 10] < wet[kRate * 9 / 10]);                // then rising
+    CHECK_NEAR(wet[kRate * 9 / 10], 2.0 * dry[kRate * 9 / 10], 0.01);  // and at the gain once it came
+}
+
 TEST_CASE(ObjectPass_FadeHappensOncePerStream) {
     constexpr size_t kRate = 48000;
     ampify::audio::ObjectPass pass(kRate);

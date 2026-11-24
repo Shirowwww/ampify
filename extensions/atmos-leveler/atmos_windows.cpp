@@ -7,6 +7,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -195,9 +196,13 @@ void RenewLeveler() {
     LoadLevels();
 }
 
+// Whether the config in use gains the sound at all, for the audio threads (GainPolicy::Leveling).
+std::atomic<bool> g_leveling{false};
+
 void UseConfig(const LevelerConfig& config) {
     std::lock_guard<std::mutex> guard(g_levelerLock);
     g_config = config;
+    g_leveling = config.maxGainDb > 0 && (config.autoLevel || config.fallbackGainDb > 0);
 }
 
 // Describes one CoreFoundation object as text, such as "mediaType:'soun' mediaSubType:'qec3' ...".
@@ -415,6 +420,8 @@ public:
         g_journaledStreamRate = rate;
         Note("stereo measurement at " + std::to_string(rate) + " Hz (IAudioRenderClient, after the player volume)");
     }
+
+    bool Leveling() override { return g_leveling.load(); }
 
     void ObjectRate(int rate) override {
         std::lock_guard<std::mutex> guard(g_levelerLock);

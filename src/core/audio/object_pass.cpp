@@ -16,25 +16,30 @@ constexpr double kFadeInFloorDb = -12.0;
 
 }  // namespace
 
-ObjectPass::ObjectPass(double sampleRate) : m_sampleRate(sampleRate), m_ramp(sampleRate) {}
+ObjectPass::ObjectPass(double sampleRate, bool fadeIn)
+    : m_sampleRate(sampleRate), m_fadeIn(fadeIn), m_ramp(sampleRate) {}
 
-void ObjectPass::FadeIn(size_t frames) {
+bool ObjectPass::FadeIn(size_t frames) {
     const auto hold = static_cast<size_t>(kFadeInHoldSeconds * m_sampleRate);
     const auto total = static_cast<size_t>(kFadeInSeconds * m_sampleRate);
+    if (frames == 0 || m_elapsed >= total) return false;
     for (size_t frame = 0; frame < frames && m_elapsed + frame < total; frame++) {
         const size_t at = m_elapsed + frame;
         const double rise = at < hold ? 0.0 : static_cast<double>(at - hold) / static_cast<double>(total - hold);
         m_curve[frame] *= static_cast<float>(std::pow(10.0, kFadeInFloorDb * (1.0 - rise) / 20.0));
     }
+    return true;
 }
 
 const PassLevels& ObjectPass::Process(std::span<const ObjectBuffer> objects, size_t frames, double targetLinear,
                                       SampleStage* stage) {
     m_levels.framePower.assign(frames, 0.0);
     m_levels.peak = 0;
-    const bool unity = m_ramp.Curve(frames, targetLinear, m_curve);
-    // Only a gained stream fades in: at unity Ampify leaves the samples exactly as Apple Music made them.
-    if (!unity) FadeIn(frames);
+    bool unity = m_ramp.Curve(frames, targetLinear, m_curve);
+    // With the leveler on, a new stream fades in from its first frame: an Atmos song after a stereo one opens its
+    // stream before the leveler knows it is Atmos and sends its gain, and waiting for that gain let the renderer's
+    // loud start through. Otherwise only a gained stream fades in: Ampify leaves the samples as Apple made them.
+    if ((m_fadeIn || !unity) && FadeIn(frames)) unity = false;
     m_elapsed += frames;
 
     // Objects come and go. Past the limit the filter states are dropped rather than the table grown

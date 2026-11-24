@@ -605,11 +605,12 @@ void OnSpatialStreamActivated(const PROPVARIANT* params, REFIID riid, void* stre
     }
 
     int rate = static_cast<int>(format->nSamplesPerSec);
+    GainPolicy* policy = g_policy.load();
     {
         std::lock_guard<std::mutex> guard(g_passLock);
-        g_objectPass = std::make_unique<audio::ObjectPass>(rate);
+        g_objectPass = std::make_unique<audio::ObjectPass>(rate, policy && policy->Leveling());
     }
-    if (GainPolicy* policy = g_policy.load()) policy->ObjectRate(rate);
+    if (policy) policy->ObjectRate(rate);
     g_spatialRate = rate;
     if (metadata && stream) HookMetadataStream(stream);
 }

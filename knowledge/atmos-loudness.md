@@ -88,7 +88,10 @@ loop came back to the same passage, and comparing with that passage played throu
 - The objects the hooks see are not louder over that time: the burst comes after them, in the renderer.
 
 `ObjectPass` is made again for each new stream, so it fades its gain in: held at -12 dB for 0.4 s, then up to the
-gain by 0.8 s (`object_pass.cpp`). It only does so while it gains the objects: at unity the samples stay untouched.
+gain by 0.8 s (`object_pass.cpp`). With the leveler on it does so from the stream's first frame, whatever the gain:
+an Atmos song after a stereo one opens its stream before the leveler knows the song is Atmos (a poll later), and a
+fade that waited for the gain let the loud start through (Victor heard it, 2026-11-24). With the leveler off, the
+samples stay untouched.
 
 ## What the 16 objects hold (2026-11-16, for Sing)
 
