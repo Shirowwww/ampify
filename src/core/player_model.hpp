@@ -60,6 +60,8 @@ struct AmpReading {
     int32_t audioFormat = 0;  // amp::AudioFormat
     std::string sampleRate;   // INowPlayingItem.AudioFormatSampleRate as Apple writes it ("192 kHz"), may be empty
     std::string bitDepth;     // INowPlayingItem.AudioFormatBitDepth ("24-bit"), empty when Apple does not know it
+    int32_t explicitState = 0;  // amp::ExplicitState
+    std::string catalogId;    // the item's content descriptor AdamId, empty for a song that is not in the catalog
     uint64_t queueItemId = 0;
     ArtworkReading artwork;
     bool lyricsAvailable = false;  // ILyricsInfo.HaveLyrics said yes and the text was read
@@ -116,6 +118,8 @@ std::string TrackIdOf(const std::string& title, const std::string& artist, const
 std::string VariantOfAudioFormat(int32_t format);
 bool IsAtmosFormat(int32_t format);
 bool IsLosslessFormat(int32_t format);
+// "explicit", "clean", or "" when Apple says neither (amp::ExplicitState).
+std::string ContentRatingOf(int32_t explicitState);
 
 // The numbers in Apple's text of the stream's format: "192 kHz" or "44,1 kHz" -> 192000 and 44100 Hz (a bare number
 // under 1000 is in kHz), "24-bit" -> 24. 0 when the text holds no plausible value.

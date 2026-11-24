@@ -26,6 +26,10 @@ struct TrackInfo {
     // The stream's sample rate in Hz and bit depth; 0 when the source does not say (SMTC, or Apple leaves it out).
     int sampleRate = 0;
     int bitDepth = 0;
+    // Apple's catalog id of the song ("1111354162"), empty for a song outside the catalog or from SMTC; and
+    // "explicit", "clean" or "" as Apple marks it.
+    std::string catalogId;
+    std::string contentRating;
     // The entry of the play queue that holds this track, as Apple numbers it. The same song played twice has two
     // entries. Empty when the source does not tell it (SMTC).
     std::string queueItemId;

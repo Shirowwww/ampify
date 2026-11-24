@@ -28,6 +28,8 @@ Json PlayerJson(const PlayerSnapshot& snapshot) {
         track.emplace_back("lossless", Json(t.lossless));
         track.emplace_back("sampleRate", Json(static_cast<double>(t.sampleRate)));
         track.emplace_back("bitDepth", Json(static_cast<double>(t.bitDepth)));
+        track.emplace_back("catalogId", Json(t.catalogId));
+        track.emplace_back("contentRating", Json(t.contentRating));
         track.emplace_back("queueItemId", Json(t.queueItemId));
         track.emplace_back("artwork", Json(t.artwork));
         track.emplace_back("artworkColor", Json(t.artworkColor));

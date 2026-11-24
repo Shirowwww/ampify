@@ -224,6 +224,8 @@ inline constexpr int kItemSubtitle = 6;
 inline constexpr int kItemArtist = 7;
 inline constexpr int kItemAlbum = 8;
 inline constexpr int kItemArtwork = 11;
+// get_ExplicitState: an AMP.Services.CommonModels.ExplicitState, None = 0, Explicit = 1, Clean = 2 (Int32).
+inline constexpr int kItemExplicitState = 13;
 inline constexpr int kItemName = 19;
 inline constexpr int kItemIsPlaceholder = 24;
 inline constexpr int kItemCurrentPosition = 30;
@@ -326,6 +328,7 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.CommonModels.INowPlayingItem", "get_IsPlaceholder", slot::kItemIsPlaceholder},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_CurrentPosition", slot::kItemCurrentPosition},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_Duration", slot::kItemDuration},
+    {"AMP.Services.CommonModels.INowPlayingItem", "get_ExplicitState", slot::kItemExplicitState},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_AudioFormat", slot::kItemAudioFormat},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_AudioFormatSampleRate", slot::kItemAudioFormatSampleRate},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_AudioFormatBitDepth", slot::kItemAudioFormatBitDepth},
@@ -405,5 +408,7 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
 // HiResLossless, DolbyAtmos, Spatial, Surround. The values are taken as 0 to 5, the MIDL default for an enum without
 // explicit values; the PC confirms it on a lossless and an Atmos track.
 enum class AudioFormat { Other = 0, Lossless = 1, HiResLossless = 2, DolbyAtmos = 3, Spatial = 4, Surround = 5 };
+// AMP.Services.CommonModels.ExplicitState, read from its constants in AMP.Services.winmd 1.1792.
+enum class ExplicitState { None = 0, Explicit = 1, Clean = 2 };
 
 }  // namespace ampify::amp

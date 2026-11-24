@@ -1,0 +1,18 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "explicit-filter",
+  "name": "Explicit or clean",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Plays one version of the songs Apple has in both, explicit or clean, and skips the other one when it comes up, such as a clean version added by mistake. Songs Apple marks neither way always play.",
+  "translations": {"fr": {"name": "Explicite ou censuré", "description": "Joue une seule version des morceaux qu'Apple propose en deux, explicite ou censurée, et passe l'autre quand elle arrive, comme une version censurée ajoutée par erreur. Les morceaux qu'Apple ne marque ni l'un ni l'autre passent toujours.", "settings": {"keep": "Version jouée"}, "options": {"Explicit": "Explicite", "Clean": "Censurée"}}, "de": {"name": "Explizit oder bereinigt", "description": "Spielt nur eine Version der Titel, die Apple in beiden Fassungen hat, explizit oder bereinigt, und überspringt die andere, etwa eine versehentlich hinzugefügte bereinigte Version. Titel ohne Kennzeichnung laufen immer.", "settings": {"keep": "Gespielte Version"}, "options": {"Explicit": "Explizit", "Clean": "Bereinigt"}}, "es": {"name": "Explícita o limpia", "description": "Reproduce una sola versión de las canciones que Apple tiene en las dos, explícita o limpia, y salta la otra cuando llega, como una versión limpia añadida por error. Las canciones sin marca siempre suenan.", "settings": {"keep": "Versión que suena"}, "options": {"Explicit": "Explícita", "Clean": "Limpia"}}, "pt": {"name": "Explícita ou limpa", "description": "Toca só uma versão das músicas que a Apple tem nas duas, explícita ou limpa, e pula a outra quando ela aparece, como uma versão limpa adicionada por engano. Músicas sem marcação sempre tocam.", "settings": {"keep": "Versão tocada"}, "options": {"Explicit": "Explícita", "Clean": "Limpa"}}, "ru": {"name": "Откровенная или цензурная", "description": "Играет только одну версию песен, которые у Apple есть в обеих, откровенную или цензурную, и пропускает другую, например цензурную, добавленную по ошибке. Песни без пометки играют всегда.", "settings": {"keep": "Какую версию играть"}, "options": {"Explicit": "Откровенная", "Clean": "Цензурная"}}, "ja": {"name": "Explicit かクリーンか", "description": "Apple が両方の版を持つ曲について Explicit 版かクリーン版の一方だけを再生し、もう一方（誤って追加したクリーン版など）が来たらスキップします。どちらの表示もない曲は常に再生されます。", "settings": {"keep": "再生する版"}, "options": {"Explicit": "Explicit", "Clean": "クリーン"}}, "zh": {"name": "露骨版或洁净版", "description": "对于 Apple 同时提供两种版本的歌曲，只播放露骨版或洁净版其中之一，另一版本出现时（如误加的洁净版）自动跳过。没有标记的歌曲照常播放。", "settings": {"keep": "播放的版本"}, "options": {"Explicit": "露骨版", "Clean": "洁净版"}}, "it": {"name": "Esplicita o pulita", "description": "Riproduce una sola versione dei brani che Apple ha in entrambe, esplicita o pulita, e salta l'altra quando arriva, come una versione pulita aggiunta per errore. I brani senza indicazione suonano sempre.", "settings": {"keep": "Versione riprodotta"}, "options": {"Explicit": "Esplicita", "Clean": "Pulita"}}, "ko": {"name": "Explicit 또는 클린", "description": "Apple이 두 가지 버전을 모두 가진 곡에서 Explicit 또는 클린 중 하나만 재생하고, 다른 버전(실수로 추가한 클린 버전 등)이 나오면 건너뜁니다. 표시가 없는 곡은 항상 재생됩니다.", "settings": {"keep": "재생할 버전"}, "options": {"Explicit": "Explicit", "Clean": "클린"}}},
+  "kitApi": "1.0",
+  "minAmpify": "1.6.0",
+  "preview": "preview.jpg",
+  "main": "main.js",
+  "permissions": ["player.read", "player.control", "notifications"],
+  "settings": [
+    {"key": "keep", "label": "Version played", "type": "choice", "options": ["Explicit", "Clean"], "default": "Explicit"}
+  ]
+}

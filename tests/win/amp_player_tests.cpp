@@ -246,6 +246,10 @@ HRESULT STDMETHODCALLTYPE AudioFormat(Facet*, int32_t* out) {  // get_AudioForma
     *out = g.format;
     return S_OK;
 }
+HRESULT STDMETHODCALLTYPE ExplicitState(Facet*, int32_t* out) {  // get_ExplicitState, slot 13
+    *out = 2;  // Clean
+    return S_OK;
+}
 HRESULT STDMETHODCALLTYPE SampleRate(Facet*, HSTRING* out) {  // get_AudioFormatSampleRate, slot 39
     *out = MakeString(L"192 kHz");
     return S_OK;
@@ -499,6 +503,7 @@ void Build() {
     itemVt.slots[30] = Fn(&CurrentPosition);
     itemVt.slots[31] = Fn(&Duration);
     itemVt.slots[38] = Fn(&AudioFormat);
+    itemVt.slots[13] = Fn(&ExplicitState);
     itemVt.slots[39] = Fn(&SampleRate);
     itemVt.slots[40] = Fn(&BitDepth);
     itemVt.slots[45] = Fn(&QueueItemId);
@@ -634,6 +639,7 @@ TEST_CASE(AmpPlayer_ReadsTheStateThroughTheWinmdSlots) {
     CHECK(reading->positionRaw == 600'000'000 && reading->durationRaw == 1'800'000'000);
     CHECK(reading->audioFormat == 1);
     CHECK(reading->sampleRate == "192 kHz" && reading->bitDepth == "24-bit");
+    CHECK(reading->explicitState == 2);
     CHECK(reading->queueItemId == 42);
     CHECK(player.Subscribed());
     CHECK(g.handlersAdded == 2);  // the player and its PlayerState

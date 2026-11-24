@@ -23,6 +23,7 @@
     {"id": "song-panel", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false, "catalog": true},
     {"id": "automix", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false, "catalog": true},
     {"id": "hi-res-badge", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false, "catalog": true},
+    {"id": "explicit-filter", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false, "catalog": true},
     {"id": "playback-speed", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false, "catalog": true},
     {"id": "mini-player", "kind": "extension", "folder": "extensions", "startsOn": false, "firstParty": false, "builtIn": false, "catalog": true}
   ],

@@ -253,7 +253,24 @@ TEST_CASE(PlayerModel_AppleSampleRateAndBitDepthAreRead) {
     CHECK(s.track->bitDepth == 0);
     std::string json = ampify::PlayerJson(s).Dump();
     CHECK(json.find("\"sampleRate\":96000") != std::string::npos);
+    CHECK(json.find("\"catalogId\":\"\"") != std::string::npos);
+    CHECK(json.find("\"contentRating\":\"\"") != std::string::npos);
     CHECK(json.find("\"bitDepth\":0") != std::string::npos);
+}
+
+TEST_CASE(PlayerModel_TheCatalogIdAndTheExplicitMarkReachTheTrack) {
+    CHECK(ampify::ContentRatingOf(1) == "explicit");
+    CHECK(ampify::ContentRatingOf(2) == "clean");
+    CHECK(ampify::ContentRatingOf(0).empty());
+    CHECK(ampify::ContentRatingOf(7).empty());
+    ampify::AmpReading reading = Reading();
+    reading.catalogId = "1111354162";
+    reading.explicitState = 1;
+    ampify::PlayerSnapshot s = ampify::SnapshotFromAmp(reading, ampify::AmpTimeUnit::Ticks100ns);
+    CHECK(s.track->catalogId == "1111354162");
+    CHECK(s.track->contentRating == "explicit");
+    std::string json = ampify::PlayerJson(s).Dump();
+    CHECK(json.find("\"catalogId\":\"1111354162\",\"contentRating\":\"explicit\"") != std::string::npos);
 }
 
 TEST_CASE(PlayerModel_PausedOrPlaceholderAppleReadings) {

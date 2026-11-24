@@ -219,6 +219,15 @@ std::optional<double> FirstNumber(const std::string& text) {
 
 }  // namespace
 
+std::string ContentRatingOf(int32_t explicitState) {
+    switch (static_cast<amp::ExplicitState>(explicitState)) {
+        case amp::ExplicitState::Explicit: return "explicit";
+        case amp::ExplicitState::Clean: return "clean";
+        case amp::ExplicitState::None: break;
+    }
+    return "";
+}
+
 int ParseSampleRateHz(const std::string& text) {
     constexpr double kMaxHz = 1'000'000;  // no stream comes near: a larger number is not a rate
     constexpr double kKilo = 1000;
@@ -287,6 +296,8 @@ PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit) {
     track.lossless = IsLosslessFormat(reading.audioFormat);
     track.sampleRate = ParseSampleRateHz(reading.sampleRate);
     track.bitDepth = ParseBitDepth(reading.bitDepth);
+    track.catalogId = reading.catalogId;
+    track.contentRating = ContentRatingOf(reading.explicitState);
     if (reading.queueItemId != 0) track.queueItemId = std::to_string(reading.queueItemId);
     track.artwork = ArtworkAddress(reading.artwork);
     track.artworkColor = ArtworkColorHex(reading.artwork);

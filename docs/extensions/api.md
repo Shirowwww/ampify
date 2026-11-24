@@ -149,8 +149,8 @@ boolean for a toggle, a number for a number). A change in Ampify's settings page
 ```js
 Ampify.player.state()
 // -> { playing, positionMs, durationMs,
-//      track: { id, title, artist, album, variantId, atmos, lossless, sampleRate, bitDepth, queueItemId, artwork,
-//               artworkColor } | null,
+//      track: { id, title, artist, album, variantId, atmos, lossless, sampleRate, bitDepth, catalogId, contentRating,
+//               queueItemId, artwork, artworkColor } | null,
 //      source: "apple" | "smtc" | "" }
 Ampify.player.on("trackchange" | "statechange" | "lyricschange" | "progress", fn)   // "songchange", "onplaypause" and "onprogress" are Spicetify's names (onplaypause also fires on a position jump)
 Ampify.player.off(event, fn)   // removes a listener added with on
@@ -192,7 +192,9 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
 - `track.variantId` is `"lossless"`, `"hi-res-lossless"`, `"dolby-atmos"`, `"spatial"`, `"surround"`, `"other"`, or
   empty. `track.sampleRate` is the stream's rate in Hz (`44100`, `192000`) and `track.bitDepth` its bit depth (`16`,
   `24`), each `0` when the source does not say: Apple gives them a few seconds after the song starts (a `progress`
-  event brings them), often without the bit depth, and SMTC never does (Ampify 1.5.9). `track.artwork` is an https cover address or `""` (Apple Music 1.1792 keeps it internal, so it is empty
+  event brings them), often without the bit depth, and SMTC never does (Ampify 1.5.9). `track.catalogId` is the
+  song's id in Apple's catalog (for `Ampify.music.analysis`), empty for a song that is not in it; `track.contentRating`
+  is `"explicit"`, `"clean"` (a censored version) or empty when Apple marks the song neither way (Ampify 1.6). `track.artwork` is an https cover address or `""` (Apple Music 1.1792 keeps it internal, so it is empty
   there); `track.artworkColor` is `"#RRGGBB"` or `""`.
 - A queue item's `artwork` goes straight into an `image` node's `src`: an https address, or `"artwork:<id>"` when Apple
   keeps the address internal (Apple's own loader then draws that entry's cover), or `""` for an entry without one.

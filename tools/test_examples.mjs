@@ -3456,6 +3456,68 @@ test("hi-res-badge leaves 48 kHz, AAC and Dolby Atmos to Apple, and trusts Apple
   assert.deepEqual(fake.world.badges.at(-1), null, "nothing playing");
 });
 
+// Explicit or clean ships with Ampify, in extensions/: it skips the version of a song the user does not want.
+function fakeExplicitFilter(keep) {
+  const dir = join(examples, "..", "extensions", "explicit-filter");
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+  const granted = new Set(manifest.permissions ?? []);
+  const used = new Set();
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+    used.add(permission);
+  };
+  const world = { state: { track: null }, skips: 0, notes: [], handlers: { trackchange: [], statechange: [] } };
+  const ampify = {
+    i18n: { define: () => {}, t: (key, values) => key + (values ? ":" + values.rating + ":" + values.song : "") },
+    log: () => {},
+    config: { get: (key) => (key === "keep" ? keep : undefined) },
+    notify: (note) => (need("notifications"), world.notes.push(note.text)),
+    player: {
+      state: () => (need("player.read"), structuredClone(world.state)),
+      on: (event, fn) => (need("player.read"), world.handlers[event].push(fn)),
+      next: () => (need("player.control"), world.skips++, true),
+    },
+  };
+  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify: ampify });
+  const emit = (event, next) => {
+    world.state = next;
+    for (const fn of world.handlers[event]) fn(structuredClone(next));
+  };
+  return { world, emit, used, manifest };
+}
+
+const rated = (entry, title, contentRating) => ({ track: { ...song("t" + entry, title, "Artist"), queueItemId: entry, contentRating } });
+
+test("explicit-filter skips the clean version once, and leaves unmarked songs alone", () => {
+  const fake = fakeExplicitFilter("Explicit");
+  fake.emit("trackchange", rated("1", "Song", ""));
+  fake.emit("trackchange", rated("2", "Song", "explicit"));
+  assert.equal(fake.world.skips, 0);
+  fake.emit("trackchange", rated("3", "Song", "clean"));
+  fake.emit("statechange", rated("3", "Song", "clean"));
+  assert.equal(fake.world.skips, 1, "one skip per entry");
+  assert.equal(fake.world.notes.at(-1), "skipped:clean:Song");
+  fake.emit("trackchange", rated("4", "Other", ""));
+  fake.emit("trackchange", rated("3", "Song", "clean"));
+  assert.equal(fake.world.skips, 1, "going back to a skipped entry plays it");
+  assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+});
+
+test("explicit-filter skips a song whose rating comes after it", () => {
+  const fake = fakeExplicitFilter("Explicit");
+  fake.emit("trackchange", rated("1", "Song", ""));
+  fake.emit("statechange", rated("1", "Song", "clean"));
+  assert.equal(fake.world.skips, 1);
+});
+
+test("explicit-filter set to clean skips the explicit version", () => {
+  const fake = fakeExplicitFilter("Clean");
+  fake.emit("trackchange", rated("1", "Song", "clean"));
+  assert.equal(fake.world.skips, 0);
+  fake.emit("trackchange", rated("2", "Song", "explicit"));
+  assert.equal(fake.world.skips, 1);
+});
+
 test("the site hides the same retired elements as the kernel", () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..");
   const site = readFileSync(join(root, "docs", "assets", "site.js"), "utf8");

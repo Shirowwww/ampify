@@ -71,6 +71,8 @@ type PlayerState = {
     atmos: boolean;
     lossless: boolean;
     sampleRate: number;  // Hz, 0 when unknown
+    catalogId: string;   // Apple's catalog id, "" for a song outside the catalog
+    contentRating: "explicit" | "clean" | "";
     bitDepth: number;    // 0 when unknown
     queueItemId: string;  // Apple's queue entry, "" when the source does not give it
     artwork: string;       // https address of the cover (about 1000 px), "" when unknown
