@@ -12,6 +12,7 @@
 #include <windows.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <vector>
 
@@ -22,6 +23,16 @@ namespace ampify::win::audio_hooks {
 // Every line of the platform and of the leveler starts with it: the bench's live cases read them. Named after the
 // leveler, which held the platform until the split; renaming it means changing those cases in the same commit.
 constexpr const char* kJournalPrefix = "Atmos: ";
+
+// CoreMedia's time, as AVFoundationCF returns it by value: AutoMix's clock, the leveler's song lengths.
+struct CMTime {
+    std::int64_t value;
+    std::int32_t timescale;
+    std::uint32_t flags;
+    std::int64_t epoch;
+};
+constexpr std::uint32_t kTimeValid = 1;
+constexpr std::uint32_t kTimeNotFinite = 4 | 8 | 16;  // positive infinity, negative infinity, indefinite
 
 // A gain policy on the sample path: the Atmos leveler (extensions/atmos-leveler). The Feed and rate calls come from the
 // audio threads, which must never wait: a policy that cannot take its lock at once skips the block.

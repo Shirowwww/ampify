@@ -25,6 +25,11 @@ struct LevelerConfig {
     double settleSeconds = 8.0;           // skipped at the start of each track (crossfade)
     double minSecondsToLevel = 10.0;      // measured audio needed before the gain follows the track
     double minSecondsToStore = 30.0;      // measured audio needed before a track is remembered
+    // A remembered level needs this much measured audio to raise the gain past fallbackGainDb, or all of a shorter song
+    // whose length is known. The first minutes of a song are often quieter than the rest: a level read from them asks
+    // for far too much gain.
+    double minSecondsToTrust = 120.0;
+    double songEndMarginSeconds = 10.0;   // a song heard to within this of its end counts as heard whole
     size_t stereoHistory = 30;            // stereo tracks kept for the target
     size_t minStereoTracks = 2;           // stereo tracks needed before the target is trusted
 };
@@ -97,6 +102,8 @@ struct FinishedTrack {
 struct TrackLevel {
     std::optional<double> storedLufs;    // known before the track is heard, from the VariantStore
     std::optional<double> measuredLufs;  // from the meter, once minSecondsToLevel has been measured
+    bool trusted = false;                // the stored level covers minSecondsToTrust: it may raise the gain past
+                                         // fallbackGainDb. Without it the level can only bring the gain down.
     bool audible = false;                // audio has passed the settle period
     double peak = 0;                     // linear peak, without the player volume
     double userVolume = 1;               // player volume already in the buffers the gain goes into: the
@@ -120,8 +127,9 @@ public:
                           double objectRate = ampify::audio::kStartSampleRate);
 
     // Ends the previous track, storing it if it was measured long enough, then starts this one.
-    // An Atmos track with an empty variant id is measured but never stored.
-    void StartTrack(const std::string& variantId, bool atmos);
+    // An Atmos track with an empty variant id is measured but never stored. `songSeconds`, the song's length when
+    // known, lets a short song's remembered level count once it covers the whole song.
+    void StartTrack(const std::string& variantId, bool atmos, std::optional<double> songSeconds = std::nullopt);
 
     // Ends the current track, as StartTrack does, without starting another: what plays next is not known yet.
     void EndTrack();
@@ -172,6 +180,8 @@ private:
     };
 
     void FinishTrack();
+    // Measured seconds a remembered level of the current track needs to raise the gain past fallbackGainDb.
+    double TrustSeconds() const;
     // The path the current track is measured on.
     const Path& Measuring() const;
     AudioPath MeasuringPath() const;
@@ -186,6 +196,7 @@ private:
     bool m_active = false;
     bool m_atmos = false;
     std::optional<StoredLevel> m_stored;
+    std::optional<double> m_songSeconds;  // the current song's length, when known
     float m_volume = 1.0f;  // last player volume seen with the stream
     std::optional<FinishedTrack> m_finished;
 };

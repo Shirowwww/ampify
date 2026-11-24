@@ -214,7 +214,8 @@ The Marketplace (`apps/marketplace`, built with `Ampify.React`) reads `ampify ma
   on the decoded samples so they match stereo loudness. Stereo is measured on the shared-mode `IAudioRenderClient`
   stream (float32) after the player volume. Atmos is measured on `ISpatialAudioObjectRenderStreamForMetadata` (mono
   objects at 48 kHz) before the volume, and brought to the same scale. Loudness is BS.1770 per song, kept per audio
-  variant in `atmos-levels.txt`. The target is the median of the latest stereo songs, with a capped gain, a soft knee
+  variant in `atmos-levels.txt`; a song heard for the first time keeps its starting gain or goes down, and gets its
+  own level from the next play. The target is the median of the latest stereo songs, with a capped gain, a soft knee
   and a peak ceiling (numbers in `extensions/atmos-leveler/leveler.hpp`; `audio.maxGainDb` bounds the gain extensions
   add on top). The leveler pauses while AMExclusive holds the output in exclusive mode. Measurements:
   [knowledge/atmos-loudness.md](../../knowledge/atmos-loudness.md).

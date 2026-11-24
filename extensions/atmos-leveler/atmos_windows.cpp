@@ -55,6 +55,8 @@ using CFStringGetBytes_t = CFIndex_t(__cdecl*)(const void* string, CFRange range
 
 constexpr unsigned kUtf8 = 0x08000100;
 
+using GetTime_t = platform::CMTime(__cdecl*)(const void* item);
+
 struct Api {
     CopyObject_t CopyCurrentItem = nullptr;        // AVCFPlayerCopyCurrentItem
     GetRate_t GetRate = nullptr;                   // AVCFPlayerGetRate
@@ -62,6 +64,7 @@ struct Api {
     CopyObject_t CopyItemTrackAsset = nullptr;     // AVCFPlayerItemTrackCopyAssetTrack
     CopyObject_t CopyAssetFormats = nullptr;       // AVCFAssetTrackCopyFormatDescriptions
     CopyObject_t CopyStableVariant = nullptr;      // AVCFPlayerItemCopyCurrentStableVariantID
+    GetTime_t GetItemDuration = nullptr;           // AVCFPlayerItemGetDuration; optional, the song's length
     CopyObject_t CFCopyDescription = nullptr;
     CFRelease_t CFRelease = nullptr;
     CFArrayGetCount_t CFArrayGetCount = nullptr;
@@ -124,6 +127,8 @@ bool Resolve(const wchar_t* module, const char* name, T& out) {
 bool ResolveApi() {
     constexpr const wchar_t* av = L"AVFoundationCF.dll";
     constexpr const wchar_t* cf = L"CoreFoundation.dll";
+    // Optional, null when missing: a short song's level then needs minSecondsToTrust like any other.
+    platform::FindExport(av, "AVCFPlayerItemGetDuration", g_api.GetItemDuration);
     return Resolve(av, "AVCFPlayerCopyCurrentItem", g_api.CopyCurrentItem) &&
            Resolve(av, "AVCFPlayerGetRate", g_api.GetRate) &&
            Resolve(av, "AVCFPlayerItemCopyTracks", g_api.CopyItemTracks) &&
@@ -239,6 +244,17 @@ std::string VariantOf(const Api& api, void* item) {
     return id;
 }
 
+// The item's length, once Apple knows it: empty while it loads or for a stream with no end.
+std::optional<double> ItemSeconds(const void* item) {
+    if (!g_api.GetItemDuration || !item) return std::nullopt;
+    platform::CMTime length = g_api.GetItemDuration(item);
+    if (!(length.flags & platform::kTimeValid) || (length.flags & platform::kTimeNotFinite) || length.timescale <= 0 ||
+        length.value <= 0) {
+        return std::nullopt;
+    }
+    return static_cast<double>(length.value) / length.timescale;
+}
+
 // Starts measuring the item once it is known to be Atmos or stereo. Poll thread only.
 void StartIfKnown() {
     // No stable variant yet: the item is still loading (and fetching its key). Its tracks are left alone.
@@ -247,14 +263,16 @@ void StartIfKnown() {
     TrackKind kind = ClassifyDescriptions(DescriptionsOf(g_api, g_playing.item));
     if (kind == TrackKind::Unknown) return;
 
+    std::optional<double> seconds = ItemSeconds(g_playing.item);
     std::lock_guard<std::mutex> guard(g_levelerLock);
-    g_leveler->StartTrack(g_playing.variant, kind == TrackKind::Atmos);
+    g_leveler->StartTrack(g_playing.variant, kind == TrackKind::Atmos, seconds);
     g_playing.started = true;
     g_playing.currentDb = g_config.fallbackGainDb;  // a new track starts at the fallback gain, as the reference does
     g_playing.reportedDb = g_playing.currentDb;
     g_playing.polls = 0;
+    std::string length = seconds ? ", " + Fixed(*seconds, 0) + " s long" : std::string();
     Note(std::string(kind == TrackKind::Atmos ? "Dolby Atmos track" : "stereo track") + ", variant " +
-         g_playing.variant +
+         g_playing.variant + length +
          (kind == TrackKind::Atmos ? ", starting gain " + Fixed(g_playing.currentDb, 1) + " dB" : std::string()));
 }
 

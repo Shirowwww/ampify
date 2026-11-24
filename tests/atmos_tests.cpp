@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <vector>
@@ -151,15 +152,38 @@ TEST_CASE(Gain_BoostsToTheTargetAndNoFurther) {
     atmos::LevelerConfig config;
     atmos::TrackLevel quiet;
     quiet.storedLufs = -20.0;
+    quiet.trusted = true;
     CHECK_NEAR(atmos::NextGainDb(config, -16.0, quiet, 0.0), 4.0, 1e-12);
 
     atmos::TrackLevel verySoft;
     verySoft.storedLufs = -40.0;
+    verySoft.trusted = true;
     CHECK_NEAR(atmos::NextGainDb(config, -16.0, verySoft, 0.0), 15.0, 1e-12);  // clamped to maxGainDb
 
     atmos::TrackLevel loud;
     loud.storedLufs = -12.0;
+    loud.trusted = true;
     CHECK_NEAR(atmos::NextGainDb(config, -16.0, loud, 0.0), 0.0, 1e-12);  // never attenuates
+}
+
+TEST_CASE(Gain_AShortLevelOnlyBringsTheStartingGainDown) {
+    atmos::LevelerConfig config;
+    // The first minute of a song, 9 dB under the target: no more than the gain the song starts at.
+    atmos::TrackLevel quietStart;
+    quietStart.storedLufs = -25.0;
+    CHECK_NEAR(atmos::NextGainDb(config, -16.0, quietStart, 0.0), config.fallbackGainDb, 1e-12);
+
+    atmos::TrackLevel wholeSong = quietStart;
+    wholeSong.trusted = true;
+    CHECK_NEAR(atmos::NextGainDb(config, -16.0, wholeSong, 0.0), 9.0, 1e-12);
+
+    // A song louder than most is still brought down, eased in once heard.
+    atmos::TrackLevel loudStart;
+    loudStart.measuredLufs = -18.0;
+    loudStart.audible = true;
+    loudStart.peak = 0.1;
+    CHECK_NEAR(atmos::NextGainDb(config, -16.0, loudStart, config.fallbackGainDb),
+               config.fallbackGainDb - config.slewDbPerPoll, 1e-12);
 }
 
 TEST_CASE(Gain_RespectsThePeakCeiling) {
@@ -221,6 +245,60 @@ TEST_CASE(Leveler_LevelsAnAtmosTrackToTheStereoTarget) {
     leveler.StartTrack("atmos-b", false);
     leveler.StartTrack("atmos-a", true);
     CHECK_NEAR(leveler.Poll(0.0), 4.0, 0.05);
+}
+
+TEST_CASE(Leveler_AQuietStartDoesNotPushASongUpUntilItIsKnown) {
+    constexpr double kRate = 48000;
+    atmos::LevelerConfig config;
+    atmos::AtmosLeveler leveler(config, kRate, kRate);
+    for (const char* id : {"stereo-1", "stereo-2"}) {
+        leveler.StartTrack(id, false);
+        std::vector<float> tone = ToneAtLufs(kRate, 2, 40.0, -16.0);
+        leveler.Feed(tone.data(), tone.size() / 2, 1.0f);
+    }
+
+    // Heard for the first time, a song 8 dB under the target from its start: it keeps the gain it starts at.
+    std::vector<float> song = ToneAtLufs(kRate, 2, config.settleSeconds + config.minSecondsToTrust + 2.0, -24.0);
+    const size_t chunkFrames = static_cast<size_t>(kRate * 0.3);
+    leveler.StartTrack("atmos-quiet", true);
+    double gainDb = config.fallbackGainDb;
+    double highest = gainDb;
+    for (size_t frame = 0; frame + chunkFrames <= song.size() / 2; frame += chunkFrames) {
+        leveler.Feed(song.data() + frame * 2, chunkFrames, 1.0f);
+        gainDb = leveler.Poll(gainDb);
+        highest = std::max(highest, gainDb);
+    }
+    CHECK_NEAR(highest, config.fallbackGainDb, 1e-9);
+
+    // Measured over minSecondsToTrust, its level is known: the next time, it starts at the full 8 dB.
+    leveler.StartTrack("atmos-other", false);
+    leveler.StartTrack("atmos-quiet", true);
+    CHECK_NEAR(leveler.Poll(config.fallbackGainDb), 8.0, 0.1);
+}
+
+TEST_CASE(Leveler_AShortSongHeardWholeIsKnownToo) {
+    constexpr double kRate = 48000;
+    constexpr double kSongSeconds = 100.0;  // shorter than settleSeconds and minSecondsToTrust together
+    atmos::LevelerConfig config;
+    atmos::AtmosLeveler leveler(config, kRate, kRate);
+    for (const char* id : {"stereo-1", "stereo-2"}) {
+        leveler.StartTrack(id, false);
+        std::vector<float> tone = ToneAtLufs(kRate, 2, 40.0, -16.0);
+        leveler.Feed(tone.data(), tone.size() / 2, 1.0f);
+    }
+    std::vector<float> song = ToneAtLufs(kRate, 2, kSongSeconds, -24.0);
+    leveler.StartTrack("atmos-short", true, kSongSeconds);
+    leveler.Feed(song.data(), song.size() / 2, 1.0f);
+    leveler.StartTrack("atmos-other", false);
+
+    // Heard to its end, its level covers the whole song: the next time it starts at the full 8 dB.
+    leveler.StartTrack("atmos-short", true, kSongSeconds);
+    CHECK_NEAR(leveler.Poll(config.fallbackGainDb), 8.0, 0.1);
+
+    // Without its length, the same level could be the first minute and a half of a longer song.
+    leveler.StartTrack("atmos-other", false);
+    leveler.StartTrack("atmos-short", true);
+    CHECK_NEAR(leveler.Poll(config.fallbackGainDb), config.fallbackGainDb, 1e-9);
 }
 
 TEST_CASE(Leveler_LoudnessDoesNotDependOnTheSliderVolume) {

@@ -78,6 +78,9 @@ double NextGainDb(const LevelerConfig& config, std::optional<double> target, con
 
     double lufs = track.storedLufs ? *track.storedLufs : *track.measuredLufs;
     double desired = std::clamp(*target - lufs, 0.0, config.maxGainDb);
+    // A song heard for the first time starts at fallbackGainDb, and its level so far only brings the gain down: one
+    // with a quiet first minute was pushed to +11.6 dB, then eased back to +5.4 dB over two minutes (2026-11-24).
+    if (!track.trusted) desired = std::min(desired, config.fallbackGainDb);
 
     // The gain must not push the peak of the buffers it goes into past the ceiling. The peak is
     // without the player volume: multiply back by the volume those buffers already carry (the
@@ -110,13 +113,14 @@ size_t AtmosLeveler::Path::Settle(size_t frames) {
 AtmosLeveler::AtmosLeveler(const LevelerConfig& config, double streamRate, double objectRate)
     : m_config(config), m_stereo(config.stereoHistory), m_stream(streamRate, 2), m_objects(objectRate, 1) {}
 
-void AtmosLeveler::StartTrack(const std::string& variantId, bool atmos) {
+void AtmosLeveler::StartTrack(const std::string& variantId, bool atmos, std::optional<double> songSeconds) {
     FinishTrack();
 
     m_variantId = variantId;
     m_atmos = atmos;
     m_active = true;
     m_stored = atmos ? m_store.Find(variantId) : std::nullopt;
+    m_songSeconds = songSeconds;
     m_stream.Start(m_config.settleSeconds);
     m_objects.Start(m_config.settleSeconds);
 }
@@ -203,12 +207,20 @@ double AtmosLeveler::Poll(double currentDb) {
     const Path& measuring = Measuring();
     TrackLevel track;
     if (m_stored) track.storedLufs = m_stored->lufs;
+    track.trusted = m_stored && m_stored->seconds >= TrustSeconds();
     if (measuring.meter.Seconds() >= m_config.minSecondsToLevel) track.measuredLufs = measuring.meter.IntegratedLufs();
     track.audible = measuring.audible;
     track.peak = measuring.meter.Peak();
     track.userVolume = path == AudioPath::Objects ? 1.0 : m_volume;
 
     return NextGainDb(m_config, m_stereo.Target(m_config.minStereoTracks), track, currentDb);
+}
+
+double AtmosLeveler::TrustSeconds() const {
+    if (!m_songSeconds) return m_config.minSecondsToTrust;
+    // All of a song is its length less the settle period the meter skips, less the end it may have been left at.
+    double whole = *m_songSeconds - m_config.settleSeconds - m_config.songEndMarginSeconds;
+    return std::clamp(whole, m_config.minSecondsToStore, m_config.minSecondsToTrust);
 }
 
 bool AtmosLeveler::IsAtmos() const {

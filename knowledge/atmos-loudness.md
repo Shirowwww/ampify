@@ -56,8 +56,25 @@ applies its gain to the samples.
 - The gain is bounded, with a peak ceiling and a soft knee. The numbers are in `extensions/atmos-leveler/leveler.hpp`
   (`LevelerConfig`); the knee is in `src/core/audio/gain_ramp.cpp`.
 - One value kept per stable variant of the song (`AVCFPlayerItemCopyCurrentStableVariantID`).
-- A new Atmos song starts at a fixed gain, then it converges as the measurement builds.
+- A new Atmos song starts at a fixed gain (`fallbackGainDb`, 5 dB: the median song needs about that much). Its
+  measure so far may bring the gain down, never up: a level is trusted to raise it only once it covers
+  `minSecondsToTrust` of the song, or all of a shorter one (its length from `AVCFPlayerItemGetDuration`), and that
+  happens from the next play. The first minutes of a song are often quieter
+  than the rest: following them, a song with a quiet first minute went up to +11.6 dB, then eased back to +5.4 dB over
+  two minutes, loud then fading (2026-11-24, Victor heard it).
 - With AMExclusive active (exclusive output), leveling pauses ([amexclusive-notes.md](amexclusive-notes.md)).
+
+## Measuring what is heard
+
+Whether a levelled Atmos song is heard as loud as a stereo one, once Windows has rendered its objects (Dolby Atmos for
+Headphones here), is not known yet. Two ways to record it, and what they give (2026-11-24, `1.1792.39942.0`):
+
+- Windows' process loopback (`AUDIOCLIENT_ACTIVATION_TYPE_PROCESS_LOOPBACK` on `AMPLibraryAgent.exe`) records Apple's
+  stereo stream, and nothing else. It stays silent for an Atmos song: the spatial objects are rendered outside the
+  process's own mix.
+- The endpoint loopback has the rendered Atmos sound, and every other program's too. That evening a call and two other
+  programs played about 14 dB louder than Apple Music at 20 % (-32 LUFS against -46 LUFS): an endpoint measure is
+  worth something only while nothing else plays. Check each session's peak meter (`IAudioMeterInformation`) first.
 
 ## A seek opens a new spatial stream, and the renderer starts too loud
 

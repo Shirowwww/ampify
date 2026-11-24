@@ -39,14 +39,6 @@ using detail::AddressOf;
 using detail::FromAddress;
 using detail::Note;
 
-struct CMTime {
-    std::int64_t value;
-    std::int32_t timescale;
-    std::uint32_t flags;
-    std::int64_t epoch;
-};
-
-constexpr std::uint32_t kTimeValid = 1;
 constexpr unsigned kUtf8 = 0x08000100;
 // Apple's stream for the next song is looked for from this long before the switch is due: the mix thread may read the
 // song's time late, Apple's player holding its lock up to 0.37 s (20/11/2026).
