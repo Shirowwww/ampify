@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.5.9 (2026-11-24)
+
+Hi-Res Lossless songs say so again, the romaji of Korean and Japanese lyrics fill smoothly in a narrow window too, the
+Marketplace search keeps every letter you type, and AMPLibraryAgent no longer crashes at startup on some PCs.
+
+### Extensions
+
+- New: Hi-Res Lossless badge (#12). Apple Music for Windows calls every lossless song "Lossless", even a 24-bit
+  192 kHz one. With this extension on, a song above 48 kHz says "Hi-Res Lossless" (in Apple's own words for each
+  language) in the badge under its title, in the flyout that badge opens and to screen readers, with "HR" after
+  Apple's Lossless mark. Other songs keep Apple's badge. It is off by default: turn it on in the Marketplace.
+- `Ampify.player.state().track` gives `sampleRate` and `bitDepth` (0 when unknown), and
+  `Ampify.ui.playbar.audioBadge({ label, icon })` changes what Apple's audio badge says (see the extension API).
+- The search box of the Marketplace, and any text field of an extension, no longer drops letters, jumps to the start
+  or loses the focus while you type (#12).
+
+### Other
+
+- Romaji filled word by word in a narrow lyrics pane too: there Apple Music draws them in a layer of their own, which
+  Ampify did not look into, so they kept Apple's stepped fill (#5).
+- AMPLibraryAgent could crash while Ampify started in it, when Windows freed an audio codec at that very moment.
+
 ## 1.5.8 (2026-11-22)
 
 AutoMix no longer plays the end of a song too loud, calls off fewer mixes and can mix a song up to its last half
