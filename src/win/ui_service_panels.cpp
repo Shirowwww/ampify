@@ -6,6 +6,8 @@
 #include "ui_service_detail.hpp"
 #include "xaml_ending.hpp"
 
+#include "../core/sidebar_fold.hpp"
+
 namespace ampify::win::ui_service_detail {
 
 namespace {
@@ -319,11 +321,52 @@ controls::Grid PagesGrid(const WindowContext& context) {
     return nullptr;
 }
 
+constexpr double kPushedRoom = kPanelWidth + kPushGap;  // what the pages give the column
+
+// Apple's sidebar: the NavigationView inside Sidebar#MainSidebar.
+controls::NavigationView SidebarNavigation(const WindowContext& context) {
+    std::optional<int> index = uirender::FindByName(context.probe, "NavView");
+    if (!index || *index >= static_cast<int>(context.probeObjects.size())) return nullptr;
+    return context.probeObjects[*index].get().try_as<controls::NavigationView>();
+}
+
+// Apple folds its sidebar for its own right pane as if the window were the pane narrower (MainPage raises the
+// threshold from 1325 to 1685 for its 360 pixels); the column takes room the same way, so the threshold grows by it
+// while the pages make it (Victor, 2026-11-24: a playlist's Share and More buttons cut off in a 1509-pixel window).
+// Apple writes its own threshold again as its pane opens or closes: that is the new base.
+void FoldSidebarForRoom(WindowContext& context, double room) {
+    controls::NavigationView sidebar = context.roomSidebar.get();
+    if (!sidebar) {
+        sidebar = SidebarNavigation(context);
+        if (!sidebar) return;
+        context.roomSidebar = winrt::make_weak(sidebar);
+        context.sidebarThresholdSet = -1;
+    }
+    const double now = sidebar.ExpandedModeThresholdWidth();
+    if (now != context.sidebarThresholdSet) context.sidebarThreshold = now;
+    const double wanted = context.sidebarThreshold + room;
+    if (now != wanted) sidebar.ExpandedModeThresholdWidth(wanted);
+    context.sidebarThresholdSet = wanted;
+}
+
+// The sidebar takes Apple's threshold back, unless Apple wrote another one since.
+void GiveSidebarThresholdBack(WindowContext& context) {
+    controls::NavigationView sidebar = context.roomSidebar.get();
+    if (sidebar && sidebar.ExpandedModeThresholdWidth() == context.sidebarThresholdSet) {
+        sidebar.ExpandedModeThresholdWidth(context.sidebarThreshold);
+    }
+    context.roomSidebar = nullptr;
+    context.sidebarThreshold = -1;
+    context.sidebarThresholdSet = -1;
+}
+
 // Panels take a column of their own instead of floating over the pages: the room on the pages' right grows by a panel
-// and a gap, and DockPanelPopup docks them there, against the window's right edge.
+// and a gap, and DockPanelPopup docks them there, against the window's right edge. Apple's sidebar folds meanwhile as
+// for its own pane, checked again on every refresh since Apple writes its threshold back.
 void PushPages(WindowContext& context) {
-    if (context.pushedPages) {
-        if (context.pushedPages.Padding().Right == context.pushedRight) return;
+    if (context.pushedPages && context.pushedPages.Padding().Right == context.pushedRight) {
+        FoldSidebarForRoom(context, kPushedRoom);
+        return;
     }
     controls::Grid pages = PagesGrid(context);
     if (!pages) return;
@@ -333,16 +376,18 @@ void PushPages(WindowContext& context) {
     xaml::Thickness padding = parent.Padding();
     if (!context.pushedPages) context.pagesPadding = padding;
     context.pushedPages = parent;
-    context.pushedRight = context.pagesPadding.Right + kPanelWidth + kPushGap;  // the column meets the window's edge
+    context.pushedRight = context.pagesPadding.Right + kPushedRoom;  // the column meets the window's edge
     padding.Right = context.pushedRight;
     parent.Padding(padding);
+    FoldSidebarForRoom(context, kPushedRoom);
     parent.UpdateLayout();  // so the column docks at once rather than floating for one refresh
 }
 
 }  // namespace
 
-// The pages take their width back once no panel shows.
+// The pages take their width back once no panel shows, and Apple's sidebar its threshold.
 void ReleasePages(WindowContext& context) {
+    GiveSidebarThresholdBack(context);
     if (!context.pushedPages) return;
     if (context.pushedPages.Padding().Right == context.pushedRight) context.pushedPages.Padding(context.pagesPadding);
     context.pushedPages = nullptr;
@@ -351,8 +396,7 @@ void ReleasePages(WindowContext& context) {
 
 namespace {
 
-constexpr double kPagesMinWidth = 720;  // narrower, a playlist's header cut its buttons: the panels float instead
-constexpr double kDockMargin = 8;       // room past that before the pages make room again: no back and forth
+constexpr double kDockMargin = 8;  // room past the edge before the column comes back: no back and forth
 
 // The pages take their width back before the floating panels measure them: measured on the pushed layout, the panels
 // floated a column's width left of the window's edge, over the pages, with the room on their right left empty.
@@ -363,16 +407,25 @@ void ReleasePagesNow(WindowContext& context) {
     parent.UpdateLayout();
 }
 
-// Whether the pages keep kPagesMinWidth beside a column of panels, measured on the pages as they are, pushed or not.
-// Only what the window shows counts: in a narrow window Apple keeps its pages at their least width and the window cuts
-// them, so their ActualWidth stayed wide while the column had no room left.
-bool PagesKeepRoom(const WindowContext& context, double windowWidth) {
-    controls::Grid pages = PagesGrid(context);
-    if (!pages || pages.ActualWidth() <= 0) return true;
-    double left = pages.TransformToVisual(nullptr).TransformPoint({0, 0}).X;
-    double width = std::min(pages.ActualWidth(), windowWidth - left);
-    if (context.pushedPages) return width >= kPagesMinWidth;
-    return width - (kPanelWidth + kPushGap) >= kPagesMinWidth + kDockMargin;
+// Apple's own right pane (lyrics, Up Next) while it stands beside the pages: its width; 0 while it is closed or lies
+// over them (Apple's narrow layout).
+double ApplesPaneBeside(const WindowContext& context) {
+    std::optional<int> index = uirender::FindByName(context.probe, "ContentSplitView");
+    if (!index || *index >= static_cast<int>(context.probeObjects.size())) return 0;
+    auto split = context.probeObjects[*index].get().try_as<controls::SplitView>();
+    if (!split || !split.IsPaneOpen()) return 0;
+    controls::SplitViewDisplayMode mode = split.DisplayMode();
+    if (mode == controls::SplitViewDisplayMode::Overlay || mode == controls::SplitViewDisplayMode::CompactOverlay) return 0;
+    return split.OpenPaneLength();
+}
+
+// Whether the panels take a column beside the pages or float over them: where Apple lets its own pane stand beside
+// them (ColumnStandsBesidePages). In window widths: 720 pixels of pages kept beside the column still cut a playlist's
+// buttons (2026-11-24), and in a narrow window Apple keeps its pages at their least width and the window cuts them,
+// so their ActualWidth stayed wide while the column had no room left.
+bool ColumnFits(const WindowContext& context, double windowWidth) {
+    return ColumnStandsBesidePages(windowWidth, kPushedRoom, ApplesPaneBeside(context),
+                                   static_cast<bool>(context.pushedPages), kDockMargin);
 }
 
 }  // namespace
@@ -382,7 +435,7 @@ bool PagesKeepRoom(const WindowContext& context, double windowWidth) {
 void PlacePanelPopup(WindowContext& context, const xaml::XamlRoot& root) {
     auto size = root.Size();
     if (AnyPanelShown(context)) {
-        if (PagesKeepRoom(context, size.Width)) {
+        if (ColumnFits(context, size.Width)) {
             PushPages(context);
         } else {
             ReleasePagesNow(context);  // a narrow window: the panels float over the pages rather than squeeze them

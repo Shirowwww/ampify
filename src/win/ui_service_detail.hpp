@@ -262,6 +262,11 @@ struct WindowContext : std::enable_shared_from_this<WindowContext> {
     controls::Grid pushedPages{nullptr};
     xaml::Thickness pagesPadding{};
     double pushedRight = -1;  // the right padding Ampify set, -1 when it set none
+    // Meanwhile Apple's sidebar folds as it does for Apple's own right pane (FoldSidebarForRoom): its NavigationView,
+    // the threshold Apple gave it, and the one Ampify set (-1 when none), to tell Apple's later writes from Ampify's.
+    winrt::weak_ref<controls::NavigationView> roomSidebar;
+    double sidebarThreshold = -1;
+    double sidebarThresholdSet = -1;
     controls::StackPanel panelStack{nullptr};
     int panelHostsMade = 0;
     // Strong: nothing else holds a Popup that is outside the tree, and its panels went with it (mounted again on every

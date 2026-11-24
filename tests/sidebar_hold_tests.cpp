@@ -84,6 +84,24 @@ TEST_CASE(SidebarHold_PinPushesThePagesOnlyWhereAppleOpensItsSidebar) {
     CHECK(!ampify::PinPushesPages(1094));
 }
 
+TEST_CASE(SidebarFold_PanelsStandBesideThePagesWhereApplesOwnPaneWould) {
+    // Ampify's column takes 388 pixels (a panel and its gap); Apple's pane, 360 of a 1440-pixel window.
+    CHECK(ampify::ColumnStandsBesidePages(1509, 388, 0, false, 8));  // Victor's window, 2026-11-24
+    CHECK(ampify::ColumnStandsBesidePages(1476, 388, 0, false, 8));
+    CHECK(!ampify::ColumnStandsBesidePages(1475, 388, 0, false, 8));
+    CHECK(!ampify::ColumnStandsBesidePages(1200, 388, 0, true, 8));
+}
+
+TEST_CASE(SidebarFold_AColumnAlreadyBesideThePagesKeepsItsPlaceDownToTheEdge) {
+    CHECK(ampify::ColumnStandsBesidePages(1468, 388, 0, true, 8));
+    CHECK(!ampify::ColumnStandsBesidePages(1467, 388, 0, true, 8));
+}
+
+TEST_CASE(SidebarFold_ApplesOwnPaneBesideThePagesTakesItsRoomToo) {
+    CHECK(!ampify::ColumnStandsBesidePages(1509, 388, 360, false, 8));
+    CHECK(ampify::ColumnStandsBesidePages(1836, 388, 360, false, 8));
+}
+
 TEST_CASE(SidebarHold_KeysHoldThePaneWhileTheFocusStaysOnIt) {
     CHECK(ampify::HoldsForKeyboard(true, true, true));
     CHECK(!ampify::HoldsForKeyboard(true, true, false));
