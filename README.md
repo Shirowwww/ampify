@@ -42,7 +42,7 @@ period. A second page lists the new releases of the artists you play.</td>
 </tr>
 <tr>
 <td valign="top"><img src="extensions/automix/preview.jpg" alt="Two songs overlapping as one fades into the other"><br>
-<b>AutoMix.</b> Each song flows into the next like a DJ set: on the beat when the tempos are close, otherwise an echo
+<b>AutoMix (beta).</b> Each song flows into the next like a DJ set: on the beat when the tempos are close, otherwise an echo
 out on a bar, the song's own ending with a breath, or a crossfade. It is young and still getting better; switch it on
 in Settings > Ampify.</td>
 <td valign="top"><img src="docs/assets/screens/settings-card.png" alt="Ampify's settings page in Apple Music, Sound and extensions tab"><br>
@@ -58,7 +58,7 @@ songs as loud as stereo ones.</td>
 |---|---|---|
 | 10 themes and 28 colour schemes, light and dark, switched without a restart | Discord presence, Last.fm scrobbling, a sleep timer, global shortcuts, an A-B loop | Nothing is written into Apple Music's package: uninstall and the original app is back |
 | 11 snippets to layer on any theme: corners, lyrics style, artwork filters, an equalizer that moves with the music | Pages for your listening stats and the new releases of the artists you play | Every extension lists its permissions before you switch it on |
-| One accent colour of your choice, or the colours of the song playing | AutoMix between songs, Sing to turn the singer's voice down, a Song panel, the time under the pointer on the progress line, and an Atmos leveler | A new Apple Music version stays untouched until Ampify has been tested on it |
+| One accent colour of your choice, or the colours of the song playing | AutoMix (beta) between songs, Sing to turn the singer's voice down, a Song panel, the time under the pointer on the progress line, and an Atmos leveler | A new Apple Music version stays untouched until Ampify has been tested on it |
 | The playback bar at the top, the bottom or centred, under every theme | A Marketplace inside Apple Music, one click to install | Updates check their SHA-256 and install while Apple Music is closed |
 
 Ampify speaks English, French, German, Spanish, Portuguese, Russian, Japanese, Simplified Chinese, Italian and Korean.
