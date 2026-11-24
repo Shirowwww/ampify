@@ -101,7 +101,7 @@ const Expected kMembers[] = {
     // setLabel, setActive, setDisabled, playbar.mark, readout and onHover, panel.onClose, the removes, popup.show and
     // close, title.get and reset added in kitApi 1.x, compatible additions
     {"ui", "object!{topbar:object!{addButton:f1=addButton,remove:f1=remove},"
-           "playbar:object!{addButton:f1=addButton,remove:f1=remove,mark:f3=mark,readout:f1=readout,onHover:f1=onHover},sidebar:object!{addItem:f1=addItem,remove:f1=remove},"
+           "playbar:object!{addButton:f1=addButton,remove:f1=remove,mark:f3=mark,readout:f1=readout,onHover:f1=onHover,audioBadge:f1=audioBadge},sidebar:object!{addItem:f1=addItem,remove:f1=remove},"
            "menu:object!{addItem:f2=addItem,remove:f1=remove},popup:object!{open:f1=open,show:f2=show,close:f1=close},"
            "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},"
            "panel:object!{register:f2=register,remove:f1=remove,onClose:f2=onClose},"

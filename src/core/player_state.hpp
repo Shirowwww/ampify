@@ -22,6 +22,9 @@ struct TrackInfo {
     std::string variantId;
     bool atmos = false;
     bool lossless = false;
+    // The stream's sample rate in Hz and bit depth; 0 when the source does not say (SMTC, or Apple leaves it out).
+    int sampleRate = 0;
+    int bitDepth = 0;
     // The entry of the play queue that holds this track, as Apple numbers it. The same song played twice has two
     // entries. Empty when the source does not tell it (SMTC).
     std::string queueItemId;

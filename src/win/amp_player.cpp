@@ -219,6 +219,8 @@ std::optional<AmpReading> AmpPlayer::Read() {
             m_artist = rt::ReadString(item, slot::kItemArtist);
             m_album = rt::ReadString(item, slot::kItemAlbum);
             m_subtitle = rt::ReadString(item, slot::kItemSubtitle);
+            m_sampleRate = rt::ReadString(item, slot::kItemAudioFormatSampleRate);
+            m_bitDepth = rt::ReadString(item, slot::kItemAudioFormatBitDepth);
             m_artwork = newest ? ReadArtwork(newest) : ArtworkReading{};
             m_item = itemObject;
             m_itemQueueId = reading.queueItemId;
@@ -256,6 +258,8 @@ std::optional<AmpReading> AmpPlayer::Read() {
         reading.artist = m_artist;
         reading.album = m_album;
         reading.subtitle = m_subtitle;
+        reading.sampleRate = m_sampleRate;
+        reading.bitDepth = m_bitDepth;
         reading.artwork = m_artwork;
         reading.lyricsAvailable = m_lyrics.has_value();
     } else {

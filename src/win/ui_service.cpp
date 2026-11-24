@@ -256,6 +256,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
         context.playbarMore = nullptr;
         ReleasePlaybarMark(context);
         ReleasePlaybarHover(context);
+        ReleaseAudioBadge(context);
         ReleasePlayerRow(context);
         context.probe.clear();
         context.probeObjects.clear();
@@ -717,6 +718,7 @@ void UiService::Run() {
                     if (changes.route) m_shared->pendingRoute = changes.route;
                     if (changes.applePlayer) m_shared->applePlayerPending = true;
                     if (changes.hover) m_shared->playbarHover = *changes.hover;
+                    if (changes.audioBadge) m_shared->audioBadge = *changes.audioBadge;
                     windows = m_shared->windows;
                 }
                 for (const auto& context : windows) {

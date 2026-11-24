@@ -207,6 +207,9 @@ inline constexpr int kItemIsPlaceholder = 24;
 inline constexpr int kItemCurrentPosition = 30;
 inline constexpr int kItemDuration = 31;
 inline constexpr int kItemAudioFormat = 38;
+// get_AudioFormatSampleRate and get_AudioFormatBitDepth: HSTRINGs (signature 0x0E in AMP.Services.winmd 1.1792).
+inline constexpr int kItemAudioFormatSampleRate = 39;
+inline constexpr int kItemAudioFormatBitDepth = 40;
 inline constexpr int kItemPlayQueueItemId = 45;
 inline constexpr int kItemLyricsInfo = 46;
 
@@ -302,6 +305,8 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.Services.CommonModels.INowPlayingItem", "get_CurrentPosition", slot::kItemCurrentPosition},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_Duration", slot::kItemDuration},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_AudioFormat", slot::kItemAudioFormat},
+    {"AMP.Services.CommonModels.INowPlayingItem", "get_AudioFormatSampleRate", slot::kItemAudioFormatSampleRate},
+    {"AMP.Services.CommonModels.INowPlayingItem", "get_AudioFormatBitDepth", slot::kItemAudioFormatBitDepth},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_PlayQueueItemID", slot::kItemPlayQueueItemId},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_Artwork", slot::kItemArtwork},
     {"AMP.Services.CommonModels.INowPlayingItem", "get_LyricsInfo", slot::kItemLyricsInfo},

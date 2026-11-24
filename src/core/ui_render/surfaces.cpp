@@ -124,6 +124,9 @@ SurfaceChanges SurfaceTracker::Poll(const UiModel& model) {
     UiPlaybarHover hover = model.PlaybarHover();
     if (hover.serial != m_hoverSerial) changes.hover = hover;
     m_hoverSerial = hover.serial;
+    UiAudioBadge badge = model.AudioBadge();
+    if (badge.serial != m_audioBadgeSerial) changes.audioBadge = badge;
+    m_audioBadgeSerial = badge.serial;
 
     m_current = std::move(now);
     m_signatures = std::move(signatures);

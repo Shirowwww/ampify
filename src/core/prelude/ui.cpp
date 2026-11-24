@@ -141,6 +141,17 @@ const char kUi[] = R"AMPIFYJS(
     if (typeof totalMs !== "number" || !Number.isFinite(totalMs)) throw new TypeError("ui: readout expects a length in ms");
     return native.uiPlaybarReadout(Math.max(0, totalMs));
   };
+  // Apple's audio badge (Lossless, Dolby Atmos) says `label`, with `icon` (SVG) after its Lossless mark, in the play
+  // bar, its flyout and to screen readers; nothing (or null) gives Apple's own badge back.
+  const audioBadge = (options) => {
+    if (options === undefined || options === null) return native.uiAudioBadge("", "");
+    if (typeof options !== "object") throw new TypeError("ui: audioBadge expects { label, icon } or null");
+    const label = options.label === undefined ? "" : options.label;
+    const icon = options.icon === undefined ? "" : options.icon;
+    if (typeof label !== "string" || label.trim() === "") throw new TypeError("ui: audioBadge expects a label");
+    if (typeof icon !== "string") throw new TypeError("ui: audioBadge expects an SVG icon as text");
+    return native.uiAudioBadge(label, icon);
+  };
   const hoverListeners = new Set();
   const onHover = (fn) => {
     if (typeof fn !== "function") throw new TypeError("ui: onHover expects a function");
@@ -279,6 +290,7 @@ const char kUi[] = R"AMPIFYJS(
       mark: (id, from, to) => markLine(id, from, to),
       readout: (totalMs) => readout(totalMs),
       onHover: (fn) => onHover(fn),
+      audioBadge: (options) => audioBadge(options),
     }),
     sidebar: Object.freeze({ addItem: (options) => addControl("sidebar", options), remove: (id) => removeControl(id) }),
     menu: Object.freeze({

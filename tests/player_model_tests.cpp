@@ -226,6 +226,36 @@ TEST_CASE(PlayerModel_AppleFormatsMapToLosslessAndAtmos) {
     CHECK(ampify::VariantOfAudioFormat(9) == "format-9");
 }
 
+TEST_CASE(PlayerModel_AppleSampleRateAndBitDepthAreRead) {
+    CHECK(ampify::ParseSampleRateHz("192 kHz") == 192000);
+    CHECK(ampify::ParseSampleRateHz("44,1 kHz") == 44100);
+    CHECK(ampify::ParseSampleRateHz("44.1kHz") == 44100);
+    CHECK(ampify::ParseSampleRateHz("96000") == 96000);
+    CHECK(ampify::ParseSampleRateHz("48") == 48000);  // a bare small number is in kHz
+    CHECK(ampify::ParseSampleRateHz("96000 Hz") == 96000);
+    CHECK(ampify::ParseSampleRateHz("500 Hz") == 500);  // Hz said: not taken for kHz
+    CHECK(ampify::ParseSampleRateHz("192 KHZ") == 192000);
+    CHECK(ampify::ParseSampleRateHz("") == 0);
+    CHECK(ampify::ParseSampleRateHz("kHz") == 0);
+    CHECK(ampify::ParseSampleRateHz("99999999 kHz") == 0);  // past any real rate
+    CHECK(ampify::ParseBitDepth("24-bit") == 24);
+    CHECK(ampify::ParseBitDepth("24 bits") == 24);
+    CHECK(ampify::ParseBitDepth("16") == 16);
+    CHECK(ampify::ParseBitDepth("") == 0);
+    CHECK(ampify::ParseBitDepth("bits") == 0);
+    CHECK(ampify::ParseBitDepth("4096") == 0);
+
+    ampify::AmpReading reading = Reading();
+    reading.sampleRate = "96 kHz";
+    reading.bitDepth = "";
+    ampify::PlayerSnapshot s = ampify::SnapshotFromAmp(reading, ampify::AmpTimeUnit::Ticks100ns);
+    CHECK(s.track->sampleRate == 96000);
+    CHECK(s.track->bitDepth == 0);
+    std::string json = ampify::PlayerJson(s).Dump();
+    CHECK(json.find("\"sampleRate\":96000") != std::string::npos);
+    CHECK(json.find("\"bitDepth\":0") != std::string::npos);
+}
+
 TEST_CASE(PlayerModel_PausedOrPlaceholderAppleReadings) {
     ampify::AmpReading reading = Reading();
     reading.paused = true;  // Apple can say playing and paused while it buffers: paused wins

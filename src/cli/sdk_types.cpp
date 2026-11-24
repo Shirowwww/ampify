@@ -70,6 +70,8 @@ type PlayerState = {
     variantId: string;
     atmos: boolean;
     lossless: boolean;
+    sampleRate: number;  // Hz, 0 when unknown
+    bitDepth: number;    // 0 when unknown
     queueItemId: string;  // Apple's queue entry, "" when the source does not give it
     artwork: string;       // https address of the cover (about 1000 px), "" when unknown
     artworkColor: string;  // dominant colour of the cover, "#RRGGBB", "" when unknown
@@ -334,6 +336,7 @@ declare const Ampify: {
     playbar: {
       addButton(button: UiButton & { beside?: "volume"; player?: boolean }): number; remove(id: number): boolean; mark(id: number, from?: number, to?: number): boolean;
       readout(totalMs?: number): void; onHover(fn: (part: number | null) => void): () => void;
+      audioBadge(badge: { label: string; icon?: string } | null): void;  // Apple's Lossless badge: its words, an icon after its mark
     };
     sidebar: { addItem(item: UiButton): number; remove(id: number): boolean };  // on while its own page is open, or after setActive
     menu: { addItem(where: "context" | "app", item: MenuItem): number; remove(id: number): boolean };

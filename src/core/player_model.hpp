@@ -58,6 +58,8 @@ struct AmpReading {
     int64_t positionRaw = 0;  // INowPlayingItem.CurrentPosition, in the unit given by AmpTimeUnit
     int64_t durationRaw = 0;
     int32_t audioFormat = 0;  // amp::AudioFormat
+    std::string sampleRate;   // INowPlayingItem.AudioFormatSampleRate as Apple writes it ("192 kHz"), may be empty
+    std::string bitDepth;     // INowPlayingItem.AudioFormatBitDepth ("24-bit"), empty when Apple does not know it
     uint64_t queueItemId = 0;
     ArtworkReading artwork;
     bool lyricsAvailable = false;  // ILyricsInfo.HaveLyrics said yes and the text was read
@@ -114,6 +116,11 @@ std::string TrackIdOf(const std::string& title, const std::string& artist, const
 std::string VariantOfAudioFormat(int32_t format);
 bool IsAtmosFormat(int32_t format);
 bool IsLosslessFormat(int32_t format);
+
+// The numbers in Apple's text of the stream's format: "192 kHz" or "44,1 kHz" -> 192000 and 44100 Hz (a bare number
+// under 1000 is in kHz), "24-bit" -> 24. 0 when the text holds no plausible value.
+int ParseSampleRateHz(const std::string& text);
+int ParseBitDepth(const std::string& text);
 
 // Apple Music writes "Artist \u2014 Album" where one line holds both (its subtitle, and its media session's artist):
 // the two parts, or the text and an empty album when there is no separator.

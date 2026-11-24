@@ -50,6 +50,17 @@ struct UiPlaybarHover {
     std::uint64_t serial = 0;
 };
 
+// What Apple's audio badge says (Ampify.ui.playbar.audioBadge): the words of the badge, of its flyout's title and of
+// its screen reader name, and an SVG icon drawn in place of Apple's Lossless mark (empty: Apple's mark stays). Set by
+// the last element that asked; `elementId` empty when none does and Apple's own badge shows. `serial` changes each
+// time it changes.
+struct UiAudioBadge {
+    std::string elementId;
+    std::string label;
+    std::string icon;
+    std::uint64_t serial = 0;
+};
+
 struct UiSlot {
     std::string elementId;
     std::string id;  // panel or page path; for a popup, its name (SetPopup) or empty (OpenPopup)
@@ -94,6 +105,11 @@ public:
     // Whether the element is told where the pointer is on the progress line.
     void SetPlaybarHoverListener(const std::string& elementId, bool listening);
     UiPlaybarHover PlaybarHover() const;
+
+    // Apple's audio badge says `label` with `icon` while the element asks; an empty label takes the element's request
+    // away. The last element to ask is the one shown.
+    void SetAudioBadge(const std::string& elementId, const std::string& label, const std::string& icon);
+    UiAudioBadge AudioBadge() const;
 
     // The kinds of item a context menu entry is for (see UiControl::kinds). False when the element has no such control.
     bool SetControlKinds(const std::string& elementId, int controlId, std::vector<std::string> kinds);
@@ -194,6 +210,8 @@ private:
     std::vector<std::pair<std::string, double>> m_readouts;  // element and length, the last asked at the end
     std::vector<std::string> m_hoverListeners;
     std::uint64_t m_hoverSerial = 0;
+    std::vector<UiAudioBadge> m_audioBadges;  // one per element, the last asked at the end
+    std::uint64_t m_audioBadgeSerial = 0;
 };
 
 // Checks a tree sent by an element: only the primitives of ui_vocab.cpp, with the depth, size and text limits of

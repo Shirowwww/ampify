@@ -360,6 +360,44 @@ TEST_CASE(Interface_OnHoverHearsWherePointerIsAndNullWhenItLeaves) {
     CHECK(f.host.ui.PlaybarHover().listeners.empty());
 }
 
+TEST_CASE(Interface_TheLastElementToNameTheAudioBadgeIsTheOneShown) {
+    ampify::UiModel model;
+    std::uint64_t serial = model.AudioBadge().serial;
+    model.SetAudioBadge("one", "Hi-Res", "<svg/>");
+    model.SetAudioBadge("two", "Studio", "");
+    CHECK(model.AudioBadge().elementId == "two");
+    CHECK(model.AudioBadge().label == "Studio");
+    CHECK(model.AudioBadge().serial != serial);
+    model.SetAudioBadge("two", "", "");  // gives the badge back: the first one shows again
+    CHECK(model.AudioBadge().label == "Hi-Res");
+    CHECK(model.AudioBadge().icon == "<svg/>");
+    serial = model.AudioBadge().serial;
+    model.RemoveElement("one");
+    CHECK(model.AudioBadge().elementId.empty());
+    CHECK(model.AudioBadge().serial != serial);
+}
+
+TEST_CASE(Interface_TheAudioBadgeNeedsThePlaybarPermissionAndALabel) {
+    Fixture f;
+    auto denied = f.Make("nobadge", "extension", R"("player.read")", R"(
+        try { Ampify.ui.playbar.audioBadge({ label: "Hi-Res" }); } catch (e) { Ampify.log("badge " + e.name); })");
+    CHECK(denied->Start());
+    CHECK(f.Logged("[nobadge] badge PermissionDenied"));
+    denied->Stop();
+
+    auto element = f.Make("badge", "extension", R"("ui.playbar")", R"(
+        try { Ampify.ui.playbar.audioBadge({ icon: "<svg/>" }); } catch (e) { Ampify.log("nolabel " + e.name); }
+        try { Ampify.ui.playbar.audioBadge("Hi-Res"); } catch (e) { Ampify.log("text " + e.name); }
+        Ampify.ui.playbar.audioBadge({ label: "Hi-Res Lossless", icon: "<svg/>" });)");
+    CHECK(element->Start());
+    CHECK(f.Logged("[badge] nolabel TypeError"));
+    CHECK(f.Logged("[badge] text TypeError"));
+    CHECK(f.host.ui.AudioBadge().label == "Hi-Res Lossless");
+    CHECK(f.host.ui.AudioBadge().icon == "<svg/>");
+    element->Stop();
+    CHECK(f.host.ui.AudioBadge().elementId.empty());
+}
+
 TEST_CASE(Interface_ABadTreeIsRefusedWhenItIsRegistered) {
     Fixture f;
     auto element = f.Make("badpanel", "extension", R"("ui.panel")",

@@ -149,7 +149,8 @@ boolean for a toggle, a number for a number). A change in Ampify's settings page
 ```js
 Ampify.player.state()
 // -> { playing, positionMs, durationMs,
-//      track: { id, title, artist, album, variantId, atmos, lossless, queueItemId, artwork, artworkColor } | null,
+//      track: { id, title, artist, album, variantId, atmos, lossless, sampleRate, bitDepth, queueItemId, artwork,
+//               artworkColor } | null,
 //      source: "apple" | "smtc" | "" }
 Ampify.player.on("trackchange" | "statechange" | "lyricschange" | "progress", fn)   // "songchange", "onplaypause" and "onprogress" are Spicetify's names (onplaypause also fires on a position jump)
 Ampify.player.off(event, fn)   // removes a listener added with on
@@ -187,7 +188,9 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
 - `track.id` is computed from title, artist and album (`t-` and 16 characters), the same whatever the source.
   `track.queueItemId` is Apple's queue entry, so the same song played twice has two.
 - `track.variantId` is `"lossless"`, `"hi-res-lossless"`, `"dolby-atmos"`, `"spatial"`, `"surround"`, `"other"`, or
-  empty. `track.artwork` is an https cover address or `""` (Apple Music 1.1792 keeps it internal, so it is empty
+  empty. `track.sampleRate` is the stream's rate in Hz (`44100`, `192000`) and `track.bitDepth` its bit depth (`16`,
+  `24`), each `0` when the source does not say: Apple gives them a few seconds after the song starts (a `progress`
+  event brings them), often without the bit depth, and SMTC never does (Ampify 1.5.9). `track.artwork` is an https cover address or `""` (Apple Music 1.1792 keeps it internal, so it is empty
   there); `track.artworkColor` is `"#RRGGBB"` or `""`.
 - A queue item's `artwork` goes straight into an `image` node's `src`: an https address, or `"artwork:<id>"` when Apple
   keeps the address internal (Apple's own loader then draws that entry's cover), or `""` for an entry without one.
@@ -451,6 +454,7 @@ Ampify.ui.setDisabled(id, disabled)    // a top bar or play bar button, or a men
 Ampify.ui.playbar.mark(id, from, to)   // a stretch of the progress line for a play bar button it added (1.3)
 Ampify.ui.playbar.readout(totalMs)     // the time under the pointer on the progress line, for a span that long (1.3)
 Ampify.ui.playbar.onHover(fn)          // fn(part): where the pointer is on the line, 0 to 1, null when it leaves (1.3)
+Ampify.ui.playbar.audioBadge({ label, icon })  // what Apple's Lossless badge says; null gives Apple's back (1.5.9)
 Ampify.ui.page.register(path, view)    // for an app
 Ampify.ui.navigate(path)
 ```
@@ -488,6 +492,14 @@ Ampify.ui.navigate(path)
   tooltips, the marker the text colour of the bar; both follow the light and dark modes and every theme's line, and
   the label goes under the line when the bar sits at the top of the window. When several elements ask, the last one
   shows.
+- `playbar.audioBadge({ label, icon })` makes Apple's audio badge, under the song in the play bar, say `label`: its
+  words where the layout shows them, its screen reader name and the title of the flyout it opens. `icon` (SVG, drawn
+  in the badge's own colour, as tall as Apple's mark and as wide as its `viewBox` asks) follows Apple's Lossless mark
+  there and in the flyout, Apple's mark unchanged; leave room on its left for the gap. It acts only while Apple shows its Lossless
+  mark: a Dolby badge keeps Apple's words, and they come back by themselves when the next song is not lossless.
+  `audioBadge(null)` gives Apple's badge back as it was. When several elements ask, the last one shows. Needs
+  `ui.playbar`; Ampify before 1.5.9 has no `audioBadge`: check that it is a function. The Hi-Res Lossless badge
+  extension uses it.
 - `playbar.onHover(fn)` calls `fn(part)` as the pointer moves over the progress line, at most every 50 ms, with `part`
   from 0 to 1 (a position divided by the line's length), and `fn(null)` once it leaves. It returns the function that
   stops listening. Both need `ui.playbar`; Ampify before 1.3 has neither.

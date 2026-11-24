@@ -135,6 +135,17 @@ struct UiNatives : ScriptBridge {
         return JS_UNDEFINED;
     }
 
+    // native.uiAudioBadge(label, icon): what Apple's audio badge says; an empty label gives Apple's own back.
+    AMPIFY_NATIVE(UiAudioBadge) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.playbar", &failure)) return failure;
+        std::string label = Clipped(String(ctx, argc, argv, 0), uivocab::kMaxControlLabel);
+        std::string icon = Clipped(String(ctx, argc, argv, 1), uivocab::kMaxControlIcon);
+        HostOf(ext).Ui().SetAudioBadge(ext->id(), label, icon);
+        return JS_UNDEFINED;
+    }
+
     // native.uiPlaybarHover(listening): whether the element hears where the pointer is on the progress line.
     AMPIFY_NATIVE(UiPlaybarHover) {
         ScriptExtension* ext = Owner(ctx);
@@ -298,6 +309,7 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiControlMark", UiNatives::UiControlMark, 3);
     scope.Function("uiPlaybarReadout", UiNatives::UiPlaybarReadout, 1);
     scope.Function("uiPlaybarHover", UiNatives::UiPlaybarHover, 1);
+    scope.Function("uiAudioBadge", UiNatives::UiAudioBadge, 2);
     scope.Function("uiControlRemove", UiNatives::UiControlRemove, 1);
     scope.Function("uiControlKinds", UiNatives::UiControlKinds, 2);
     scope.Function("uiPanel", UiNatives::UiPanel, 2);

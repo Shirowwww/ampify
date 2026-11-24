@@ -164,6 +164,8 @@ struct PlayerCopy {
 };
 
 // One XAML window of Apple Music (the main window or the mini player).
+struct AudioBadgeState;  // ui_service_badge.cpp
+
 struct WindowContext : std::enable_shared_from_this<WindowContext> {
     WindowRole role = WindowRole::Main;
     winrt::weak_ref<xaml::Window> window;
@@ -232,6 +234,8 @@ struct WindowContext : std::enable_shared_from_this<WindowContext> {
     double hoverPart = -1;      // where the pointer is now, -1 when it is off the line
     double hoverSentPart = -1;  // what the listeners were told last
     std::uint64_t hoverSerial = 0;
+    // What Ampify changed in Apple's audio badge (Ampify.ui.playbar.audioBadge, FollowAudioBadge), to give it back.
+    std::shared_ptr<AudioBadgeState> audioBadge;
 
     // Main window only.
     // Strong, like the Popup: the panels stay ours even when Apple Music rebuilds the children of its page (in the
@@ -412,6 +416,7 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     uirender::PlayerMode playerMode = uirender::PlayerMode::Window;  // apple.fullscreen, read by the worker
     bool closeToTray = false;  // apple.close, read by the worker
     UiPlaybarHover playbarHover;  // the progress line's readout and listeners, read by the worker
+    UiAudioBadge audioBadge;      // what Apple's audio badge says, read by the worker
     std::atomic<bool> entryInHeader{false};  // ampify.entry, read on the interface thread (PlaceSidebarItem)
     std::string cardTheme;   // the theme the Ampify page shows
     bool cardStale = false;  // the theme changed elsewhere (Marketplace, ampify theme set): the card is built again
@@ -532,6 +537,10 @@ void FollowPlaybarMark(UiService::Shared& shared, const std::shared_ptr<WindowCo
 void ReleasePlaybarMark(WindowContext& context) noexcept;
 void FollowPlaybarHover(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context);
 void ReleasePlaybarHover(WindowContext& context) noexcept;
+
+// ui_service_badge.cpp
+void FollowAudioBadge(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context);
+void ReleaseAudioBadge(WindowContext& context) noexcept;
 
 // ui_service_player.cpp
 void FollowPlayerRow(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,

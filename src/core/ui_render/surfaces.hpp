@@ -39,9 +39,10 @@ struct SurfaceChanges {
     std::optional<std::pair<std::string, std::string>> route;  // a new Ampify.ui.navigate (element, path), once
     bool applePlayer = false;  // Ampify.ui.applePlayer.open was called since the last poll
     std::optional<UiPlaybarHover> hover;  // the progress line's readout or its listeners changed
+    std::optional<UiAudioBadge> audioBadge;  // what Apple's audio badge says changed
 
     bool Empty() const {
-        return added.empty() && changed.empty() && removed.empty() && !route && !applePlayer && !hover;
+        return added.empty() && changed.empty() && removed.empty() && !route && !applePlayer && !hover && !audioBadge;
     }
 };
 
@@ -62,6 +63,7 @@ private:
     std::uint64_t m_routeSerial = 0;
     std::uint64_t m_applePlayerRequests = 0;
     std::uint64_t m_hoverSerial = 0;
+    std::uint64_t m_audioBadgeSerial = 0;
     std::uint64_t m_revision = 0;
     std::uint64_t m_version = 0;  // UiModel::Version at the last reading
     bool m_polled = false;

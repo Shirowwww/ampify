@@ -437,6 +437,21 @@ UiPlaybarHover UiModel::PlaybarHover() const {
     return hover;
 }
 
+void UiModel::SetAudioBadge(const std::string& elementId, const std::string& label, const std::string& icon) {
+    Edit edit(*this);
+    auto owned = [&](const UiAudioBadge& badge) { return badge.elementId == elementId; };
+    m_audioBadges.erase(std::remove_if(m_audioBadges.begin(), m_audioBadges.end(), owned), m_audioBadges.end());
+    if (!label.empty()) m_audioBadges.push_back(UiAudioBadge{elementId, label, icon, 0});
+    m_audioBadgeSerial++;
+}
+
+UiAudioBadge UiModel::AudioBadge() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    UiAudioBadge badge = m_audioBadges.empty() ? UiAudioBadge{} : m_audioBadges.back();
+    badge.serial = m_audioBadgeSerial;
+    return badge;
+}
+
 bool UiModel::SetControlKinds(const std::string& elementId, int controlId, std::vector<std::string> kinds) {
     Edit edit(*this);
     return ChangeControl(m_controls, elementId, controlId,
@@ -486,6 +501,12 @@ void UiModel::RemoveElement(const std::string& elementId) {
     m_hoverListeners.erase(std::remove(m_hoverListeners.begin(), m_hoverListeners.end(), elementId),
                            m_hoverListeners.end());
     if (m_readouts.size() + m_hoverListeners.size() != hover) m_hoverSerial++;
+    auto badge = [&](const UiAudioBadge& b) { return b.elementId == elementId; };
+    auto badges = std::remove_if(m_audioBadges.begin(), m_audioBadges.end(), badge);
+    if (badges != m_audioBadges.end()) {
+        m_audioBadges.erase(badges, m_audioBadges.end());
+        m_audioBadgeSerial++;
+    }
 }
 
 std::optional<UiControl> UiModel::Find(int controlId) const {

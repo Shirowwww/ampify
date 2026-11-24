@@ -200,6 +200,45 @@ bool IsLosslessFormat(int32_t format) {
            format == static_cast<int32_t>(amp::AudioFormat::HiResLossless);
 }
 
+namespace {
+
+// The first number of `text`, a comma or a point as its decimal mark; nullopt without one.
+std::optional<double> FirstNumber(const std::string& text) {
+    auto digit = [&](size_t at) { return at < text.size() && std::isdigit(static_cast<unsigned char>(text[at])); };
+    size_t at = 0;
+    while (at < text.size() && !digit(at)) at++;
+    if (at == text.size()) return std::nullopt;
+    double value = 0;
+    while (digit(at)) value = value * 10 + (text[at++] - '0');
+    if (at < text.size() && (text[at] == ',' || text[at] == '.') && digit(at + 1)) {
+        double scale = 0.1;
+        for (at++; digit(at); at++, scale /= 10) value += (text[at] - '0') * scale;
+    }
+    return value;
+}
+
+}  // namespace
+
+int ParseSampleRateHz(const std::string& text) {
+    constexpr double kMaxHz = 1'000'000;  // no stream comes near: a larger number is not a rate
+    constexpr double kKilo = 1000;
+    std::optional<double> value = FirstNumber(text);
+    if (!value) return 0;
+    // "kHz" multiplies, "Hz" alone does not; a bare number under 1000 can only be in kHz ("44.1", "96").
+    std::string lower = text;
+    for (char& c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    bool kilo = lower.find("khz") != std::string::npos;
+    bool hertz = !kilo && lower.find("hz") != std::string::npos;
+    double hz = kilo || (!hertz && *value < kKilo) ? *value * kKilo : *value;
+    return hz > 0 && hz <= kMaxHz ? static_cast<int>(std::lround(hz)) : 0;
+}
+
+int ParseBitDepth(const std::string& text) {
+    constexpr double kMaxBits = 64;
+    std::optional<double> value = FirstNumber(text);
+    return value && *value >= 1 && *value <= kMaxBits ? static_cast<int>(*value) : 0;
+}
+
 std::pair<std::string, std::string> SplitArtistAlbum(const std::string& text) {
     static const std::string kSeparator = " \xE2\x80\x94 ";  // " \u2014 ", an em dash between spaces
     size_t at = text.find(kSeparator);
@@ -246,6 +285,8 @@ PlayerSnapshot SnapshotFromAmp(const AmpReading& reading, AmpTimeUnit unit) {
     track.variantId = VariantOfAudioFormat(reading.audioFormat);
     track.atmos = IsAtmosFormat(reading.audioFormat);
     track.lossless = IsLosslessFormat(reading.audioFormat);
+    track.sampleRate = ParseSampleRateHz(reading.sampleRate);
+    track.bitDepth = ParseBitDepth(reading.bitDepth);
     if (reading.queueItemId != 0) track.queueItemId = std::to_string(reading.queueItemId);
     track.artwork = ArtworkAddress(reading.artwork);
     track.artworkColor = ArtworkColorHex(reading.artwork);

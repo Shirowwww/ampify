@@ -75,7 +75,7 @@ private:
     rt::Ref m_item;  // the NowPlayingItem whose strings are cached
     uint64_t m_itemQueueId = 0;
     unsigned long long m_stringsAt = 0;
-    std::string m_title, m_artist, m_album, m_subtitle;
+    std::string m_title, m_artist, m_album, m_subtitle, m_sampleRate, m_bitDepth;
     ArtworkReading m_artwork;
 
     std::optional<RawLyrics> m_lyrics;  // of the item in m_item

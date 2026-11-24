@@ -44,6 +44,22 @@ Apple's own drawing. Line-synced lyrics are sharp, as long as anything that move
 | Right column | `LyricsHostView` with `CurrentLineAlignment`, `EndScrollsUp`, `IsFadingEnabled` |
 | Exit | `ExitFullScreenButton`, `CloseFullScreenButton` |
 
+## Audio badge (`AudioBadgeControl`, `AudioQualityFlyout`)
+
+Apple Music 1.1792 on Windows calls every lossless stream "Lossless", even 24-bit 192 kHz, although its album pages say
+"Hi-Res Lossless" (`HiResLosslessText`) and its now-playing item knows the rate (`INowPlayingItem.AudioFormat` is
+`HiResLossless`, `get_AudioFormatSampleRate` and `get_AudioFormatBitDepth` give HSTRINGs, the bit depth often empty).
+
+| Part | Names |
+|---|---|
+| Badge | `AudioBadgeControl#AudioBadgeControl` > `Button#AudioBadgeButton` (its screen reader name is the badge's word) holding two variants: `AudioBadge` (`ImageWithLabel`: a mark and `TextBlock#AudioBadgeLabel`) and `StackPanel#AudioBadgeCompact` (the mark alone, the one the play bar shows at full width) |
+| Marks | a `Canvas` without a name, 17.25 x 11, holding one `Path` of the resource `LosslessAssetPathData`; the Dolby ones are named (`DolbyImageCompact`). The Lossless and Dolby canvases take turns through their `Visibility`. The `Path` has its own size and a stretch: a geometry put in it is fitted to that box, out of shape, unless its `Stretch` goes to `None` |
+| Flyout | `AudioQualityFlyout`, in a popup window of its own ("Hôte contextuel"): the large mark, a headline with the badge's word, a line such as "ALAC 24 bits/192 kHz", and `AudioQualitySettings`. Reached through `AudioBadgeButton.Flyout()` and its `Opened` event |
+
+`Ampify.ui.playbar.audioBadge` changes the words in place and adds its icon as a second path in the mark's canvas, after Apple's (`src/win/ui_service_badge.cpp`). A geometry for a `Path` made
+by `XamlReader` loads from `<Path Data='F1 M...'/>`; built as `GeometryGroup` of `PathGeometry Figures=`, the icon
+did not show.
+
 ## Lyrics (`LyricsView`, `KaraokeLyricsView`, `LyricsListViewItem`, `KaraokeLyricsLine`)
 
 Apple's lyrics are richer than they look in the side panel:
