@@ -77,8 +77,17 @@ struct Status {
     double leadSeconds = NAN;   // how far ahead of the deck's reading the second player runs
     double switchLagMs = NAN;   // once mixing, how far the next song is behind the plan, counted in samples
     double driftMs = NAN;       // at the last key, how much later Apple's stream is heard than the deck counts
+    double switchIn = NAN;      // while Apple's player is on A: seconds until it goes to the next song
+    double heardFor = NAN;      // seconds the mix is heard after that switch: to the last key, then the echo's repeats
     int seeks = 0;              // seeks of the second player for this plan
 };
+
+inline constexpr double kMixShownAhead = 6;  // seconds before Apple's switch the mix may show, at most
+
+// Whether Apple's progress line shows the mix (src/win/mix_glow.cpp). Apple's player goes to the next song as the mix
+// begins: from as long before the switch as the mix is heard after it (kMixShownAhead at most), the old song's line
+// shows it as the new one's does, as on the iPhone; through a recovery once `mixed`, to the end.
+bool MixShown(const Status& status, bool mixed);
 
 class MixSession {
 public:

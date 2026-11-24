@@ -63,6 +63,10 @@ struct SharedAudio {
     // The speed of Apple's player, in thousandths (1000: normal). The interface asks, the engine applies and says.
     std::atomic<uint32_t> rateRequestMilli;  // 0 until asked
     std::atomic<uint32_t> rateMilli;         // 0 until the engine applied one
+
+    // AutoMix: when its mix began to be heard (GetTickCount64), 0 while none is. The engine writes it, and the
+    // interface shows the mix on Apple's progress line meanwhile.
+    std::atomic<int64_t> mixHeardSinceMs;
 };
 
 enum class SingMode : uint32_t { Off = 0, Light = 1, Studio = 2 };

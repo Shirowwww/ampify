@@ -5,6 +5,7 @@
 #include "artwork_passthrough.hpp"
 #include "lcd_links.hpp"
 #include "lyrics_window.hpp"
+#include "mix_glow.hpp"
 #include "notifications.hpp"
 #include "player_controls.hpp"
 #include "sharp_artwork.hpp"
@@ -33,6 +34,7 @@ struct AppleTweak {
 constexpr AppleTweak kTweaks[] = {
     {nullptr, KeepBarArtworkJournal},
     {nullptr, KeepDisplayLinks},
+    {nullptr, KeepMixGlow},
     {[](const uirender::AppleTweaks& t, Journal&) { SetTextMarquee(t.textMarquee); }, KeepTextMarquee},
     {[](const uirender::AppleTweaks& t, Journal&) { SetSidebarOnHover(t.sidebarOnHover); }, KeepSidebarOnHover},
     {[](const uirender::AppleTweaks& t, Journal&) { SetTopbarSearch(t.topbarSearch); }, KeepTopbarSearch},

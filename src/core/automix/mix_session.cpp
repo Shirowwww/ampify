@@ -52,6 +52,19 @@ std::string_view PhaseName(Phase phase) {
     return "idle";
 }
 
+bool MixShown(const Status& status, bool mixed) {
+    switch (status.phase) {
+        case Phase::Preparing:
+        case Phase::Aligning:
+        case Phase::Ready:
+        case Phase::TakingOver:  // a cut mixes nothing: it shows nothing before its switch
+            return status.heardFor > 0 && status.switchIn <= std::min(status.heardFor, kMixShownAhead);
+        case Phase::Mixing: return true;
+        case Phase::Recovering: return mixed;
+        default: return false;
+    }
+}
+
 std::string MixSession::Start(const MixPlan& plan, double aDuration, double bDuration) {
     std::string problem = Check(plan, aDuration, bDuration);
     if (!problem.empty()) return problem;
@@ -66,6 +79,7 @@ std::string MixSession::Start(const MixPlan& plan, double aDuration, double bDur
     m_status = Status{};
     m_status.phase = Phase::Waiting;
     m_status.next = plan.next;
+    m_status.heardFor = (plan.keys.back().at - plan.keys.front().at) / plan.rate + EchoAfter(plan);
     m_cancel.reset();
     m_phaseSince = -1;
     m_lastA = m_lastGhost = m_lastHeard = m_lastAOnA = NAN;
@@ -392,6 +406,10 @@ void MixSession::TickLocked(double now) {
     if (a) {
         if (m_lastAMoved < 0 || *a != m_lastA) m_lastAMoved = now;
         m_lastA = *a;
+        // Apple's player can be on B only from the takeover on, where a look at its item is made anyway.
+        if (phase < Phase::TakingOver || (phase == Phase::TakingOver && !m_decks.MainOnNext())) {
+            m_status.switchIn = SwitchTime(m_plan) - *a;
+        }
     }
     // Apple's player paused or stalled: the hooks say so first, this is the fallback.
     if (phase != Phase::Waiting && m_lastAMoved >= 0 && now - m_lastAMoved > kStallSeconds) {

@@ -333,6 +333,10 @@ Ampify.audio.sing.onChange(fn)           // fn(state) when the state moves (poll
 
 #### AutoMix [preview]
 
+While a mix is heard, Ampify shows it on Apple's progress line, in the play bar and in the full-screen player, as Apple
+Music does on the iPhone: the part played glows and "Mixing" shows under the middle of the line, or in place of the
+artist line when the bar keeps the song's display, a light passing over it (still when Windows' animations are off).
+
 `Ampify.automix` (permission `audio.mix`, audio process only) plays the end of the current song into the next one.
 Ampify starts a second player on the current song a few seconds ahead, delays its sound until it is Apple's to the
 sample, lets it take the song over, moves Apple's player to the next song at the plan's start, then shapes both

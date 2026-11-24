@@ -24,6 +24,7 @@
 #include <utility>
 
 #include "../../../extensions/atmos-leveler/format_detection.hpp"
+#include "../../core/audio/audio_share.hpp"
 #include "../../core/automix/mix_deck.hpp"
 #include "../hook.hpp"
 #include "audio_hooks.hpp"
@@ -752,12 +753,25 @@ private:
         Note(line);
     }
 
+    // Tells the interface whether the mix shows on Apple's progress line (automix::MixShown, src/win/mix_glow.cpp).
+    static void ShareHeard(bool shown) {
+        audio::SharedAudio* block = SharedAudioBlock();
+        if (!block) return;
+        if (!shown) {
+            if (block->mixHeardSinceMs.load() != 0) block->mixHeardSinceMs.store(0);
+            return;
+        }
+        int64_t idle = 0;
+        block->mixHeardSinceMs.compare_exchange_strong(idle, SharedAudioNowMs());
+    }
+
     // One thread while a plan is alive, gone once the session rests.
     void Wake() {
         bool expected = false;
         if (!m_running.compare_exchange_strong(expected, true)) return;
         std::thread([this] {
             automix::Phase last = automix::Phase::Idle;
+            bool mixed = false;
             while (true) {
                 if (const char* reason = m_interrupt.exchange(nullptr)) m_session.Cancel(reason, true);
                 if (PlaybackRate() != 1.0) m_session.Cancel("Apple's player changed its speed", true);
@@ -770,6 +784,8 @@ private:
                     last = status.phase;
                     Report(status);
                 }
+                mixed = mixed || status.phase == automix::Phase::Mixing;
+                ShareHeard(automix::MixShown(status, mixed));
                 if (!m_session.Active()) break;
                 std::this_thread::sleep_for(std::chrono::duration<double>(m_session.TickInterval()));
             }
@@ -779,6 +795,7 @@ private:
                 std::lock_guard<std::mutex> guard(m_deckLock);
                 if (!m_session.Active()) m_decks.SetGains({});
             }
+            ShareHeard(false);
             m_running = false;
             m_interrupt = nullptr;
             // A plan taken while the thread was leaving would wait forever: look once more.

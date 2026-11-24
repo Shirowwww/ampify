@@ -44,6 +44,7 @@
 #include "../core/ui_render/render_tree.hpp"
 #include "artwork_cap.hpp"
 #include "artwork_passthrough.hpp"
+#include "mix_glow.hpp"
 #include "player_controls.hpp"
 #include "sidebar_hover.hpp"
 #include "xaml_host.hpp"
@@ -383,7 +384,8 @@ std::vector<theme::NodeInfo> XamlTreeBackend::Snapshot() {
         }
         // Ampify's app pages sit beside Apple's frame but stay out of themes, as when they lived in a popup: the kit
         // renderer owns their values.
-        if (node.name == "AMPIFY_PageHost" || node.name == kLargeArtworkLoaderName || node.name == kEffectHostName) {
+        if (node.name == "AMPIFY_PageHost" || node.name == kLargeArtworkLoaderName || node.name == kEffectHostName ||
+            node.name == kMixLayerName || node.name == kMixLabelName) {
             continue;
         }
         if (auto text = item.object.try_as<controls::TextBlock>()) node.icon = IsIconText(text.Text());

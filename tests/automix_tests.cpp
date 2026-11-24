@@ -1178,6 +1178,59 @@ TEST_CASE(AutoMix_ALoopNotHeldLeavesTheSecondPlayerPlaying) {
     CHECK(decks.quiets == 0);
 }
 
+// The interface shows the mix as long before Apple's switch as it is heard after it: while Apple's player is still on
+// A, the session tells how long until the switch, and from the start how long the mix is heard after it.
+TEST_CASE(AutoMix_ASessionTellsHowLongUntilTheSwitchAndHowLongTheMixIsHeardAfter) {
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(EchoPlan(), 200, 200).empty());
+    CHECK_NEAR(session.GetStatus().heardFor, 8 + 2, 1e-9);  // the keys, then the echo's repeats
+    Run(session, decks, 15);
+    REQUIRE(session.GetStatus().phase != Phase::Failed);
+    CHECK_NEAR(session.GetStatus().switchIn, 100 - (80 + 15), 0.05);
+    Run(session, decks, 19.5);
+    CHECK_NEAR(session.GetStatus().switchIn, 0.5, 0.05);
+    Run(session, decks, 60);
+    CHECK(session.GetStatus().phase == Phase::Done);
+}
+
+TEST_CASE(AutoMix_TheMixShowsAsLongBeforeTheSwitchAsAfterIt) {
+    Status status;
+    status.heardFor = 4;
+    status.switchIn = 4.5;
+    for (Phase phase : {Phase::Preparing, Phase::Aligning, Phase::Ready, Phase::TakingOver}) {
+        status.phase = phase;
+        CHECK(!MixShown(status, false));
+    }
+    status.switchIn = 3.9;
+    for (Phase phase : {Phase::Preparing, Phase::Aligning, Phase::Ready, Phase::TakingOver}) {
+        status.phase = phase;
+        CHECK(MixShown(status, false));
+    }
+    status.phase = Phase::Waiting;  // the second player not even started: nothing is sure to be mixed
+    CHECK(!MixShown(status, false));
+    status.heardFor = 30;  // a long mix: the old song's line shows it only so long
+    status.phase = Phase::Ready;
+    status.switchIn = kMixShownAhead + 0.1;
+    CHECK(!MixShown(status, false));
+    status.switchIn = kMixShownAhead - 0.1;
+    CHECK(MixShown(status, false));
+    status.switchIn = NAN;
+    CHECK(!MixShown(status, false));
+    status.heardFor = 0;  // a cut: Apple's player alone, nothing heard of a mix
+    status.switchIn = -0.05;
+    CHECK(!MixShown(status, false));
+    status.phase = Phase::Mixing;
+    CHECK(MixShown(status, true));
+    status.phase = Phase::Recovering;
+    CHECK(MixShown(status, true));    // the mix was heard: shown until the song is Apple's alone again
+    CHECK(!MixShown(status, false));  // given up before the switch: it never was
+    for (Phase phase : {Phase::Idle, Phase::Done, Phase::Failed}) {
+        status.phase = phase;
+        CHECK(!MixShown(status, true));
+    }
+}
+
 TEST_CASE(AutoMix_ANewPlanReplacesOneWhoseMixHasNotBegun) {
     FakeDecks decks;
     MixSession session(decks);
