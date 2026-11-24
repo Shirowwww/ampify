@@ -22,6 +22,7 @@ constexpr double kMaxNudge = 0.06;   // further off, something else than Apple's
 // seconds after a switch, inside Apple's player). Keys and the echo's edges come exactly where they fall on top.
 constexpr double kAheadStep = 0.04;
 constexpr int kAheadSteps = 20;
+constexpr double kGateEdge = 0.001;
 constexpr double kStallSeconds = 1.5;   // a player not moving for this long: paused or stuck
 constexpr double kSwitchMargin = 0.5;   // Apple's player still on A this long after the switch point: it will not
 constexpr double kMaxSwitchDelay = 0.25;  // a later start of B is a stall, not the player's usual delay
@@ -156,7 +157,8 @@ void MixSession::GainAhead(double heard) {
     auto at = [this](double aTime) {
         const Gains gains = GainsAt(m_plan.keys, aTime);
         return DeckGains{gains.b,       gains.a,       gains.bLow, gains.aLow, gains.bFilter, gains.aFilter,
-                         EchoSendAt(m_plan, aTime), Echoes(m_plan) ? 1.0 : 0.0};
+                         EchoSendAt(m_plan, aTime), Echoes(m_plan) ? 1.0 : 0.0, gains.bThin, gains.aMuffle,
+                         GateAt(m_plan, aTime)};
     };
     // From the first key on, A plays at the plan's speed: its time passes that much faster than the listener's.
     const double speed = m_plan.rate;
@@ -171,6 +173,17 @@ void MixSession::GainAhead(double heard) {
     for (const double edge : edges) {
         const double seconds = (edge - heard) / speed;
         if (seconds > 0 && seconds < kAheadSteps * kAheadStep) points.push_back({seconds, at(edge)});
+    }
+    // The gate goes up and down at once on its edges, a millisecond each: B slams in on the drop, not over a step.
+    if (Gates(m_plan)) {
+        // Inside an edge's millisecond, its end still goes in: without it the gate would ramp over the next step.
+        for (const double edge : {m_plan.gate.beats.front() - kStabRise, m_plan.gate.until}) {
+            const double after = (edge - heard) / speed;
+            const double before = after - kGateEdge / speed;
+            if (after <= 0 || before >= kAheadSteps * kAheadStep) continue;
+            if (before > 0) points.push_back({before, at(edge - kGateEdge)});
+            points.push_back({after, at(edge)});
+        }
     }
     std::sort(points.begin(), points.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
     m_gains = points.front().second;
@@ -351,7 +364,7 @@ void MixSession::TickLocked(double now) {
         double p = std::clamp((now - m_phaseSince) / m_recoverSeconds, 0.0, 1.0);
         Gain({Lerp(m_recoverFrom.main, 1, p), m_recoverFrom.tail * (1 - p), Lerp(m_recoverFrom.mainLow, 1, p),
               m_recoverFrom.tailLow, Lerp(m_recoverFrom.mainFilter, 0, p), m_recoverFrom.tailFilter, 0,
-              m_recoverFrom.echoReturn * (1 - p)});
+              m_recoverFrom.echoReturn * (1 - p), Lerp(m_recoverFrom.mainThin, 0, p), m_recoverFrom.tailMuffle});
         if (p < 1 || !HeldBackPlayed(now)) return;
         LetGo();
         Gain(kApplesAlone);
@@ -453,6 +466,7 @@ void MixSession::TickLocked(double now) {
                 if (!m_lagMeasured) LearnSwitchDelay();
                 GainAhead(*heard);
                 if (*heard < m_plan.keys.back().at) return;
+                if (const std::optional<double> drift = m_decks.ApartDrift()) m_status.driftMs = *drift * 1000;
             }
             if (!HeldBackPlayed(now)) return FadeEcho(now);
             LetGo();

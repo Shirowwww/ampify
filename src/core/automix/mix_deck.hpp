@@ -26,6 +26,8 @@
 #include <optional>
 #include <vector>
 
+#include "mix_plan.hpp"
+
 namespace ampify::automix {
 
 class TempoStretch;
@@ -33,7 +35,9 @@ class TempoStretch;
 // 0..1 each. `main` is Apple's stream as it comes, `tail` the deck's copy of A; the lows are what is left of each
 // one's bass. The filters are how far each is filtered, 0 not at all: Apple's stream through a low-pass (B comes in
 // muffled), the deck's copy through a high-pass (A leaves thin). The echo takes the deck's A before its volume
-// (`echoSend`), so that it rings on once A is gone, and is heard at `echoReturn`.
+// (`echoSend`), so that it rings on once A is gone, and is heard at `echoReturn`. `mainThin` and `tailMuffle` are the
+// crossover (GainKey's bThin and aMuffle): Apple's stream through a steep high-pass, the deck's copy through a steep
+// low-pass.
 struct DeckGains {
     double main = 1;
     double tail = 0;
@@ -43,6 +47,10 @@ struct DeckGains {
     double tailFilter = 0;
     double echoSend = 0;
     double echoReturn = 0;
+    double mainThin = 0;
+    double tailMuffle = 0;
+    // 1: B (Apple's stream) in the stabs SetGate gave, A dipping under each; 0: neither.
+    double gate = 0;
 };
 
 struct DeckStep {
@@ -84,11 +92,14 @@ public:
     // Apple's player started B that much later than made up for, which shows only once B plays. Only once A's speed
     // moved (SetStretch): a copy played as recorded would jump. False when it cannot.
     bool Nudge(double seconds);
-    // An echo whose repeats come `delay` seconds apart, each `feedback` of the one before. After Open.
-    void SetEcho(double delay, double feedback);
+    // An echo whose repeats come `delay` seconds apart, each `feedback` of the one before, the first `level` of what was
+    // thrown. After Open.
+    void SetEcho(double delay, double feedback, double level = kEchoLevel);
     // From `from` (A's time) on, the deck plays the `length` seconds of A there over and over, kept as the second
     // player's sound of them comes in. After Open, before Align.
-    void SetLoop(double from, double length);
+    void SetLoop(double from, double length, const std::vector<LoopRoll>& rolls = {});
+    // B's stabs and A's dip under them, in A's time, wherever the gains' `gate` is up. After Open.
+    void SetGate(const Gate& gate);
     bool LoopHeld() const;  // all of the loop came in: nothing more of the second player's sound is needed
 
     // Reached in a straight line a fiftieth of a second from now, at the same instant in both streams. `volume` is
@@ -106,6 +117,9 @@ public:
     double ResidualDb() const;
     // Seconds between the last frame of Apple's stream for A and the first of its stream for B, as heard.
     std::optional<double> SwitchGap() const;
+    // Seconds by which Apple's stream is, from its latest blocks, further on than where the deck placed it once its
+    // place was known: what the deck does to it is heard that much later. None until both are known.
+    std::optional<double> ApartDrift() const;
 
     // ---- the audio threads
 
@@ -127,9 +141,14 @@ private:
 
     // A state-variable filter (Simper's), steady while its cutoff moves. It runs on every chunk once the deck plays
     // A, whatever its amount, so its state is the music's; at 0 its sound is not used, and it comes in and goes out
-    // across one chunk, from the dry sound to its own: no click either way.
+    // across one chunk, from the dry sound to its own: no click either way. Its cutoff moves from `open` Hz at an
+    // amount of 0 to `shut` at 1, evenly in pitch; `q` 0.707 has no resonant peak, and two stages of 0.541 and 1.307
+    // make a four-pole Butterworth filter.
     struct Sweep {
         bool highPass = false;
+        double open = 20000;
+        double shut = 400;
+        double q = 0.7071;
         double ic1[2] = {0, 0};
         double ic2[2] = {0, 0};
         void Run(float* stereo, size_t frames, double from, double to, int sampleRate);
@@ -142,6 +161,7 @@ private:
         std::vector<float> line;  // stereo, exactly the delay long
         size_t at = 0;
         double feedback = 0;
+        double level = kEchoLevel;
         double low[2] = {0, 0};   // the low-pass's state
         double base[2] = {0, 0};  // what the high-pass takes away
         // Adds the echo to `out` (times `scale`), feeding it `in`; send and return move in a line over the chunk.
@@ -176,6 +196,8 @@ private:
     size_t UntilPoint(std::int64_t at, size_t frames) const;
     bool ReadTail(std::uint64_t from, size_t frames, float* out) const;
     bool ReadSong(std::uint64_t from, size_t frames, float* out) const;
+    void LoopFrame(std::uint64_t offset, float* out) const;
+    double HeardAt(std::int64_t tailFrame) const;
     void KeepLoop();
     size_t UntilEvent(size_t frames);
     double TakeNudge(size_t frames);
@@ -196,9 +218,11 @@ private:
 
     bool m_aligned = false;
     // Apple's frame n and the second player's frame n + m_apart leave the speakers together: exactly so for the
-    // stream Align measured (m_exact), near enough for the curves on the ones Apple's player makes afterwards.
+    // stream Align measured (m_exact), near enough for the curves on the ones Apple's player makes afterwards, until
+    // Windows has taken enough of them to tell (m_apartKnown): a gate's stabs must fall on B's beats.
     std::int64_t m_apart = 0;
     bool m_exact = false;
+    bool m_apartKnown = false;
     // Once Apple's player moved on: where the last sounding frame of its stream for A was heard, and how many empty
     // frames its stream for B began with (counted until the first sounding one).
     std::optional<std::int64_t> m_oldEnd;
@@ -214,8 +238,10 @@ private:
     std::vector<Point> m_curve;  // the gains over the second player's frames, straight lines between points
     LowShelf m_mainShelf;
     LowShelf m_tailShelf;
-    Sweep m_mainSweep;  // low-pass
-    Sweep m_tailSweep{true};
+    Sweep m_mainSweep;     // B's low-pass
+    Sweep m_tailSweep;     // A's high-pass
+    Sweep m_mainThin[2];   // the crossover: B's high-pass, in two stages
+    Sweep m_tailMuffle[2]; // and A's low-pass
     Echo m_echo;
 
     // The loop: the second player's frames from a seam before it to its end, the seam blended into its last frames
@@ -227,6 +253,18 @@ private:
     std::int64_t m_loopAt = -1;     // the second player's frame where it starts, once aligned
     size_t m_loopKept = 0;          // frames of m_loop filled
     bool m_loopHeld = false;
+    // The rolls: from `from` frames into the loop on, its first `frames` over and over.
+    struct Roll {
+        std::uint64_t from = 0;
+        size_t frames = 0;
+    };
+    std::vector<Roll> m_rolls;
+    Gate m_gate;
+    // A's time heard with the second player's stream frame m_heardFrame, and how far it moves for each frame after
+    // it, as the deck's copy last went out: Apple's stream reads A's time there, for the gate.
+    std::int64_t m_heardFrame = 0;
+    double m_heardTime = 0;
+    double m_heardStep = 0;
 
     double m_residualError = 0;
     double m_residualPower = 0;

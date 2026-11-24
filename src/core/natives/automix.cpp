@@ -47,7 +47,8 @@ std::string StateJson(const AutoMixState& state) {
                          {"stepErrorDb", Num(mix.copyErrorDb)},
                          {"seeks", Json(static_cast<double>(mix.seeks))}};
     // What a plan may ask for beyond volumes, lows and speed: an older kernel refuses or ignores these.
-    Json::Array features{Json("cut"), Json("filter"), Json("echo"), Json("loop")};
+    Json::Array features{Json("cut"), Json("filter"), Json("echo"), Json("loop"),
+                         Json("crossover"), Json("gate"), Json("roll")};
     Json::Object out{{"available", Json(state.available)},
                      {"playing", Json(state.playing)},
                      {"current", SongJson(state.current)},

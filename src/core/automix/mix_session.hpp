@@ -61,6 +61,8 @@ public:
     virtual void DropHeldBack() {}
     // A set `seconds` further back (on, when negative) over a second, at the same pitch: MixDeck::Nudge.
     virtual bool Nudge(double seconds) { return false; }
+    // Seconds by which Apple's stream is heard later than where the deck placed it (MixDeck::ApartDrift).
+    virtual std::optional<double> ApartDrift() { return std::nullopt; }
 };
 
 enum class Phase { Idle, Waiting, Preparing, Aligning, Ready, TakingOver, Mixing, Recovering, Done, Failed };
@@ -74,6 +76,7 @@ struct Status {
     double copyErrorDb = NAN;   // the deck's copy of A against Apple's, last measure: -60 is the same sound
     double leadSeconds = NAN;   // how far ahead of the deck's reading the second player runs
     double switchLagMs = NAN;   // once mixing, how far the next song is behind the plan, counted in samples
+    double driftMs = NAN;       // at the last key, how much later Apple's stream is heard than the deck counts
     int seeks = 0;              // seeks of the second player for this plan
 };
 

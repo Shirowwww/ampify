@@ -35,7 +35,12 @@ constexpr double kLowFloor = 0.0316;     // -30 dB: "no lows"
 constexpr double kHighPassOpen = 20, kHighPassShut = 2000;
 constexpr double kLowPassOpen = 20000, kLowPassShut = 400;
 constexpr double kSweepQ = 0.7071;
-constexpr double kEchoLevel = 0.7;       // the echo's first repeat against what was sent
+// The crossover: B's high-pass from 2 Hz to 16 kHz, A's low-pass from 20 kHz down to 30 Hz, each a four-pole
+// Butterworth filter (two stages), whose low-pass and high-pass at one cutoff add up to the power of what goes in.
+// B's opens far under the bass: at 20 Hz it still shifted a 40 Hz note by nearly 80 degrees, a thump as it let go.
+constexpr double kThinOpen = 2, kThinShut = 16000;
+constexpr double kMuffleOpen = 20000, kMuffleShut = 30;
+constexpr double kStageQ[2] = {0.5412, 1.3066};
 constexpr double kEchoLowPassHz = 5000;  // in the echo's loop: each repeat a little darker
 constexpr double kEchoHighPassHz = 300;  // and a little thinner, out of B's bass
 constexpr double kSilent = 1e-6;         // a sample under this is silence
@@ -166,26 +171,34 @@ DeckGains Lerp(const DeckGains& from, const DeckGains& to, double t) {
     return {Lerp(from.main, to.main, t),       Lerp(from.tail, to.tail, t),
             Lerp(from.mainLow, to.mainLow, t), Lerp(from.tailLow, to.tailLow, t),
             Lerp(from.mainFilter, to.mainFilter, t), Lerp(from.tailFilter, to.tailFilter, t),
-            Lerp(from.echoSend, to.echoSend, t), Lerp(from.echoReturn, to.echoReturn, t)};
+            Lerp(from.echoSend, to.echoSend, t), Lerp(from.echoReturn, to.echoReturn, t),
+            Lerp(from.mainThin, to.mainThin, t), Lerp(from.tailMuffle, to.tailMuffle, t),
+            Lerp(from.gate, to.gate, t)};
 }
 
 bool SameGains(const DeckGains& x, const DeckGains& y) {
     return x.main == y.main && x.tail == y.tail && x.mainLow == y.mainLow && x.tailLow == y.tailLow &&
            x.mainFilter == y.mainFilter && x.tailFilter == y.tailFilter && x.echoSend == y.echoSend &&
-           x.echoReturn == y.echoReturn;
+           x.echoReturn == y.echoReturn && x.mainThin == y.mainThin && x.tailMuffle == y.tailMuffle &&
+           x.gate == y.gate;
 }
 
 double Settled(double value) { return std::abs(value) < kDust ? 0 : value; }
 
-double Cutoff(double amount, bool highPass, int sampleRate) {
-    const double open = highPass ? kHighPassOpen : kLowPassOpen;
-    const double shut = highPass ? kHighPassShut : kLowPassShut;
+double Cutoff(double amount, double open, double shut, int sampleRate) {
     return std::min(open * std::pow(shut / open, std::clamp(amount, 0.0, 1.0)), 0.45 * sampleRate);
 }
 
 }  // namespace
 
-MixDeck::MixDeck() = default;
+MixDeck::MixDeck() {
+    m_mainSweep = {false, kLowPassOpen, kLowPassShut, kSweepQ};
+    m_tailSweep = {true, kHighPassOpen, kHighPassShut, kSweepQ};
+    for (int stage = 0; stage < 2; stage++) {
+        m_mainThin[stage] = {true, kThinOpen, kThinShut, kStageQ[stage]};
+        m_tailMuffle[stage] = {false, kMuffleOpen, kMuffleShut, kStageQ[stage]};
+    }
+}
 MixDeck::~MixDeck() = default;
 
 void MixDeck::LowShelf::Clear() { z1[0] = z1[1] = z2[0] = z2[1] = 0; }
@@ -216,8 +229,8 @@ void MixDeck::Sweep::Run(float* stereo, size_t frames, double from, double to, i
     const double wetFrom = from > 0 ? 1 : 0;
     const double wetTo = to > 0 ? 1 : 0;
     const bool used = wetFrom + wetTo > 0;
-    const double k = 1 / kSweepQ;
-    const double g = std::tan(std::numbers::pi * Cutoff((from + to) * 0.5, highPass, sampleRate) / sampleRate);
+    const double k = 1 / q;
+    const double g = std::tan(std::numbers::pi * Cutoff((from + to) * 0.5, open, shut, sampleRate) / sampleRate);
     const double a1 = 1 / (1 + g * (g + k));
     const double a2 = g * a1;
     const double a3 = g * a2;
@@ -250,7 +263,7 @@ bool MixDeck::Echo::Run(const float* in, float* out, size_t frames, const DeckGa
     for (size_t i = 0; i < frames; i++) {
         const double t = static_cast<double>(i) / static_cast<double>(frames);
         const double send = Lerp(from.echoSend, to.echoSend, t);
-        const double back = Lerp(from.echoReturn, to.echoReturn, t) * kEchoLevel * scale;
+        const double back = Lerp(from.echoReturn, to.echoReturn, t) * level * scale;
         for (int c = 0; c < 2; c++) {
             float& slot = line[at * 2 + c];
             const double repeat = slot;  // written a delay ago
@@ -280,6 +293,8 @@ void MixDeck::Open(int sampleRate, double holdSeconds) {
     curve.push_back({0, DeckGains{}});
     std::unique_ptr<TempoStretch> old;
     std::vector<float> oldEcho, oldLoop;
+    std::vector<Roll> oldRolls;
+    Gate oldGate;
     {
         std::lock_guard<std::mutex> guard(m_lock);
         m_echo.line.swap(oldEcho);
@@ -288,6 +303,11 @@ void MixDeck::Open(int sampleRate, double holdSeconds) {
         m_loopFrames = m_loopSeam = m_loopKept = 0;
         m_loopAt = -1;
         m_loopHeld = false;
+        m_rolls.swap(oldRolls);
+        std::swap(m_gate, oldGate);
+        m_heardFrame = 0;
+        m_heardTime = 0;
+        m_heardStep = sampleRate > 0 ? 1.0 / static_cast<double>(sampleRate) : 0;
         m_rate = sampleRate;
         m_hold = hold;
         m_tail.swap(tail);
@@ -299,7 +319,7 @@ void MixDeck::Open(int sampleRate, double holdSeconds) {
         m_curve.swap(curve);
         m_tailFrames = m_tailSent = m_mainFrames = 0;
         m_mainFeed = m_tailFeed = Feed{};
-        m_aligned = m_exact = false;
+        m_aligned = m_exact = m_apartKnown = false;
         m_apart = m_delay = 0;
         m_oldEnd.reset();
         m_emptyEnd = m_emptyHead = 0;
@@ -308,6 +328,8 @@ void MixDeck::Open(int sampleRate, double holdSeconds) {
         m_tailShelf.Clear();
         m_mainSweep.Clear();
         m_tailSweep.Clear();
+        for (Sweep& stage : m_mainThin) stage.Clear();
+        for (Sweep& stage : m_tailMuffle) stage.Clear();
         m_residualDb = NAN;
         m_residualError = m_residualPower = 0;
         m_residualFrames = 0;
@@ -320,6 +342,8 @@ void MixDeck::Open(int sampleRate, double holdSeconds) {
 
 void MixDeck::Close() {
     std::vector<float> tail, history, echo, loop;
+    std::vector<Roll> rolls;
+    Gate gate;
     std::unique_ptr<TempoStretch> stretch;
     {
         std::lock_guard<std::mutex> guard(m_lock);
@@ -329,6 +353,8 @@ void MixDeck::Close() {
         m_history.swap(history);
         m_echo.line.swap(echo);
         m_loop.swap(loop);
+        m_rolls.swap(rolls);
+        std::swap(m_gate, gate);
         m_loopFrames = 0;
         m_loopAt = -1;
         m_loopHeld = false;
@@ -465,7 +491,7 @@ std::optional<DeckStep> MixDeck::Align(double leadHint, double aTime, double vol
     if (lead <= 0 || static_cast<size_t>(lead) >= m_hold) return step;
     m_delay = delay;
     m_apart = apart;
-    m_exact = true;
+    m_exact = m_apartKnown = true;
     m_cursor = static_cast<double>(heard + delay);
     m_pos = aTime + static_cast<double>(heard - static_cast<std::int64_t>(refEnd)) / rate;
     m_scale = found->scale;
@@ -508,7 +534,7 @@ bool MixDeck::Nudge(double seconds) {
     return true;
 }
 
-void MixDeck::SetEcho(double delay, double feedback) {
+void MixDeck::SetEcho(double delay, double feedback, double level) {
     int sampleRate = 0;
     {
         std::lock_guard<std::mutex> guard(m_lock);
@@ -521,10 +547,11 @@ void MixDeck::SetEcho(double delay, double feedback) {
     m_echo.line.swap(line);
     m_echo.at = 0;
     m_echo.feedback = std::clamp(feedback, 0.0, 0.95);
+    m_echo.level = std::clamp(level, 0.0, kMaxEchoLevel);
     m_echo.low[0] = m_echo.low[1] = m_echo.base[0] = m_echo.base[1] = 0;
 }
 
-void MixDeck::SetLoop(double from, double length) {
+void MixDeck::SetLoop(double from, double length, const std::vector<LoopRoll>& rolls) {
     int sampleRate = 0;
     {
         std::lock_guard<std::mutex> guard(m_lock);
@@ -533,15 +560,37 @@ void MixDeck::SetLoop(double from, double length) {
     const size_t frames = sampleRate > 0 && length > 0 ? static_cast<size_t>(std::llround(length * sampleRate)) : 0;
     const size_t seam = std::min(frames / 2, static_cast<size_t>(kLoopSeamSeconds * sampleRate));
     std::vector<float> loop((frames + seam) * 2);
+    // Each roll on a whole turn of the one before, to the frame: rounding the times apart would leave a frame out.
+    std::vector<Roll> kept;
+    std::uint64_t at = 0;
+    size_t turn = frames;
+    for (const LoopRoll& roll : rolls) {
+        const auto rollFrames = static_cast<size_t>(std::llround(roll.length * sampleRate));
+        if (frames == 0 || rollFrames == 0 || rollFrames >= turn) break;
+        const double offset = (roll.at - from) * sampleRate;
+        const double turnsAfter = (offset - static_cast<double>(at)) / static_cast<double>(turn);
+        const auto turns = static_cast<std::uint64_t>(std::max<long long>(1, std::llround(turnsAfter)));
+        at += turns * turn;
+        kept.push_back({at, rollFrames});
+        turn = rollFrames;
+    }
     std::lock_guard<std::mutex> guard(m_lock);
     if (!m_open || m_rate != sampleRate) return;
     m_loop.swap(loop);
+    m_rolls.swap(kept);
     m_loopFrom = from;
     m_loopFrames = frames;
     m_loopSeam = seam;
     m_loopAt = m_aligned && frames > 0 ? std::llround(m_cursor + (from - m_pos) * m_rate) : -1;
     m_loopKept = 0;
     m_loopHeld = false;
+}
+
+void MixDeck::SetGate(const Gate& gate) {
+    Gate copy = gate;  // made before the lock; the old one goes after it
+    std::lock_guard<std::mutex> guard(m_lock);
+    if (!m_open) return;
+    std::swap(m_gate, copy);
 }
 
 bool MixDeck::LoopHeld() const {
@@ -597,6 +646,14 @@ std::optional<double> MixDeck::SwitchGap() const {
     return static_cast<double>(first - *m_oldEnd) / m_rate;
 }
 
+std::optional<double> MixDeck::ApartDrift() const {
+    std::lock_guard<std::mutex> guard(m_lock);
+    if (!m_open || !m_apartKnown || m_rate <= 0) return std::nullopt;
+    const std::optional<std::int64_t> apart = Apart();
+    if (!apart) return std::nullopt;
+    return static_cast<double>(*apart - m_apart) / m_rate;
+}
+
 std::optional<double> MixDeck::Time() const {
     std::lock_guard<std::mutex> guard(m_lock);
     if (!m_open || !m_aligned) return std::nullopt;
@@ -635,11 +692,42 @@ bool MixDeck::ReadSong(std::uint64_t from, size_t frames, float* out) const {
         if (!ReadTail(from, done, out)) return false;
     }
     for (; done < frames; done++) {
+        if (!m_rolls.empty()) {
+            LoopFrame(from + done - start, out + done * 2);
+            continue;
+        }
         const size_t k = m_loopSeam + static_cast<size_t>((from + done - start) % m_loopFrames);
         out[done * 2] = m_loop[k * 2];
         out[done * 2 + 1] = m_loop[k * 2 + 1];
     }
     return true;
+}
+
+// The loop's frame `offset` frames after its start, in the turns of the loop or of the roll under way. A roll's end
+// goes over, across its last frames, into what led into the loop's start, as the loop's own end does (KeepLoop).
+void MixDeck::LoopFrame(std::uint64_t offset, float* out) const {
+    std::uint64_t base = 0;
+    size_t length = m_loopFrames;
+    for (const Roll& roll : m_rolls) {
+        if (offset < roll.from) break;
+        base = roll.from;
+        length = roll.frames;
+    }
+    const auto p = static_cast<size_t>((offset - base) % length);
+    const float* at = m_loop.data() + (m_loopSeam + p) * 2;
+    out[0] = at[0];
+    out[1] = at[1];
+    const size_t seam = std::min(m_loopSeam, length / 2);
+    if (length == m_loopFrames || seam == 0 || p + seam < length) return;
+    const float w = static_cast<float>(p + seam - length + 1) / static_cast<float>(seam);  // 1 on the last
+    const float* before = m_loop.data() + (m_loopSeam + p - length) * 2;
+    out[0] += (before[0] - out[0]) * w;
+    out[1] += (before[1] - out[1]) * w;
+}
+
+// A's time heard at the second player's stream frame `tailFrame`, from where the deck's copy last went out.
+double MixDeck::HeardAt(std::int64_t tailFrame) const {
+    return m_heardTime + static_cast<double>(tailFrame - m_heardFrame) * m_heardStep;
 }
 
 // Copies what came in of the loop, from a seam before its start. Once all of it is there, its last frames go over
@@ -798,7 +886,14 @@ void MixDeck::ProcessMain(float* stereo, size_t frames, int sampleRate, const De
         m_emptyHead = 0;
         m_headCounted = false;
         m_apart = static_cast<std::int64_t>(m_tailSent) - static_cast<std::int64_t>(m_mainFrames);
-        m_exact = false;
+        m_exact = m_apartKnown = false;
+    }
+    // Then exactly, once Windows has taken enough of the new stream to tell (a period or so off until then).
+    if (m_aligned && !m_apartKnown) {
+        if (const std::optional<std::int64_t> apart = Apart()) {
+            m_apart = *apart;
+            m_apartKnown = true;
+        }
     }
     // Apple's player pads the end of a stream and the start of the next with empty frames: the songs are further
     // apart than the streams.
@@ -826,13 +921,21 @@ void MixDeck::ProcessMain(float* stereo, size_t frames, int sampleRate, const De
         } else {
             m_mainShelf.Clear();
         }
-        const bool filtered = from.mainFilter > 0 || to.mainFilter > 0;
+        const bool filtered = from.mainFilter > 0 || to.mainFilter > 0 || from.mainThin > 0 || to.mainThin > 0;
         m_mainSweep.Run(chunk, count, from.mainFilter, to.mainFilter, m_rate);
-        if (from.main != 1 || to.main != 1) {
+        for (Sweep& stage : m_mainThin) stage.Run(chunk, count, from.mainThin, to.mainThin, m_rate);
+        const bool gated = (from.gate > 0 || to.gate > 0) && !m_gate.beats.empty();
+        if (from.main != 1 || to.main != 1 || gated) {
             for (size_t i = 0; i < count; i++) {
-                const float gain = static_cast<float>(Lerp(from.main, to.main, static_cast<double>(i) / count));
-                chunk[i * 2] *= gain;
-                chunk[i * 2 + 1] *= gain;
+                const double t = static_cast<double>(i) / count;
+                double gain = Lerp(from.main, to.main, t);
+                // Between its stabs B is held out, as far as the gate is up.
+                if (gated) {
+                    const double stab = StabAt(m_gate, HeardAt(at + static_cast<std::int64_t>(i)));
+                    gain *= 1 - Lerp(from.gate, to.gate, t) * (1 - stab);
+                }
+                chunk[i * 2] *= static_cast<float>(gain);
+                chunk[i * 2 + 1] *= static_cast<float>(gain);
             }
         } else if (m_exact && m_state == Stretch::Off && from.tail == 0 && to.tail == 0 && from.mainLow == 1 &&
                    to.mainLow == 1 && !filtered) {
@@ -871,7 +974,13 @@ bool MixDeck::ProcessTail(float* stereo, size_t frames, int sampleRate, bool sil
         const size_t count = UntilPoint(at, UntilEvent(std::min(kChunk, frames - done)));
         const DeckGains from = GainsAt(at);
         const DeckGains to = GainsAt(at + static_cast<std::int64_t>(count));
+        const double heardFrom = m_pos;
         const bool there = NextTail(count);  // silence in m_dry when not
+        m_heardFrame = at;
+        m_heardTime = heardFrom;
+        // A short chunk of a stretched song reads a rounded number of frames, and a starved one none: the step of
+        // the last full chunk stands.
+        if (there && count >= kChunk / 2) m_heardStep = (m_pos - heardFrom) / static_cast<double>(count);
         float* chunk = stereo + done * 2;
         const bool audible = there && (from.tail > 0 || to.tail > 0);
         const bool sent = there && (from.echoSend > 0 || to.echoSend > 0);
@@ -881,11 +990,19 @@ bool MixDeck::ProcessTail(float* stereo, size_t frames, int sampleRate, bool sil
             m_tailShelf.Clear();
         }
         m_tailSweep.Run(m_dry.data(), count, from.tailFilter, to.tailFilter, m_rate);
+        for (Sweep& stage : m_tailMuffle) stage.Run(m_dry.data(), count, from.tailMuffle, to.tailMuffle, m_rate);
         if (audible) {
+            const bool ducked = (from.gate > 0 || to.gate > 0) && m_gate.duck > 0 && !m_gate.beats.empty();
             for (size_t i = 0; i < count; i++) {
-                const float gain = static_cast<float>(Lerp(from.tail, to.tail, static_cast<double>(i) / count) * scale);
-                chunk[i * 2] = m_dry[i * 2] * gain;
-                chunk[i * 2 + 1] = m_dry[i * 2 + 1] * gain;
+                const double t = static_cast<double>(i) / count;
+                double gain = Lerp(from.tail, to.tail, t) * scale;
+                // A dips under each of B's stabs, so that the stab is heard.
+                if (ducked) {
+                    const double stab = StabAt(m_gate, HeardAt(at + static_cast<std::int64_t>(i)));
+                    gain *= 1 - Lerp(from.gate, to.gate, t) * m_gate.duck * stab;
+                }
+                chunk[i * 2] = m_dry[i * 2] * static_cast<float>(gain);
+                chunk[i * 2 + 1] = m_dry[i * 2 + 1] * static_cast<float>(gain);
             }
             heard = true;
         } else {

@@ -17,6 +17,9 @@ namespace ampify::automix {
 // user's volume. `aLow` and `bLow` are what is left of each song's lows (under 150 Hz or so), 1 for all of them: two
 // bass lines at once are mud, so a mix swaps them. `aFilter` thins A out from below (a high-pass rising from 20 Hz at
 // 0 to 2 kHz at 1) and `bFilter` muffles B from above (a low-pass coming down from 20 kHz at 0 to 400 Hz at 1).
+// `aMuffle` and `bThin` are the other way round, steeper, and reach further: A through a low-pass coming down from
+// 20 kHz at 0 to 30 Hz at 1, B through a high-pass rising from 2 Hz at 0 to 16 kHz at 1. At one cutoff the two add
+// up to the power of either song alone: a crossover that hands A's sound to B's from the top down, both at full volume.
 struct GainKey {
     double at = 0;
     double a = 1;
@@ -25,16 +28,29 @@ struct GainKey {
     double bLow = 1;
     double aFilter = 0;
     double bFilter = 0;
+    double aMuffle = 0;
+    double bThin = 0;
 };
 
 // An echo thrown on A, as a DJ does at the end of a phrase: from `from` to `to` (A's time) what the deck plays of A
 // also goes into a delay line, whose repeats, each a little thinner than the last, ring on over B once A is gone.
 // `delay` is the time between repeats (a beat, or half of one), `feedback` what each repeat is of the one before.
+inline constexpr double kEchoLevel = 0.7;  // an echo's first repeat against what was thrown, unless the plan says
+
 struct Echo {
     double from = 0;
     double to = 0;
     double delay = 0;  // 0: no echo
     double feedback = 0;
+    double level = kEchoLevel;
+};
+
+// The loop rolled shorter, as a DJ rolls a bar into a drop: from `at` (A's time, which runs on through the loop) the
+// deck plays the loop's first `length` seconds over and over. Each roll starts on a turn of the one before (of the
+// loop, for the first) and is shorter than it.
+struct LoopRoll {
+    double at = 0;
+    double length = 0;
 };
 
 // A stretch of A played over and over from `from` (A's time) on, `length` seconds of it (a bar), until the mix is
@@ -43,6 +59,17 @@ struct Echo {
 struct Loop {
     double from = 0;
     double length = 0;  // 0: no loop
+    std::vector<LoopRoll> rolls;  // by time
+};
+
+// B in stabs on its beats, as a DJ teases the next song in under the current one: from each of `beats` (A's time:
+// B's beats laid on A's) B is heard for `on` seconds, and not between them, until `until`, from where it plays on as
+// the keys say. Under each stab A dips by `duck` (0..1 of its volume), so that the stab is heard.
+struct Gate {
+    std::vector<double> beats;  // empty: no gate
+    double on = 0;
+    double duck = 0;
+    double until = 0;
 };
 
 // Apple's player moves on to B when A reaches the first key, B at bStart; Ampify's deck carries A's end until the last.
@@ -56,6 +83,7 @@ struct MixPlan {
     double rateFrom = 0;
     Echo echo;
     Loop loop;
+    Gate gate;
 };
 
 struct Gains {
@@ -65,6 +93,8 @@ struct Gains {
     double bLow = 1;
     double aFilter = 0;
     double bFilter = 0;
+    double aMuffle = 0;
+    double bThin = 0;
 };
 
 inline constexpr size_t kMaxKeys = 64;
@@ -74,9 +104,18 @@ inline constexpr double kMaxRampSeconds = 30;  // rateFrom to the first key
 inline constexpr double kMinEchoDelay = 0.05;  // seconds between an echo's repeats
 inline constexpr double kMaxEchoDelay = 2;
 inline constexpr double kMaxEchoFeedback = 0.9;
+inline constexpr double kMaxEchoLevel = 2;
 inline constexpr double kMinLoopSeconds = 0.2;
 inline constexpr double kMaxLoopSeconds = 8;
 inline constexpr double kLoopRoom = 1;  // seconds of A after the loop: the second player is paused before its end
+inline constexpr size_t kMaxLoopRolls = 8;
+inline constexpr double kMinRollSeconds = 0.03;  // an eighth of a beat at 140 bpm is 54 ms
+inline constexpr size_t kMaxGateBeats = 128;
+inline constexpr double kMinStabSeconds = 0.02;
+inline constexpr double kMaxStabSeconds = 2;
+// A stab opens over this long before its beat, so that the beat's attack is whole, and closes over this long after.
+inline constexpr double kStabRise = 0.003;
+inline constexpr double kStabFall = 0.008;
 // The second player plays A ahead of what is heard: through A, it would stop, and its stream with the deck's sound in
 // it (about a second past the song's end). It is paused this long before A's end and the deck plays what it holds:
 // a mix that needs the deck may end this close to A's end.
@@ -84,7 +123,8 @@ inline constexpr double kGhostEndMargin = 0.3;
 
 // The volumes when A is at `at`: those of the first key before it and of the last key after it. Between two keys the
 // squared gains move along a smoothstep, so a crossfade keeps its power and starts and stops without a corner; the
-// lows move along the same smoothstep.
+// lows and the filters move along the same smoothstep, the crossover in a straight line (its sweeps have a key a beat
+// and would stop on each).
 Gains GainsAt(const std::vector<GainKey>& keys, double at);
 
 bool Stretches(const MixPlan& plan);  // A changes speed
@@ -95,6 +135,12 @@ bool Cuts(const MixPlan& plan);
 
 bool Echoes(const MixPlan& plan);
 bool Loops(const MixPlan& plan);
+bool Gates(const MixPlan& plan);
+
+// 1 while B is in stabs, from the first stab's rise to the gate's end, at A's time `aTime`; else 0.
+double GateAt(const MixPlan& plan, double aTime);
+// How open a stab leaves B at A's time `aTime`, 0..1: 1 from each beat for `on` seconds, with short edges.
+double StabAt(const Gate& gate, double aTime);
 
 // 1 while A goes into the echo, at A's time `aTime`, else 0.
 double EchoSendAt(const MixPlan& plan, double aTime);
@@ -124,9 +170,10 @@ double HoldFor(const MixPlan& plan);
 // Why the plan cannot be played, or empty. The durations are the songs' lengths in seconds, 0 when unknown.
 std::string Check(const MixPlan& plan, double aDuration, double bDuration);
 
-// The plan from the object Ampify.automix.schedule takes: {next, bStart, keys: [[at, a, b], [at, a, b, aLow, bLow] or
-// [at, a, b, aLow, bLow, aFilter, bFilter], ...], rate, rateFrom, echo: {from, to, delay, feedback}, loop: {from,
-// length}}, the last four optional.
+// The plan from the object Ampify.automix.schedule takes: {next, bStart, keys: [[at, a, b], [at, a, b, aLow, bLow],
+// [at, a, b, aLow, bLow, aFilter, bFilter] or [at, a, b, aLow, bLow, aFilter, bFilter, aMuffle, bThin], ...], rate,
+// rateFrom, echo: {from, to, delay, feedback}, loop: {from, length, rolls: [[at, length], ...]}, gate: {beats: [...],
+// on, duck, until}}, the last five optional (and a loop's rolls).
 std::optional<MixPlan> PlanFromJson(const Json& json, std::string* error);
 
 }  // namespace ampify::automix

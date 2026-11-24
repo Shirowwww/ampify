@@ -35,17 +35,22 @@ double CarriedSeconds(const MixPlan& plan) {
 
 Gains GainsAt(const std::vector<GainKey>& keys, double at) {
     if (keys.empty()) return {};
-    auto of = [](const GainKey& key) { return Gains{key.a, key.b, key.aLow, key.bLow, key.aFilter, key.bFilter}; };
+    auto of = [](const GainKey& key) {
+        return Gains{key.a, key.b, key.aLow, key.bLow, key.aFilter, key.bFilter, key.aMuffle, key.bThin};
+    };
     if (!(at > keys.front().at)) return of(keys.front());
     if (at >= keys.back().at) return of(keys.back());
     auto next = std::upper_bound(keys.begin(), keys.end(), at, [](double t, const GainKey& k) { return t < k.at; });
     const GainKey& to = *next;
     const GainKey& from = *(next - 1);
     double span = to.at - from.at;
-    double s = span > 0 ? Smoothstep((at - from.at) / span) : 1;
-    auto line = [s](double x, double y) { return x + (y - x) * s; };
-    return {Between(from.a, to.a, s),       Between(from.b, to.b, s),       line(from.aLow, to.aLow),
-            line(from.bLow, to.bLow),       line(from.aFilter, to.aFilter), line(from.bFilter, to.bFilter)};
+    double x = span > 0 ? std::clamp((at - from.at) / span, 0.0, 1.0) : 1;
+    double s = Smoothstep(x);
+    auto along = [](double p, double q, double t) { return p + (q - p) * t; };
+    return {Between(from.a, to.a, s),            Between(from.b, to.b, s),
+            along(from.aLow, to.aLow, s),        along(from.bLow, to.bLow, s),
+            along(from.aFilter, to.aFilter, s),  along(from.bFilter, to.bFilter, s),
+            along(from.aMuffle, to.aMuffle, x),  along(from.bThin, to.bThin, x)};
 }
 
 bool Stretches(const MixPlan& plan) { return plan.rate != 1; }
@@ -57,6 +62,23 @@ bool Echoes(const MixPlan& plan) { return plan.echo.delay != 0; }
 
 bool Loops(const MixPlan& plan) { return plan.loop.length != 0; }
 
+bool Gates(const MixPlan& plan) { return !plan.gate.beats.empty(); }
+
+double GateAt(const MixPlan& plan, double aTime) {
+    if (!Gates(plan)) return 0;
+    return aTime >= plan.gate.beats.front() - kStabRise && aTime < plan.gate.until ? 1 : 0;
+}
+
+double StabAt(const Gate& gate, double aTime) {
+    // The last beat at or before the stab's rise: a stab rises just before its beat.
+    auto next = std::upper_bound(gate.beats.begin(), gate.beats.end(), aTime + kStabRise);
+    if (next == gate.beats.begin()) return 0;
+    const double beat = *(next - 1);
+    if (aTime < beat) return std::clamp((aTime - (beat - kStabRise)) / kStabRise, 0.0, 1.0);
+    if (aTime <= beat + gate.on) return 1;
+    return std::clamp(1 - (aTime - beat - gate.on) / kStabFall, 0.0, 1.0);
+}
+
 double EchoSendAt(const MixPlan& plan, double aTime) {
     return Echoes(plan) && aTime >= plan.echo.from && aTime < plan.echo.to ? 1 : 0;
 }
@@ -65,7 +87,9 @@ double EchoAfter(const MixPlan& plan) {
     if (!Echoes(plan) || plan.keys.empty()) return 0;
     const Echo& echo = plan.echo;
     // Each repeat is `feedback` of the one before: that many repeats until they are under the floor, and the first.
-    const double repeats = echo.feedback > 0 ? 1 + std::ceil(std::log(kEchoFloor) / std::log(echo.feedback)) : 1;
+    // A louder echo takes longer to get there: the floor is the default level's.
+    const double floor = kEchoFloor * kEchoLevel / echo.level;
+    const double repeats = echo.feedback > 0 ? 1 + std::ceil(std::log(floor) / std::log(echo.feedback)) : 1;
     const double ring = std::min(echo.delay * repeats, kMaxEchoRing);
     return std::max(0.0, ring - (plan.keys.back().at - echo.to) / plan.rate);
 }
@@ -96,6 +120,56 @@ double Eaten(const MixPlan& plan) { return std::max(0.0, plan.rate - 1) * Carrie
 // A slower A reads less than it receives: what waits grows by that much.
 double Kept(const MixPlan& plan) { return std::max(0.0, 1 - plan.rate) * CarriedSeconds(plan); }
 
+// A roll starts where the loop (or the roll) before it comes round to its start, give or take Apple's milliseconds.
+constexpr double kTurnSlack = 0.002;
+
+std::string CheckRolls(const MixPlan& plan) {
+    const std::vector<LoopRoll>& rolls = plan.loop.rolls;
+    if (rolls.empty()) return {};
+    if (!Loops(plan)) return "only a loop rolls";
+    if (rolls.size() > kMaxLoopRolls) return "too many rolls";
+    double at = plan.loop.from;
+    double length = plan.loop.length;
+    for (const LoopRoll& roll : rolls) {
+        if (!std::isfinite(roll.at) || !std::isfinite(roll.length)) return "a roll is not a time";
+        if (!(roll.length >= kMinRollSeconds)) return "a roll must be 0.03 seconds long or more";
+        if (!(roll.length < length)) return "each roll must be shorter than the one before";
+        const double turns = (roll.at - at) / length;
+        if (!(turns >= 1 - kTurnSlack) || std::abs(turns - std::round(turns)) * length > kTurnSlack) {
+            return "a roll must start on a turn of the loop or the roll before";
+        }
+        if (!(roll.at < plan.keys.back().at)) return "a roll must start within the mix";
+        at = roll.at;
+        length = roll.length;
+    }
+    return {};
+}
+
+std::string CheckGate(const MixPlan& plan) {
+    if (!Gates(plan)) return {};
+    const Gate& gate = plan.gate;
+    if (Cuts(plan)) return "a cut has no gate";
+    if (gate.beats.size() > kMaxGateBeats) return "too many stabs";
+    for (size_t i = 0; i < gate.beats.size(); i++) {
+        if (!std::isfinite(gate.beats[i])) return "a stab is not a time";
+        if (i > 0 && !(gate.beats[i] > gate.beats[i - 1])) return "the stabs are not in time order";
+    }
+    if (!(gate.beats.front() >= plan.keys.front().at && gate.beats.back() < plan.keys.back().at)) {
+        return "the stabs must fall within the mix";
+    }
+    if (!(gate.on >= kMinStabSeconds && gate.on <= kMaxStabSeconds)) return "a stab must last 0.02 to 2 seconds";
+    for (size_t i = 1; i < gate.beats.size(); i++) {
+        if (gate.beats[i] - gate.beats[i - 1] < gate.on + kStabFall + kStabRise) {
+            return "a stab must be over before the next one rises";
+        }
+    }
+    if (!InUnit(gate.duck)) return "the gate's duck must be between 0 and 1";
+    if (!(gate.until > gate.beats.front() && gate.until <= plan.keys.back().at)) {
+        return "the gate must end after its first stab and within the mix";
+    }
+    return {};
+}
+
 }  // namespace
 
 double LeadFor(const MixPlan& plan) {
@@ -115,7 +189,9 @@ std::string Check(const MixPlan& plan, double aDuration, double bDuration) {
         if (!std::isfinite(key.at) || key.at < 0) return "a key has no valid time";
         if (!InUnit(key.a) || !InUnit(key.b)) return "a key's volumes must be between 0 and 1";
         if (!InUnit(key.aLow) || !InUnit(key.bLow)) return "a key's lows must be between 0 and 1";
-        if (!InUnit(key.aFilter) || !InUnit(key.bFilter)) return "a key's filters must be between 0 and 1";
+        if (!InUnit(key.aFilter) || !InUnit(key.bFilter) || !InUnit(key.aMuffle) || !InUnit(key.bThin)) {
+            return "a key's filters must be between 0 and 1";
+        }
         if (i > 0 && key.at < plan.keys[i - 1].at) return "the keys are not in time order";
     }
     const GainKey& first = plan.keys.front();
@@ -123,7 +199,7 @@ std::string Check(const MixPlan& plan, double aDuration, double bDuration) {
     if (first.a != 1 || first.b != 0) return "the first key must have A at 1 and B at 0";
     if (last.a != 0 || last.b != 1) return "the last key must leave A at 0 and B at 1";
     if (last.bLow != 1) return "the last key must leave B its lows";
-    if (last.bFilter != 0) return "the last key must leave B unfiltered";
+    if (last.bFilter != 0 || last.bThin != 0) return "the last key must leave B unfiltered";
     const bool cut = Cuts(plan);
     if (last.at <= first.at && !cut) return "the mix has no length";
     if (cut && Stretches(plan)) return "a cut leaves A's speed alone";
@@ -156,6 +232,7 @@ std::string Check(const MixPlan& plan, double aDuration, double bDuration) {
         if (!(echo.feedback >= 0 && echo.feedback <= kMaxEchoFeedback)) {
             return "the echo's feedback must be between 0 and 0.9";
         }
+        if (!(echo.level > 0 && echo.level <= kMaxEchoLevel)) return "the echo's level must be over 0, 2 at most";
         if (!(echo.from >= first.at && echo.from < echo.to && echo.to <= last.at)) {
             return "the echo must start and end within the mix";
         }
@@ -171,7 +248,8 @@ std::string Check(const MixPlan& plan, double aDuration, double bDuration) {
             return "the loop ends too close to the end of the song";
         }
     }
-    return {};
+    if (const std::string why = CheckRolls(plan); !why.empty()) return why;
+    return CheckGate(plan);
 }
 
 std::optional<MixPlan> PlanFromJson(const Json& json, std::string* error) {
@@ -213,19 +291,46 @@ std::optional<MixPlan> PlanFromJson(const Json& json, std::string* error) {
                               {"feedback", &plan.echo.feedback}})) {
         return fail("echo must be {from, to, delay, feedback}, all numbers");
     }
+    if (const Json* echo = json.Find("echo"); echo && echo->Find("level")) {
+        const Json* level = echo->Find("level");
+        if (!level->AsNumber()) return fail("the echo's level must be a number");
+        plan.echo.level = *level->AsNumber();
+    }
     if (!readNumbers("loop", {{"from", &plan.loop.from}, {"length", &plan.loop.length}})) {
         return fail("loop must be {from, length}, both numbers");
+    }
+    auto numberAt = [](const Json::Array& list, size_t i) { return *list[i].AsNumber(); };
+    auto allNumbers = [](const Json::Array& list) {
+        return std::all_of(list.begin(), list.end(), [](const Json& n) { return n.AsNumber() != nullptr; });
+    };
+    if (const Json* loop = json.Find("loop"); loop && loop->Find("rolls")) {
+        const Json::Array* rolls = loop->Find("rolls")->AsArray();
+        if (!rolls || rolls->size() > kMaxLoopRolls) return fail("the loop's rolls must be [[at, length], ...]");
+        for (const Json& roll : *rolls) {
+            const Json::Array* pair = roll.AsArray();
+            if (!pair || pair->size() != 2 || !allNumbers(*pair)) return fail("the loop's rolls must be [[at, length], ...]");
+            plan.loop.rolls.push_back({numberAt(*pair, 0), numberAt(*pair, 1)});
+        }
+    }
+    if (const Json* gate = json.Find("gate")) {
+        const Json* beats = gate->IsObject() ? gate->Find("beats") : nullptr;
+        const Json::Array* list = beats ? beats->AsArray() : nullptr;
+        if (!list || list->size() > kMaxGateBeats || !allNumbers(*list) ||
+            !readNumbers("gate", {{"on", &plan.gate.on}, {"duck", &plan.gate.duck}, {"until", &plan.gate.until}})) {
+            return fail("gate must be {beats: [times], on, duck, until}, all numbers");
+        }
+        for (size_t i = 0; i < list->size(); i++) plan.gate.beats.push_back(numberAt(*list, i));
     }
     const Json* keys = json.Find("keys");
     if (!keys || !keys->AsArray()) return fail("keys must be an array of [at, a, b] or longer keys");
     for (const Json& key : *keys->AsArray()) {
         const Json::Array* numbers = key.AsArray();
         const size_t size = numbers ? numbers->size() : 0;
-        bool valid = (size == 3 || size == 5 || size == 7) &&
+        bool valid = (size == 3 || size == 5 || size == 7 || size == 9) &&
                      std::all_of(numbers->begin(), numbers->end(), [](const Json& n) { return n.AsNumber() != nullptr; });
         if (!valid) {
-            return fail("each key must be [at, a, b], [at, a, b, aLow, bLow] or [at, a, b, aLow, bLow, aFilter, bFilter], "
-                        "all numbers");
+            return fail("each key must be [at, a, b], [at, a, b, aLow, bLow], [at, a, b, aLow, bLow, aFilter, bFilter] "
+                        "or [at, a, b, aLow, bLow, aFilter, bFilter, aMuffle, bThin], all numbers");
         }
         auto number = [&](size_t i) { return *(*numbers)[i].AsNumber(); };
         GainKey point{number(0), number(1), number(2)};
@@ -233,9 +338,13 @@ std::optional<MixPlan> PlanFromJson(const Json& json, std::string* error) {
             point.aLow = number(3);
             point.bLow = number(4);
         }
-        if (size == 7) {
+        if (size >= 7) {
             point.aFilter = number(5);
             point.bFilter = number(6);
+        }
+        if (size == 9) {
+            point.aMuffle = number(7);
+            point.bThin = number(8);
         }
         plan.keys.push_back(point);
         if (plan.keys.size() > kMaxKeys) return fail("too many keys");

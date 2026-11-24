@@ -497,8 +497,9 @@ public:
         A().setVolume(m_ghost, 0.0f);
         g_deck.Open(rate, automix::HoldFor(plan));
         if (automix::Stretches(plan)) g_deck.SetStretch(automix::CarryFrom(plan), plan.keys.front().at, plan.rate);
-        if (automix::Echoes(plan)) g_deck.SetEcho(plan.echo.delay, plan.echo.feedback);
-        if (automix::Loops(plan)) g_deck.SetLoop(plan.loop.from, plan.loop.length);
+        if (automix::Echoes(plan)) g_deck.SetEcho(plan.echo.delay, plan.echo.feedback, plan.echo.level);
+        if (automix::Loops(plan)) g_deck.SetLoop(plan.loop.from, plan.loop.length, plan.loop.rolls);
+        if (automix::Gates(plan)) g_deck.SetGate(plan.gate);
         g_feed.start = 0;
         g_feed.live = false;
         g_feed.quiet = false;
@@ -560,6 +561,7 @@ public:
     }
 
     std::optional<double> HeardTime() override { return g_deck.Time(); }
+    std::optional<double> ApartDrift() override { return g_deck.ApartDrift(); }
 
     double CopyErrorDb() override { return g_deck.ResidualDb(); }
 
@@ -729,6 +731,9 @@ private:
         if (status.phase == automix::Phase::Done || status.phase == automix::Phase::Failed) {
             if (!std::isnan(status.switchLagMs)) {
                 line += ", next song " + detail::Fixed(status.switchLagMs, 2) + " ms behind its point";
+            }
+            if (!std::isnan(status.driftMs)) {
+                line += ", heard " + detail::Fixed(status.driftMs, 1) + " ms later than the deck counted";
             }
             if (g_feed.start.load() != 0) {
                 line += ", the old song's stream fed within " +

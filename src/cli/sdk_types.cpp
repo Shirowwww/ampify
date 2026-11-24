@@ -142,21 +142,25 @@ type AutoMixState = {
   next: AutoMixSong | null;
   mix: { phase: AutoMixPhase; next: string | null; reason: string | null; stepErrorDb: number | null; seeks: number };
   // what a plan may ask for beyond volumes, bass and speed; none before Ampify 1.5.5
-  features?: ("cut" | "filter" | "echo" | "loop")[];
+  features?: ("cut" | "filter" | "echo" | "loop" | "crossover" | "gate" | "roll")[];
 };
 // keys: [time in the current song, its volume, the next song's volume], from [t, 1, 0] to [t2, 0, 1], or the same
-// with the bass of each song (1 kept, 0 taken away), then how far each is filtered (0 not at all); two keys at the
-// same time are a cut. rate: the current song's speed in the mix, reached from rateFrom. echo: the current song from
-// `from` to `to` also into an echo, `delay` seconds apart. loop: its `length` seconds at `from` over and over.
+// with the bass of each song (1 kept, 0 taken away), then how far each is filtered (0 not at all), then the current
+// song's low-pass and the next song's high-pass (crossover); two keys at the same time are a cut. rate: the current
+// song's speed in the mix, reached from rateFrom. echo: the current song from `from` to `to` also into an echo,
+// `delay` seconds apart, coming back at `level`. loop: its `length` seconds at `from` over and over, rolled shorter
+// at each of `rolls`. gate: the next song in stabs from each of `beats`.
 type AutoMixPlan = {
   next: string;
   bStart: number;
   keys: ([number, number, number] | [number, number, number, number, number] |
-         [number, number, number, number, number, number, number])[];
+         [number, number, number, number, number, number, number] |
+         [number, number, number, number, number, number, number, number, number])[];
   rate?: number;
   rateFrom?: number;
-  echo?: { from: number; to: number; delay: number; feedback: number };
-  loop?: { from: number; length: number };
+  echo?: { from: number; to: number; delay: number; feedback: number; level?: number };
+  loop?: { from: number; length: number; rolls?: [number, number][] };
+  gate?: { beats: number[]; on: number; duck: number; until: number };
 };
 type ExtractedColors = {
   PROMINENT: string;

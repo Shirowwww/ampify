@@ -171,7 +171,7 @@ public:
         if (gains.empty()) return true;
         const DeckGains& last = gains.back();
         return last.main == 1 && last.tail == 0 && last.mainLow == 1 && last.tailLow == 1 && last.mainFilter == 0 &&
-               last.tailFilter == 0;
+               last.tailFilter == 0 && last.mainThin == 0 && last.tailMuffle == 0;
     }
     bool NothingHeard() const {
         for (const DeckGains& set : gains) {
@@ -214,6 +214,22 @@ MixPlan LoopPlan() {
     return plan;
 }
 
+// B in stabs on every half second from 101 while A plays on in full, A dipping a third under each, until the drop at
+// 104, where B comes in whole with its bass.
+MixPlan GatePlan() {
+    MixPlan plan = Plan();
+    plan.keys = {{100, 1, 0, 1, 0}, {101, 1, 1, 1, 0}, {104, 1, 1, 0, 1}, {108, 0, 1, 0, 1}};
+    plan.gate = {{101, 101.5, 102, 102.5, 103, 103.5}, 0.25, 0.3, 104};
+    return plan;
+}
+
+// LoopPlan's bar from 102, rolled to its first half from 106 (two turns of it), then to its first quarter from 107.
+MixPlan RollPlan() {
+    MixPlan plan = LoopPlan();
+    plan.loop.rolls = {{106, 1}, {107, 0.5}};
+    return plan;
+}
+
 // Runs the session in 10 ms steps until it rests or the test's clock reaches `until`.
 void Run(MixSession& session, FakeDecks& decks, double until) {
     while (decks.t < until && session.Active()) {
@@ -228,6 +244,13 @@ bool NoJump(const std::vector<DeckGains>& gains, double step) {
         if (std::abs(gains[i].tail - gains[i - 1].tail) > step) return false;
     }
     return true;
+}
+
+// A crossover: both songs at full volume, B in from its top, A muffled down to its bass and gone at 108.
+MixPlan CrossoverPlan() {
+    MixPlan plan = Plan();
+    plan.keys = {{100, 1, 0, 1, 1, 0, 0, 0, 1}, {104, 1, 1, 1, 1, 0, 0, 0.6, 0.3}, {108, 0, 1, 1, 1, 0, 0, 0.6, 0}};
+    return plan;
 }
 
 }  // namespace
@@ -279,6 +302,38 @@ TEST_CASE(AutoMix_TheFiltersSweepBetweenKeys) {
     CHECK(GainsAt(keys, 11).bFilter == 0);
     CHECK(GainsAt({{0, 1, 0}, {10, 0, 1}}, 5).aFilter == 0);  // keys without filters leave both songs open
     CHECK(GainsAt({{0, 1, 0}, {10, 0, 1}}, 5).bFilter == 0);
+}
+
+TEST_CASE(AutoMix_TheCrossoverMovesBetweenKeys) {
+    // B comes in from its top (a high-pass shut) and A leaves muffled (a low-pass coming down), both at full volume.
+    std::vector<GainKey> keys = {{0, 1, 1, 1, 1, 0, 0, 0, 1}, {10, 1, 1, 1, 1, 0, 0, 1, 0}, {10.3, 0, 1, 1, 1, 0, 0, 1, 0}};
+    CHECK(GainsAt(keys, -1).bThin == 1);
+    CHECK(GainsAt(keys, -1).aMuffle == 0);
+    Gains middle = GainsAt(keys, 5);
+    CHECK_NEAR(middle.bThin, 0.5, 1e-9);
+    CHECK_NEAR(middle.aMuffle, 0.5, 1e-9);
+    CHECK(middle.a == 1);
+    CHECK(middle.b == 1);
+    // In a straight line, not along the volumes' smoothstep: a sweep of a key a beat never stops on each beat.
+    CHECK_NEAR(GainsAt(keys, 2.5).bThin, 0.75, 1e-9);
+    CHECK_NEAR(GainsAt(keys, 2.5).aMuffle, 0.25, 1e-9);
+    CHECK(GainsAt(keys, 11).bThin == 0);
+    CHECK(GainsAt(keys, 11).aMuffle == 1);
+    CHECK(GainsAt({{0, 1, 0, 1, 1, 0, 0}, {10, 0, 1, 1, 1, 0, 0}}, 5).bThin == 0);  // shorter keys leave it open
+}
+
+TEST_CASE(AutoMix_CheckWantsBOutOfTheCrossoverAtTheEnd) {
+    MixPlan plan = Plan();
+    plan.keys.front().bThin = 1;
+    plan.keys.back().aMuffle = 1;
+    CHECK(Check(plan, 200, 200).empty());  // B from its top at first, A muffled at the end
+    plan.keys.back().bThin = 0.1;
+    CHECK(!Check(plan, 200, 200).empty());  // but B whole once A is gone
+    plan = Plan();
+    plan.keys.front().aMuffle = 1.2;
+    CHECK(!Check(plan, 200, 200).empty());
+    plan.keys.front().aMuffle = NAN;
+    CHECK(!Check(plan, 200, 200).empty());
 }
 
 TEST_CASE(AutoMix_CheckRefusesPlansThatCannotBePlayed) {
@@ -401,12 +456,23 @@ TEST_CASE(AutoMix_ThePlanReadsFromTheScriptsObject) {
     CHECK(plan->keys[1].aFilter == 0.6);
     CHECK(plan->keys[0].aLow == 1);
     CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0,1,1,0]]})"), &error));
+    json = ampify::Json::Parse(
+        R"({"next":"B","bStart":30,"keys":[[100,1,0,1,1,0,0.2,0,0.9],[108,0,1,1,1,0.5,0,0.7,0]]})");
+    REQUIRE(json.has_value());
+    plan = PlanFromJson(*json, &error);
+    REQUIRE(plan.has_value());
+    CHECK(plan->keys[0].bThin == 0.9);
+    CHECK(plan->keys[0].bFilter == 0.2);
+    CHECK(plan->keys[1].aMuffle == 0.7);
+    CHECK(plan->keys[1].aFilter == 0.5);
+    CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0,1,1,0,0,0]]})"), &error));
     json = ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],
         "echo":{"from":104,"to":106,"delay":0.5,"feedback":0.5},"loop":{"from":102,"length":2}})");
     REQUIRE(json.has_value());
     plan = PlanFromJson(*json, &error);
     REQUIRE(plan.has_value());
     CHECK(plan->echo.from == 104 && plan->echo.to == 106 && plan->echo.delay == 0.5 && plan->echo.feedback == 0.5);
+    CHECK(plan->echo.level == kEchoLevel);  // not given: the level every echo had
     CHECK(plan->loop.from == 102 && plan->loop.length == 2);
     CHECK(Echoes(*plan) && Loops(*plan));
     plan = PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]]})"), &error);
@@ -416,6 +482,17 @@ TEST_CASE(AutoMix_ThePlanReadsFromTheScriptsObject) {
                             R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],"echo":{"from":104,"delay":0.5}})"),
                         &error));
     CHECK(error.find("echo") != std::string::npos);
+    auto withLevel = [&](const char* level) {
+        return PlanFromJson(*ampify::Json::Parse(std::string(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],)") +
+                                                 R"("echo":{"from":104,"to":106,"delay":0.5,"feedback":0.5,"level":)" +
+                                                 level + "}}"),
+                            &error);
+    };
+    plan = withLevel("1.2");
+    REQUIRE(plan.has_value());
+    CHECK(plan->echo.level == 1.2);
+    CHECK(!withLevel("\"loud\""));
+    CHECK(error.find("level") != std::string::npos);
     CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],"loop":2})"),
                         &error));
     CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"rate":"fast","keys":[]})"), &error));
@@ -613,6 +690,40 @@ TEST_CASE(AutoMix_TheDeckHasTheNextKeyWhereItFallsBeforeTheThreadCouldStall) {
     double last = 0;
     for (const auto& [seconds, set] : decks.ahead) last = std::max(last, seconds);
     CHECK(last >= 0.7);  // longer than a stall
+}
+
+TEST_CASE(AutoMix_TheDeckFiltersEachSongAsTheCrossoverSays) {
+    // Apple's player is on B during the mix: B's high-pass is the deck's main stream's, A's low-pass its copy's.
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(CrossoverPlan(), 200, 200).empty());
+    Run(session, decks, 23.9);  // A at 103.9
+    REQUIRE(session.GetStatus().phase == Phase::Mixing);
+    bool found = false;
+    for (const auto& [seconds, set] : decks.ahead) {
+        if (std::abs(decks.aheadHeard + seconds - 104) < 1e-6) {
+            found = std::abs(set.mainThin - 0.3) < 1e-6 && std::abs(set.tailMuffle - 0.6) < 1e-6;
+        }
+    }
+    CHECK(found);
+}
+
+TEST_CASE(AutoMix_ACancelledCrossoverOpensTheNextSongAgainWithoutAJump) {
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(CrossoverPlan(), 200, 200).empty());
+    Run(session, decks, 24);  // A at 104: B through its high-pass, A muffled
+    REQUIRE(session.GetStatus().phase == Phase::Mixing);
+    session.Cancel("cancelled");
+    const size_t from = decks.gains.size();
+    Run(session, decks, 30);
+    CHECK(session.GetStatus().phase == Phase::Failed);
+    CHECK(decks.ApplesAlone());
+    REQUIRE(decks.gains.size() > from + 10);
+    CHECK(decks.gains[from].mainThin > 0.2);  // B's high-pass opens over the recovery, not at once
+    for (size_t i = from + 1; i < decks.gains.size(); i++) {
+        CHECK(std::abs(decks.gains[i].mainThin - decks.gains[i - 1].mainThin) <= 0.05);
+    }
 }
 
 TEST_CASE(AutoMix_ANextSongLateOnTheBeatSetsTheStretchedOldSongBack) {
@@ -959,6 +1070,12 @@ TEST_CASE(AutoMix_CheckKeepsTheEchoAndTheLoopWithinWhatCanBePlayed) {
     CHECK(!Check(plan, 200, 200).empty());  // not a delay, not "no echo" either
     plan.echo = {104, 106, 0.5, 0.95};
     CHECK(!Check(plan, 200, 200).empty());  // repeats that would never end
+    plan.echo = {104, 106, 0.5, 0.5, 0};
+    CHECK(!Check(plan, 200, 200).empty());  // an echo no one hears
+    plan.echo.level = kMaxEchoLevel + 0.5;
+    CHECK(!Check(plan, 200, 200).empty());
+    plan.echo.level = kMaxEchoLevel;
+    CHECK(Check(plan, 200, 200).empty());
     plan = CutPlan();
     plan.echo = {110, 110, 0.5, 0.5};
     CHECK(!Check(plan, 200, 200).empty());  // a cut has no deck to echo A
@@ -968,6 +1085,9 @@ TEST_CASE(AutoMix_CheckKeepsTheEchoAndTheLoopWithinWhatCanBePlayed) {
     CHECK(EchoAfter(plan) == 0);  // one repeat, heard before the last key
     plan.echo.feedback = 0.9;
     CHECK_NEAR(EchoAfter(plan), 8 - 2, 1e-9);  // 8 s at most
+    plan = EchoPlan();
+    plan.echo.level = 2 * kEchoLevel;
+    CHECK_NEAR(EchoAfter(plan), 2.5, 1e-9);  // twice as loud: a repeat more to get as far down
     CHECK(EchoAfter(Plan()) == 0);
 
     // A loop needs the second player only until the deck holds it: the mix may outlast A.
@@ -1069,4 +1189,151 @@ TEST_CASE(AutoMix_ANewPlanReplacesOneWhoseMixHasNotBegun) {
     CHECK(session.Start(later, 200, 200).empty());
     CHECK(!decks.ghostOn);
     CHECK(session.GetStatus().phase == Phase::Waiting);
+}
+
+TEST_CASE(AutoMix_ThePlanReadsAGateAndARolledLoop) {
+    std::string error;
+    std::optional<ampify::Json> json = ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],
+        "gate":{"beats":[101,101.5,102],"on":0.25,"duck":0.3,"until":104},
+        "loop":{"from":102,"length":2,"rolls":[[104,1],[105,0.5]]}})");
+    REQUIRE(json.has_value());
+    std::optional<MixPlan> plan = PlanFromJson(*json, &error);
+    REQUIRE(plan.has_value());
+    CHECK(Gates(*plan));
+    CHECK(plan->gate.beats.size() == 3 && plan->gate.beats[1] == 101.5);
+    CHECK(plan->gate.on == 0.25 && plan->gate.duck == 0.3 && plan->gate.until == 104);
+    REQUIRE(plan->loop.rolls.size() == 2);
+    CHECK(plan->loop.rolls[0].at == 104 && plan->loop.rolls[0].length == 1);
+    CHECK(plan->loop.rolls[1].at == 105 && plan->loop.rolls[1].length == 0.5);
+    plan = PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]]})"), &error);
+    REQUIRE(plan.has_value());
+    CHECK(!Gates(*plan) && plan->loop.rolls.empty());
+    CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],
+        "gate":{"beats":[101,"x"],"on":0.25,"duck":0.3,"until":104}})"), &error));
+    CHECK(error.find("gate") != std::string::npos);
+    CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],
+        "gate":{"beats":[101],"on":0.25,"until":104}})"), &error));
+    CHECK(!PlanFromJson(*ampify::Json::Parse(R"({"next":"B","bStart":30,"keys":[[100,1,0],[108,0,1]],
+        "loop":{"from":102,"length":2,"rolls":[[104]]}})"), &error));
+    CHECK(error.find("rolls") != std::string::npos);
+}
+
+TEST_CASE(AutoMix_CheckKeepsTheGateAndTheRollsWithinWhatCanBePlayed) {
+    CHECK(Check(GatePlan(), 200, 200).empty());
+    MixPlan plan = GatePlan();
+    plan.gate.beats = {101.5, 101};
+    CHECK(!Check(plan, 200, 200).empty());  // out of order
+    plan.gate.beats = {99.5, 101};
+    CHECK(!Check(plan, 200, 200).empty());  // before the mix
+    plan.gate.beats = {101, 108};
+    CHECK(!Check(plan, 200, 200).empty());  // once A is gone
+    plan = GatePlan();
+    plan.gate.on = 0.01;
+    CHECK(!Check(plan, 200, 200).empty());
+    plan.gate.on = 2.5;
+    CHECK(!Check(plan, 200, 200).empty());
+    plan.gate.on = 0.48;
+    CHECK(Check(plan, 200, 200).empty());   // over before the next beat's stab rises
+    plan.gate.on = 0.5;
+    CHECK(!Check(plan, 200, 200).empty());  // still falling as the next one rises
+    plan = GatePlan();
+    plan.gate.duck = 1.5;
+    CHECK(!Check(plan, 200, 200).empty());
+    plan = GatePlan();
+    plan.gate.until = 101;
+    CHECK(!Check(plan, 200, 200).empty());  // over before its first stab
+    plan.gate.until = 109;
+    CHECK(!Check(plan, 200, 200).empty());  // past the mix
+    plan = GatePlan();
+    plan.gate.beats.clear();
+    for (size_t i = 0; i <= kMaxGateBeats; i++) plan.gate.beats.push_back(101 + 0.02 * static_cast<double>(i));
+    CHECK(!Check(plan, 200, 200).empty());
+    plan = CutPlan();
+    plan.gate = {{110}, 0.25, 0, 110};
+    CHECK(!Check(plan, 200, 200).empty());  // a cut has no deck to gate B
+
+    CHECK(Check(RollPlan(), 106, 200).empty());
+    plan = RollPlan();
+    plan.loop.rolls = {{105, 1}};
+    CHECK(!Check(plan, 200, 200).empty());  // not on a turn of the bar: the turns are at 104, 106...
+    plan.loop.rolls = {{104, 2}};
+    CHECK(!Check(plan, 200, 200).empty());  // not shorter
+    plan.loop.rolls = {{104, 1}, {104.5, 0.5}};
+    CHECK(!Check(plan, 200, 200).empty());  // not on a turn of the roll before
+    plan.loop.rolls = {{104, 1}, {106, 0.5}, {105, 0.25}};
+    CHECK(!Check(plan, 200, 200).empty());  // out of order
+    plan.loop.rolls = {{104, 0.01}};
+    CHECK(!Check(plan, 200, 200).empty());
+    plan.loop.rolls = {{112, 1}};
+    CHECK(!Check(plan, 200, 200).empty());  // after the mix
+    plan = Plan();
+    plan.loop.rolls = {{104, 1}};
+    CHECK(!Check(plan, 200, 200).empty());  // nothing to roll
+}
+
+TEST_CASE(AutoMix_TheGateIsOnFromItsFirstStabToItsEnd) {
+    const MixPlan plan = GatePlan();
+    CHECK(GateAt(plan, 100.5) == 0);
+    CHECK(GateAt(plan, 101 - kStabRise) == 1);
+    CHECK(GateAt(plan, 103.99) == 1);
+    CHECK(GateAt(plan, 104) == 0);  // the drop: B whole
+    CHECK(GateAt(Plan(), 102) == 0);
+    const Gate& gate = plan.gate;
+    CHECK(StabAt(gate, 101 - 2 * kStabRise) == 0);
+    CHECK_NEAR(StabAt(gate, 101 - kStabRise / 2), 0.5, 1e-9);
+    CHECK(StabAt(gate, 101) == 1);  // the beat's first sample is whole
+    CHECK(StabAt(gate, 101.24) == 1);
+    CHECK_NEAR(StabAt(gate, 101.25 + kStabFall / 2), 0.5, 1e-9);
+    CHECK(StabAt(gate, 101.25 + kStabFall) < 1e-9);
+    CHECK(StabAt(gate, 101.4) == 0);
+    CHECK(StabAt(gate, 103.6) == 1);  // the last stab
+    CHECK(StabAt(gate, 100) == 0);
+}
+
+TEST_CASE(AutoMix_TheDeckGatesBFromTheFirstStabToTheDrop) {
+    FakeDecks plain, gated;
+    MixSession plainSession(plain), gateSession(gated);
+    REQUIRE(plainSession.Start(Plan(), 200, 200).empty());
+    REQUIRE(gateSession.Start(GatePlan(), 200, 200).empty());
+    Run(plainSession, plain, 60);
+    Run(gateSession, gated, 60);
+    CHECK(gateSession.GetStatus().phase == Phase::Done);
+    for (const DeckGains& set : plain.gains) CHECK(set.gate == 0);
+    bool on = false;
+    for (size_t i = 0; i < gated.gains.size(); i++) {
+        const double a = 80 + gated.gainClock[i];  // A's time, as the deck carries it
+        if (a > 101.05 && a < 103.95) on = on || gated.gains[i].gate == 1;
+        if (a < 100.95 || a > 104.05) CHECK(gated.gains[i].gate == 0);
+    }
+    CHECK(on);
+    CHECK(gated.ApplesAlone() && gated.gains.back().gate == 0);
+}
+
+// The gains given ahead hold the gate up to a millisecond before the drop: B is not let in over the step before it.
+TEST_CASE(AutoMix_TheGateEndsOnTheDropItself) {
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(GatePlan(), 200, 200).empty());
+    Run(session, decks, 23.5);  // A at 103.5: the drop in the gains given ahead
+    REQUIRE(session.GetStatus().phase == Phase::Mixing);
+    bool before = false, after = false;
+    for (const auto& [seconds, set] : decks.ahead) {
+        const double a = decks.aheadHeard + seconds;
+        if (a < 104 - 0.0005 && a > 104 - 0.0015) before = set.gate == 1;
+        if (std::abs(a - 104) < 0.0005) after = set.gate == 0;
+    }
+    CHECK(before);
+    CHECK(after);
+}
+
+TEST_CASE(AutoMix_AFailedMixLetsBOutOfItsStabs) {
+    FakeDecks decks;
+    MixSession session(decks);
+    REQUIRE(session.Start(GatePlan(), 200, 200).empty());
+    Run(session, decks, 22);  // A at 102: B in stabs
+    REQUIRE(session.GetStatus().phase == Phase::Mixing);
+    session.Cancel("paused");
+    Run(session, decks, 30);
+    CHECK(decks.ApplesAlone());
+    CHECK(decks.gains.back().gate == 0);
 }

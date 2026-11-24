@@ -354,7 +354,7 @@ Ampify.automix.preferStereo(want) // -> true once the wish reached Apple's playe
 - `mix`: `{ phase, next, reason, stepErrorDb, seeks }`. `phase` is `idle`, `waiting`, `preparing`, `aligning`,
   `ready`, `taking over`, `mixing`, `recovering`, `done` or `failed` (then `reason` says why); `stepErrorDb` is what
   is left when the second player's copy is taken from Apple's sound, in dB below it, `null` until measured.
-- A plan is `{ next, bStart, keys, rate, rateFrom, echo, loop }`: `next` is the next song's `name`, `bStart` where
+- A plan is `{ next, bStart, keys, rate, rateFrom, echo, loop, gate }`: `next` is the next song's `name`, `bStart` where
   that song starts (seconds into it), `keys` 2 to 64 points in time order, at most 60 s apart and before the end of
   both songs. The current song must go on for 3 s after the last key (3.3 s when it is stretched, and more when it is
   slowed: what the mix lasts times `1 - rate`), because the second player runs ahead of what is heard.
@@ -362,24 +362,40 @@ Ampify.automix.preferStereo(want) // -> true once the wish reached Apple's playe
   the same with two more numbers, the bass of each song (1 kept, 0 taken away below 150 Hz), the last key leaving the
   next song its bass, or with two more again, how far each song is filtered (0 not at all): the current song through
   a high-pass rising from 20 Hz at 0 to 2 kHz at 1, the next one through a low-pass coming down from 20 kHz at 0 to
-  400 Hz at 1, the last key leaving the next song unfiltered. Apple's player moves to the next song at the first key;
+  400 Hz at 1, the last key leaving the next song unfiltered, or with two more again, the crossover (0 not at all):
+  the current song through a steep low-pass coming down from 20 kHz at 0 to 30 Hz at 1, the next one through a steep
+  high-pass rising from 2 Hz at 0 to 16 kHz at 1. At one cutoff the two add up to the power of either song, so both
+  can play at full volume while one hands its sound to the other; the last key leaves the next song open. Apple's
+  player moves to the next song at the first key;
   between two keys the squared volumes follow a smoothstep, so a crossfade keeps its power, and the bass and the
-  filters follow the same curve.
+  filters follow the same curve; the crossover's two numbers move in a straight line, so a sweep of many keys never
+  stops on one.
 - Two keys at the same time, `[[t, 1, 0], [t, 0, 1]]`, are a cut: Apple's player alone goes from the current song at
   `t` to the next one at `bStart`, with no overlap, no second player and no `rate`, so `t` may be right at the end of
   the song (a song heard to its last note, the next one from its first sound).
-- `echo` (optional): `{ from, to, delay, feedback }`. From `from` to `to` (times in the current song, within the mix)
-  the current song also goes into an echo, taken before its volume, so its repeats ring on once it is gone: `delay`
-  seconds apart (0.05 to 2), each `feedback` (0 to 0.9) of the one before, a little darker and thinner each time.
-  They are faded out over their last second, once 40 dB down or 8 s after the last key at most.
+- `echo` (optional): `{ from, to, delay, feedback, level }`. From `from` to `to` (times in the current song, within
+  the mix) the current song also goes into an echo, taken before its volume, so its repeats ring on once it is gone:
+  `delay` seconds apart (0.05 to 2), each `feedback` (0 to 0.9) of the one before, a little darker and thinner each
+  time. The first comes back at `level` (optional, over 0 and up to 2, 0.7 when left out; older versions of Ampify
+  take every echo at 0.7) of what was thrown. They are faded out over their last second, once 40 dB down or 8 s after
+  the last key at most.
 - `loop` (optional): `{ from, length }`. From `from` (within the mix) on, the current song's `length` seconds there
   (0.2 to 8, a bar) play over and over, their seam joined so that they follow each other without a click, until the
   mix is over. The song's time runs on through the loop, as if it went on: later keys are in that time and may lie
   past the end of the song. The loop must end a second before the song does, and the mix start with the room above
-  before the end of the song (it is the first key that needs it, not the last).
+  before the end of the song (it is the first key that needs it, not the last). `rolls` (optional, up to 8) rolls the
+  loop shorter, as a DJ rolls a bar into a drop: `[[at, length], ...]`, each from `at` (in the loop's running time)
+  playing the loop's first `length` seconds (0.03 or more) over and over. Each roll starts on a turn of the one before
+  (of the loop, for the first) and is shorter than it.
+- `gate` (optional): `{ beats, on, duck, until }`. The next song comes in as stabs: from each of `beats` (up to 128
+  times in the current song, in order, within the mix: the next song's beats laid on it) it is heard for `on` seconds
+  (0.02 to 2), its volume as the keys say, and not between them, until `until`, from where it plays on as the keys say.
+  Under each stab the current song dips by `duck` (0 to 1 of its volume). Each stab opens 3 ms before its beat, so that
+  the beat's attack is whole, and closes over 8 ms, before the next one opens.
 - `state().features` lists what the kernel takes beyond volumes, bass and speed: `cut`, `filter`, `echo`, `loop`
-  (added after Ampify 1.5.4). An older one has no `features`, refuses the longer keys and the cuts, and ignores
-  `echo` and `loop`: test the list first.
+  (added after Ampify 1.5.4), `crossover` (the keys of nine numbers, after Ampify 1.5.7), `gate` and `roll` (after
+  Ampify 1.5.9). An older one has no `features`, refuses the longer keys and the cuts, and ignores `echo`, `loop`,
+  `rolls` and `gate`: test the list first.
 - `rate` (0.9 to 1.1, optional) is the speed the current song has during the mix, at its own pitch; it gets there
   evenly from `rateFrom` (seconds into the song, at most 30 s before the first key). Key times stay those of the song
   itself: a mix of 16 s at 1.05 lasts 15.2 s.
