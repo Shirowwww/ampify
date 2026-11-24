@@ -1,0 +1,15 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "hi-res-badge",
+  "name": "Hi-Res Lossless badge",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Apple Music for Windows calls every lossless song \"Lossless\", even at 24-bit 192 kHz. Above 48 kHz, its badge, its flyout and its screen reader name say \"Hi-Res Lossless\" again, with \"HR\" after Apple's Lossless mark.",
+  "translations": {"fr": {"name": "Badge Lossless haute qualité", "description": "Apple Music pour Windows appelle « Lossless » tout morceau sans perte, même en 24 bits 192 kHz. Au-delà de 48 kHz, son badge, sa bulle et son nom lu à l'écran disent à nouveau « Lossless haute qualité », avec « HR » après la marque Lossless d'Apple."}, "de": {"name": "Hi-Res-Lossless-Abzeichen", "description": "Apple Music für Windows nennt jeden verlustfreien Titel „Lossless“, auch mit 24 Bit und 192 kHz. Über 48 kHz sagen sein Abzeichen, sein Flyout und sein Bildschirmlesername wieder „Hi-Res Lossless“, mit „HR“ nach Apples Lossless-Zeichen."}, "es": {"name": "Insignia de alta resolución sin pérdida", "description": "Apple Music para Windows llama «Lossless» a toda canción sin pérdida, incluso a 24 bits y 192 kHz. Por encima de 48 kHz, su insignia, su ventana y su nombre para lectores de pantalla vuelven a decir «Alta resolución sin pérdida», con «HR» tras la marca Lossless de Apple."}, "pt": {"name": "Selo Hi-Res Lossless", "description": "O Apple Music para Windows chama de “Lossless” toda música sem perdas, mesmo em 24 bits e 192 kHz. Acima de 48 kHz, o selo, o painel e o nome lido pelo leitor de tela voltam a dizer “Hi-Res Lossless”, com “HR” depois da marca Lossless da Apple."}, "ru": {"name": "Значок Hi-Res Lossless", "description": "Apple Music для Windows называет любой трек без потерь «Lossless», даже 24 бит 192 кГц. Выше 48 кГц значок, его окно и имя для экранного диктора снова говорят «Hi-Res Lossless», с «HR» после знака Lossless от Apple."}, "ja": {"name": "ハイレゾロスレスバッジ", "description": "Windows 版 Apple Music は、24 ビット 192 kHz の曲でもすべて「ロスレス」と表示します。48 kHz を超える曲では、バッジ、その吹き出し、スクリーンリーダー向けの名前がApple のロスレスマークの後に「HR」を添えて、再び「ハイレゾロスレス」と表示します。"}, "zh": {"name": "高解析度无损标志", "description": "Windows 版 Apple Music 将所有无损歌曲都标为“无损”，即使是 24 位 192 kHz。高于 48 kHz 时，其标志、弹出框和屏幕阅读器名称会重新显示“高解析度无损”，并在 Apple 的无损标记后加上“HR”。"}, "it": {"name": "Badge Hi-Res Lossless", "description": "Apple Music per Windows chiama «Lossless» ogni brano senza perdita, anche a 24 bit e 192 kHz. Oltre i 48 kHz, il badge, il suo riquadro e il nome letto dagli screen reader tornano a dire «Hi-Res Lossless», con «HR» dopo il marchio Lossless di Apple."}, "ko": {"name": "고해상도 무손실 배지", "description": "Windows용 Apple Music은 24비트 192kHz 곡도 모두 '무손실'로 표시합니다. 48kHz를 넘는 곡에서는 배지, 팝업, 화면 낭독기 이름이 Apple의 무손실 표시 뒤에 'HR'을 붙여 다시 '고해상도 무손실'로 표시됩니다."}},
+  "kitApi": "1.0",
+  "minAmpify": "1.5.9",
+  "preview": "preview.jpg",
+  "main": "main.js",
+  "permissions": ["player.read", "ui.playbar"]
+}

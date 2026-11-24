@@ -3400,6 +3400,62 @@ test("hover-time takes the readout away while no song is loaded, and waits for a
   assert.deepEqual(fake.world.readouts, [0, 200_000, 0], "the queue ended: no song, no readout");
 });
 
+// Hi-Res Lossless badge ships with Ampify, in extensions/: it names Apple's badge from the rate of the stream playing.
+function fakeHiResBadge(state, language = "en") {
+  const dir = join(examples, "..", "extensions", "hi-res-badge");
+  const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
+  const granted = new Set(manifest.permissions ?? []);
+  const used = new Set();
+  const need = (permission) => {
+    if (!granted.has(permission)) throw new Error(`PermissionDenied: ${permission}`);
+    used.add(permission);
+  };
+  const world = { state, badges: [], handlers: { trackchange: [], statechange: [], progress: [] } };
+  let texts = {};
+  const ampify = {
+    i18n: { define: (table) => { texts = table; }, t: (key) => (texts[language] ?? texts.en)[key] },
+    player: {
+      state: () => (need("player.read"), structuredClone(world.state)),
+      on: (event, fn) => (need("player.read"), world.handlers[event].push(fn)),
+    },
+    ui: { playbar: { audioBadge: (badge) => (need("ui.playbar"), world.badges.push(badge)) } },
+  };
+  runIn(readFileSync(join(dir, "main.js"), "utf-8"), { Ampify: ampify });
+  const emit = (event, next) => {
+    world.state = next;
+    for (const fn of world.handlers[event]) fn(structuredClone(next));
+  };
+  return { world, emit, used, manifest };
+}
+
+const lossless = (id, sampleRate, extra = {}) =>
+  ({ ...song(id, id, "Artist"), variantId: "lossless", lossless: true, sampleRate, bitDepth: 0, ...extra });
+
+test("hi-res-badge names the badge Hi-Res above 48 kHz, even when Apple tells the rate late", () => {
+  const fake = fakeHiResBadge(playing(lossless("t1", 0), 200_000));
+  assert.deepEqual(fake.world.badges, [], "no rate yet: Apple's badge stays");
+  fake.emit("progress", playing(lossless("t1", 192_000), 200_000, 3_000));
+  assert.equal(fake.world.badges.length, 1);
+  assert.equal(fake.world.badges[0].label, "Hi-Res Lossless");
+  assert.match(fake.world.badges[0].icon, /^<svg [^>]*viewBox="0 0 15 12">(<path d="[^"]+"\/>)+<\/svg>$/);
+  fake.emit("progress", playing(lossless("t1", 192_000), 200_000, 4_000));
+  assert.equal(fake.world.badges.length, 1, "the same badge is not asked for again");
+  fake.emit("trackchange", playing(lossless("t2", 44_100), 180_000));
+  assert.deepEqual(fake.world.badges.at(-1), null, "a 44.1 kHz song gives Apple's badge back");
+  assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+});
+
+test("hi-res-badge leaves 48 kHz, AAC and Dolby Atmos to Apple, and trusts Apple's own Hi-Res format", () => {
+  const fake = fakeHiResBadge(playing(lossless("t1", 48_000), 200_000), "fr");
+  fake.emit("trackchange", playing({ ...lossless("t2", 0), lossless: false }, 200_000));
+  fake.emit("trackchange", playing(lossless("t3", 96_000, { atmos: true }), 200_000));
+  assert.deepEqual(fake.world.badges, []);
+  fake.emit("trackchange", playing(lossless("t4", 0, { variantId: "hi-res-lossless" }), 200_000));
+  assert.equal(fake.world.badges[0].label, "Lossless haute qualité", "Apple's own French words");
+  fake.emit("statechange", { playing: false, positionMs: 0, durationMs: 0, track: null });
+  assert.deepEqual(fake.world.badges.at(-1), null, "nothing playing");
+});
+
 test("the site hides the same retired elements as the kernel", () => {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..");
   const site = readFileSync(join(root, "docs", "assets", "site.js"), "utf8");
