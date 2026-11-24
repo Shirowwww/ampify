@@ -108,6 +108,25 @@ struct PlayerNatives : ScriptBridge {
         return JS_NewBool(ctx, host && host->SetVolume(volume));
     }
 
+    // native.playerSetRate(rate): Apple's player speed, 0.5 to 2. native.playerRate(): the speed in effect.
+    AMPIFY_NATIVE(PlayerSetRate) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "player.control", &failure)) return failure;
+        double rate = Number(ctx, argc, argv, 0);
+        if (!(rate >= 0.5 && rate <= 2.0)) return Throw(ctx, "RangeError", "setRate expects a speed from 0.5 to 2");
+        ampify::PlayerRateHost* host = HostOf(ext).Capability<ampify::PlayerRateHost>();
+        return JS_NewBool(ctx, host && host->SetRate(rate));
+    }
+
+    AMPIFY_NATIVE(PlayerRate) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "player.read", &failure)) return failure;
+        ampify::PlayerRateHost* host = HostOf(ext).Capability<ampify::PlayerRateHost>();
+        return JS_NewFloat64(ctx, host ? host->Rate() : 1.0);
+    }
+
     // native.playerLyrics(): the LyricsJson of src/core/lyrics.hpp, as text ("null" without lyrics or without the service).
     AMPIFY_NATIVE(PlayerLyrics) {
         ScriptExtension* ext = Owner(ctx);
@@ -174,6 +193,8 @@ void DefinePlayer(api::NativeScope& scope) {
     scope.Function("playerSetShuffle", PlayerNatives::PlayerSetShuffle, 1);
     scope.Function("playerSetRepeat", PlayerNatives::PlayerSetRepeat, 1);
     scope.Function("playerSetVolume", PlayerNatives::PlayerSetVolume, 1);
+    scope.Function("playerSetRate", PlayerNatives::PlayerSetRate, 1);
+    scope.Function("playerRate", PlayerNatives::PlayerRate, 0);
     scope.Function("playerLyrics", PlayerNatives::PlayerLyrics, 0);
     scope.Function("playerArtwork", PlayerNatives::PlayerArtwork, 0);
     scope.Function("queueList", PlayerNatives::QueueList, 0);

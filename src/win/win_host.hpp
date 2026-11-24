@@ -33,7 +33,7 @@ class KitCommandRunner;
 }
 
 class WinHost : public Host, public HttpPostHost, public BrowserHost, public ImageHost, public ArtworkHost,
-                public GifHost, public PlayerModesHost, public PlayerVolumeHost, public KeyUnbindHost,
+                public GifHost, public PlayerModesHost, public PlayerVolumeHost, public PlayerRateHost, public KeyUnbindHost,
                 public ClipboardHost, public AppInfoHost {
 public:
     using KeyCallback = std::function<void(const std::string& elementId, const std::string& combo)>;
@@ -97,6 +97,8 @@ public:
     bool SetShuffle(bool on) override;
     bool SetRepeat(const std::string& mode) override;
     bool SetVolume(double volume) override;
+    bool SetRate(double rate) override;
+    double Rate() override;
 
     // AudioHost (src/core/audio/audio_host.hpp): in full in AMPLibraryAgent.exe, where the audio is rendered, read
     // only in the interface process. QueueHost (src/core/player_queue.hpp) in both processes.

@@ -40,6 +40,17 @@ struct PlayerModesHost {
     virtual bool SetRepeat(const std::string& mode) = 0;
 };
 
+// The speed of Apple's player (Ampify.player.setRate): asked from either process, applied in the audio one.
+struct PlayerRateHost {
+    static constexpr std::string_view kCapabilityName = "player.rate";
+    virtual ~PlayerRateHost() = default;
+
+    // 0.5 to 2 (1: normal). False outside that range or when the speed cannot be asked.
+    virtual bool SetRate(double rate) = 0;
+    // The speed in effect, 1 until one is applied.
+    virtual double Rate() = 0;
+};
+
 struct PlayerVolumeHost {
     static constexpr std::string_view kCapabilityName = "player.volume";
     virtual ~PlayerVolumeHost() = default;

@@ -63,6 +63,11 @@ bool Placed();
 // place (the player is not known yet). Apple's own slider is not redrawn: it shows the value until Apple moves it.
 bool SetPlayerVolume(double volume);
 
+// The speed of Apple's player (player_rate.cpp), 0.5 to 2: taken at once by the player that plays, and by the next
+// play otherwise (through AutoMix's hook on AVCFPlayerSetRate). False outside that range or without Apple's player.
+bool SetPlaybackRate(double rate);
+double PlaybackRate();
+
 // The player Apple Music set a volume on last, retained for the caller (CFRelease), or null.
 void* RetainFollowedPlayer();
 

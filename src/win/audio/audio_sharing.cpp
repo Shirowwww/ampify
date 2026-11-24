@@ -8,6 +8,7 @@
 
 #include "../../core/sing_pack.hpp"
 #include "../win_common.hpp"
+#include "audio_hooks.hpp"
 
 namespace ampify::win {
 
@@ -44,6 +45,12 @@ audio::SharedAudio* SharedAudioBlock() {
 
 int64_t SharedAudioNowMs() { return static_cast<int64_t>(GetTickCount64()); }
 
+double SharedPlaybackRate() {
+    audio::SharedAudio* block = SharedAudioBlock();
+    const uint32_t milli = block ? block->rateMilli.load() : 0;
+    return milli ? milli / 1000.0 : 1.0;
+}
+
 void StartAudioSharing(audio::AudioEngine& engine, Journal& journal, std::function<void()> startSound) {
     audio::SharedAudio* block = SharedAudioBlock();
     if (!block) {
@@ -78,6 +85,12 @@ void StartAudioSharing(audio::AudioEngine& engine, Journal& journal, std::functi
                     engine.Release(kShareUser);
                 }
                 subscribed = wanted;
+                // The speed the interface asked for, applied once the hooks are in place.
+                uint32_t rate = block->rateRequestMilli.load();
+                if (rate != 0 && rate != block->rateMilli.load() && audio_hooks::SetPlaybackRate(rate / 1000.0)) {
+                    block->rateMilli.store(rate);
+                    journal.Write("Player: speed " + std::to_string(rate / 1000.0).substr(0, 4));
+                }
             }
             std::this_thread::sleep_for(kStatusEvery);
         }

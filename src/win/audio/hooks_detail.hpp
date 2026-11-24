@@ -35,6 +35,7 @@ Fn FromAddress(void* address) {
 // The player volume (player_volume.cpp), for the hooks.
 bool ResolvePlayerApi();     // CFRetain and CFRelease, which following the player needs
 bool HookPlayerVolume();     // AVCFPlayerSetVolume in every module that imports it
+float SpeedFor(float rate);  // what AVCFPlayerSetRate's hook passes on for Apple's rate: the speed for a 1
 float LastPlayerVolume();    // what Apple Music set on its player last; until then, the slider's stored value
 void PublishStoredVolume();  // the slider's value from Apple's preferences, until the player has one. Poll thread
 

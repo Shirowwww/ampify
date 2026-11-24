@@ -193,6 +193,17 @@ bool WinHost::SetRepeat(const std::string& mode) {
     return !now.empty() && now == mode;
 }
 
+// The speed goes through the block both processes share: the engine's sharing thread applies it to Apple's player.
+bool WinHost::SetRate(double rate) {
+    audio::SharedAudio* block = win::SharedAudioBlock();
+    if (!block || !(rate >= 0.5 && rate <= 2.0)) return false;
+    block->rateRequestMilli.store(static_cast<uint32_t>(std::lround(rate * 1000)));
+    audio::DemandSound(*block, win::SharedAudioNowMs());  // the hooks must be in place to apply it
+    return true;
+}
+
+double WinHost::Rate() { return win::SharedPlaybackRate(); }
+
 // In the interface process the setter works on Apple's volume control, which only its own thread may touch; in the audio
 // process it hooks the player, from any thread.
 bool WinHost::SetVolume(double volume) {
@@ -237,6 +248,7 @@ void* WinHost::QueryCapability(std::string_view name) {
     // then moves) or from the audio process (a hook, the slider stays).
     if (m_process == "ui" && name == PlayerModesHost::kCapabilityName) return static_cast<PlayerModesHost*>(this);
     if (name == PlayerVolumeHost::kCapabilityName) return static_cast<PlayerVolumeHost*>(this);
+    if (name == PlayerRateHost::kCapabilityName) return static_cast<PlayerRateHost*>(this);
     if (void* found = m_services->Query(name)) return found;
     // The Marketplace page runs ampify.exe from the interface process, where it is shown.
     if (m_process == "ui" && name == KitCommandHost::kCapabilityName) return static_cast<KitCommandHost*>(m_kitCommands.get());

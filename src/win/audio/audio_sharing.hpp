@@ -25,6 +25,7 @@ namespace ampify::win {
 // The block, mapped once per process. Null when Windows refused the mapping.
 audio::SharedAudio* SharedAudioBlock();
 int64_t SharedAudioNowMs();  // GetTickCount64: the clock both processes share
+double SharedPlaybackRate();  // the speed the engine applied to Apple's player (Ampify.player.setRate), 1 until then
 
 // AMPLibraryAgent.exe: a thread that writes the status every 100 ms and the frames while they are wanted. Once only.
 // startSound runs once, on a thread of its own, the first time the interface asks for the sound: it puts the sample

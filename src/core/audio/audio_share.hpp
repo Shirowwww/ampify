@@ -24,7 +24,7 @@ struct SharedAudio {
     static constexpr uint32_t kMagic = 0x41414D50;  // "PMAA": the block is Ampify's
     // Raised when a field moves. It also names the mapping, so builds of two layouts never map the same block, and a
     // reader that finds another layout in it anyway reads nothing.
-    static constexpr uint32_t kLayout = 6;
+    static constexpr uint32_t kLayout = 7;
     static constexpr size_t kMaxBands = 32;
 
     std::atomic<uint32_t> magic;
@@ -59,6 +59,10 @@ struct SharedAudio {
     std::atomic<uint32_t> singReason;             // SingReason
     std::atomic<uint32_t> singRequestModel;       // SingModel: the voice model studio mode runs
     std::atomic<uint32_t> singRequestMusicMilli;  // 0..1000: the share of the music left (the singer alone at 0)
+
+    // The speed of Apple's player, in thousandths (1000: normal). The interface asks, the engine applies and says.
+    std::atomic<uint32_t> rateRequestMilli;  // 0 until asked
+    std::atomic<uint32_t> rateMilli;         // 0 until the engine applied one
 };
 
 enum class SingMode : uint32_t { Off = 0, Light = 1, Studio = 2 };

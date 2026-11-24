@@ -24,6 +24,8 @@ bool HookVtableEntry(void** entry, void* replacement, void** original, std::stri
 // Replaces the address of `function` imported from `dll` in the import table of every loaded module that
 // imports it, delay-loaded imports included (those only when `dll` is a System32 DLL). `original` receives the
 // address that was replaced first. Returns how many import entries were replaced. Protected modules are skipped.
+// An entry holds one replacement: a second hook on a function already hooked is refused there, so a feature that
+// needs the same function goes through the existing hook.
 size_t HookImportEverywhere(const char* dll, const char* function, void* replacement, void** original);
 
 // HookImportEverywhere, and the same for every module loaded afterwards (a loader notification). Returns how many

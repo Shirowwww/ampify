@@ -833,7 +833,7 @@ void __cdecl SetRate_Hook(void* player, float rate) {
     Adopt(player);
     const bool apples = player == g_queue.load();
     if (apples && rate != 0.0f) detail::SingPlays();
-    g_setRate(player, rate);
+    g_setRate(player, detail::SpeedFor(rate));  // the speed asked for (player_rate.cpp), which this hook also serves
     if (apples && rate == 0.0f) {
         Instance().Interrupt("paused");
         detail::SingPaused();

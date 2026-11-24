@@ -278,6 +278,8 @@ declare const Ampify: {
     setRepeat(mode: "off" | "all" | "one"): boolean;
     toggleRepeat(): boolean;  // off, all, one, off...
     setVolume(volume: number): boolean;  // Apple's player volume, 0 to 1, once a song has started; moves Apple's slider from "ui"
+    setRate(rate: number): boolean;  // Apple's player speed, 0.5 to 2, kept across pauses and songs
+    rate(): number;                  // the speed in effect, 1 until one is set
     skipForward(ms?: number): boolean;  // 15 s by default, within the song
     skipBack(ms?: number): boolean;
     progress(): number;  // 0 to 1; 0 while the length is unknown

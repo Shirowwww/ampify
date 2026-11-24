@@ -170,6 +170,8 @@ Ampify.player.setRepeat(mode)       // "off" | "all" | "one"
 Ampify.player.toggleShuffle()       // flips shuffle
 Ampify.player.toggleRepeat()        // off, all, one, off...
 Ampify.player.setVolume(volume)     // 0 to 1: Apple's player volume, interface or audio process, [preview]
+Ampify.player.setRate(rate)         // 0.5 to 2: Apple's player speed, kept across pauses and songs (1.6, player.control)
+Ampify.player.rate()                // the speed in effect, 1 until one is set (player.read)
 Ampify.player.skipForward(ms)       // seeks 15 s on (or ms), within the song; false without a track
 Ampify.player.skipBack(ms)
 Ampify.player.progress()            // 0 to 1, how far the song has gone; 0 while its length is unknown
@@ -232,6 +234,10 @@ Ampify.player.queue.remove(itemId)                                 // [preview]
   `null` or `false` until then. From the interface process, the volume they read comes from the audio process, about
   100 ms behind.
 - `skipForward` and `skipBack` seek from `state().positionMs`, never before the start or past the end.
+- `setRate(rate)` asks Apple's player to play at `rate` times its speed, from either process: the audio process
+  applies it to the player that plays at once, or at the next play, and keeps it across pauses, seeks and songs until
+  `setRate(1)`. It answers `true` once asked; `rate()` says the speed in effect a moment later. Apple's own clock and
+  lyrics follow the speed, and so does `state().positionMs` between Apple's readings, with the lyrics Ampify fills.
 
 ### 5.4 Audio [preview]
 

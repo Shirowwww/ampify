@@ -112,6 +112,13 @@ const char kPlayer[] = R"AMPIFYJS(
       if (!Number.isFinite(value) || value < 0 || value > 1) throw new RangeError("setVolume expects a number from 0 to 1");
       return native.playerSetVolume(value);
     },
+    // The speed of Apple's player, 0.5 to 2 (1: normal), kept across pauses and songs; rate() reads it back.
+    setRate(rate) {
+      const value = Number(rate);
+      if (!Number.isFinite(value) || value < 0.5 || value > 2) throw new RangeError("setRate expects a speed from 0.5 to 2");
+      return native.playerSetRate(value);
+    },
+    rate: () => native.playerRate(),
     skipForward: (ms) => skip(ms, 1),
     skipBack: (ms) => skip(ms, -1),
     // 0 to 1, how far the song has gone; 0 while its length is not known.

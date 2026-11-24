@@ -81,7 +81,7 @@ const Expected kMembers[] = {
     {"player", "object!{state:f0=state,on:f2=on,off:f2=off,play:f0=play,pause:f0=pause,next:f0=next,previous:f0=previous,"
                "seek:f1=seek,toggle:f0=toggle,shuffle:f0=shuffle,repeat:f0=repeat,setShuffle:f1=setShuffle,"
                "toggleShuffle:f0=toggleShuffle,setRepeat:f1=setRepeat,toggleRepeat:f0=toggleRepeat,"
-               "setVolume:f1=setVolume,skipForward:f1=skipForward,skipBack:f1=skipBack,progress:f0=progress,"
+               "setVolume:f1=setVolume,setRate:f1=setRate,rate:f0=rate,skipForward:f1=skipForward,skipBack:f1=skipBack,progress:f0=progress,"
                "formatTime:f1=formatTime,muted:f0=muted,setMute:f1=setMute,toggleMute:f0=toggleMute,"
                "increaseVolume:f1=increaseVolume,decreaseVolume:f1=decreaseVolume,lyrics:f0=lyrics,artwork:f0=artwork,"
                "queue:object!{list:f0=list,add:f2=add,remove:f1=remove}}"},

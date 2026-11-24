@@ -541,6 +541,27 @@ TEST_CASE(PlayerQueue_ListNeedsPlayerReadAndWritesNeedPlayerControl) {
     CHECK(f.queueHost.added[0] == "1440833098|next");
     CHECK(f.queueHost.added[1] == "12|last");
     CHECK(f.queueHost.removed.size() == 1 && f.queueHost.removed[0] == "7");
+    CHECK(f.Logged("[qwrite] move true"));
+    CHECK(f.Logged("[qwrite] nobefore TypeError"));
+    CHECK((f.queueHost.moved == std::vector<std::string>{"9<7"}));
+}
+
+TEST_CASE(Player_TheSpeedNeedsControlAndStaysBetweenHalfAndDouble) {
+    Fixture f;
+    auto denied = f.Make("noslow", R"("player.read")", R"(
+        Ampify.log("rate " + Ampify.player.rate());
+        try { Ampify.player.setRate(1.5); } catch (e) { Ampify.log("set " + e.name); })");
+    CHECK(denied->Start());
+    CHECK(f.Logged("[noslow] rate 1"));
+    CHECK(f.Logged("[noslow] set PermissionDenied"));
+    auto speed = f.Make("speed", R"("player.control")", R"(
+        try { Ampify.player.setRate(3); } catch (e) { Ampify.log("fast " + e.name); }
+        try { Ampify.player.setRate("x"); } catch (e) { Ampify.log("text " + e.name); }
+        Ampify.log("set " + Ampify.player.setRate(1.25));)");
+    CHECK(speed->Start());
+    CHECK(f.Logged("[speed] fast RangeError"));
+    CHECK(f.Logged("[speed] text RangeError"));
+    CHECK(f.Logged("[speed] set false"));  // a host without the speed says no
 }
 
 TEST_CASE(PlayerQueue_ARefusalIsFalseWithItsReasonInTheJournal) {

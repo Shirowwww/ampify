@@ -1,0 +1,15 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "playback-speed",
+  "name": "Playback speed",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "A button of the playback bar that plays songs from half to double speed, with a slider and presets. The speed holds across pauses and songs until it is set back to normal.",
+  "translations": {"fr": {"name": "Vitesse de lecture", "description": "Un bouton de la barre de lecture qui joue les morceaux de la moitié au double de leur vitesse, avec un curseur et des préréglages. La vitesse reste d'un morceau à l'autre jusqu'au retour à la normale."}, "de": {"name": "Wiedergabegeschwindigkeit", "description": "Eine Taste der Wiedergabeleiste, die Titel mit halber bis doppelter Geschwindigkeit spielt, mit Schieberegler und Voreinstellungen. Die Geschwindigkeit bleibt über Pausen und Titel hinweg, bis sie wieder normal ist."}, "es": {"name": "Velocidad de reproducción", "description": "Un botón de la barra de reproducción que reproduce las canciones de la mitad al doble de su velocidad, con un control deslizante y ajustes rápidos. La velocidad se mantiene entre canciones hasta volver a la normal."}, "pt": {"name": "Velocidade de reprodução", "description": "Um botão da barra de reprodução que toca as músicas da metade ao dobro da velocidade, com um controle deslizante e predefinições. A velocidade se mantém entre músicas até voltar ao normal."}, "ru": {"name": "Скорость воспроизведения", "description": "Кнопка панели воспроизведения, которая играет песни от половинной до двойной скорости, с ползунком и готовыми значениями. Скорость сохраняется между песнями, пока её не вернут к обычной."}, "ja": {"name": "再生速度", "description": "スライダーとプリセットで、曲を半分から 2 倍の速度で再生する再生バーのボタンです。通常の速度に戻すまで、一時停止や曲が変わっても速度は保たれます。"}, "zh": {"name": "播放速度", "description": "播放栏上的一个按钮，可用滑块和预设以一半到两倍的速度播放歌曲。在恢复正常速度之前，暂停或切换歌曲后速度保持不变。"}, "it": {"name": "Velocità di riproduzione", "description": "Un pulsante della barra di riproduzione che suona i brani da metà al doppio della velocità, con un cursore e valori pronti. La velocità resta tra un brano e l'altro finché non torna normale."}, "ko": {"name": "재생 속도", "description": "슬라이더와 프리셋으로 곡을 절반에서 두 배 속도로 재생하는 재생 막대 버튼입니다. 보통 속도로 되돌릴 때까지 일시정지나 곡이 바뀌어도 속도가 유지됩니다."}},
+  "kitApi": "1.0",
+  "minAmpify": "1.6.0",
+  "preview": "preview.jpg",
+  "main": "main.js",
+  "permissions": ["player.control", "ui.playbar", "ui.popup", "storage"]
+}
