@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.6.1 (2026-11-24)
+
+Dolby Atmos songs start at the right volume, the song panel tells more about the sound, and a docked panel no longer
+cuts off a playlist's buttons.
+
+### Extensions
+
+- Song panel: "The sound" card can also give the energy, danceability, acoustic and vocal shares and the loudness of
+  the song, each fact with its own switch in the extension's settings, in two columns that line up. A song Apple
+  gives no tempo for gets one from its beats.
+
+### Other
+
+- Side panels: Apple's sidebar folds to its icons while a panel takes its column in a narrower window, as it does for
+  Apple's own lyrics pane, so a playlist's buttons are no longer cut off.
+- Atmos leveler: a Dolby Atmos song heard for the first time no longer starts loud and then fades for two minutes. It
+  keeps the gain it starts at, or goes down if it is louder than most, and gets its own level from the next play.
+- Atmos leveler: a Dolby Atmos song that follows a stereo one no longer starts with a loud burst. Windows plays the
+  first moment of a new Atmos stream too loud, and Ampify's fade now covers it from the very first sound.
+
 ## 1.6.0 (2026-11-24)
 
 AutoMix (beta) mixes like a DJ, songs play faster or slower, Queue flow orders what comes next so each song leads into
