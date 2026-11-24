@@ -146,7 +146,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | `Player.toggleShuffle`, `setShuffle`, `toggleRepeat`, `setRepeat` | `player.toggleShuffle()`, `setShuffle(on)`, `toggleRepeat()`, `setRepeat("off" \| "all" \| "one")`, `shuffle()`, `repeat()`: Apple's own buttons, checked on screen | Done |
 | `Platform.History` | `Ampify.ui.navigate` for Ampify's own pages; `http.open` of a `music.apple.com` link (`uri.build`) opens that album, artist, playlist or song in Apple Music's own window; no back and forward of Apple's history | Done |
 | `Platform.Library`, `Playlists`, `CosmosAsync`, `GraphQL` | `library.tracks()` reads the library file with play counts (permission `library.read`); no playlists, no writes, no Cosmos or GraphQL: Apple's internal API is private | Partial |
-| `Queue`, `removeFromQueue` | `player.queue.list()` (complete once Apple's Up Next panel was opened), `queue.remove` | Partial |
+| `Queue`, `removeFromQueue` | `player.queue.list()` (complete once Apple's Up Next panel was opened), `queue.remove`, `queue.move` to put an entry still to come before another | Partial |
 | `addToQueue` | Apple's player ignores what Ampify hands it ([knowledge/apple-music-queue.md](../knowledge/apple-music-queue.md)) | Missing |
 | `React`, `ReactDOM`, `ReactComponent`, `ReactHook` | `Ampify.React`, `Ampify.components`, `Ampify.hooks` (no `useTheme`) | Done |
 | `Topbar`, `Playbar` buttons | `ui.topbar.addButton`, `ui.playbar.addButton`, `ui.setLabel` to change their text, `active` and `ui.setActive` for a toggle drawn in the accent colour | Done |
@@ -184,14 +184,16 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Better Local Files | Apple Music already lists the files of the PC under Library, by album, artist and song, with their artwork | Built in |
 | Name That Tune | Needs a player for the catalog's previews beside Apple's; Ampify plays sound only through Apple Music | Missing |
 | Full Screen settings | Snippet settings can change Apple's full-screen player, and Ampify adds shuffle and repeat around its transport buttons; the player Apple opens by itself in screen mode has neither | Partial |
-| Shuffle+ (true shuffle) | Needs `addToQueue`, which Apple ignores | Missing |
+| Shuffle+ (true shuffle) | `queue.move` can reorder what is to come, as the `queue-flow` extension does; no shuffle extension yet | Missing |
 | adblockify, Toggle DJ, "Made for you" shortcut, HomeWhereYouBelong, No Tracking Links | Spotify only: Apple Music has no ads, no DJ, and its share links carry no tracking | Missing |
 
 ## Beyond Spicetify
 
 Ampify also has: a 10-band equalizer API for extensions on the samples (Apple Music keeps its own equalizer, which it
 skips for Dolby Atmos; Ampify's has no screen and was tested with synthetic sound) and an Atmos leveler, a LUFS meter,
-Discord Rich Presence and Last.fm scrobbling as extensions, a local HTTP remote (this PC only), MIDI, a notification-area icon, settings profiles, themes that
+Discord Rich Presence and Last.fm scrobbling as extensions, songs played from half to double speed keeping the pitch,
+a queue sorted so each song leads into the next from Apple's own audio analysis, explicit or clean versions only, a
+play history that includes stations, a local HTTP remote (this PC only), MIDI, a notification-area icon, settings profiles, themes that
 follow Windows or the time, tests of an element without Apple Music (`ampify test`), and an anonymous diagnosis report.
 
 ## Cider
