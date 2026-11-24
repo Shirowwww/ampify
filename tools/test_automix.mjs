@@ -33,7 +33,7 @@ function roomAfter(rate) {
 // Apple's structure: a phrase starts on every `phraseEvery`-th bar from bar `phraseFrom`.
 function song({ duration = 200, bpm = 124, firstBeat = 0, loudFrom = 0, loudTo = duration, vocals = [],
                 attributes = {}, danceability = 0.8, fadeIn = null, fadeOut = null, level = null, key = null,
-                melodicness = 0.7, phraseEvery = 0, phraseFrom = 0, beatAt = null } = {}) {
+                melodicness = 0.7, phraseEvery = 0, phraseFrom = 0, beatAt = null, energy = null } = {}) {
   // beatAt(t, i): the length of the beat that starts at t, the i-th one, when the tempo moves along the song.
   const beats = [];
   for (let t = firstBeat, i = 0; t < duration; t += beatAt ? beatAt(t, i) : 60 / bpm, i++) beats.push(Math.round(t * 1000));
@@ -54,7 +54,8 @@ function song({ duration = 200, bpm = 124, firstBeat = 0, loudFrom = 0, loudTo =
     analysis: {
       beats: { beatsInMilliseconds: beats, barsInMilliseconds: bars },
       bpm: { main: bpm, beginning: bpm, ending: bpm },
-      danceability: { main: danceability, beginning: danceability, ending: danceability },
+      ...(danceability === null ? {} : { danceability: { main: danceability, beginning: danceability, ending: danceability } }),
+      ...(energy === null ? {} : { energy: { main: energy, beginning: energy, ending: energy } }),
       melodicness: { main: melodicness, beginning: melodicness, ending: melodicness },
       ...(key ? { key: { main: key, beginning: key, ending: key } } : {}),
       loudness: { main: { value: -8 } },
@@ -129,7 +130,24 @@ function barsApart(a, b, plan, t) {
   return Math.min(...barsB.map((bar) => Math.abs(bar - inB)));
 }
 
-test("two songs at one tempo mix for eight bars, bar on bar, ending on the current song's last loud bar", () => {
+// The next song is in full this long before the bar it drops on, so that its downbeat is heard whole (main.js's
+// SWAP_AHEAD_S).
+const SWAP_AHEAD_S = 0.02;
+
+// The key where the next song is in full with its bass.
+const landingOf = (keys) => keys.find((k) => k[2] === 1 && k[4] === 1);
+
+// The drop of a mix on the beat, in A's time: the bar on which the next song lands in full.
+function dropOf(plan) {
+  return landingOf(plan.keys)[0] + SWAP_AHEAD_S * (plan.rate ?? 1);
+}
+
+// Where the next song is, in its own time, on the drop.
+function bAtDrop(plan) {
+  return plan.bStart + (dropOf(plan) - plan.keys[0][0]) / (plan.rate ?? 1);
+}
+
+test("two songs at one tempo mix for eight bars, the next one dropping in full on the current song's last loud bar", () => {
   const a = song({ loudTo: 190 });
   const b = song({ attributes: { albumName: "Other" } });
   const result = planMix(a, b, OPTIONS);
@@ -138,18 +156,76 @@ test("two songs at one tempo mix for eight bars, bar on bar, ending on the curre
   assertPlayable(result.plan, a, b);
   const bars = a.analysis.beats.barsInMilliseconds.map((ms) => ms / 1000);
   assert.ok(bars.includes(result.plan.keys[0][0]), "the mix starts on a bar of the current song");
-  assert.ok(result.plan.keys.at(-1)[0] <= 190, "and ends before its music fades");
+  const drop = dropOf(result.plan);
+  assert.ok(bars.some((t) => Math.abs(t - drop) < 1e-9) && drop <= 190, `and drops on its last loud bar (${drop})`);
+  assert.equal(drop, bars.filter((t) => t <= 190).at(-1));
   const bBars = b.analysis.beats.barsInMilliseconds.map((ms) => ms / 1000);
   assert.ok(bBars.some((t) => Math.abs(t - result.plan.bStart) < 0.002), "the next song comes in on one of its bars");
   assert.ok(result.plan.keys[0][2] === 0 && result.plan.keys[0][1] === 1, "it comes in silent");
 });
 
-test("a silent start of the next song is skipped, up to its first phrase", () => {
+test("a mix on the beat is a drop: the next song rises without its bass, then lands in full on the bar", () => {
+  const a = song({ loudTo: 190 });
+  const b = song({ attributes: { albumName: "Other" } });
+  const { plan } = planMix(a, b, OPTIONS);
+  const keys = plan.keys;
+  const beat = 60 / 124;
+  const ms = 0.002;  // Apple's bars are whole milliseconds
+  const drop = dropOf(plan);
+  const up = keys[1];
+  assert.ok(up[0] - keys[0][0] <= beat + ms, "the next song is up within a beat of the mix's start");
+  assert.ok(Math.abs(up[2] - 0.5) < 0.01, "at half its volume, as it plays in full in its first bars");
+  assert.deepEqual([up[1], up[3], up[4]], [1, 1, 0], "without its bass, under the current song in full");
+  for (const key of keys.filter((k) => k[0] < drop - beat / 2 - SWAP_AHEAD_S - ms)) {
+    assert.deepEqual([key[1], key[3], key[4]], [1, 1, 0], `nothing moves for the current song before the drop (${key})`);
+  }
+  const landed = landingOf(keys);
+  assert.deepEqual([landed[1], landed[3]], [0.7, 0], "on the drop the current song steps back, without its bass");
+  const before = keys[keys.indexOf(landed) - 1];
+  assert.ok(Math.abs(landed[0] - before[0] - beat / 2) < ms, "the basses change hands over half a beat");
+  assert.ok(before[2] > up[2] && before[2] < 1, "the next song a little louder by then");
+  const tail = keys.at(-1)[0] - drop;
+  assert.ok(Math.abs(tail - 0.75 * 4 * beat) < ms, `the current song gone three quarters of a bar later (${tail} s)`);
+});
+
+test("past the drop, a current song whose beats drift from the next one's fades out sooner, a second at least", () => {
+  // 100 bpm, then five percent slower from the beat after its last bar: the third beat after the drop is 30 ms late.
+  const a = song({ bpm: 100, beatAt: (t) => (t < 197 ? 0.6 : 0.63) });
+  const b = song({ bpm: 100, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.equal(result.kind, "beat");
+  assertPlayable(result.plan, a, b);
+  const drop = dropOf(result.plan);
+  assert.ok(Math.abs(drop - 196.8) < 0.002, `the drop on the current song's last bar (${drop})`);
+  const tail = result.plan.keys.at(-1)[0] - drop;
+  assert.ok(tail >= 1 - 1e-9 && tail < 1.2, `gone ${tail.toFixed(2)} s after the drop, not three quarters of a bar`);
+  const gap = widestBeatGap(a, b, result.plan);
+  assert.ok(gap <= 0.025, `beats ${(gap * 1000).toFixed(1)} ms apart at worst`);
+});
+
+test("a quiet intro of the next song rises under the current song's last bars, and drops where it is in full", () => {
+  const a = song({ loudTo: 190 });
+  const bar = 4 * 60 / 124;
+  // Four quiet bars, then the song in full: the drop of a DJ set, on the fifth.
+  const b = song({ level: (t) => (t < 4 * bar - 0.25 ? -20 : -8), attributes: { albumName: "Other" } });
+  const result = planMix(a, b, OPTIONS);
+  assert.equal(result.kind, "beat");
+  assertPlayable(result.plan, a, b);
+  const inB = bAtDrop(result.plan);
+  assert.ok(Math.abs(inB - 4 * bar) < 0.002, `the next song drops on its fifth bar (${inB})`);
+  assert.equal(result.bars, 4, "its four quiet bars under the current song's last four");
+  assert.equal(result.plan.keys[1][2], 1, "the quiet intro at its own level");
+});
+
+test("a silent start of the next song goes under the current song, which drops it on a bar where it plays", () => {
   const a = song();
   const b = song({ loudFrom: 5, attributes: { albumName: "Other" } });
   const result = planMix(a, b, OPTIONS);
   assert.equal(result.kind, "beat");
-  assert.ok(result.plan.bStart >= 5 - 0.05, `B starts at ${result.plan.bStart}`);
+  assertPlayable(result.plan, a, b);
+  const inB = bAtDrop(result.plan);
+  const bBars = b.analysis.beats.barsInMilliseconds.map((ms) => ms / 1000);
+  assert.ok(inB >= 5 && bBars.some((t) => Math.abs(t - inB) < 0.002), `B drops on a bar at ${inB}`);
 });
 
 // Where the next song is first heard in a plan, and the time of the next song that plays then.
@@ -200,20 +276,20 @@ test("a swap ends the current song on a phrase when one ends within its last bar
   assert.ok(index < bars.length - 3, "a few bars before the last one");
 });
 
-test("a song that fades out by itself, or hardly danceable ones, keep the crossfade", () => {
+test("a song that fades out by itself keeps the crossfade; songs with little beat still swap on a bar", () => {
   const b = song({ bpm: 138, firstBeat: 2.5, attributes: { albumName: "Other" } });
   const fading = song({ fadeOut: { startInMilliseconds: 190000, endInMilliseconds: 198000 } });
   assert.equal(planMix(fading, b, OPTIONS).kind, "crossfade");
   assert.equal(planMix(fading, b, OPTIONS).why, "this song fades out by itself", "the log says what was in the way");
-  assert.equal(planMix(song({ danceability: 0.1 }), b, OPTIONS).why, "this song ends with little beat");
   // Apple reports a short fade at the end of most songs, where the last note dies: that one is swapped before
   const dying = song({ fadeOut: { startInMilliseconds: 196000, endInMilliseconds: 198000 } });
   const swap = planMix(dying, b, OPTIONS);
   assert.equal(swap.kind, "swap");
   assert.ok(swap.plan.keys.at(-1)[0] <= 196, "the swap is over when the last note starts dying");
-  assert.equal(planMix(song({ danceability: 0.1 }), b, OPTIONS).kind, "crossfade");
+  // Apple finds hardly any beat in much rap (danceability 0.1 to 0.4): its bars still carry a swap.
+  assert.equal(planMix(song({ danceability: 0.1 }), b, OPTIONS).kind, "swap");
   assert.equal(planMix(song(), song({ bpm: 138, firstBeat: 2.5, danceability: 0.1, attributes: { albumName: "Other" } }),
-                       OPTIONS).kind, "crossfade");
+                       OPTIONS).kind, "swap");
 });
 
 test("a next song that starts right on its first bar has no room for a swap: a crossfade", () => {
@@ -231,12 +307,14 @@ test("the current song is brought to the next one's tempo, and their bars stay t
   assert.ok(Math.abs(result.plan.rate - 128 / 124) < 1e-3, `rate ${result.plan.rate}`);
   assert.ok(Math.abs(result.plan.keys[0][0] - result.plan.rateFrom - 8) < 1e-9, "eight seconds to reach that speed");
   const barsA = a.analysis.beats.barsInMilliseconds.map((ms) => ms / 1000);
-  const [start, end] = [result.plan.keys[0][0], result.plan.keys.at(-1)[0]];
-  for (const t of [start, (start + end) / 2, end]) {
+  const [start, drop] = [result.plan.keys[0][0], dropOf(result.plan)];
+  for (const t of [start, (start + drop) / 2, drop]) {
     assert.ok(barsA.some((bar) => Math.abs(bar - t) < 0.002), `a bar of the current song at ${t}`);
     const apart = barsApart(a, b, result.plan, t);
     assert.ok(apart <= 0.003, `bars ${(apart * 1000).toFixed(1)} ms apart at ${t}`);
   }
+  const gap = widestBeatGap(a, b, result.plan);
+  assert.ok(gap <= 0.025, `and the beats, the current song's fade after the drop too (${(gap * 1000).toFixed(1)} ms)`);
 });
 
 // The widest gap, in seconds as heard, between a beat of one song and the nearest beat of the other over the mix.
@@ -285,8 +363,8 @@ test("tempos a hair apart are left alone: the bars drift 20 ms at most", () => {
   assert.equal(result.kind, "beat");
   assertPlayable(result.plan, a, b);
   assert.equal(result.plan.rate, undefined);
-  const [start, end] = [result.plan.keys[0][0], result.plan.keys.at(-1)[0]];
-  for (const t of [start, (start + end) / 2, end]) assert.ok(barsApart(a, b, result.plan, t) <= 0.02 + 1e-9);
+  const [start, drop] = [result.plan.keys[0][0], dropOf(result.plan)];
+  for (const t of [start, (start + drop) / 2, drop]) assert.ok(barsApart(a, b, result.plan, t) <= 0.02 + 1e-9);
 });
 
 test("more than five percent of stretch keeps the mix to four bars", () => {
@@ -305,8 +383,7 @@ test("a song at half the tempo of the next shares its pulse: one bar on two", ()
   assert.equal(result.kind, "beat");
   assertPlayable(result.plan, a, b);
   assert.ok(Math.abs(result.plan.rate - 141 / 140) < 1e-3, `rate ${result.plan.rate}`);
-  const [start, end] = [result.plan.keys[0][0], result.plan.keys.at(-1)[0]];
-  for (const t of [start, end]) assert.ok(barsApart(a, b, result.plan, t) <= 0.003);
+  for (const t of [result.plan.keys[0][0], dropOf(result.plan)]) assert.ok(barsApart(a, b, result.plan, t) <= 0.003);
 });
 
 test("no room to reach the next song's tempo before the mix: a crossfade", () => {
@@ -316,18 +393,19 @@ test("no room to reach the next song's tempo before the mix: a crossfade", () =>
   assert.notEqual(result.kind, "beat");
 });
 
-test("the basses of the two songs change hands in the middle of a mix on the beat", () => {
+test("the basses of the two songs change hands on the drop of a mix on the beat", () => {
   const a = song();
   const b = song({ attributes: { albumName: "Other" } });
-  const keys = planMix(a, b, OPTIONS).plan.keys;
+  const { plan } = planMix(a, b, OPTIONS);
+  const keys = plan.keys;
   assert.deepEqual(Array.from(keys[0].slice(3)), [1, 0], "the next song comes in without its lows");
   assert.deepEqual(Array.from(keys.at(-1).slice(3)), [0, 1], "and ends with them, the current song without");
-  const [start, end] = [keys[0][0], keys.at(-1)[0]];
+  const drop = dropOf(plan);
+  const halfBeat = 30 / 124 + 0.002;
   for (const key of keys) {
-    const x = (key[0] - start) / (end - start);
     assert.ok(key[3] + key[4] <= 1 + 1e-9, "never both basses in full");
-    if (x < 0.4) assert.deepEqual(Array.from(key.slice(3)), [1, 0]);
-    if (x > 0.6) assert.deepEqual(Array.from(key.slice(3)), [0, 1]);
+    if (key[0] < drop - SWAP_AHEAD_S - halfBeat) assert.deepEqual(Array.from(key.slice(3)), [1, 0], "the current song's, before");
+    if (key[0] >= drop - SWAP_AHEAD_S) assert.deepEqual(Array.from(key.slice(3)), [0, 1], "the next song's, from the drop on");
   }
 });
 
@@ -343,16 +421,19 @@ test("keys that clash keep the mix short, keys that agree do not", () => {
   assert.equal(planMix(drums, drumsToo, OPTIONS).bars, 8, "two songs with no melody to clash");
 });
 
-test("with Apple's structure the mix ends on a phrase of the current song and starts on one of the next", () => {
+test("with Apple's structure the next song drops on one of its phrases, where a phrase of the current song ends", () => {
   const a = song({ loudTo: 190, phraseEvery: 4, phraseFrom: 1 });
   const b = song({ phraseEvery: 4, phraseFrom: 2, attributes: { albumName: "Other" } });
   const result = planMix(a, b, OPTIONS);
   assert.equal(result.kind, "beat");
   assertPlayable(result.plan, a, b);
   const bar = 4 * 60 / 124;
-  const lastBar = Math.round(result.plan.keys.at(-1)[0] / bar);
-  assert.equal((lastBar - 1) % 4, 0, `the mix ends on bar ${lastBar}, a phrase of the current song`);
-  assert.ok(result.plan.keys.at(-1)[0] <= 190);
+  const drop = dropOf(result.plan);
+  const lastBar = Math.round(drop / bar);
+  assert.equal((lastBar - 1) % 4, 0, `the drop on bar ${lastBar}, a phrase of the current song`);
+  assert.ok(drop <= 190);
+  const inB = Math.round(bAtDrop(result.plan) / bar);
+  assert.equal((inB - 2) % 4, 0, `and on bar ${inB} of the next song, one of its phrases`);
   assert.ok(Math.abs(result.plan.bStart - 2 * bar) < 0.003, `the next song comes in at ${result.plan.bStart}`);
 });
 
@@ -387,17 +468,34 @@ test("songs without Apple's analysis get a six-second crossfade over the song's 
   assert.equal(result.plan.bStart, 0);
 });
 
-test("songs Apple finds a little danceable still mix on the beat, those it finds hardly so do not", () => {
-  const b = song({ attributes: { albumName: "Other" }, danceability: 0.2 });
-  assert.equal(planMix(song({ danceability: 0.2 }), b, OPTIONS).kind, "beat");
-  assert.equal(planMix(song({ danceability: 0.1 }), b, OPTIONS).kind, "crossfade");
-  assert.equal(planMix(song({ danceability: 0.2 }), song({ attributes: { albumName: "Other" }, danceability: 0.1 }),
-                       OPTIONS).kind, "crossfade");
+test("songs Apple finds hardly danceable, much rap among them, still mix on the beat, and so do songs it gives no score", () => {
+  const b = song({ attributes: { albumName: "Other" }, danceability: 0.1 });
+  assert.equal(planMix(song({ danceability: 0.1 }), b, OPTIONS).kind, "beat");
+  assert.equal(planMix(song({ danceability: 0.1, energy: 0.6 }), b, OPTIONS).kind, "beat", "with energy, not soft");
+  const unscored = song({ danceability: null, attributes: { albumName: "Other" } });
+  assert.equal(planMix(song({ danceability: null }), unscored, OPTIONS).kind, "beat");
+});
+
+test("a soft ending, hardly danceable and quiet, is left to breathe, or fades as Apple's player would", () => {
+  const b = song({ attributes: { albumName: "Other" } });
+  // A ballad that ends on its last note at 195 s, then silence: the next song after a breath, even one that starts
+  // strong and shares the tempo.
+  const ballad = song({ danceability: 0.1, energy: 0.1, loudTo: 195 });
+  const breath = planMix(ballad, b, CAN);
+  assert.equal(breath.kind, "natural");
+  assert.ok(breath.soft);
+  assertKernelTakes(breath.plan, ballad, b);
+  assert.ok(Math.abs(breath.plan.keys[0][0] - 195.9) < 1e-9, `to its end, 0.6 s of its own silence (${breath.plan.keys[0][0]})`);
+  // One that plays to the last second has no silence to breathe in: a crossfade, never a drop.
+  const fade = planMix(song({ danceability: 0.1, energy: 0.1 }), b, CAN);
+  assert.equal(fade.kind, "crossfade");
+  assert.equal(fade.why, "this song ends softly");
+  assert.equal(planMix(ballad, b, OPTIONS).kind, "crossfade", "an older kernel cannot cut: a crossfade");
 });
 
 test("a crossfade follows the current song's own fade-out, the next song nearly full when it begins", () => {
-  const a = song({ danceability: 0.1,fadeOut: { startInMilliseconds: 190000, endInMilliseconds: 198000 } });
-  const b = song({ attributes: { albumName: "Other" } });
+  const a = song({ fadeOut: { startInMilliseconds: 190000, endInMilliseconds: 198000 } });
+  const b = song({ bpm: 138, firstBeat: 2.5, attributes: { albumName: "Other" } });
   const result = planMix(a, b, OPTIONS);
   assert.equal(result.kind, "crossfade");
   assertPlayable(result.plan, a, b);
@@ -632,13 +730,14 @@ function assertKernelTakes(plan, a, b) {
   assert.ok(keys.length >= 2 && keys.length <= 64);
   for (let i = 1; i < keys.length; i++) assert.ok(keys[i][0] >= keys[i - 1][0], "keys in time order");
   for (const key of keys) {
-    assert.ok([3, 5, 7].includes(key.length), `a key of ${key.length} numbers`);
+    assert.ok([3, 5, 7, 9].includes(key.length), `a key of ${key.length} numbers`);
     for (const value of key.slice(1)) assert.ok(value >= 0 && value <= 1, "volumes, lows and filters within 0..1");
   }
   assert.deepEqual([first[1], first[2]], [1, 0]);
   assert.deepEqual([last[1], last[2]], [0, 1]);
   assert.equal(last[4] ?? 1, 1, "B has its lows at the end");
   assert.equal(last[6] ?? 0, 0, "and is no longer filtered");
+  assert.equal(last[8] ?? 0, 0, "from below either");
   const cut = keys.length === 2 && first[0] === last[0];
   const rate = plan.rate ?? 1;
   if (cut) {
@@ -653,13 +752,30 @@ function assertKernelTakes(plan, a, b) {
     assert.ok(plan.loop.from >= first[0] && plan.loop.from < last[0], "the loop starts within the mix");
     assert.ok(plan.loop.length >= 0.2 && plan.loop.length <= 8);
     assert.ok(plan.loop.from + plan.loop.length + 1 <= a.duration, "and ends a second before the song does");
+    let [at, length] = [plan.loop.from, plan.loop.length];
+    for (const [rollAt, rollLength] of plan.loop.rolls ?? []) {
+      assert.ok(rollLength >= 0.03 && rollLength < length, "each roll shorter than the one before");
+      const turns = (rollAt - at) / length;
+      assert.ok(turns >= 0.998 && Math.abs(turns - Math.round(turns)) * length <= 0.002, "on a turn of the one before");
+      assert.ok(rollAt < last[0], "within the mix");
+      [at, length] = [rollAt, rollLength];
+    }
   } else if (!cut) {
     assert.ok(a.duration - last[0] >= room, "the song goes on after the mix");
   }
   if (plan.echo) {
-    const { from, to, delay, feedback } = plan.echo;
+    const { from, to, delay, feedback, level = 0.7 } = plan.echo;
     assert.ok(from >= first[0] && from < to && to <= last[0], "the echo is thrown within the mix");
     assert.ok(delay >= 0.05 && delay <= 2 && feedback >= 0 && feedback <= 0.9);
+    assert.ok(level > 0 && level <= 2, "an echo level the kernel takes");
+  }
+  if (plan.gate) {
+    const { beats, on, duck, until } = plan.gate;
+    assert.ok(beats.length >= 1 && beats.length <= 128, "stabs the kernel takes");
+    for (let i = 1; i < beats.length; i++) assert.ok(beats[i] > beats[i - 1], "stabs in time order");
+    assert.ok(beats[0] >= first[0] && beats.at(-1) < last[0], "stabs within the mix");
+    assert.ok(on >= 0.02 && on <= 2 && duck >= 0 && duck <= 1);
+    assert.ok(until > beats[0] && until <= last[0], "the gate ends within the mix");
   }
   assert.ok(plan.bStart >= 0 && plan.bStart + (last[0] - first[0]) / rate < b.duration);
 }
@@ -673,10 +789,11 @@ test("a kernel that filters gets mixes on the beat where the next song comes in 
   assert.equal(result.kind, "beat");
   assertKernelTakes(result.plan, a, b);
   const keys = result.plan.keys;
-  assert.deepEqual([keys[0][5], keys[0][6]], [0, 0.35], "the next song muffled as it comes in");
-  assert.deepEqual([keys.at(-1)[5], keys.at(-1)[6]], [0.35, 0], "the current one thin as it goes");
+  assert.deepEqual([keys[0][5], keys[0][6]], [0, 0.5], "the next song muffled as it comes in");
+  assert.deepEqual([keys.at(-1)[5], keys.at(-1)[6]], [0.6, 0], "the current one thin as it goes");
   const swap = keys.find((key) => key[4] === 1);
   assert.equal(swap[6], 0, "the next song is open once it has the bass");
+  assert.ok(keys[keys.indexOf(swap) - 1][6] < keys[1][6], "and opens up as the drop nears");
   // An older kernel gets the very same mix, unfiltered.
   const old = planMix(a, b, OPTIONS);
   assert.deepEqual(Array.from(old.plan.keys, (key) => Array.from(key)), Array.from(keys, (key) => Array.from(key.slice(0, 5))));
@@ -728,27 +845,64 @@ test("a next song that starts right on its first bar takes the current song's ne
 });
 
 test("a song that stops on a hit is heard to its end, then a next song that starts strong comes in at once", () => {
-  const a = song({ danceability: 0.1, loudTo: 195 });
-  const b = song({ loudFrom: 1, attributes: { albumName: "Other" } });
+  // Another tempo: no mix on the beat goes over the hit.
+  const a = song({ loudTo: 195 });
+  const b = song({ bpm: 138, loudFrom: 1, attributes: { albumName: "Other" } });
   const result = planMix(a, b, CAN);
   assert.equal(result.kind, "natural");
   assertKernelTakes(result.plan, a, b);
   // the hit rings 0.3 s past where the loudness drops, then 0.12 s of silence, the next song's own
   assert.deepEqual(Array.from(result.plan.keys, (key) => Array.from(key)), [[195.3, 1, 0], [195.3, 0, 1]]);
   assert.ok(Math.abs(result.plan.bStart - 0.88) < 1e-9);
-  assert.equal(planMix(a, b, OPTIONS).kind, "crossfade", "an older kernel cannot cut: a crossfade");
+  assert.equal(planMix(a, b, OPTIONS).kind, "swap", "an older kernel cannot cut: a swap on a bar");
 });
 
-test("after a hit, a next song that starts softly gets a breath; a short fade still gets its crossfade", () => {
-  const soft = song({ loudFrom: 2, fadeIn: { startInMilliseconds: 2000, endInMilliseconds: 5000 }, attributes: { albumName: "Other" } });
-  const hit = planMix(song({ danceability: 0.1, loudTo: 195 }), soft, CAN);
+test("after a hit, a next song that starts softly gets a breath; a short fade gets a mix", () => {
+  const soft = song({ bpm: 138, loudFrom: 2, fadeIn: { startInMilliseconds: 2000, endInMilliseconds: 5000 },
+                      attributes: { albumName: "Other" } });
+  const hit = planMix(song({ loudTo: 195 }), soft, CAN);
   assert.equal(hit.kind, "natural");
   assert.ok(Math.abs(hit.plan.keys[0][0] - 195.3) < 1e-9 && Math.abs(hit.plan.bStart - 1.4) < 1e-9,
             "0.6 s before a soft start, of its own silence");
   // Most songs end on a fade of a few seconds (Apple's French chart, 18/11/2026): a pause after each would sound
   // like no AutoMix at all.
-  const dying = { danceability: 0.1, loudTo: 196.5, fadeOut: { startInMilliseconds: 194000, endInMilliseconds: 196500 } };
-  assert.equal(planMix(song(dying), song({ attributes: { albumName: "Other" } }), CAN).kind, "crossfade");
+  const dying = { loudTo: 196.5, fadeOut: { startInMilliseconds: 194000, endInMilliseconds: 196500 } };
+  assert.equal(planMix(song(dying), song({ attributes: { albumName: "Other" } }), CAN).kind, "beat");
+});
+
+// Heard on 24/11 (s2-7): a soft end, then a next song that starts loud, came in 19 dB above it, all at once.
+test("after a soft end, a next song much louder than it comes in muffled and rises, the old song silent by then", () => {
+  const quietEnd = song({ danceability: 0.1, energy: 0.1, level: (t) => (t < 185 ? -8 : t < 195 ? -17 : -60) });
+  const loud = song({ attributes: { albumName: "Other" } });
+  const result = planMix(quietEnd, loud, CAN);
+  assert.equal(result.kind, "natural");
+  assertKernelTakes(result.plan, quietEnd, loud);
+  const { keys } = result.plan;
+  assert.ok(keys.length > 2 && keys.at(-1)[0] > keys[0][0], "a fade, not a cut");
+  assert.ok(keys[0][0] > 195, "after the song's last sound");
+  assert.ok(keys[1][1] === 0 && keys[1][2] > 0 && keys[1][2] < 0.5 && keys[1][6] > 0, "the next song low and muffled");
+  assert.ok(Math.abs(keys.at(-1)[0] - keys[0][0] - 1.5) < 1e-9, "in full a second and a half later");
+  // A next song no louder than the end it follows still comes in at once.
+  const even = planMix(song({ danceability: 0.1, energy: 0.1, loudTo: 195 }), loud, CAN);
+  assert.deepEqual(Array.from(even.plan.keys, (key) => key[0]), [even.plan.keys[0][0], even.plan.keys[0][0]]);
+});
+
+// Heard on 24/11 (fondu-2): a song fading out, then one whose drop comes after seven quiet seconds: four seconds of
+// near silence between them.
+test("a crossfade into a quiet intro lands the next song's drop where the current song has faded out", () => {
+  const a = song({ fadeOut: { startInMilliseconds: 190000, endInMilliseconds: 198000 },
+                   level: (t) => (t < 190 ? -8 : t < 193 ? -14 : t < 198 ? -24 : -60) });
+  const b = song({ bpm: 138, firstBeat: 2.5, level: (t) => (t < 9 ? -24 : -8), attributes: { albumName: "Other" } });
+  const result = planMix(a, b, CAN);
+  assert.equal(result.kind, "crossfade");
+  assertKernelTakes(result.plan, a, b);
+  const { keys, bStart } = result.plan;
+  const dropAt = keys[0][0] + (9 - bStart);
+  assert.ok(Math.abs(dropAt - 193) < 0.6, `the drop lands where the current song falls away (${dropAt})`);
+  // The current song's own fade is 6 dB down before the drop; the next song's intro started at once left 16 dB.
+  const hole = deepestHole(a, b, result.plan);
+  const before = deepestHole(a, b, { ...result.plan, bStart: 0 });
+  assert.ok(hole < 8 && before > 12, `no hole between them (${hole.toFixed(1)} dB, ${before.toFixed(1)} before)`);
 });
 
 test("a beat song that fades within a few seconds leaves on an echo, before its fade, into a song of another tempo", () => {
@@ -764,8 +918,8 @@ test("a beat song that fades within a few seconds leaves on an echo, before its 
 });
 
 test("a song that fades out by itself keeps its crossfade, filtered", () => {
-  const a = song({ danceability: 0.1, fadeOut: { startInMilliseconds: 190000, endInMilliseconds: 198000 } });
-  const b = song({ attributes: { albumName: "Other" } });
+  const a = song({ fadeOut: { startInMilliseconds: 190000, endInMilliseconds: 198000 } });
+  const b = song({ bpm: 138, firstBeat: 2.5, attributes: { albumName: "Other" } });
   const result = planMix(a, b, CAN);
   assert.equal(result.kind, "crossfade");
   assertKernelTakes(result.plan, a, b);
@@ -797,4 +951,372 @@ test("a song that stops on a hit, sung to its last bars, loops a bar without its
   }
   assert.equal(planMix(song(), song({ attributes: { albumName: "Other" } }), CAN).kind, "beat",
                "without a singer in the way, the mix on the beat as it was");
+});
+
+// ---- with a kernel that also has the crossover: A's low-pass and B's high-pass (added after Ampify 1.5.7)
+
+const CROSS = { ...OPTIONS, can: new Set(["cut", "filter", "echo", "loop", "crossover"]) };
+// The kernel's ranges (mix_deck.cpp): B's high-pass from 2 Hz to 16 kHz, A's low-pass from 20 kHz down to 30 Hz.
+const thinHz = (amount) => 2 * (16000 / 2) ** amount;
+const muffleHz = (amount) => 20000 * (30 / 20000) ** amount;
+// Where the next song is, in its own time, when a crossover is over: its drop, a hair after the last key.
+const bAtDropOf = (plan) => plan.bStart + (plan.keys.at(-1)[0] - plan.keys[0][0]) / (plan.rate ?? 1) + SWAP_AHEAD_S;
+
+test("with the crossover, a mix on the beat keeps both songs at full volume and hands one to the other from the top down", () => {
+  const a = song({ loudTo: 190 });
+  const b = song({ attributes: { albumName: "Other" } });
+  const result = planMix(a, b, CROSS);
+  assert.equal(result.kind, "beat");
+  assert.equal(result.style, "crossover");
+  assertKernelTakes(result.plan, a, b);
+  const keys = result.plan.keys;
+  assert.ok(keys.every((k) => k.length === 9), "keys with the crossover's two numbers");
+  const beat = 60 / 124;
+  const [first, last] = [keys[0], keys.at(-1)];
+  assert.equal(first[8], 1, "the next song comes in with only its very top");
+  const body = keys.slice(1, -1);
+  // At full volume within half a beat, its highs were heard as the new song coming in too soon (24/11, n-3).
+  assert.ok(Math.abs(body[0][0] - first[0] - 2 * beat) <= 0.004, "rising to full volume over two beats");
+  for (const key of body) {
+    assert.deepEqual(Array.from(key.slice(1, 5)), [1, 1, 1, 1], `both whole and at full volume (${key})`);
+    assert.ok(Math.abs(Math.log(muffleHz(key[7]) / thinHz(key[8]))) < 0.01, `one cutoff for both (${key})`);
+  }
+  for (let i = 1; i < body.length; i++) {
+    assert.ok(body[i][8] <= body[i - 1][8] && body[i][7] >= body[i - 1][7], "the cutoff only comes down");
+  }
+  assert.ok(thinHz(body.at(-1)[8]) <= 160, "down to the bass by the end");
+  const late = body.find((k) => k[0] >= first[0] + (last[0] - first[0]) * 0.75);
+  assert.ok(thinHz(late[8]) > 4000, "three quarters in, the next song still gives only its highs");
+  assert.deepEqual([last[1], last[2], last[8]], [0, 1, 0], "on the drop the current song is gone, the next one whole");
+  assert.ok(last[0] - body.at(-1)[0] <= 0.3 + 1e-9, "the current song cut within 0.3 s");
+  const drop = last[0] + SWAP_AHEAD_S;
+  assert.ok(barTimes(a).some((t) => Math.abs(t - drop) < 1e-6), `the drop on a bar of the current song (${drop})`);
+  assert.ok(deepestHole(a, b, result.plan) <= 0.5, "no hole: both play in full");
+});
+
+test("a crossover lands where the two singers do not sing together as it hands the mids over", () => {
+  // The current song is sung to its end; the next one's first line runs from 10 to 16 s. Eight bars would land on
+  // its bar 8 (15.5 s), over that line; four bars land on its bar 4 (7.7 s), before it.
+  const a = song({ loudTo: 190, vocals: [[150, 200]] });
+  const b = song({ vocals: [[10, 16]], attributes: { albumName: "Other" } });
+  assert.equal(planMix(a, song({ attributes: { albumName: "Other" } }), CROSS).bars, 8, "without the line, eight bars");
+  const result = planMix(a, b, CROSS);
+  assert.equal(result.style, "crossover");
+  assert.equal(result.bars, 4);
+  assert.ok(bAtDropOf(result.plan) < 10, `the next song whole before its singer (${bAtDropOf(result.plan)})`);
+  assert.equal(planMix(a, b, CAN).bars, 8, "the drop of a kernel without the crossover is left as it was");
+});
+
+test("a song that stops on a hit loops a bar under the crossover as well", () => {
+  const a = song({ vocals: [[100, 195]] });
+  const b = song({ vocals: [[0, 60]], attributes: { albumName: "Other" } });
+  const result = planMix(a, b, CROSS);
+  assert.equal(result.kind, "loop");
+  assert.equal(result.style, "crossover");
+  assertKernelTakes(result.plan, a, b);
+  assert.ok(result.plan.keys.every((k) => k.length === 9), "the crossover's keys");
+  assert.ok(result.plan.keys.at(-1)[0] > result.plan.loop.from + 3 * result.plan.loop.length, "over the loop's turns");
+});
+
+test("without the crossover the kernel gets the drop it always took", () => {
+  const a = song({ loudTo: 190 });
+  const b = song({ attributes: { albumName: "Other" } });
+  const result = planMix(a, b, CAN);
+  assert.notEqual(result.style, "crossover");
+  assert.ok(result.plan.keys.every((k) => k.length === 7));
+});
+
+test("a long crossover at a fast tempo stays within the kernel's 64 keys", () => {
+  // The next song's music is in full from 40 s: sixteen bars of it come before its drop.
+  const a = song({ bpm: 174, loudTo: 190 });
+  const b = song({ bpm: 174, loudFrom: 40, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, { ...CROSS, style: "Long blends", maxSeconds: 40 });
+  assert.equal(result.style, "crossover");
+  assert.equal(result.bars, 16);
+  assertKernelTakes(result.plan, a, b);
+});
+
+// ---- with a kernel that also has the gate and the roll (after Ampify 1.5.9): a style drawn for each pair
+
+const STYLED = { ...OPTIONS, can: new Set(["cut", "filter", "echo", "loop", "crossover", "gate", "roll"]) };
+const BAR = 60 / 124 * 4;
+const beatTimes = (s) => s.analysis.beats.beatsInMilliseconds.map((ms) => ms / 1000);
+// The kernel's low-pass of the next song (bFilter): from 20 kHz at 0 down to 400 Hz at 1.
+const lowPassHz = (amount) => 20000 * (400 / 20000) ** amount;
+
+test("in stabs, the next song comes in on its beats over the current song, without its bass, then drops in full", () => {
+  const a = song({ loudTo: 190 });
+  const b = song({ attributes: { albumName: "Other" } });
+  const result = planMix(a, b, { ...STYLED, prefer: "stabs" });
+  assert.equal(result.kind, "beat");
+  assert.equal(result.style, "stabs");
+  assertKernelTakes(result.plan, a, b);
+  const { keys, gate, bStart } = result.plan;
+  const drop = gate.until + SWAP_AHEAD_S;
+  assert.ok(barTimes(a).some((t) => Math.abs(t - drop) < 1e-6), "the drop on a bar of the current song");
+  for (const stab of gate.beats) {
+    const inB = bStart + (stab - keys[0][0]);
+    assert.ok(beatTimes(b).some((t) => Math.abs(t - inB) < 0.002), "each stab on a beat of the next song");
+  }
+  assert.equal(gate.beats.length, Math.round((drop - keys[0][0]) / (BAR / 4)), "one on every beat of the build");
+  assert.ok(Math.abs(gate.on - BAR / 8) < 1e-3, "half a beat each");
+  assert.equal(gate.duck, 0.3);
+  assert.equal(keys[1][2], 1, "at full level: the gate chops it");
+  assert.ok(Math.abs(lowPassHz(keys[0][6]) - 1000) < 1, "muffled from 1 kHz...");
+  const before = keys.filter((k) => k[0] < gate.until);
+  assert.ok(before.every((k, i) => i === 0 || k[6] <= before[i - 1][6]), "...opening up to the drop");
+  assert.ok(before.every((k) => k[1] === 1), "the current song at full volume until the drop");
+  assert.ok(before.every((k) => k[4] === 0), "the next song without its bass until the drop");
+  const bassCut = keys.find((k) => k[3] === 0);
+  assert.ok(barTimes(a).some((t) => Math.abs(t - bassCut[0] - SWAP_AHEAD_S) < 2e-3), "the current song's bass goes on a bar");
+  assert.ok(drop - bassCut[0] - SWAP_AHEAD_S >= BAR - 1e-6, "a bar or more before the drop: a bridge without bass");
+  const after = keys.filter((k) => k[0] >= gate.until);
+  assert.ok(after.every((k) => k[2] === 1 && k[4] === 1), "the next song whole from the drop, bass and all");
+  assert.ok(keys.at(-1)[0] - gate.until <= BAR + 2e-3, "the current song gone within a bar");
+  const half = after.find((k) => k[0] >= gate.until + BAR / 2 - 1e-6);
+  assert.ok(half[1] < 0.2, "mostly gone within half of it");
+});
+
+test("a drop without the stabs brings the next song up to 0.8 under the current one, bass gone a bar before", () => {
+  const a = song({ loudTo: 190 });
+  const b = song({ attributes: { albumName: "Other" } });
+  const result = planMix(a, b, { ...STYLED, prefer: "drop" });
+  assert.equal(result.style, "drop");
+  assertKernelTakes(result.plan, a, b);
+  const { keys } = result.plan;
+  assert.equal(result.plan.gate, undefined);
+  const bassCut = keys.findIndex((k) => k[3] === 0);
+  assert.ok(Math.abs(keys[bassCut][2] - 0.8) < 1e-9, "the next song at 0.8 where the bass goes");
+  assert.ok(keys.slice(1, bassCut).every((k) => k[2] > 0 && k[2] <= 0.8 + 1e-9), "rising to it");
+  assert.ok(deepestHole(a, b, result.plan) <= 0.5, "no hole");
+});
+
+test("a roll plays the current song's last bar faster and faster, then the next song lands on the bar, at any tempo", () => {
+  const a = song();
+  const b = song({ bpm: 96, attributes: { albumName: "Other" } });  // too far from 124 to share a tempo
+  const result = planMix(a, b, { ...STYLED, prefer: "roll" });
+  assert.equal(result.kind, "roll");
+  assertKernelTakes(result.plan, a, b);
+  const { keys, loop, bStart } = result.plan;
+  const beat = BAR / 4;
+  const drop = keys.at(-1)[0] + SWAP_AHEAD_S;
+  assert.ok(barTimes(a).some((t) => Math.abs(t - drop) < 1e-6), "the next song lands on a bar of the current one");
+  assert.ok(Math.abs(loop.from - (drop - BAR)) < 1e-3, "the bar rolled is the one before");
+  assert.ok(Math.abs(loop.length - beat) < 1e-3, "its first beat twice...");
+  const rolls = loop.rolls.map(([at, length]) => [at - loop.from, length]);
+  assert.ok(Math.abs(rolls[0][0] - BAR / 2) < 1e-3 && Math.abs(rolls[0][1] - beat / 2) < 1e-3, "...then half beats");
+  assert.ok(Math.abs(rolls[1][0] - BAR * 3 / 4) < 1e-3 && Math.abs(rolls[1][1] - beat / 4) < 1e-3, "...then quarters");
+  // "A bit of the next song before the transition" (24/11, n3-1): it creeps in with the half beats, thin, without its
+  // bass and at half volume at most, then drops in full.
+  const before = keys.slice(0, -1);
+  assert.ok(before.filter((k) => k[0] <= loop.rolls[0][0] + 1e-9).every((k) => k[2] === 0), "unheard before the half beats");
+  assert.ok(before.at(-1)[2] > 0 && before.every((k) => k[2] <= 0.5), "heard a little before the drop, half at most");
+  assert.ok(before.filter((k) => k[2] > 0).every((k) => k[4] === 0 && k[8] >= 0.5), "thin and without its bass then");
+  const quarters = loop.rolls[1][0];
+  // Thinned, its bass gone, a roll fell 12 to 18 dB before the drop (24/11, s2-10 and n-1): it darkens instead, its
+  // bass kept, the next song in whole only on the drop.
+  assert.ok(keys.every((k) => k[3] === 1 && k[5] === 0), "its bass to the drop, never thinned");
+  const dark = keys.map((k) => k[7]);
+  assert.ok(dark.every((x, i) => i === 0 || x >= dark[i - 1]), "darkening from the loop's start, never back");
+  const mid = keys.find((k) => k[0] >= quarters)[7];
+  assert.ok(dark[0] === 0 && mid > 0 && mid < keys.at(-2)[7] && keys.at(-2)[7] <= 0.5, "to about 1 kHz by the drop");
+  // A kernel without the crossover's filters thins it out, its bass gone with the quarter beats only.
+  const older = planMix(a, b, { ...STYLED, can: new Set([...STYLED.can].filter((x) => x !== "crossover")), prefer: "roll" });
+  assert.equal(older.kind, "roll");
+  assertKernelTakes(older.plan, a, b);
+  const bassAt = (time) => older.plan.keys.findLast((k) => k[0] <= time)[3];
+  assert.ok(bassAt(quarters - 0.01) === 1 && bassAt(quarters + 0.05) === 0, "its bass gone with the quarter beats");
+  const entry = bStart + (drop - keys[0][0]);
+  assert.ok(barTimes(b).some((t) => Math.abs(t - entry) < 1e-3), "the next song in on a bar of its own");
+  assert.ok(bStart >= 0, "played unheard under the roll from before it");
+  // The cut was heard as too raw (24/11): the last beat of quarters rings on, thinner, under the next song's drop.
+  const { echo } = result.plan;
+  assert.ok(echo, "an echo of the roll's end");
+  // Apple's bars are whole milliseconds: a beat within one of BAR / 4.
+  assert.ok(Math.abs(echo.to - keys.at(-1)[0]) < 1e-9 && Math.abs(echo.from - (echo.to - beat)) < 1e-3, "its last beat");
+  assert.ok(Math.abs(echo.delay - beat) < 1e-3 && echo.feedback >= 0.35 && echo.feedback <= 0.5, "a beat apart, fading");
+});
+
+test("a slow song rolls the second half of its bar, on half beats", () => {
+  const a = song({ bpm: 60 });  // a beat of a second: a whole bar rolled lasted four seconds (Capuche, 24/11)
+  const b = song({ bpm: 96, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, { ...STYLED, prefer: "roll" });
+  assert.equal(result.kind, "roll");
+  assertKernelTakes(result.plan, a, b);
+  const { keys, loop } = result.plan;
+  const drop = keys.at(-1)[0] + SWAP_AHEAD_S;
+  assert.ok(Math.abs(loop.length - 0.5) < 1e-6, "half a beat, again");
+  assert.ok(Math.abs(loop.from - (drop - 2)) < 1e-6, "from the bar's third beat");
+  const rolls = loop.rolls.map(([at, length]) => [at - loop.from, length]);
+  assert.ok(Math.abs(rolls[0][0] - 1) < 1e-6 && Math.abs(rolls[0][1] - 0.25) < 1e-6, "then quarter beats");
+  assert.ok(Math.abs(rolls[1][0] - 1.5) < 1e-6 && Math.abs(rolls[1][1] - 0.125) < 1e-6, "then eighths");
+});
+
+test("a next song sung over its build is not chopped into stabs, nor a sung beat rolled", () => {
+  const a = song({ loudTo: 190 });
+  const sung = song({ vocals: [[0, 60]], attributes: { albumName: "Other" } });
+  assert.notEqual(planMix(a, sung, { ...STYLED, prefer: "stabs" }).style, "stabs");
+  const singing = song({ vocals: [[150, 200]] });
+  const other = song({ bpm: 96, attributes: { albumName: "Other" } });
+  assert.notEqual(planMix(singing, other, { ...STYLED, prefer: "roll" }).kind, "roll");
+  const fast = song({ bpm: 320 });
+  const fastPlan = planMix(fast, other, { ...STYLED, prefer: "roll" });
+  assert.notEqual(fastPlan.kind, "roll", "a beat shorter than the kernel's shortest loop is not rolled");
+  assert.equal(planMix(song(), other, { ...STYLED, prefer: "roll" }).kind, "roll", "unsung, it rolls");
+});
+
+test("a sung or fading last bar rolls the latest bar up to eight earlier that ends a phrase, never cutting a singer", () => {
+  const other = song({ bpm: 96, attributes: { albumName: "Other" } });
+  const bars = barTimes(song());
+  const rolledAt = (a) => {
+    const result = planMix(a, other, { ...STYLED, prefer: "roll" });
+    assert.equal(result.kind, "roll");
+    assertKernelTakes(result.plan, a, other);
+    const drop = result.plan.keys.at(-1)[0] + SWAP_AHEAD_S;
+    return bars.findIndex((t) => Math.abs(t - drop) < 1e-6);
+  };
+  // Phrases every four bars: the last one starts on bar 100 (193.5 s); the one before on bar 96 (185.8 s).
+  assert.equal(rolledAt(song({ level: (t) => (t < 186 ? -8 : -14), phraseEvery: 4 })), 96, "before the outro");
+  assert.equal(rolledAt(song({ level: (t) => (t < 186 ? -8 : -14) })), 96, "without phrases, the latest bar in full");
+  assert.notEqual(planMix(song({ vocals: [[150, 200]] }), other, { ...STYLED, prefer: "roll" }).kind, "roll",
+    "never further back than eight bars");
+  // A verse's last lines cut off, 14 and 26 s before the end, were heard as too early (24/11).
+  assert.notEqual(planMix(song({ vocals: [[184, 200]], phraseEvery: 4 }), other, { ...STYLED, prefer: "roll" }).kind,
+    "roll", "nor over a singer's last lines");
+});
+
+// Heard on 24/11, the same songs both ways: rolled 7 s before the song's own fade it was better than the crossfade;
+// 14 and 26 s before, the crossfade was.
+test("a song that fades out by itself rolls just before its fade, or keeps its crossfade", () => {
+  const fading = (vocals) => song({ fadeOut: { startInMilliseconds: 190000, endInMilliseconds: 198000 }, vocals,
+                                    level: (t) => (t < 190 ? -8 : t < 198 ? -8 - (t - 190) * 3 : -60) });
+  const other = song({ bpm: 96, attributes: { albumName: "Other" } });
+  const rolled = planMix(fading([]), other, { ...STYLED, prefer: "roll" });
+  assert.equal(rolled.kind, "roll");
+  assertKernelTakes(rolled.plan, fading([]), other);
+  const drop = rolled.plan.keys.at(-1)[0] + SWAP_AHEAD_S;
+  assert.ok(drop <= 190 && drop >= 180, `on a bar just before its fade (${drop})`);
+  // Sung up to its fade: the nearest bar it could roll is more than ten seconds before it.
+  assert.equal(planMix(fading([[170, 198]]), other, { ...STYLED, prefer: "roll" }).kind, "crossfade");
+});
+
+test("each pair draws its style, always the same, the ones least like a crossfade most often", () => {
+  const a = song({ loudTo: 190 });
+  const b = song({ attributes: { albumName: "Other" } });
+  const styles = {};
+  for (let i = 0; i < 60; i++) {
+    const x = { ...a, id: "a" + i };
+    const y = { ...b, id: "b" + i };
+    const first = planMix(x, y, STYLED);
+    assert.equal(planMix(x, y, STYLED).style, first.style, "the same pair, the same style");
+    styles[first.style] = (styles[first.style] ?? 0) + 1;
+  }
+  assert.ok(Object.keys(styles).length >= 4, "every style comes up: " + JSON.stringify(styles));
+  assert.ok(styles.stabs > styles.crossover && styles.stabs > styles.drop, "stabs most: " + JSON.stringify(styles));
+});
+
+test("songs whose keys clash are never held both in full, and roll more often", () => {
+  const draw = (key) => {
+    const styles = {};
+    for (let i = 0; i < 60; i++) {
+      const a = { ...song({ loudTo: 190, key: { tonic: "C", mode: "major" } }), id: "a" + i };
+      const b = { ...song({ key, attributes: { albumName: "Other" } }), id: "b" + i };
+      const style = planMix(a, b, STYLED).style;
+      styles[style] = (styles[style] ?? 0) + 1;
+    }
+    return styles;
+  };
+  const clash = draw({ tonic: "F#", mode: "major" });
+  const agree = draw({ tonic: "G", mode: "major" });
+  assert.equal(clash.crossover, undefined, "no crossover: " + JSON.stringify(clash));
+  assert.ok(clash.roll > (agree.roll ?? 0), "more rolls: " + JSON.stringify(clash) + " " + JSON.stringify(agree));
+  assert.ok(Object.keys(clash).length >= 3, "still a style drawn for each pair: " + JSON.stringify(clash));
+});
+
+// Heard on 24/11: an echo too short (s2-4, s2-5), one cut too fast and off the next song's beat (n-4), a dead stop
+// with two beats of echo alone before a late drop (n3-4), then one that rose muffled under a fading song (n5-4): "let it
+// come in lightly a little before, filtered, then the drop right as the transition is full", as the rolls do; then
+// (n6-1) "it comes in a bit too late, and the echo is not heard enough".
+test("with the styles, an echo out lets the next song creep in thin, then drops it whole on the bar", () => {
+  const a = song({ bpm: 124 });
+  // A quiet intro, in full from 7 s: its bars at 138 bpm fall every 1.74 s, the drop on the one at 6.96 s.
+  const b = song({ bpm: 138, level: (t) => (t < 7 ? -20 : -8), attributes: { albumName: "Other" } });
+  const result = planMix(a, b, { ...STYLED, prefer: "echo" });
+  assert.equal(result.kind, "echo");
+  assertKernelTakes(result.plan, a, b);
+  const { keys, echo, bStart } = result.plan;
+  assert.equal(echo.feedback, 0.5, "each repeat half the one before, ringing on over the drop");
+  assert.ok(echo.level > 0.7 && echo.level <= 2, "louder than the kernel's own echo, to be heard over the drop");
+  assert.ok(Math.abs(echo.delay - 60 / 138) < 1e-3, "the repeats on the next song's beats");
+  const swapAt = keys.at(-1)[0] + SWAP_AHEAD_S;
+  assert.ok(barTimes(a).some((t) => Math.abs(t - swapAt) < 1e-6), `the swap on a bar of the current song (${swapAt})`);
+  assert.ok(Math.abs(echo.to - keys.at(-1)[0]) < 1e-9 && Math.abs(echo.from - (swapAt - 2 * echo.delay)) < 1e-6,
+            "its last two beats thrown into the echo");
+  const before = keys.slice(0, -1);
+  assert.ok(before.every((k) => k[2] <= 0.7), "heard before the bar, never as loud as the current song");
+  // Apple's bars are in milliseconds: a bar is the song's own to a millisecond.
+  assert.ok(Math.abs(keys[0][0] - (swapAt - 2 * BAR)) < 2e-3 && keys[0][2] === 0, "unheard two bars before...");
+  const lastBar = keys.find((k) => Math.abs(k[0] - (swapAt - BAR)) < 2e-3);
+  assert.ok(lastBar && lastBar[2] >= 0.25, "...already heard as the last bar starts...");
+  assert.ok(before.slice(1).every((k, i) => k[2] > before[i][2]), "...and rising all through it");
+  assert.ok(before.filter((k) => k[2] > 0).every((k) => k[4] === 0 && k[6] === 0 && k[8] >= 0.5),
+            "thin, not muffled, and without its bass then");
+  assert.ok(before.every((k) => k[1] === 1 && k[3] === 1 && k[5] === 0), "the current song whole, bass and all, to the bar");
+  assert.ok(before.at(-1)[7] > 0 && before.at(-1)[7] <= 0.25, "darkening a little, so that its echo is heard");
+  assert.equal(keys.at(-1)[1], 0, "gone on the bar");
+  const entry = bStart + (swapAt - keys[0][0]);
+  assert.ok(Math.abs(entry - barTimes(b)[4]) < 1e-3, `the next song in full on its drop, on the bar (${entry})`);
+  // Without the crossover's filters it creeps in muffled instead.
+  const plain = planMix(a, b, { ...STYLED, can: new Set([...STYLED.can].filter((x) => x !== "crossover")), prefer: "echo" });
+  assert.equal(plain.kind, "echo");
+  assertKernelTakes(plain.plan, a, b);
+  assert.ok(plain.plan.keys.slice(0, -1).filter((k) => k[2] > 0).every((k) => k[4] === 0 && k[6] > 0), "muffled then");
+});
+
+// Heard on 24/11 (n-2): a hit, then the next song at once, "could have had a little crossfade".
+test("with the styles, a song's natural end joins the next song in a short crossfade over its last ring", () => {
+  const a = song({ loudTo: 195 });
+  const b = song({ bpm: 138, loudFrom: 1, attributes: { albumName: "Other" } });
+  const result = planMix(a, b, STYLED);
+  assert.equal(result.kind, "natural");
+  assertKernelTakes(result.plan, a, b);
+  const { keys, bStart } = result.plan;
+  assert.equal(keys.length, 2);
+  assert.ok(keys[0][0] >= 194.7 && keys[0][0] < 195.3, `from under the hit's ring (${keys[0][0]})`);
+  assert.ok(Math.abs(keys[1][0] - keys[0][0] - 1) < 1e-9, "the next song in full a second later");
+  assert.ok(keys[0][6] > 0 && keys[1][6] === 0, "muffled at first, then open");
+  assert.ok(Math.abs(bStart - 1) < 1e-9, "from its first sound");
+});
+
+// Apple may give a value it does not know as null, and null < 0.2 is true in JavaScript: unknown is not soft.
+test("a song whose analysis has no number for its danceability and energy is not taken for a soft one", () => {
+  const a = song({ loudTo: 195 });
+  for (const name of ["danceability", "energy", "acousticness"]) a.analysis[name] = { main: null, beginning: null, ending: null };
+  const b = song({ attributes: { albumName: "Other" } });
+  const result = planMix(a, b, CAN);
+  assert.ok(!result.soft, `not left to end softly (${result.kind})`);
+});
+
+test("a crossfade after a fade already deep where it starts lands the next song's drop there, not past it", () => {
+  // Down 9 dB within two seconds, then slowly on to near silence at 195 s: deep already where a 12 s crossfade starts.
+  const level = (t) => (t < 170 ? -8 : t < 172 ? -8 - (t - 170) * 4.5 : t < 195 ? -17 - (t - 172) * 8 / 23 : -60);
+  const a = song({ level, fadeOut: { startInMilliseconds: 170000, endInMilliseconds: 195000 } });
+  const b = song({ bpm: 96, level: (t) => (t < 7 ? -25 : -8), attributes: { albumName: "Other" } });
+  const result = planMix(a, b, CAN);
+  assert.equal(result.kind, "crossfade");
+  assertKernelTakes(result.plan, a, b);
+  assert.ok(Math.abs(result.plan.bStart - 7) < 1e-6, `its drop at the crossfade's start (${result.plan.bStart})`);
+});
+
+test("songs that cannot share a tempo roll or leave on an echo, by pair", () => {
+  const a = song();
+  const b = song({ bpm: 96, attributes: { albumName: "Other" } });
+  const kinds = {};
+  for (let i = 0; i < 100; i++) {
+    const kind = planMix({ ...a, id: "a" + i }, { ...b, id: "b" + i }, STYLED).kind;
+    kinds[kind] = (kinds[kind] ?? 0) + 1;
+  }
+  assert.deepEqual(Object.keys(kinds).sort(), ["echo", "roll"]);
+  // Heard as a fade (24/11 series: 6 echoes in 12 mixes): about one pair in ten.
+  assert.ok(kinds.echo <= 15, "the echo, like a fade, now and then only: " + JSON.stringify(kinds));
 });
