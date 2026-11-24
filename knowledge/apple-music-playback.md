@@ -209,6 +209,13 @@ by recording the default output (WASAPI loopback) while a song was mixed into it
 - `AVCFPlayerSetRate` other than 1 on the second player: its sound jumps back 80 to 280 ms at each change (seen in
   the recording). AutoMix stretches the samples itself (`src/core/automix/tempo_stretch.cpp`, Signalsmith Stretch).
 - `AVCFPlayerItemSetAudioMix(item, NULL)` crashes the agent (`AVFoundationCF.dll` + 0x5ebce): set an empty mix.
+- The pitch following the speed: an audio mix whose input parameters ask for `AVCFAudioTimePitchAlgorithmVarispeed`
+  (`AVCFAudioMixInputParametersSetAudioTimePitchAlgorithm`, the only time-pitch setter AVFoundationCF exports) is
+  taken and never heard either: the same passage recorded at 1.25x with it, set while playing or before a change of
+  speed, has the pitch of 1.25x without it (0.00 semitone apart; 2026-11-24, a stereo stream). Local files do not go
+  through AVFoundationCF at all. A pitch that follows the speed would be Ampify's own work on the song's stream:
+  Apple's player at the speed, keeping the pitch, then the samples shifted up by the same ratio (Signalsmith Stretch
+  does pitch too).
 - Loudness info: Apple only sets `{"adjust to album loudness": true}` on its items.
 
 ## Apple's analysis of a song
