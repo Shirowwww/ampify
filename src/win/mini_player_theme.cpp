@@ -18,6 +18,7 @@
 #include "win_common.hpp"
 #include "xaml_backend.hpp"
 #include "xaml_chrome.hpp"
+#include "../core/mini_layout.hpp"
 #include "../core/theme/inspector.hpp"
 #include "../core/ui_watchdog.hpp"
 
@@ -136,6 +137,9 @@ void TickOn(Binding& binding, const theme::SessionRequest& request, Journal& jou
     ampify::ActivityScope activity("mini player theme tick");
     side.backend.RecheckMedia();
     std::optional<theme::Inspection> inspection = side.session.Tick(side.backend, request);
+    // Its own theme's wish for its window (--mini-window): the main window's does not tick while it hides behind it.
+    std::shared_ptr<const theme::Theme> applied = side.session.Applied();
+    PublishMiniWindowLayout(applied ? MiniWindowLayoutOf(applied->variables) : MiniWindowLayout::Apple);
     // The window's own light or dark mode follows the scheme, as the main window's does.
     side.backend.SetAppMode(request.theme ? request.theme->dark : std::nullopt);
     if (std::string note = side.backend.TakeCaptionNote(); !note.empty()) side.journal.Write(note);

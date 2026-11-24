@@ -16,6 +16,7 @@
 #include "../src/core/journal.hpp"
 #include "../src/core/json.hpp"
 #include "../src/core/manifest.hpp"
+#include "../src/core/mini_layout.hpp"
 #include "../src/core/settings.hpp"
 #include "../src/core/settings_catalog.hpp"
 #include "../src/core/theme/animation.hpp"
@@ -6823,4 +6824,36 @@ TEST_CASE(TreeBackend_DefaultsTakeNothingOffAndRefuseWhatTheyCannotShow) {
     th::Decor decor;
     decor.image = "a.png";
     CHECK(tree.SetDecor(1, th::PseudoElement::After, &decor) == th::DecorChange::Refused);
+}
+
+TEST_CASE(MiniWindowLayout_IsCompactOnlyWhenTheThemeAsks) {
+    using ampify::MiniWindowLayout;
+    CHECK(ampify::MiniWindowLayoutOf({}) == MiniWindowLayout::Apple);
+    CHECK(ampify::MiniWindowLayoutOf({{"mini-window", "compact"}}) == MiniWindowLayout::Compact);
+    CHECK(ampify::MiniWindowLayoutOf({{"mini-window", " Compact "}}) == MiniWindowLayout::Compact);
+    CHECK(ampify::MiniWindowLayoutOf({{"mini-window", "\"compact\""}}) == MiniWindowLayout::Compact);
+    CHECK(ampify::MiniWindowLayoutOf({{"mini-window", "apple"}}) == MiniWindowLayout::Apple);
+    CHECK(ampify::MiniWindowLayoutOf({{"mini-window", "compacted"}}) == MiniWindowLayout::Apple);
+    CHECK(ampify::MiniWindowLayoutOf({{"panel-radius", "compact"}}) == MiniWindowLayout::Apple);
+}
+
+// A snippet's :root variables that Ampify itself reads (--panel-radius, --artwork-veil, --mini-window) reach the
+// composed theme, a later snippet's over an earlier one's and both over the theme's.
+TEST_CASE(Snippets_PassTheirVariablesToTheComposedTheme) {
+    MemoryFiles themeFiles;
+    themeFiles.files["user.css"] = ":root { --panel-radius: 12px; --gap: 8; }\n";
+    th::Theme theme = Load(themeFiles);
+
+    MemoryFiles first;
+    first.files["user.css"] = ":root { --panel-radius: 0; --mini-window: apple; }\n";
+    MemoryFiles second;
+    second.files["user.css"] = ":root { --mini-window: compact; }\n";
+    std::vector<std::shared_ptr<const th::Theme>> snippets{Shared(LoadSnippetFrom(first, "a", &theme)),
+                                                           Shared(LoadSnippetFrom(second, "b", &theme))};
+
+    th::Theme composed = th::ComposeTheme(&theme, snippets, nullptr);
+    CHECK(composed.variables["panel-radius"] == "0");
+    CHECK(composed.variables["mini-window"] == "compact");
+    CHECK(composed.variables["gap"] == "8");
+    CHECK(ampify::MiniWindowLayoutOf(composed.variables) == ampify::MiniWindowLayout::Compact);
 }

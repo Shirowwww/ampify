@@ -2,15 +2,20 @@
    around the song, one switch per part, on top of any theme. The mini player is a window of its own: only the names
    that start with .mini- reach it (docs/themes/names.md). */
 
-/* Faded, the progress line and the buttons still take clicks: the pointer finds them where they always are, and they
-   come back as soon as it enters the window. */
+/* The window ends under the song's row: the progress line and the buttons stand over it, on a veil, and show as soon as
+   the pointer is over them. Faded, they still take clicks, so the pointer finds them where they always are. With a pane
+   or the album view open, Apple's window comes back, its controls under the pointer only. */
 @setting controls {
+    :root {
+        --mini-window: compact;
+    }
+
     .mini-controls {
         opacity: 0;
         transition: opacity 200ms;
     }
 
-    .mini-player:hover .mini-controls {
+    .mini-controls:hover {
         opacity: 1;
     }
 }

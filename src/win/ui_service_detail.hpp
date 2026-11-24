@@ -165,6 +165,19 @@ struct PlayerCopy {
     bool disabled = false;
 };
 
+// The compact mini player a theme asks for (--mini-window: compact, ui_service_mini_compact.cpp): what Ampify changed
+// while Apple shows its compact view, given back when Apple shows more (a pane, the album view) or the theme lets go.
+struct MiniCompactState {
+    bool on = false;            // the window cut under the song's row, Apple's controls raised over it
+    double band = 0;            // the caption band above the raised controls, where Ampify's buttons stand
+    int appleClientHeight = 0;  // the client height Apple last gave its compact window, in physical pixels
+    winrt::weak_ref<controls::Grid> controls;      // Apple's row of controls, the parent of Grid#TransportGrid
+    winrt::weak_ref<xaml::FrameworkElement> view;  // MiniPlayerView#miniPlayerView, kept at the window's top
+    winrt::Windows::Foundation::Numerics::float3 controlsTranslation{};  // the row's own Translation, put back
+    controls::Border veil{nullptr};  // Ampify's acrylic under the raised controls, as see-through as they are
+    std::optional<xaml::VerticalAlignment> viewAlignment;  // the view's own alignment, put back
+};
+
 // One XAML window of Apple Music (the main window or the mini player).
 struct AudioBadgeState;  // ui_service_badge.cpp
 
@@ -342,6 +355,7 @@ struct WindowContext : std::enable_shared_from_this<WindowContext> {
     std::optional<bool> miniStarShown;
     std::chrono::steady_clock::time_point miniStarHeld{};
     dispatching::DispatcherQueueTimer miniStarCheck{nullptr};
+    MiniCompactState miniCompact;  // the compact mini player a theme asks for (ui_service_mini_compact.cpp)
 };
 
 // One element's settings card, held strongly: a weak reference to an element Ampify made never resolves. Its controls
@@ -585,6 +599,9 @@ inline constexpr double kMiniButtonWidth = 36;  // two fit in the 76 px right of
 std::size_t MiniButtonRoom(const WindowContext& context);
 void ReleaseMiniPlayer(WindowContext& context) noexcept;
 void RunPendingMiniAction(UiService::Shared& shared);
+// ui_service_mini_compact.cpp: the compact mini player, at each refresh of the mini player's window (its thread).
+void FollowMiniCompact(UiService::Shared& shared, WindowContext& context, const xaml::UIElement& content);
+void ReleaseMiniCompact(WindowContext& context) noexcept;
 
 }  // namespace ui_service_detail
 

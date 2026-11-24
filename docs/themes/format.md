@@ -587,6 +587,7 @@ after the theme.
 | `--panel-radius` | The layouts' panels, and the panels of extensions (`Ampify.ui.panel`), which take no larger radius inside. Corners sets it to `0` for square corners |
 | `--bar-radius`, `--lcd-radius` | Snippets that draw over the playback bar or the song's display, such as the glow of Artwork colours |
 | `--artwork-size` | Spinning artwork, which turns a record of that size. Set it only while the theme resizes the bar's artwork |
+| `--mini-window: compact` | Apple's mini player, while its lyrics and Up Next panes and its album view are closed: the window ends under the song's row, and `.mini-controls` stand over that row on Apple's in-app acrylic, which is as see-through as they are (a theme that fades them out, as Minimal mini player does, gets the song back). Ampify's buttons of the mini player go into the band above them. Apple's window comes back with a pane or the album view |
 | A right margin on `.content` | The panels of extensions, docked in that room ([A column for the panels](#a-column-for-the-panels)) |
 | The accent (`AccentFillColorDefaultBrush`, or `theme.accent`) | Apple's controls, the progress line, the marks of `Ampify.ui.playbar.mark`, and `$AccentFillColorDefaultBrush` in any rule ([Chosen accent](#chosen-accent)) |
 | The cover playing (nothing to set) | `--art-1` and the other artwork variables, in themes and snippets ([The artwork of the playing song](#the-artwork-of-the-playing-song)), and `Ampify.color.playing()` in extensions |

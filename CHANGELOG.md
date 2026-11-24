@@ -12,8 +12,11 @@ in it.
   window can be see-through (down to 50 %), a star beside the song makes it a favourite, and the album's animated
   cover, which Apple only shows on album pages, plays over its artwork (#12). Off by default: turn it on in the
   Marketplace.
-- New snippet: Minimal mini player. The progress line and buttons only under the pointer, and the title, times,
-  volume, lyrics and Up Next buttons or Apple's moving background hidden, one switch each.
+- New snippet: Minimal mini player. A compact window, down to the song, whose progress line and buttons show over it
+  under the pointer; and the title, times, volume, lyrics and Up Next buttons or Apple's moving background hidden,
+  one switch each. Themes get the same window with `--mini-window: compact`.
+- A snippet's `:root` variables that Ampify reads (`--panel-radius`, `--artwork-veil`) now reach it: Corners' square
+  corners reach the panels of extensions.
 - The Hi-Res Lossless badge shows in the mini player too (#12), and a play bar button an extension shows in Apple's
   full-screen player (`player: true`, as Sing does) shows in the mini player as well, right of the song.
 - `Ampify.ui.miniPlayer` opens, closes or toggles Apple's mini player and asks things of its window (see the extension

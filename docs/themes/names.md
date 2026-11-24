@@ -225,6 +225,8 @@ The players' windows only take the rules that name them: `.playbar` or a bare `T
 `.mini-lcd` or `MiniPlayerPage TextBlock` do. The mini player runs on an interface thread of its own, where Ampify
 applies the same theme and snippets with a second copy of its engine: the theme's colours and scheme reach it, and
 `ampify devtools` writes its tree to `logs\inspector-mini.txt` and `inspector-mini.json` while it is open.
+`--mini-window: compact` in `:root` cuts its window to the song's row ([format](format.md#what-a-theme-tells-snippets-and-extensions)).
+A `:hover` on `.mini-player` itself never comes on yet: put it on the part under the pointer (`.mini-controls:hover`).
 
 ## Playback bar
 

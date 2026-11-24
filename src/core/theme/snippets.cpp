@@ -74,6 +74,13 @@ Theme ComposeTheme(const Theme* theme, const std::vector<std::shared_ptr<const T
         names.push_back(snippet->id);
         dictionaries.push_back(snippet->resourceDictionary);
         AddLayer(*snippet, layer++, composed);
+        // Its :root variables too, for what Ampify reads of them (--panel-radius, --artwork-veil, --mini-window). A
+        // snippet starts from the theme's: only what it changed is taken, so a later one keeps an earlier one's.
+        for (const auto& [name, value] : snippet->variables) {
+            auto own = hasTheme ? theme->variables.find(name) : composed.variables.end();
+            if (hasTheme && own != theme->variables.end() && own->second == value) continue;
+            composed.variables[name] = value;
+        }
         for (const auto& [role, value] : snippet->fonts) {
             FontRole& merged = composed.fonts[role];
             if (!value.family.empty()) merged.family = value.family;

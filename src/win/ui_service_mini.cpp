@@ -140,16 +140,12 @@ void FollowMiniStar(UiService::Shared& shared, const std::shared_ptr<WindowConte
 
 }  // namespace
 
-controls::StackPanel MiniButtonHost(WindowContext& context, const xaml::UIElement& content) {
-    controls::Grid display = content ? FindDisplay(content) : nullptr;
-    if (!display) return nullptr;
-    if (context.miniHost && context.miniHost.Parent() == display) return context.miniHost;
-    RemoveFromParent(context.miniHost);
-    controls::StackPanel host;
-    host.Name(kHostName);
-    host.Orientation(controls::Orientation::Horizontal);
+namespace {
+
+// Right of the song, in the display's last column, under the caption buttons (which show under the pointer).
+void PlaceInDisplay(const controls::StackPanel& host, const controls::Grid& display) {
     host.VerticalAlignment(xaml::VerticalAlignment::Bottom);
-    host.Margin(xaml::Thickness{0, 0, 0, kHostMargin});  // under the caption buttons, which show under the pointer
+    host.Margin(xaml::Thickness{0, 0, 0, kHostMargin});
     std::int32_t columns = static_cast<std::int32_t>(display.ColumnDefinitions().Size());
     if (columns >= 3) {
         controls::Grid::SetColumn(host, columns - 1);
@@ -161,8 +157,45 @@ controls::StackPanel MiniButtonHost(WindowContext& context, const xaml::UIElemen
     }
     std::int32_t rows = static_cast<std::int32_t>(display.RowDefinitions().Size());
     if (rows > 1) controls::Grid::SetRowSpan(host, rows);
-    display.Children().Append(host);
-    context.miniHost = host;
+}
+
+// The compact mini player: at the left of the band above Apple's raised row of controls, inside that row, so the
+// buttons show and hide with it (the Minimal mini player snippet fades it out of the pointer).
+void PlaceOverControls(const controls::StackPanel& host, const controls::Grid& row, double band) {
+    host.VerticalAlignment(xaml::VerticalAlignment::Top);
+    host.HorizontalAlignment(xaml::HorizontalAlignment::Left);
+    host.Margin(xaml::Thickness{0, -band, 0, 0});
+    controls::Grid::SetColumnSpan(host, std::max(static_cast<std::int32_t>(row.ColumnDefinitions().Size()), 1));
+}
+
+}  // namespace
+
+controls::StackPanel MiniButtonHost(WindowContext& context, const xaml::UIElement& content) {
+    controls::Grid overControls = context.miniCompact.on ? context.miniCompact.controls.get() : nullptr;
+    controls::Grid parent = overControls ? overControls : (content ? FindDisplay(content) : nullptr);
+    if (!parent) return nullptr;
+    if (context.miniHost && context.miniHost.Parent() == parent) {
+        // The band is known once Apple laid the window out, maybe after the buttons moved over the controls.
+        if (overControls) context.miniHost.Margin(xaml::Thickness{0, -context.miniCompact.band, 0, 0});
+        return context.miniHost;
+    }
+    if (!context.miniHost) {
+        context.miniHost = controls::StackPanel();
+        context.miniHost.Name(kHostName);
+        context.miniHost.Orientation(controls::Orientation::Horizontal);
+    }
+    controls::StackPanel host = context.miniHost;  // moved whole: the star and the buttons in it stay
+    RemoveFromParent(host);
+    for (const auto& property : {controls::Grid::RowProperty(), controls::Grid::ColumnProperty(),
+                                 controls::Grid::RowSpanProperty(), controls::Grid::ColumnSpanProperty()}) {
+        host.ClearValue(property);
+    }
+    if (overControls) {
+        PlaceOverControls(host, overControls, context.miniCompact.band);
+    } else {
+        PlaceInDisplay(host, parent);
+    }
+    parent.Children().Append(host);
     return host;
 }
 
@@ -180,6 +213,7 @@ void FollowMiniPlayer(UiService::Shared& shared, const std::shared_ptr<WindowCon
         wish = shared.miniPlayer;
     }
     auto content = context->root.get().try_as<xaml::UIElement>();
+    FollowMiniCompact(shared, *context, content);  // first: it decides where Ampify's buttons stand
     FollowAudioBadge(shared, context);
     FollowMiniStar(shared, context, content, wish.favorite);
     FollowPlayerRow(shared, context, surfaces);
@@ -191,6 +225,7 @@ void FollowMiniPlayer(UiService::Shared& shared, const std::shared_ptr<WindowCon
 void ReleaseMiniPlayer(WindowContext& context) noexcept {
     if (context.role != WindowRole::Mini) return;
     ReleaseMiniMotion(context.miniMotion);
+    ReleaseMiniCompact(context);
     try {
         ReleaseStar(context);
         RemoveFromParent(context.miniHost);
