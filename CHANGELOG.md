@@ -1,13 +1,22 @@
 # Changelog
 
-## Unreleased
+## 1.6.0 (2026-11-24)
 
-Apple's mini player gets Ampify too: the Hi-Res badge and the players' buttons show in it, a shortcut and the tray
-icon open it from anywhere, and new elements let you trim it, make it see-through and play the album's animated cover
-in it.
+AutoMix (beta) mixes like a DJ, songs play faster or slower, Queue flow orders what comes next so each song leads into
+the next, the song panel tells the tempo, key and mood of the song playing, and Apple's mini player gets Ampify too.
 
 ### Extensions
 
+- New: Playback speed. A play bar button sets Apple's player from half to double speed, with a slider and presets,
+  keeping the pitch. The speed holds across pauses and songs until it is set back to normal.
+- New: Queue flow. A play bar button sorts the songs to come so that each one leads into the next, from Apple's own
+  analysis of every song: close tempos, keys that sit together, no jump in energy or loudness. A second click puts the
+  queue back as it was.
+- New: Explicit or clean. Plays one version of the songs Apple has in both, explicit or clean, and skips the other one
+  when it comes up. Songs Apple marks neither way always play.
+- Song panel: a "The sound" card gives the tempo, key and mood of the song playing, from Apple's own analysis.
+- New in the Marketplace: Play history, every song played on this PC, stations such as Discovery included, which Apple
+  Music keeps no history of.
 - New: Mini player. A shortcut (Ctrl+Shift+Alt+M by default) opens and closes Apple's mini player from any program, its
   window can be see-through (down to 50 %), a star beside the song makes it a favourite, and the album's animated
   cover, which Apple only shows on album pages, plays over its artwork (#12). Off by default: turn it on in the
@@ -22,6 +31,39 @@ in it.
 - `Ampify.ui.miniPlayer` opens, closes or toggles Apple's mini player and asks things of its window (see the extension
   API), and themes reach its parts by name (`.mini-artwork`, `.mini-title`, `.mini-controls`... in the theme names).
 - Ampify's tray icon has a "Mini player" entry.
+- AutoMix mixes more like a DJ, with fewer fades. Each pair of songs draws its own way from one to the next, the same
+  every time that pair plays: the next song in stabs on its beats until it drops, a drop under a bridge without bass,
+  the crossover (the next song rising to full over two beats), or the current song's last bar rolled faster and faster
+  into the next song's drop, darkening and ringing on as an echo over it while the next song creeps in, thin, under
+  its half beats (half a bar, on half beats, for a slow song). When that last bar is sung or already fading out, the
+  roll takes one up to eight bars earlier, even before a song's own fade-out if it cuts no singing. Songs whose keys
+  clash are never heard both in full.
+- An echo out goes as a roll does: the next song creeps in, thin, over the current song's last two bars (the last one
+  for a slow song) while the current one darkens, bass and all; on the bar the current song stops into an echo heard
+  over the next song's drop, its repeats on that song's beats. A song that ends on a hit goes into the next one with
+  a one-second crossfade under its last ring instead of a cut. A crossfade into a quiet intro lands the next song's
+  drop where the current song has faded out, instead of leaving seconds of near silence, and a next song much louder
+  than the soft end it follows comes in muffled and rises over a second and a half.
+- While AutoMix mixes, the part played of the progress line glows and "Mixing" shows under it, a light passing over
+  the word, as Apple Music does on the iPhone. It comes a few seconds before the song changes, so the old song's line
+  shows it as the new one's does. It shows in every play bar layout and in the full-screen player; where the bar
+  holds the song's display, or has no room under its line, the word takes the artist line's place.
+- AutoMix stays out while Apple's player plays faster or slower than normal.
+- AutoMix is marked as a beta in the Marketplace: it mixes most pairs of songs well and is still getting better.
+- `Ampify.player.setRate(rate)` and `rate()` set and read Apple's player speed, `Ampify.music.analysis(ids)` gives
+  Apple's audio analysis of catalog songs (tempo, key, loudness, energy, mood), `queue.move(id, beforeId)` moves an
+  entry still to come, and `state().track` gives `catalogId` and `contentRating` (see the extension API).
+- A slider writes its value with the decimal comma of the language (1,25 in French).
+- The Marketplace fits its cards in French: Details is an icon beside the settings one, and the state an element's
+  button already says (on, off) is no longer written beside it.
+
+### Other
+
+- Word-by-word lyrics can light up with a soft edge, as the iPhone app draws them (#5): in Ampify's settings, set
+  "Word-by-word lyrics" to "Smooth, soft edge". The crisp edge stays the default. A paused line now keeps the edge
+  it had instead of going back to Apple's steps until the next line.
+- At another speed, Ampify's clock of the song follows the player: the lyrics it fills and the position extensions
+  read no longer fall behind and jump each second.
 
 ## 1.5.9 (2026-11-24)
 
