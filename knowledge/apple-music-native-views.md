@@ -88,4 +88,30 @@ each view defines them for itself. A theme cannot reach them with `colors.ini` t
   window's") only element rules apply there.
 - `Ampify.ui.applePlayer.open()` (`src/win/apple_player.cpp`) opens Apple's full-screen player as a window over the
   main one; Now Playing uses it.
+- `Ampify.ui.miniPlayer` (`src/win/mini_player_window.cpp`) opens the mini player with `AMP.UI.Views.MiniPlayer`
+  (`IMiniPlayerStatics` 73725FCF-EAB9-5408-9E38-8D694C96CFB3, `Instance` at slot 6; `IMiniPlayer`
+  5BCBEBFA-C49D-5FB2-BBC4-4BFE6F2247BB, `get_ViewModel` 6, `Show` 8) and closes it with `WM_CLOSE`, as Alt+F4 does (invoking its
+  `CloseButton` through an automation peer, or by UI Automation, at times did nothing: 24/11/2026). Apple's
+  own setting "Keep MiniPlayer on top of all other windows" (Settings > Advanced, `KeepMiniplayerOnTop` of
+  `IGeneralSettings`) already keeps it in front. `IMiniPlayerView` also has `ExpandAlbumView`, `ShrinkAlbumView` and
+  `ShowFullScreenPlayer`; its view model (`IMiniPlayerViewModel`) `IsLyricsOpen`, `IsPlayQueueOpen`, `IsInAlbumView`.
+- The mini player's tree (1.1792, 350 px wide): `MiniPlayerPage > Grid > ImmersionLockup, BlurControl,
+  MiniPlayerView`; in the view, `Grid#MainContent` holds `MiniNowPlayingControl#LCD` (80 px: `ArtworkImage#ActualArtwork`
+  60 px at 16,16 with an `AspectRatioGrid` frame, `TrackTitleAndArtist` with the two ticker tapes and the
+  `AudioBadgeControl`) and `Grid#BottomContent` (the lyrics and Up Next panes, then a `Grid` of the scrubber with
+  `CurrentTime` and `Duration` and `Grid#TransportGrid`: a `StackPanel` with `VolumeControl` and `Button#ActionButton`,
+  the `TransportControl`, and a `StackPanel` with the lyrics and Up Next toggles). `CustomCaptionButtons#CaptionButtons`
+  stands at the top right, faded until the pointer comes.
+- Apple's album pages play motion artwork in a `MediaPlayerElement#MotionArtworkPlayer`; the catalog gives it as
+  `editorialVideo` of an album (`motionDetailSquare.video`, an HLS master of fragmented MP4 files, H.264 and HEVC,
+  no sound), only with `extend=editorialVideo`. Ampify's mini player cover plays the H.264 file of one variant
+  (`src/win/mini_motion.cpp`).
+- The favourite of the song playing (the mini player's star, `src/win/player_controls.cpp`): `IItemStatusProvider`
+  (5E8D6C28-32B3-525B-8C3D-D4C4BC65BB5E, `CanFavorite` slot 24, `IsFavorited` 22) on the now playing item reads it;
+  `ActionHelper.CreateFavoriteOrSuggestLessAction` (statics 69765FDD-B278-535B-81F6-DF696B0BF3D3, slot 16) builds
+  the action of Apple's "Favorite" menu entry, dispatched by `UIBroker.GlobalDispatchActionAsync`. Its `isFavorited`
+  is the state the song has now, not the one wanted: told `true` for a song that was no favourite, it did nothing
+  (seen 24/11/2026); told the state it has, `IsFavorited` reads the other one a moment later, both ways.
+- WinUI's `ToggleButton` raises no `Click` when a screen reader toggles it (UI Automation `Toggle`): Ampify's toggles
+  answer `Checked` and `Unchecked` instead (`OnPersonToggle` in `src/win/ui_service_player.cpp`).
 - The class names themes use for these views are in [names.md](../docs/themes/names.md).

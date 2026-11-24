@@ -258,6 +258,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
         ReleasePlaybarHover(context);
         ReleaseAudioBadge(context);
         ReleasePlayerRow(context);
+        ReleaseMiniPlayer(context);
         context.probe.clear();
         context.probeObjects.clear();
         context.dialogOpen = false;
@@ -495,6 +496,9 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         FollowFoldedLogo(shared, context);
         FollowSongRoom(shared, context);
         ApplySurfaces(shared, context, content);
+        RunPendingMiniAction(shared);
+    } else if (context->role == WindowRole::Mini) {
+        FollowMiniPlayer(shared, context);
     }
 }
 
@@ -719,11 +723,12 @@ void UiService::Run() {
                     if (changes.applePlayer) m_shared->applePlayerPending = true;
                     if (changes.hover) m_shared->playbarHover = *changes.hover;
                     if (changes.audioBadge) m_shared->audioBadge = *changes.audioBadge;
+                    if (changes.miniPlayerAction) m_shared->miniPlayerPending = changes.miniPlayerAction;
+                    if (changes.miniPlayer) m_shared->miniPlayer = *changes.miniPlayer;
                     windows = m_shared->windows;
                 }
-                for (const auto& context : windows) {
-                    if (context->role == WindowRole::Main) QueueRefresh(m_shared, context);
-                }
+                // The mini player shows the badge, the players' buttons and its window's wishes too.
+                for (const auto& context : windows) QueueRefresh(m_shared, context);
             }
         } catch (const winrt::hresult_error& error) {
             m_shared->Once("worker-error", "Interface: error on the watching thread (" + HresultText(error.code().value) + ")");

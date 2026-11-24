@@ -69,6 +69,8 @@
 #include "apple_player.hpp"
 #include "close_to_tray.hpp"
 #include "kit_command.hpp"
+#include "mini_motion.hpp"
+#include "mini_player_window.hpp"
 #include "xaml_host.hpp"
 
 namespace ampify::win {
@@ -327,6 +329,19 @@ struct WindowContext : std::enable_shared_from_this<WindowContext> {
     winrt::weak_ref<controls::StackPanel> playerRow;
     dispatching::DispatcherQueueTimer playerRetry{nullptr};
     int playerTries = 0;
+
+    // Mini player only: what Ampify changed in its window, and the animated cover over its artwork
+    // (Ampify.ui.miniPlayer.set, FollowMiniPlayer).
+    MiniWindowState miniWindow;
+    std::shared_ptr<MiniMotionState> miniMotion;
+    // Ampify's buttons in the mini player's display, right of the song: the favourite star, then the players' buttons
+    // of the extensions (the transport row has no room). Strong, like the other buttons; the state the star shows, and
+    // until when a click's state stands while Apple applies it.
+    controls::StackPanel miniHost{nullptr};
+    primitives::ToggleButton miniStar{nullptr};
+    std::optional<bool> miniStarShown;
+    std::chrono::steady_clock::time_point miniStarHeld{};
+    dispatching::DispatcherQueueTimer miniStarCheck{nullptr};
 };
 
 // One element's settings card, held strongly: a weak reference to an element Ampify made never resolves. Its controls
@@ -417,6 +432,8 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     bool closeToTray = false;  // apple.close, read by the worker
     UiPlaybarHover playbarHover;  // the progress line's readout and listeners, read by the worker
     UiAudioBadge audioBadge;      // what Apple's audio badge says, read by the worker
+    std::optional<MiniPlayerAction> miniPlayerPending;  // Ampify.ui.miniPlayer.open/close/toggle, run by the main window
+    UiMiniPlayer miniPlayer;  // what the elements ask of the mini player's window, read by the worker
     std::atomic<bool> entryInHeader{false};  // ampify.entry, read on the interface thread (PlaceSidebarItem)
     std::string cardTheme;   // the theme the Ampify page shows
     bool cardStale = false;  // the theme changed elsewhere (Marketplace, ampify theme set): the card is built again
@@ -549,6 +566,25 @@ void ReleasePlayerRow(WindowContext& context) noexcept;
 // The content of Apple's full-screen player while it is on screen and run by this thread, else null: a popup opened
 // meanwhile shows over it, not behind it in the main window.
 xaml::UIElement ShownPlayerContent() noexcept;
+// The lyrics button of a player's transport row, whose style Ampify's buttons there take; null before it is laid out.
+primitives::ToggleButton PlayerLyricsButton(const xaml::UIElement& content);
+// A toggle whose state belongs to its owner: a click, a key or a screen reader's Toggle (which raises no Click) calls
+// `changed` with the state asked for, and the toggle stays as the owner last showed it (ShowToggleState) until the
+// owner shows the new one. Interface thread.
+void OnPersonToggle(const primitives::ToggleButton& button, std::function<void(bool)> changed);
+void ShowToggleState(const primitives::ToggleButton& button, bool on);
+
+// ui_service_mini.cpp: Apple's mini player, on its own thread (its badge, the players' buttons, its window), and the
+// open, close and toggle the elements asked for, run by the main window's refresh.
+void FollowMiniPlayer(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context);
+// Ampify's row of buttons in the mini player's display (made once, at the right of the song), or null while the
+// display is not laid out. Mini player thread.
+controls::StackPanel MiniButtonHost(WindowContext& context, const xaml::UIElement& content);
+inline constexpr double kMiniButtonWidth = 36;  // two fit in the 76 px right of the song, at Apple's width
+// How many of the players' buttons the mini player's display has room for, beside the star.
+std::size_t MiniButtonRoom(const WindowContext& context);
+void ReleaseMiniPlayer(WindowContext& context) noexcept;
+void RunPendingMiniAction(UiService::Shared& shared);
 
 }  // namespace ui_service_detail
 

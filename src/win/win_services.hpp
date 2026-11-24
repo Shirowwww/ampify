@@ -95,6 +95,7 @@ public:
     static constexpr unsigned kTrayPrevious = 1;
     static constexpr unsigned kTrayNext = 2;
     static constexpr unsigned kTrayOpenKit = 3;
+    static constexpr unsigned kTrayMiniPlayer = 4;  // opens Apple's mini player, or closes it when it is on screen
     static constexpr unsigned kTrayFirstElementItem = 100;
 
 private:

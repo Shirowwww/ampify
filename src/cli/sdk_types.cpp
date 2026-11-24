@@ -346,6 +346,12 @@ declare const Ampify: {
     fullscreen: { open(view: UiNode): void; close(): void; onClose(fn: () => void): () => void };
     // permission ui.fullscreen; Apple Music's own full-screen player, laid over the window
     applePlayer: { open(): void };
+    // permission ui.fullscreen; Apple Music's own mini player, and what the element asks of its window (null: nothing);
+    // motion: the address of an animated cover's MP4 file on https://mvod.itunes.apple.com/
+    miniPlayer: {
+      open(): void; close(): void; toggle(): void;
+      set(options: { opacity?: number; favorite?: boolean; motion?: string | null } | null): void;
+    };
     panel: { register(id: string, view: UiNode): void; remove(id: string): boolean; onClose(id: string, fn: () => void): () => void };
     title: { set(text: string): void; get(): string; reset(): void };
     /** A new label for a top bar or play bar button this element added: its text without an icon, its tooltip with one. */

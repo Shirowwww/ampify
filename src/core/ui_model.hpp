@@ -7,6 +7,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "json.hpp"
@@ -60,6 +61,27 @@ struct UiAudioBadge {
     std::string icon;
     std::uint64_t serial = 0;
 };
+
+// Apple's mini player (Ampify.ui.miniPlayer): what an element asks of its window. `opacity` is the window's, from
+// kMiniOpacityMin to 1; `favorite` adds a star that marks the song playing as a favourite; `motion` is the address of
+// the album's animated cover (a video file of Apple's, IsMotionArtworkAddress), played over the artwork, empty for
+// none. Set by the last element that asked; `elementId` empty when none does and Apple's own window shows. `serial`
+// changes each time it changes.
+struct UiMiniPlayer {
+    std::string elementId;
+    double opacity = 1.0;
+    bool favorite = false;
+    std::string motion;
+    std::uint64_t serial = 0;
+};
+inline constexpr double kMiniOpacityMin = 0.4;  // lower, the window is hard to find again on a busy desktop
+
+// An animated cover Ampify plays: an MP4 file on Apple's motion artwork host, over https, of a reasonable length. Any
+// other address is refused, so an element cannot have the kernel fetch what its own network permissions do not reach.
+bool IsMotionArtworkAddress(std::string_view address);
+
+// What an element asks Apple's mini player to do (Ampify.ui.miniPlayer.open, close, toggle).
+enum class MiniPlayerAction { Open, Close, Toggle };
 
 struct UiSlot {
     std::string elementId;
@@ -159,6 +181,17 @@ public:
     void RequestApplePlayer();
     std::uint64_t ApplePlayerRequests() const;
 
+    // Ampify.ui.miniPlayer.open, close and toggle: one more request each time, and the last action asked.
+    void RequestMiniPlayer(MiniPlayerAction action);
+    std::pair<std::uint64_t, MiniPlayerAction> MiniPlayerRequest() const;
+
+    // What the element asks of the mini player's window (Ampify.ui.miniPlayer.set): the opacity is brought within
+    // [kMiniOpacityMin, 1] (NaN gives 1), and an animated cover that IsMotionArtworkAddress refuses is dropped. Asking
+    // nothing (opacity 1, no star, no animated cover) takes the element's request away. The last element to ask is
+    // the one shown.
+    void SetMiniPlayer(const std::string& elementId, double opacity, bool favorite, const std::string& motion);
+    UiMiniPlayer MiniPlayer() const;
+
     void RemoveElement(const std::string& elementId);
 
     std::optional<UiControl> Find(int controlId) const;
@@ -212,6 +245,10 @@ private:
     std::uint64_t m_hoverSerial = 0;
     std::vector<UiAudioBadge> m_audioBadges;  // one per element, the last asked at the end
     std::uint64_t m_audioBadgeSerial = 0;
+    std::uint64_t m_miniRequests = 0;
+    MiniPlayerAction m_miniAction = MiniPlayerAction::Toggle;
+    std::vector<UiMiniPlayer> m_miniPlayers;  // one per element, the last asked at the end
+    std::uint64_t m_miniPlayerSerial = 0;
 };
 
 // Checks a tree sent by an element: only the primitives of ui_vocab.cpp, with the depth, size and text limits of

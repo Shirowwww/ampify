@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+Apple's mini player gets Ampify too: the Hi-Res badge and the players' buttons show in it, a shortcut and the tray
+icon open it from anywhere, and new elements let you trim it, make it see-through and play the album's animated cover
+in it.
+
+### Extensions
+
+- New: Mini player. A shortcut (Ctrl+Shift+Alt+M by default) opens and closes Apple's mini player from any program, its
+  window can be see-through (down to 50 %), a star beside the song makes it a favourite, and the album's animated
+  cover, which Apple only shows on album pages, plays over its artwork (#12). Off by default: turn it on in the
+  Marketplace.
+- New snippet: Minimal mini player. The progress line and buttons only under the pointer, and the title, times,
+  volume, lyrics and Up Next buttons or Apple's moving background hidden, one switch each.
+- The Hi-Res Lossless badge shows in the mini player too (#12), and a play bar button an extension shows in Apple's
+  full-screen player (`player: true`, as Sing does) shows in the mini player as well, right of the song.
+- `Ampify.ui.miniPlayer` opens, closes or toggles Apple's mini player and asks things of its window (see the extension
+  API), and themes reach its parts by name (`.mini-artwork`, `.mini-title`, `.mini-controls`... in the theme names).
+- Ampify's tray icon has a "Mini player" entry.
+
 ## 1.5.9 (2026-11-24)
 
 Hi-Res Lossless songs say so again, the romaji of Korean and Japanese lyrics fill smoothly in a narrow window too, the

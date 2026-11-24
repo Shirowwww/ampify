@@ -165,11 +165,33 @@ inline constexpr char kFullScreenPlayerClass[] = "AMP.UI.Views.FullScreenPlayer"
 inline constexpr char kIidFullScreenPlayerStatics[] = "4D31E252-6ACE-5007-9125-9AD55E79E5E6";
 inline constexpr char kIidFullScreenPlayer[] = "98034843-19EB-5B19-8A3F-A1AEDEDD9727";
 
+// Apple's mini player, in AMP.UI.Views.winmd 1.1792 (GuidAttribute values of IMiniPlayerStatics and IMiniPlayer): the
+// object the artwork of the playback bar opens. Opened by Ampify.ui.miniPlayer (src/win/mini_player_window.cpp).
+inline constexpr char kMiniPlayerClass[] = "AMP.UI.Views.MiniPlayer";
+inline constexpr char kIidMiniPlayerStatics[] = "73725FCF-EAB9-5408-9E38-8D694C96CFB3";
+inline constexpr char kIidMiniPlayer[] = "5BCBEBFA-C49D-5FB2-BBC4-4BFE6F2247BB";
+
+// The favourite state of the song playing and Apple's way to change it, in AMP.Services.winmd 1.1792 (read with
+// winmdidl). The NowPlayingItem implements IItemStatusProvider; ActionHelper.CreateFavoriteOrSuggestLessAction(
+// ContentDescriptor, Boolean isFavorited, Boolean isSuggestLess, Boolean ignoreSuggestLess, Boolean reportClickMetrics)
+// gives one of Apple's actions, which UIBroker.GlobalDispatchActionAsync runs, as the "Favorite" entry of its menus does.
+inline constexpr char kIidItemStatusProvider[] = "5E8D6C28-32B3-525B-8C3D-D4C4BC65BB5E";
+inline constexpr char kClassActionHelper[] = "AMP.Services.CommonModels.ActionHelper";
+inline constexpr char kIidActionHelperStatics[] = "69765FDD-B278-535B-81F6-DF696B0BF3D3";
+
 namespace slot {
+// AMP.Services.CommonModels.IItemStatusProvider and IActionHelperStatics.
+inline constexpr int kStatusIsFavorited = 22;
+inline constexpr int kStatusCanFavorite = 24;
+inline constexpr int kActionHelperCreateFavorite = 16;
 // AMP.UI.Views.IFullScreenPlayerStatics and IFullScreenPlayer. Show takes no argument.
 inline constexpr int kFullScreenPlayerStaticsInstance = 6;
 inline constexpr int kFullScreenPlayerViewModel = 6;
 inline constexpr int kFullScreenPlayerShow = 8;
+// AMP.UI.Views.IMiniPlayerStatics and IMiniPlayer, the same shape. Show takes no argument.
+inline constexpr int kMiniPlayerStaticsInstance = 6;
+inline constexpr int kMiniPlayerViewModel = 6;
+inline constexpr int kMiniPlayerShow = 8;
 
 inline constexpr int kPlayerStaticsCurrent = 6;
 
@@ -354,6 +376,12 @@ inline constexpr SlotEvidence kSlotEvidence[] = {
     {"AMP.UI.Views.IFullScreenPlayerStatics", "Instance", slot::kFullScreenPlayerStaticsInstance},
     {"AMP.UI.Views.IFullScreenPlayer", "get_ViewModel", slot::kFullScreenPlayerViewModel},
     {"AMP.UI.Views.IFullScreenPlayer", "Show", slot::kFullScreenPlayerShow},
+    {"AMP.Services.CommonModels.IItemStatusProvider", "get_IsFavorited", slot::kStatusIsFavorited},
+    {"AMP.Services.CommonModels.IItemStatusProvider", "get_CanFavorite", slot::kStatusCanFavorite},
+    {"AMP.Services.CommonModels.IActionHelperStatics", "CreateFavoriteOrSuggestLessAction", slot::kActionHelperCreateFavorite},
+    {"AMP.UI.Views.IMiniPlayerStatics", "Instance", slot::kMiniPlayerStaticsInstance},
+    {"AMP.UI.Views.IMiniPlayer", "get_ViewModel", slot::kMiniPlayerViewModel},
+    {"AMP.UI.Views.IMiniPlayer", "Show", slot::kMiniPlayerShow},
     {"AMP.UI.Views.INowPlayingControl", "get_ViewModel", kNowPlayingControlViewModel},
     {"AMP.Services.CommonModels.INowPlayingViewModel", "get_GoToNowPlayingItemAction", kNowPlayingViewModelGoToItemAction},
     {"AMP.UI.Views.IUIBrokerStatics", "GlobalDispatchActionAsync", kUiBrokerGlobalDispatchAction},

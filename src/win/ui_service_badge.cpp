@@ -1,4 +1,5 @@
-// Apple's audio badge (the Lossless mark under the song in the play bar, and the flyout it opens) saying what an
+// Apple's audio badge (the Lossless mark under the song in the play bar and in the mini player, and the flyout it
+// opens) saying what an
 // element asks (Ampify.ui.playbar.audioBadge): its words, its screen reader name and, after Apple's own Lossless mark,
 // the element's icon. Apple's objects are changed in place and given back as they were: the words, the name, and the
 // width of the mark's canvas, from which Ampify's icon is taken out again. Only while Apple shows its Lossless mark: a
@@ -23,7 +24,7 @@ constexpr wchar_t kBadgeName[] = L"AudioBadgeControl";
 constexpr wchar_t kButtonName[] = L"AudioBadgeButton";
 constexpr wchar_t kLabelName[] = L"AudioBadgeLabel";
 constexpr wchar_t kIconName[] = L"AMPIFY_AudioBadgeIcon";  // Ampify's path, beside Apple's in the mark's canvas
-constexpr int kSearchLimit = 6000;  // elements walked in the main window to find the badge
+constexpr int kSearchLimit = 6000;  // elements walked in a window to find the badge
 constexpr int kBadgeLimit = 200;    // the badge and its flyout hold a few dozen
 // The element's paths, checked by ParseSvgIcon (path commands and numbers only), go in Data after "F1 ", the path
 // language's nonzero fill, the one SVG uses.
@@ -385,7 +386,9 @@ bool Attach(const std::shared_ptr<AudioBadgeState>& state, const xaml::Dependenc
 }  // namespace
 
 void FollowAudioBadge(Shared& shared, const std::shared_ptr<WindowContext>& context) {
-    if (context->role != WindowRole::Main) return;
+    // The play bar's badge, and the one under the song in the mini player, on that window's own thread.
+    if (context->role != WindowRole::Main && context->role != WindowRole::Mini) return;
+    const std::string where = context->role == WindowRole::Mini ? "the mini player's" : "the play bar's";
     UiAudioBadge wanted;
     {
         std::lock_guard<std::mutex> lock(shared.mutex);
@@ -405,17 +408,18 @@ void FollowAudioBadge(Shared& shared, const std::shared_ptr<WindowContext>& cont
         state->control = nullptr;
         state->button = nullptr;
         if (!Attach(state, context->root.get())) {
-            if (!wanted.elementId.empty()) shared.Once("badge-missing", "Interface: Apple's audio badge was not found");
+            if (!wanted.elementId.empty()) shared.Once("badge-missing|" + where, "Interface: " + where + " audio badge was not found");
             return;
         }
     }
     Apply(state);
     if (state->refused) {
-        shared.Once("badge-icon", std::string("Interface: the audio badge's icon was not drawn: ") + state->refused);
+        shared.Once("badge-icon|" + where,
+                    "Interface: " + where + " audio badge's icon was not drawn: " + std::string(state->refused));
         state->refused = nullptr;
     }
     if (!wanted.elementId.empty() && !state->told) {
-        shared.journal.Write("Interface: Apple's audio badge says \"" + wanted.label + "\" for " + wanted.elementId);
+        shared.journal.Write("Interface: " + where + " audio badge says \"" + wanted.label + "\" for " + wanted.elementId);
         state->told = true;
     }
 }

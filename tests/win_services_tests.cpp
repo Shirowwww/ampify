@@ -387,8 +387,11 @@ TEST_CASE(WinServices_TrayIconWhenTheSessionHasANotificationArea) {
     services.InjectTrayCommand(ampify::win::Services::kTrayNext);
     services.InjectTrayCommand(ampify::win::Services::kTrayFirstElementItem);
     services.InjectTrayCommand(0);
+    services.InjectTrayCommand(ampify::win::Services::kTrayMiniPlayer);
     services.Service();
     CHECK(host.commands.size() == 1 && host.commands[0] == ampify::PlayerCommand::Next);
+    CHECK(host.ui.MiniPlayerRequest().first == 1);  // Apple's mini player opens, or closes when it is on screen
+    CHECK(host.ui.MiniPlayerRequest().second == ampify::MiniPlayerAction::Toggle);
     CHECK(events.size() == 2);
     CHECK(!events.empty() && events[0] == R"(tray {"to":"calme","item":1})");
     CHECK(events.size() == 2 && events[1] == R"(tray {"click":true})");

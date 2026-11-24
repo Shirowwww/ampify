@@ -213,6 +213,13 @@ that takes no input). `.list-item:selected` and `.next-button:disabled` work as 
 | `.mini-lcd` | Its display of the song playing |
 | `.mini-player-lyrics`, `.mini-player-queue` | Its lyrics and Up Next views, when open |
 | `.mini-player-volume` | Its volume control |
+| `.mini-artwork` | The song's artwork at its top left (it grows into the album view on a click) |
+| `.mini-title`, `.mini-artist`, `.mini-audio-badge` | The song's title and artist beside it, and the audio badge under them |
+| `.mini-controls` | The bottom block: the progress line with its times, and the row of buttons |
+| `.mini-scrubber`, `.mini-time` | The progress line, and the elapsed and remaining times |
+| `.mini-transport` | Previous, play and next |
+| `.mini-actions`, `.mini-panes-buttons` | The buttons left of the transport (volume, then Apple's other button), and right of it (lyrics, Up Next) |
+| `.mini-caption-buttons` | Its own minimize, maximize and close buttons, shown under the pointer |
 
 The players' windows only take the rules that name them: `.playbar` or a bare `TextBlock` never reach them, but
 `.mini-lcd` or `MiniPlayerPage TextBlock` do. The mini player runs on an interface thread of its own, where Ampify

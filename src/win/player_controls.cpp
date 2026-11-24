@@ -734,6 +734,49 @@ std::string PlayingCatalogId() noexcept {
     }
 }
 
+std::optional<bool> PlayingFavorite() noexcept {
+    try {
+        rt::Ref item = PlayingItem();
+        rt::Ref status;
+        if (!item || !rt::Query(item, rt::GuidOf(amp::kIidItemStatusProvider), status)) return std::nullopt;
+        std::uint8_t can = 0;
+        std::uint8_t favorited = 0;
+        if (FAILED(rt::CallSlot(status, amp::slot::kStatusCanFavorite, &can)) || !can) return std::nullopt;
+        if (FAILED(rt::CallSlot(status, amp::slot::kStatusIsFavorited, &favorited))) return std::nullopt;
+        return favorited != 0;
+    } catch (...) {
+        return std::nullopt;
+    }
+}
+
+bool SetPlayingFavorite(bool favorite) noexcept {
+    try {
+        rt::Ref item = PlayingItem();
+        rt::Ref descriptor = item ? ContentDescriptorOf(item) : rt::Ref{};
+        if (!descriptor) return false;
+        rt::Ref helper, action, broker, operation;
+        rt::Activation activation = rt::GetActivationFactory(winrt::to_hstring(amp::kClassActionHelper).c_str(),
+                                                             rt::GuidOf(amp::kIidActionHelperStatics), helper);
+        // Apple's action goes from the state it is told the song has now (seen 24/11: told 1 for a song that was no
+        // favourite, it did nothing).
+        const std::uint8_t isFavorited = favorite ? 0 : 1;
+        const std::uint8_t no = 0;
+        const std::uint8_t metrics = 1;  // as Apple's own menu entry: the click counts in Apple's statistics
+        if (FAILED(activation.result) ||
+            FAILED(rt::CallSlot(helper, amp::slot::kActionHelperCreateFavorite, descriptor.Get(), isFavorited, no, no,
+                                metrics, action.Put())) ||
+            !action) {
+            return false;
+        }
+        activation = rt::GetActivationFactory(winrt::to_hstring(amp::kClassUiBroker).c_str(),
+                                              rt::GuidOf(amp::kIidUiBrokerStatics), broker);
+        return SUCCEEDED(activation.result) &&
+               SUCCEEDED(rt::CallSlot(broker, amp::kUiBrokerGlobalDispatchAction, action.Get(), operation.Put()));
+    } catch (...) {
+        return false;
+    }
+}
+
 bool SetMainPlayerVolume(double gain) noexcept {
     try {
         auto control = MainWindowButton(L"VolumeControl");

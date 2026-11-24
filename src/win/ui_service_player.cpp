@@ -1,6 +1,8 @@
-// The play bar buttons that Apple's full-screen player shows too (Ampify.ui.playbar.addButton with `player: true`):
-// a copy of each stands in the player's transport row, just before its lyrics button, with that button's style. A
-// click on a copy is the play bar button's click, and the copy follows the button's label and state.
+// The play bar buttons that Apple's players show too (Ampify.ui.playbar.addButton with `player: true`): a copy of each
+// stands in the full-screen player's transport row, just before its lyrics button, and in the mini player's display,
+// right of the song (its transport row is full), with that button's style. A click on a copy is the play bar button's
+// click, and the copy follows the button's label and state. The full-screen player runs on the main window's thread;
+// the mini player has its own window context.
 
 #if defined(AMPIFY_WITH_XAML)
 
@@ -54,9 +56,7 @@ void SyncCopy(PlayerCopy& copy, const UiControl& control) {
         controls::ToolTipService::SetToolTip(copy.button, winrt::box_value(Wide(control.label)));
         automation::AutomationProperties::SetName(copy.button, Wide(control.label));
     }
-    auto checked = copy.button.IsChecked();
-    if ((checked && checked.Value()) != control.active) copy.button.IsChecked(control.active);
-    automation::AutomationProperties::SetItemStatus(copy.button, control.active ? L"on" : L"");
+    ShowToggleState(copy.button, control.active);
     if (copy.disabled != control.disabled) {
         copy.disabled = control.disabled;
         copy.button.IsEnabled(!control.disabled);
@@ -65,15 +65,21 @@ void SyncCopy(PlayerCopy& copy, const UiControl& control) {
 
 // A toggle like the lyrics button beside it: same style, padding and height, so its size, halo, hover and press are
 // those of its neighbours. On, it is checked, as the lyrics button is while the lyrics show.
-PlayerCopy MakeCopy(UiService::Shared& shared, const primitives::ToggleButton& lyrics, const UiControl& control) {
+PlayerCopy MakeCopy(UiService::Shared& shared, const primitives::ToggleButton& lyrics, const UiControl& control,
+                    bool compact) {
     PlayerCopy copy;
     primitives::ToggleButton button;
     if (auto style = lyrics.Style()) button.Style(style);
     button.Padding(lyrics.Padding());
-    button.Margin(lyrics.Margin());
-    button.VerticalAlignment(lyrics.VerticalAlignment());
     if (lyrics.ActualHeight() > 0) button.Height(lyrics.ActualHeight());
-    if (lyrics.ActualWidth() > 0) button.MinWidth(lyrics.ActualWidth());
+    if (compact) {
+        button.Width(kMiniButtonWidth);
+        button.MinWidth(0);
+    } else {
+        button.Margin(lyrics.Margin());
+        button.VerticalAlignment(lyrics.VerticalAlignment());
+        if (lyrics.ActualWidth() > 0) button.MinWidth(lyrics.ActualWidth());
+    }
     // A glyph takes the button's foreground, which the style changes under the pointer and while checked.
     if (xaml::FrameworkElement icon = MakeIconElement(control.icon, 16, L"TextFillColorPrimaryBrush")) {
         button.Content(icon);
@@ -86,17 +92,9 @@ PlayerCopy MakeCopy(UiService::Shared& shared, const primitives::ToggleButton& l
     UiEventSink sink = shared.sink;
     std::string elementId = control.elementId;
     int id = control.id;
-    button.Click([sink, elementId, id](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
-        try {
-            // The click toggled it: the element says whether it is on (setActive), so it goes back until then.
-            if (auto toggle = sender.try_as<primitives::ToggleButton>()) {
-                auto checked = toggle.IsChecked();
-                toggle.IsChecked(!(checked && checked.Value()));
-            }
-            if (sink) sink(UiEvent{elementId, id, true, {}});
-        } catch (...) {
-            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
-        }
+    // The element says whether it is on (setActive): the copy goes back until then.
+    OnPersonToggle(button, [sink, elementId, id](bool) {
+        if (sink) sink(UiEvent{elementId, id, true, {}});
     });
     copy.button = button;
     copy.label = control.label;
@@ -129,6 +127,35 @@ void RetryLater(UiService::Shared& shared, const std::shared_ptr<WindowContext>&
 
 }  // namespace
 
+void ShowToggleState(const primitives::ToggleButton& button, bool on) {
+    automation::AutomationProperties::SetItemStatus(button, on ? L"on" : L"");  // first: OnPersonToggle reads it
+    auto checked = button.IsChecked();
+    if ((checked && checked.Value()) != on) button.IsChecked(on);
+}
+
+void OnPersonToggle(const primitives::ToggleButton& button, std::function<void(bool)> changed) {
+    auto handler = [changed = std::move(changed)](IInspectable const& sender, xaml::RoutedEventArgs const&) noexcept {
+        try {
+            auto toggle = sender.try_as<primitives::ToggleButton>();
+            if (!toggle) return;
+            bool shown = automation::AutomationProperties::GetItemStatus(toggle) == L"on";
+            auto checked = toggle.IsChecked();
+            bool asked = checked && checked.Value();
+            if (asked == shown) return;  // the owner's own change (ShowToggleState)
+            toggle.IsChecked(shown);
+            changed(asked);
+        } catch (...) {
+            // A handler runs inside Apple Music's XAML frame: nothing may escape it.
+        }
+    };
+    button.Checked(handler);
+    button.Unchecked(handler);
+}
+
+primitives::ToggleButton PlayerLyricsButton(const xaml::UIElement& content) {
+    return FindPlayerRow(content).lyrics;
+}
+
 xaml::UIElement ShownPlayerContent() noexcept {
     try {
         xaml::Window player = AppWindowOf(WindowRole::Player);
@@ -152,6 +179,8 @@ void FollowPlayerRow(UiService::Shared& shared, const std::shared_ptr<WindowCont
             wanted.push_back(&surface);
         }
     }
+    const bool mini = context->role == WindowRole::Mini;
+    if (mini && wanted.size() > MiniButtonRoom(*context)) wanted.resize(MiniButtonRoom(*context));
     // Hidden, the player keeps its copies (Apple shows the same window again); a button taken away goes at once.
     for (auto it = context->playerCopies.begin(); it != context->playerCopies.end();) {
         bool kept = std::any_of(wanted.begin(), wanted.end(), [&](const Surface* surface) { return surface->key == it->first; });
@@ -163,35 +192,43 @@ void FollowPlayerRow(UiService::Shared& shared, const std::shared_ptr<WindowCont
         it = context->playerCopies.erase(it);
     }
     if (wanted.empty()) return;
-    xaml::UIElement content = ShownPlayerContent();
+    xaml::UIElement content = mini ? context->root.get().try_as<xaml::UIElement>() : ShownPlayerContent();
     if (!content) return;
+    const std::string where = mini ? "Apple's mini player" : "Apple's full-screen player";
     PlayerRow row = FindPlayerRow(content);
     if (!row.panel) {
-        shared.Once("player-row-missing", "Interface: Apple's full-screen player has no lyrics button row yet, "
-                                          "its buttons wait for it");
+        shared.Once(std::string("player-row-missing|") + (mini ? "mini" : "full"),
+                    "Interface: " + where + " has no lyrics button row yet, its buttons wait for it");
         RetryLater(shared, context);
         return;
     }
     context->playerTries = 0;
-    if (context->playerRow.get() != row.panel) {
+    controls::StackPanel target = mini ? MiniButtonHost(*context, content) : row.panel;
+    if (!target) {
+        shared.Once("player-row-missing|mini-display", "Interface: " + where + " has no display yet, its buttons wait for it");
+        RetryLater(shared, context);
+        return;
+    }
+    if (context->playerRow.get() != target) {
         RemoveCopies(*context);  // a new player page: the copies of the old one go with it
-        context->playerRow = winrt::make_weak(row.panel);
+        context->playerRow = winrt::make_weak(target);
     }
     for (const Surface* surface : wanted) {
         const UiControl& control = surface->control;
         auto found = context->playerCopies.find(surface->key);
-        if (found != context->playerCopies.end() && found->second.button.Parent() == row.panel) {
+        if (found != context->playerCopies.end() && found->second.button.Parent() == target) {
             SyncCopy(found->second, control);
             continue;
         }
         if (found != context->playerCopies.end()) RemoveFromParent(found->second.button);
-        PlayerCopy copy = MakeCopy(shared, row.lyrics, control);
-        std::uint32_t index = 0;
-        if (!row.panel.Children().IndexOf(row.lyrics, index)) index = row.panel.Children().Size();
-        row.panel.Children().InsertAt(index, copy.button);
+        PlayerCopy copy = MakeCopy(shared, row.lyrics, control, mini);
+        std::uint32_t index = target.Children().Size();  // the mini player's: after the star
+        if (!mini && !target.Children().IndexOf(row.lyrics, index)) index = target.Children().Size();
+        target.Children().InsertAt(index, copy.button);
         context->playerCopies[surface->key] = copy;
-        shared.Once("player|" + surface->key, "Interface: button \"" + control.label + "\" of " + control.elementId +
-                                                  " placed in Apple's full-screen player, before its lyrics button");
+        shared.Once(std::string(mini ? "mini|" : "player|") + surface->key,
+                    "Interface: button \"" + control.label + "\" of " + control.elementId + " placed in " + where +
+                        (mini ? ", right of the song" : ", before its lyrics button"));
     }
 }
 

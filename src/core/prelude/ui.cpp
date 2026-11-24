@@ -152,6 +152,17 @@ const char kUi[] = R"AMPIFYJS(
     if (typeof icon !== "string") throw new TypeError("ui: audioBadge expects an SVG icon as text");
     return native.uiAudioBadge(label, icon);
   };
+  // Apple's mini player: its window's opacity (0.4 to 1), a favourite star, the album's animated cover (the address
+  // of one of Apple's motion artwork videos).
+  const miniPlayerSet = (options) => {
+    if (options === undefined || options === null) return native.uiMiniPlayerSet(1, false, "");
+    if (typeof options !== "object") throw new TypeError("ui: miniPlayer.set expects { opacity, favorite, motion } or null");
+    const opacity = options.opacity === undefined ? 1 : options.opacity;
+    if (typeof opacity !== "number" || !Number.isFinite(opacity)) throw new TypeError("ui: miniPlayer.set expects a number as opacity");
+    const motion = options.motion === undefined || options.motion === null ? "" : options.motion;
+    if (typeof motion !== "string") throw new TypeError("ui: miniPlayer.set expects an address as motion");
+    return native.uiMiniPlayerSet(opacity, options.favorite === true, motion);
+  };
   const hoverListeners = new Set();
   const onHover = (fn) => {
     if (typeof fn !== "function") throw new TypeError("ui: onHover expects a function");
@@ -307,6 +318,12 @@ const char kUi[] = R"AMPIFYJS(
     }),
     fullscreen,
     applePlayer: Object.freeze({ open: () => native.uiApplePlayer() }),
+    miniPlayer: Object.freeze({
+      open: () => native.uiMiniPlayer("open"),
+      close: () => native.uiMiniPlayer("close"),
+      toggle: () => native.uiMiniPlayer("toggle"),
+      set: (options) => miniPlayerSet(options),
+    }),
     panel: Object.freeze({
       register: (id, vue) => native.uiPanel(text(id), treeText(vue, "panel:" + text(id))),
       remove(id) {

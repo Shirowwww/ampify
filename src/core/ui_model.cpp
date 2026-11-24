@@ -507,6 +507,9 @@ void UiModel::RemoveElement(const std::string& elementId) {
         m_audioBadges.erase(badges, m_audioBadges.end());
         m_audioBadgeSerial++;
     }
+    if (std::erase_if(m_miniPlayers, [&](const UiMiniPlayer& wish) { return wish.elementId == elementId; }) > 0) {
+        m_miniPlayerSerial++;
+    }
 }
 
 std::optional<UiControl> UiModel::Find(int controlId) const {
@@ -569,6 +572,45 @@ std::uint64_t UiModel::RouteSerial() const {
 void UiModel::RequestApplePlayer() {
     Edit edit(*this);
     m_applePlayerRequests++;
+}
+
+void UiModel::RequestMiniPlayer(MiniPlayerAction action) {
+    Edit edit(*this);
+    m_miniRequests++;
+    m_miniAction = action;
+}
+
+std::pair<std::uint64_t, MiniPlayerAction> UiModel::MiniPlayerRequest() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    return {m_miniRequests, m_miniAction};
+}
+
+bool IsMotionArtworkAddress(std::string_view address) {
+    constexpr std::string_view kHost = "https://mvod.itunes.apple.com/";
+    constexpr std::size_t kMaxLength = 1024;
+    if (address.size() > kMaxLength || !address.starts_with(kHost) || !address.ends_with(".mp4")) return false;
+    return std::none_of(address.begin(), address.end(), [](char c) {
+        auto byte = static_cast<unsigned char>(c);
+        return byte <= 0x20 || byte >= 0x7F || c == '\\' || c == '"' || c == '<' || c == '>';
+    });
+}
+
+void UiModel::SetMiniPlayer(const std::string& elementId, double opacity, bool favorite, const std::string& motion) {
+    Edit edit(*this);
+    std::erase_if(m_miniPlayers, [&](const UiMiniPlayer& wish) { return wish.elementId == elementId; });
+    double kept = std::isnan(opacity) ? 1.0 : std::clamp(opacity, kMiniOpacityMin, 1.0);
+    std::string video = IsMotionArtworkAddress(motion) ? motion : std::string();
+    if (kept < 1.0 || favorite || !video.empty()) {
+        m_miniPlayers.push_back(UiMiniPlayer{elementId, kept, favorite, std::move(video), 0});
+    }
+    m_miniPlayerSerial++;
+}
+
+UiMiniPlayer UiModel::MiniPlayer() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    UiMiniPlayer wish = m_miniPlayers.empty() ? UiMiniPlayer{} : m_miniPlayers.back();
+    wish.serial = m_miniPlayerSerial;
+    return wish;
 }
 
 UiModel::Edit::~Edit() {

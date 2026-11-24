@@ -12,6 +12,7 @@
 #undef GetCurrentTime  // windows.h macro that breaks Storyboard::GetCurrentTime in the projection
 #endif
 
+#include <optional>
 #include <string>
 
 #include <winrt/Microsoft.UI.Xaml.h>
@@ -53,6 +54,12 @@ winrt::Microsoft::UI::Xaml::Media::ImageSource PlayingArtworkSource(double pixel
 winrt::Microsoft::UI::Xaml::Media::ImageSource QueueArtworkImage(uint64_t itemId, double pixels) noexcept;
 // The catalog id (AdamId, digits) of the song playing, empty for a file that is not in the catalog. Interface thread only.
 std::string PlayingCatalogId() noexcept;
+// Whether the song playing is one of the user's favourites, as Apple's own menus show it; nothing when no song plays
+// or Apple says it cannot be made one. Any interface thread.
+std::optional<bool> PlayingFavorite() noexcept;
+// Makes the song playing a favourite, or not, with Apple's own action (what the "Favorite" entry of its menus runs).
+// False when Apple refused; the state changes a moment later. Any interface thread.
+bool SetPlayingFavorite(bool favorite) noexcept;
 
 // Why the last SetMainPlayerVolume failed, once (empty when it did not). Any thread.
 std::string TakeMainPlayerVolumeProblem();

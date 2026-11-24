@@ -460,6 +460,80 @@ TEST_CASE(Interface_ApplePlayerNeedsTheFullscreenPermission) {
     CHECK(f.host.ui.ApplePlayerRequests() == 2);
 }
 
+TEST_CASE(Interface_TheMiniPlayerOpensClosesAndTogglesWithTheFullscreenPermission) {
+    Fixture f;
+    auto denied = f.Make("mini-no", "extension", "", R"(Ampify.ui.miniPlayer.toggle();)");
+    CHECK(!denied->Start());
+    CHECK(f.host.ui.MiniPlayerRequest().first == 0);
+
+    auto opened = f.Make("mini-open", "extension", R"("ui.fullscreen")", R"(Ampify.ui.miniPlayer.open();)");
+    CHECK(opened->Start());
+    CHECK(f.host.ui.MiniPlayerRequest().first == 1);
+    CHECK(f.host.ui.MiniPlayerRequest().second == ampify::MiniPlayerAction::Open);
+
+    auto closed = f.Make("mini-close", "extension", R"("ui.fullscreen")",
+                         R"(Ampify.ui.miniPlayer.toggle(); Ampify.ui.miniPlayer.close();)");
+    CHECK(closed->Start());
+    CHECK(f.host.ui.MiniPlayerRequest().first == 3);
+    CHECK(f.host.ui.MiniPlayerRequest().second == ampify::MiniPlayerAction::Close);
+}
+
+namespace {
+const std::string kMotion = "https://mvod.itunes.apple.com/itunes-assets/HLSMusic122/v4/be/42/f8/P517392561_sdr_360x360_-.mp4";
+}
+
+TEST_CASE(Interface_TheMiniPlayerWindowTakesTheLastElementsWishesWithinBounds) {
+    ampify::UiModel model;
+    std::uint64_t serial = model.MiniPlayer().serial;
+    model.SetMiniPlayer("one", 0.8, true, "");
+    model.SetMiniPlayer("two", 0.1, false, kMotion);  // below the floor: the window stays findable
+    CHECK(model.MiniPlayer().elementId == "two");
+    CHECK(model.MiniPlayer().opacity == ampify::kMiniOpacityMin);
+    CHECK(model.MiniPlayer().motion == kMotion);
+    CHECK(!model.MiniPlayer().favorite);
+    CHECK(model.MiniPlayer().serial != serial);
+    model.SetMiniPlayer("two", 1, false, "");  // asks nothing: the first element's wishes show again
+    CHECK(model.MiniPlayer().elementId == "one");
+    CHECK(model.MiniPlayer().opacity == 0.8);
+    CHECK(model.MiniPlayer().favorite);
+    model.SetMiniPlayer("one", std::nan(""), true, "https://example.com/a.mp4");  // not Apple's: no video
+    CHECK(model.MiniPlayer().opacity == 1.0);
+    CHECK(model.MiniPlayer().motion.empty());
+    serial = model.MiniPlayer().serial;
+    model.RemoveElement("one");
+    CHECK(model.MiniPlayer().elementId.empty());
+    CHECK(model.MiniPlayer().opacity == 1.0);
+    CHECK(model.MiniPlayer().serial != serial);
+}
+
+TEST_CASE(Interface_OnlyApplesMotionArtworkFilesAreAnimatedCovers) {
+    CHECK(ampify::IsMotionArtworkAddress(kMotion));
+    CHECK(!ampify::IsMotionArtworkAddress("http://mvod.itunes.apple.com/a.mp4"));            // not https
+    CHECK(!ampify::IsMotionArtworkAddress("https://mvod.itunes.apple.com.evil.com/a.mp4"));  // another host
+    CHECK(!ampify::IsMotionArtworkAddress("https://mvod.itunes.apple.com/a.m3u8"));          // not the file
+    CHECK(!ampify::IsMotionArtworkAddress("https://mvod.itunes.apple.com/a b.mp4"));
+    CHECK(!ampify::IsMotionArtworkAddress("https://mvod.itunes.apple.com/" + std::string(1100, 'a') + ".mp4"));
+}
+
+TEST_CASE(Interface_TheMiniPlayerSetChecksItsOptions) {
+    Fixture f;
+    auto element = f.Make("mini-set", "extension", R"("ui.fullscreen")", R"(
+        Ampify.ui.miniPlayer.set({ opacity: 0.75, favorite: true, motion: ")" + kMotion + R"(" });
+        try { Ampify.ui.miniPlayer.set({ opacity: "half" }); } catch (e) { Ampify.log("[set] " + e.name); }
+        try { Ampify.ui.miniPlayer.set(3); } catch (e) { Ampify.log("[set] " + e.name); }
+        try { Ampify.ui.miniPlayer.set({ motion: "https://example.com/v.mp4" }); } catch (e) { Ampify.log("[set] " + e.name); }
+    )");
+    CHECK(element->Start());
+    CHECK(f.host.ui.MiniPlayer().elementId == "mini-set");
+    CHECK(f.host.ui.MiniPlayer().opacity == 0.75);
+    CHECK(f.host.ui.MiniPlayer().favorite);
+    CHECK(f.host.ui.MiniPlayer().motion == kMotion);
+    CHECK(f.Logged("[set] TypeError"));
+    CHECK(f.Logged("[set] RangeError"));
+    element->Stop();
+    CHECK(f.host.ui.MiniPlayer().elementId.empty());
+}
+
 TEST_CASE(Interface_TitleNeedsTheWindowPermission) {
     Fixture f;
     auto denied = f.Make("title-no", "extension", "", R"(Ampify.ui.title.set("Demo");)");

@@ -306,6 +306,24 @@ TEST_CASE(UiRender_AnApplePlayerRequestIsReportedOnce) {
     CHECK(!tracker.Poll(model).applePlayer);
 }
 
+TEST_CASE(UiRender_AMiniPlayerRequestAndItsWishesAreReportedOnce) {
+    ampify::UiModel model;
+    SurfaceTracker tracker;
+    SurfaceChanges first = tracker.Poll(model);
+    CHECK(!first.miniPlayerAction);
+    CHECK(!first.miniPlayer);
+
+    model.RequestMiniPlayer(ampify::MiniPlayerAction::Toggle);
+    model.SetMiniPlayer("x", 0.5, false, "");
+    SurfaceChanges changes = tracker.Poll(model);
+    CHECK(changes.miniPlayerAction == ampify::MiniPlayerAction::Toggle);
+    CHECK(changes.miniPlayer && changes.miniPlayer->opacity == 0.5);
+    CHECK(!changes.Empty());
+    SurfaceChanges again = tracker.Poll(model);
+    CHECK(!again.miniPlayerAction);
+    CHECK(!again.miniPlayer);
+}
+
 TEST_CASE(UiRender_TheModelTellsEachChangeAndNothingElse) {
     ampify::UiModel model;
     int heard = 0;

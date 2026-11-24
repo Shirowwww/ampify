@@ -1,0 +1,34 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "mini-player",
+  "name": "Mini player",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "Apple's mini player, closer at hand: a shortcut opens and closes it from any program, its window can be see-through, a star marks the song as a favourite, and the album's animated cover plays over its artwork.",
+  "translations": {"fr": {"name": "Mini-lecteur", "description": "Le mini-lecteur d'Apple, plus à portée de main : un raccourci l'ouvre et le ferme depuis n'importe quel programme, sa fenêtre peut être transparente, une étoile met le morceau en favori et la pochette animée de l'album s'y joue.", "settings": {"shortcut": "Raccourci clavier", "opacity": "Opacité de la fenêtre", "favorite": "Étoile des favoris", "motion": "Pochette animée de l'album"}, "options": {"None": "Aucun"}}, "de": {"name": "Miniplayer", "description": "Apples Miniplayer, näher zur Hand: Ein Tastenkürzel öffnet und schließt ihn aus jedem Programm, sein Fenster kann durchscheinend sein, ein Stern macht den Titel zum Favoriten und das animierte Albumcover läuft darin.", "settings": {"shortcut": "Tastenkürzel", "opacity": "Deckkraft des Fensters", "favorite": "Favoritenstern", "motion": "Animiertes Albumcover"}, "options": {"None": "Keins"}}, "es": {"name": "Minirreproductor", "description": "El minirreproductor de Apple, más a mano: un atajo lo abre y lo cierra desde cualquier programa, su ventana puede ser transparente, una estrella marca la canción como favorita y la portada animada del álbum se reproduce en él.", "settings": {"shortcut": "Atajo de teclado", "opacity": "Opacidad de la ventana", "favorite": "Estrella de favoritos", "motion": "Portada animada del álbum"}, "options": {"None": "Ninguno"}}, "pt": {"name": "Minirreprodutor", "description": "O minirreprodutor da Apple, mais à mão: um atalho o abre e fecha de qualquer programa, sua janela pode ser transparente, uma estrela marca a música como favorita e a capa animada do álbum toca nele.", "settings": {"shortcut": "Atalho de teclado", "opacity": "Opacidade da janela", "favorite": "Estrela de favoritos", "motion": "Capa animada do álbum"}, "options": {"None": "Nenhum"}}, "ru": {"name": "Мини-плеер", "description": "Мини-плеер Apple всегда под рукой: сочетание клавиш открывает и закрывает его из любой программы, окно может быть полупрозрачным, звезда добавляет песню в избранное, а анимированная обложка альбома играет в нём.", "settings": {"shortcut": "Сочетание клавиш", "opacity": "Непрозрачность окна", "favorite": "Звезда избранного", "motion": "Анимированная обложка альбома"}, "options": {"None": "Нет"}}, "ja": {"name": "ミニプレーヤー", "description": "Apple のミニプレーヤーをもっと手軽に。ショートカットでどのアプリからでも開閉でき、ウインドウを半透明にでき、星で曲をお気に入りにし、アルバムのアニメーションアートワークを再生します。", "settings": {"shortcut": "キーボードショートカット", "opacity": "ウインドウの不透明度", "favorite": "お気に入りの星", "motion": "アルバムのアニメーションアートワーク"}, "options": {"None": "なし"}}, "zh": {"name": "迷你播放器", "description": "让 Apple 的迷你播放器更顺手：快捷键可在任何程序中打开和关闭它，窗口可以半透明，星标可将歌曲设为喜爱，并在其中播放专辑的动态封面。", "settings": {"shortcut": "键盘快捷键", "opacity": "窗口不透明度", "favorite": "喜爱星标", "motion": "专辑动态封面"}, "options": {"None": "无"}}, "it": {"name": "Mini player", "description": "Il mini player di Apple più a portata di mano: una scorciatoia lo apre e lo chiude da qualsiasi programma, la finestra può essere trasparente, una stella aggiunge il brano ai preferiti e la copertina animata dell'album vi scorre.", "settings": {"shortcut": "Scorciatoia da tastiera", "opacity": "Opacità della finestra", "favorite": "Stella dei preferiti", "motion": "Copertina animata dell'album"}, "options": {"None": "Nessuna"}}, "ko": {"name": "미니 플레이어", "description": "Apple의 미니 플레이어를 더 가까이: 단축키로 어떤 프로그램에서든 열고 닫고, 창을 반투명하게 하고, 별로 곡을 즐겨찾기에 넣고, 앨범의 움직이는 아트워크를 재생합니다.", "settings": {"shortcut": "키보드 단축키", "opacity": "창 불투명도", "favorite": "즐겨찾기 별", "motion": "앨범의 움직이는 아트워크"}, "options": {"None": "없음"}}},
+  "kitApi": "1.0",
+  "minAmpify": "1.6.0",
+  "preview": "preview.jpg",
+  "main": "main.js",
+  "permissions": [
+    "player.read",
+    "storage",
+    "ui.fullscreen",
+    "ui.keyboard",
+    "network:music.apple.com",
+    "network:amp-api.music.apple.com",
+    "network:mvod.itunes.apple.com"
+  ],
+  "tags": [
+    "mini-player"
+  ],
+  "settings": [
+    {"key": "shortcut", "label": "Keyboard shortcut", "type": "choice", "default": "Ctrl+Shift+Alt+M",
+     "options": ["Ctrl+Shift+Alt+M", "Ctrl+Alt+M", "None"]},
+    {"key": "opacity", "label": "Window opacity", "type": "choice", "default": "100 %",
+     "options": ["100 %", "90 %", "80 %", "70 %", "60 %", "50 %"]},
+    {"key": "favorite", "label": "Favourite star", "type": "toggle", "default": true},
+    {"key": "motion", "label": "The album's animated cover", "type": "toggle", "default": true}
+  ]
+}

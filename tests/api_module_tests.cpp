@@ -99,11 +99,12 @@ const Expected kMembers[] = {
     {"color", "object!{extract:f3=extract,fromArtwork:f1=fromArtwork,playing:f0=playing}"},
     {"fonts", "object!{roles:f0=roles,style:f1=style}"},
     // setLabel, setActive, setDisabled, playbar.mark, readout and onHover, panel.onClose, the removes, popup.show and
-    // close, title.get and reset added in kitApi 1.x, compatible additions
+    // close, title.get and reset, miniPlayer added in kitApi 1.x, compatible additions
     {"ui", "object!{topbar:object!{addButton:f1=addButton,remove:f1=remove},"
            "playbar:object!{addButton:f1=addButton,remove:f1=remove,mark:f3=mark,readout:f1=readout,onHover:f1=onHover,audioBadge:f1=audioBadge},sidebar:object!{addItem:f1=addItem,remove:f1=remove},"
            "menu:object!{addItem:f2=addItem,remove:f1=remove},popup:object!{open:f1=open,show:f2=show,close:f1=close},"
            "fullscreen:object!{open:f1=open,close:f0=close,onClose:f1=onClose},applePlayer:object!{open:f0=open},"
+           "miniPlayer:object!{open:f0=open,close:f0=close,toggle:f0=toggle,set:f1=set},"
            "panel:object!{register:f2=register,remove:f1=remove,onClose:f2=onClose},"
            "page:object!{register:f2=register},title:object!{set:f1=set,get:f0=get,reset:f0=reset},"
            "setLabel:f2=setLabel,setActive:f2=setActive,setDisabled:f2=setDisabled,navigate:f1=navigate}"},

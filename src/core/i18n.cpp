@@ -17,6 +17,8 @@ constexpr Message kKit[] = {
     {"tray.tooltip", "Ampify"},
     {"tray.previous", "Previous track"},
     {"tray.next", "Next track"},
+    {"tray.miniPlayer", "Mini player"},
+    {"mini.favorite", "Favorite"},
     {"tray.openKit", "Open the Ampify folder"},
     {"tray.started", "Notification area icon shown"},
     {"tray.failed", "Windows refused the notification area icon ({error})"},
@@ -292,6 +294,8 @@ constexpr Message kKit[] = {
 constexpr Message kKitFr[] = {
     {"tray.previous", "Morceau précédent"},
     {"tray.next", "Morceau suivant"},
+    {"tray.miniPlayer", "Mini-lecteur"},
+    {"mini.favorite", "Favori"},
     {"tray.openKit", "Ouvrir le dossier Ampify"},
     {"ui.on", "Activé"},
     {"ui.off", "Désactivé"},
@@ -554,6 +558,8 @@ constexpr Message kKitFr[] = {
 constexpr Message kKitDe[] = {
     {"tray.previous", "Vorheriger Titel"},
     {"tray.next", "Nächster Titel"},
+    {"tray.miniPlayer", "Miniplayer"},
+    {"mini.favorite", "Favorit"},
     {"tray.openKit", "Ampify-Ordner öffnen"},
     {"tray.show", "Apple Music anzeigen"},
     {"tray.quit", "Apple Music beenden"},
@@ -816,6 +822,8 @@ constexpr Message kKitDe[] = {
 constexpr Message kKitEs[] = {
     {"tray.previous", "Canción anterior"},
     {"tray.next", "Canción siguiente"},
+    {"tray.miniPlayer", "Minirreproductor"},
+    {"mini.favorite", "Favorito"},
     {"tray.openKit", "Abrir la carpeta de Ampify"},
     {"tray.show", "Mostrar Apple Music"},
     {"tray.quit", "Salir de Apple Music"},
@@ -1076,6 +1084,8 @@ constexpr Message kKitEs[] = {
 constexpr Message kKitPt[] = {
     {"tray.previous", "Faixa anterior"},
     {"tray.next", "Próxima faixa"},
+    {"tray.miniPlayer", "Minirreprodutor"},
+    {"mini.favorite", "Favorito"},
     {"tray.openKit", "Abrir a pasta do Ampify"},
     {"tray.show", "Mostrar o Apple Music"},
     {"tray.quit", "Sair do Apple Music"},
@@ -1336,6 +1346,8 @@ constexpr Message kKitPt[] = {
 constexpr Message kKitRu[] = {
     {"tray.previous", "Предыдущий трек"},
     {"tray.next", "Следующий трек"},
+    {"tray.miniPlayer", "Мини-плеер"},
+    {"mini.favorite", "Избранное"},
     {"tray.openKit", "Открыть папку Ampify"},
     {"tray.show", "Показать Apple Music"},
     {"tray.quit", "Выйти из Apple Music"},
@@ -1598,6 +1610,8 @@ constexpr Message kKitRu[] = {
 constexpr Message kKitJa[] = {
     {"tray.previous", "前の曲"},
     {"tray.next", "次の曲"},
+    {"tray.miniPlayer", "ミニプレーヤー"},
+    {"mini.favorite", "お気に入り"},
     {"tray.openKit", "Ampify フォルダーを開く"},
     {"tray.show", "Apple Music を表示"},
     {"tray.quit", "Apple Music を終了"},
@@ -1858,6 +1872,8 @@ constexpr Message kKitJa[] = {
 constexpr Message kKitZh[] = {
     {"tray.previous", "上一首"},
     {"tray.next", "下一首"},
+    {"tray.miniPlayer", "迷你播放器"},
+    {"mini.favorite", "喜爱"},
     {"tray.openKit", "打开 Ampify 文件夹"},
     {"tray.show", "显示 Apple Music"},
     {"tray.quit", "退出 Apple Music"},
@@ -2116,6 +2132,8 @@ constexpr Message kKitZh[] = {
 constexpr Message kKitIt[] = {
     {"tray.previous", "Brano precedente"},
     {"tray.next", "Brano successivo"},
+    {"tray.miniPlayer", "Mini player"},
+    {"mini.favorite", "Preferito"},
     {"tray.openKit", "Apri la cartella Ampify"},
     {"ui.on", "Attivo"},
     {"ui.off", "Disattivo"},
@@ -2372,6 +2390,8 @@ constexpr Message kKitIt[] = {
 constexpr Message kKitKo[] = {
     {"tray.previous", "이전 곡"},
     {"tray.next", "다음 곡"},
+    {"tray.miniPlayer", "미니 플레이어"},
+    {"mini.favorite", "즐겨찾기"},
     {"tray.openKit", "Ampify 폴더 열기"},
     {"ui.on", "켜짐"},
     {"ui.off", "꺼짐"},

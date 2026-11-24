@@ -228,6 +228,39 @@ struct UiNatives : ScriptBridge {
         return JS_UNDEFINED;
     }
 
+    // native.uiMiniPlayer(action): "open", "close" or "toggle" Apple Music's own mini player.
+    AMPIFY_NATIVE(UiMiniPlayer) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.fullscreen", &failure)) return failure;
+        std::string action = String(ctx, argc, argv, 0).value_or("");
+        if (action == "open") {
+            HostOf(ext).Ui().RequestMiniPlayer(MiniPlayerAction::Open);
+        } else if (action == "close") {
+            HostOf(ext).Ui().RequestMiniPlayer(MiniPlayerAction::Close);
+        } else if (action == "toggle") {
+            HostOf(ext).Ui().RequestMiniPlayer(MiniPlayerAction::Toggle);
+        } else {
+            return Throw(ctx, "RangeError", "miniPlayer: unknown action");
+        }
+        return JS_UNDEFINED;
+    }
+
+    // native.uiMiniPlayerSet(opacity, favorite, motion): what the element asks of the mini player's window; `motion`
+    // is the address of an animated cover, "" for none, refused when it is not one of Apple's (IsMotionArtworkAddress).
+    AMPIFY_NATIVE(UiMiniPlayerSet) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        if (!Require(ctx, ext, "ui.fullscreen", &failure)) return failure;
+        bool favorite = argc >= 2 && JS_ToBool(ctx, argv[1]) != 0;
+        std::string motion = String(ctx, argc, argv, 2).value_or("");
+        if (!motion.empty() && !IsMotionArtworkAddress(motion)) {
+            return Throw(ctx, "RangeError", "miniPlayer.set: motion is not an animated cover of Apple's");
+        }
+        HostOf(ext).Ui().SetMiniPlayer(ext->id(), Number(ctx, argc, argv, 0), favorite, motion);
+        return JS_UNDEFINED;
+    }
+
     // native.uiFullscreenClose(session): closes the element's own fullscreen surface, so it needs no permission.
     AMPIFY_NATIVE(UiFullscreenClose) {
         ScriptExtension* ext = Owner(ctx);
@@ -318,6 +351,8 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiFullscreen", UiNatives::UiFullscreen, 2);
     scope.Function("uiFullscreenClose", UiNatives::UiFullscreenClose, 1);
     scope.Function("uiApplePlayer", UiNatives::UiApplePlayer, 0);
+    scope.Function("uiMiniPlayer", UiNatives::UiMiniPlayer, 1);
+    scope.Function("uiMiniPlayerSet", UiNatives::UiMiniPlayerSet, 3);
     scope.Function("uiPage", UiNatives::UiPage, 2);
     scope.Function("uiNavigate", UiNatives::UiNavigate, 1);
     scope.Function("uiTitle", UiNatives::UiTitle, 1);

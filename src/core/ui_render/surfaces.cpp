@@ -127,6 +127,12 @@ SurfaceChanges SurfaceTracker::Poll(const UiModel& model) {
     UiAudioBadge badge = model.AudioBadge();
     if (badge.serial != m_audioBadgeSerial) changes.audioBadge = badge;
     m_audioBadgeSerial = badge.serial;
+    auto [miniRequests, miniAction] = model.MiniPlayerRequest();
+    if (miniRequests != m_miniRequests) changes.miniPlayerAction = miniAction;
+    m_miniRequests = miniRequests;
+    UiMiniPlayer mini = model.MiniPlayer();
+    if (mini.serial != m_miniPlayerSerial) changes.miniPlayer = mini;
+    m_miniPlayerSerial = mini.serial;
 
     m_current = std::move(now);
     m_signatures = std::move(signatures);

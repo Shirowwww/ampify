@@ -201,6 +201,16 @@ TEST_CASE(Names_PlayerWindowsAndViewsAreNamedByTheirTypes) {
     CHECK(ClassFindsLast("mini-player", "MiniPlayerPage"));
     CHECK(ClassFindsLast("mini-lcd", "MiniPlayerPage MiniPlayerView Grid MiniNowPlayingControl#LCD"));
     CHECK(ClassFindsLast("mini-player-background", "MiniPlayerPage Grid ImmersionLockup#immersionLockup"));
+    const std::string lcd = "MiniPlayerPage Grid MiniPlayerView Grid Grid Grid MiniNowPlayingControl#LCD Grid#LCD";
+    CHECK(ClassFindsLast("mini-artwork", lcd + " ArtworkImage#ActualArtwork"));
+    CHECK(ClassFindsLast("mini-title", lcd + " StackPanel TickerTapeControl#TrackTitleTickerTape ScrollViewer "
+                                             "TextBlock#ScrollingText"));
+    CHECK(!ClassFindsLast("mini-title", lcd + " StackPanel TickerTapeControl#ArtistTitleTickerTape TextBlock#ScrollingText"));
+    const std::string bottom = "MiniPlayerPage Grid MiniPlayerView Grid Grid#BottomContent Grid";
+    CHECK(ClassFindsLast("mini-time", bottom + " Grid Grid TextBlock#Duration"));
+    CHECK(ClassFindsLast("mini-transport", bottom + " Grid#TransportGrid TransportControl#TransportControl"));
+    CHECK(!ClassFindsLast("mini-transport", kPlaybar + " Grid TransportControl#TransportControl"));  // the play bar's
+    CHECK(!ClassFindsLast("mini-artwork", kPlaybar + " Grid ArtworkImage#ActualArtwork"));
     CHECK(ClassFindsLast("airplay-panel", "Popup FlyoutPresenter AirPlayView"));
     CHECK(ClassFindsLast("equalizer", "Grid EqualizerView"));
     CHECK(ClassFindsLast("info-panel", "Grid InfoPanelControl"));

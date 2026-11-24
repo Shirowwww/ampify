@@ -82,7 +82,7 @@ A function whose permission is not declared throws `PermissionDenied` and does n
 | `audio.sing` | `Ampify.audio.sing`: the karaoke mode, from either process | [preview] |
 | `ui.topbar`, `ui.playbar`, `ui.sidebar`, `ui.menu`, `ui.popup` | Buttons, sidebar entries, menu entries, dialogs | [stable] |
 | `ui.panel`, `ui.window` | A side panel, a secondary window | [preview] |
-| `ui.fullscreen` | A view over the whole window, and Apple's own full-screen player | [stable] |
+| `ui.fullscreen` | A view over the whole window, and Apple's own full-screen and mini players | [stable] |
 | `ui.page` | App pages and navigation | [stable] |
 | `ui.keyboard` | Global or window shortcuts | [preview] |
 | `clipboard.write`, `clipboard.read` | `Ampify.clipboard.copy` and `paste`: text put on, and read from, the Windows clipboard | [preview] |
@@ -441,6 +441,10 @@ Ampify.ui.fullscreen.open(view)        // permission ui.fullscreen; called again
 Ampify.ui.fullscreen.close()
 Ampify.ui.fullscreen.onClose(fn)       // returns a function that removes fn
 Ampify.ui.applePlayer.open()           // permission ui.fullscreen: Apple Music's own full-screen player
+Ampify.ui.miniPlayer.open()            // permission ui.fullscreen: Apple Music's own mini player (1.6)
+Ampify.ui.miniPlayer.close()           // as Alt+F4 on it does: Apple Music's main window comes back
+Ampify.ui.miniPlayer.toggle()          // closes it when it is on screen, opens it otherwise
+Ampify.ui.miniPlayer.set({ opacity, favorite, motion })  // what the element asks of its window; null: nothing
 Ampify.ui.panel.register(id, view)     // a 380 px column on the right; it slides in from the right
 Ampify.ui.panel.remove(id)             // slides it back out; register brings it back
 Ampify.ui.panel.onClose(id, fn)        // the user closed it with its Close button: it is removed (register brings it
@@ -476,7 +480,8 @@ Ampify.ui.navigate(path)
   button instead of at the end of the bar, as Volume percentage does. `"volume"` is the only name for now; another
   throws. Ampify before 1.3.2 leaves `beside` out and puts the button at the end.
 - `playbar.addButton({ label, icon, onClick, player: true })` also shows the button in Apple Music's full-screen
-  player, just before its lyrics button, drawn like that button and checked while it is on (`active`, `setActive`).
+  player, just before its lyrics button, drawn like that button and checked while it is on (`active`, `setActive`),
+  and since 1.6 in its mini player too, where the row has room for the first two such buttons.
   A click there runs the same `onClick`, and a popup opened then shows over the player. A text without `onClick`
   stays in the bar only. Sing does this. Ampify before
   1.5.6 leaves `player` out.
@@ -492,7 +497,8 @@ Ampify.ui.navigate(path)
   tooltips, the marker the text colour of the bar; both follow the light and dark modes and every theme's line, and
   the label goes under the line when the bar sits at the top of the window. When several elements ask, the last one
   shows.
-- `playbar.audioBadge({ label, icon })` makes Apple's audio badge, under the song in the play bar, say `label`: its
+- `playbar.audioBadge({ label, icon })` makes Apple's audio badge, under the song in the play bar and in the mini
+  player (since 1.6), say `label`: its
   words where the layout shows them, its screen reader name and the title of the flyout it opens. `icon` (SVG, drawn
   in the badge's own colour, as tall as Apple's mark and as wide as its `viewBox` asks) follows Apple's Lossless mark
   there and in the flyout, Apple's mark unchanged; leave room on its left for the gap. It acts only while Apple shows its Lossless
@@ -515,6 +521,16 @@ Ampify.ui.navigate(path)
   last element that opens it wins, and `onClose` runs when the user closes it or another element takes it.
 - `applePlayer.open()` opens Apple's full-screen player where the user chose in Ampify's settings page (`apple.fullscreen`).
   If Apple Music refuses, nothing opens and the log says why.
+- `miniPlayer.open()` opens Apple's mini player as the artwork of the playback bar does, or brings it to the front
+  when it is already open; `close()` closes its window as Alt+F4 does, so Apple Music's window comes back as after a
+  click on its cross. Ampify's tray icon has the same toggle.
+- `miniPlayer.set({ opacity, favorite, motion })` asks for the mini player's window: `opacity` from 0.4 to 1 (lower is
+  raised to 0.4, so the window stays findable), `favorite: true` for a star that marks the song playing as a
+  favourite, and `motion` the address of the album's animated cover, an MP4 file on `https://mvod.itunes.apple.com/`
+  (the H.264 file a variant of `editorialVideo.motionDetailSquare.video` names in Apple's catalog; any other address
+  throws). Ampify downloads it once, keeps the last six, and plays it muted and looping over the artwork, which Apple
+  grows into the album view on a click; nothing plays while Windows' animation effects are off. The last element to
+  ask wins; `set(null)`, or stopping the element, gives Apple's window back.
 - An app page takes the place of Apple Music's page, with a Back button; Apple Music's own navigation closes it.
 - A `lyrics` node draws itself from Apple's player at the screen's pace: the element renders it once, with no timer of
   its own. Give it room, as a growing child of a `stack` of fixed `height`. An `image` with `src: "artwork"` shows

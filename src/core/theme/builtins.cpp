@@ -284,6 +284,19 @@ const std::vector<ClassEntry> kClasses{
     {"mini-player-lyrics", {"MiniPlayerPage LyricsHostView"}},
     {"mini-player-queue", {"MiniPlayerPage PlayQueueView"}},
     {"mini-player-volume", {"MiniPlayerPage VolumeControl"}},
+    // Its parts, from its tree (Apple Music 1.1792): the song at the top (artwork, title, artist, badge), the bottom
+    // block with the progress line and the buttons, and the window's own caption buttons.
+    {"mini-artwork", {"MiniPlayerPage ArtworkImage#ActualArtwork"}},
+    {"mini-title", {"MiniPlayerPage TickerTapeControl#TrackTitleTickerTape TextBlock#ScrollingText"}},
+    {"mini-artist", {"MiniPlayerPage TickerTapeControl#ArtistTitleTickerTape TextBlock#ScrollingText"}},
+    {"mini-audio-badge", {"MiniPlayerPage AudioBadgeControl"}},
+    {"mini-controls", {"MiniPlayerPage Grid#BottomContent > Grid:nth-child(2)"}},
+    {"mini-scrubber", {"MiniPlayerPage ScrubberControl#Scrubber"}},
+    {"mini-time", {"MiniPlayerPage TextBlock#CurrentTime", "MiniPlayerPage TextBlock#Duration"}},
+    {"mini-transport", {"MiniPlayerPage TransportControl#TransportControl"}},
+    {"mini-actions", {"MiniPlayerPage Grid#TransportGrid > StackPanel:nth-child(1)"}},
+    {"mini-panes-buttons", {"MiniPlayerPage Grid#TransportGrid > StackPanel:nth-child(3)"}},
+    {"mini-caption-buttons", {"MiniPlayerPage CustomCaptionButtons#CaptionButtons"}},
     // Playback bar
     {"playbar", {"Grid#TransportBar"}},
     {"playbar-controls", {"Grid#TransportBar > Grid:nth-child(1)"}},

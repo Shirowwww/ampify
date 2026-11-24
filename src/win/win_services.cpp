@@ -10,6 +10,7 @@
 #include "../core/api/dispatch_names.hpp"
 #include "../core/json.hpp"
 #include "../core/player_state.hpp"
+#include "../core/ui_model.hpp"
 #include "../core/natives/service_flags.hpp"
 #include "../core/output_files.hpp"
 #include "discord_ipc.hpp"
@@ -117,6 +118,7 @@ void Services::RebuildTrayMenu() {
     std::vector<TrayEntry> entries;
     entries.push_back({kTrayPrevious, FromUtf8(i18n::Text("tray.previous"))});
     entries.push_back({kTrayNext, FromUtf8(i18n::Text("tray.next"))});
+    entries.push_back({kTrayMiniPlayer, FromUtf8(i18n::Text("tray.miniPlayer"))});
     m_trayTargets.clear();
     unsigned next = kTrayFirstElementItem;
     for (const auto& [elementId, items] : m_trayItems) {
@@ -361,6 +363,8 @@ void Services::Service() {
             m_host.Control(PlayerCommand::Previous, 0);
         } else if (command == kTrayNext) {
             m_host.Control(PlayerCommand::Next, 0);
+        } else if (command == kTrayMiniPlayer) {
+            m_host.Ui().RequestMiniPlayer(MiniPlayerAction::Toggle);
         } else if (command == kTrayOpenKit) {
             ShellExecuteW(nullptr, L"open", m_kit.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
         } else if (auto found = m_trayTargets.find(command); found != m_trayTargets.end()) {
