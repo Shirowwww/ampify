@@ -26,6 +26,8 @@
 #include "../../../extensions/atmos-leveler/format_detection.hpp"
 #include "../../core/automix/mix_deck.hpp"
 #include "../hook.hpp"
+#include "audio_hooks.hpp"
+#include "audio_sharing.hpp"
 #include "hooks_detail.hpp"
 
 namespace ampify::win::audio_hooks {
@@ -666,6 +668,8 @@ public:
         if (IdentityOf(next).catalogId == "0") return "the next song is not from Apple Music's catalog";
         // Dolby Atmos goes out as objects, not as a stereo stream the deck could mix into.
         if (detail::MainStreamRate() == 0) return "the sound does not go out as a stereo stream";
+        // At another speed (Ampify.player.setRate), Apple's song no longer keeps the time the plan counts in.
+        if (PlaybackRate() != 1.0) return "Apple's player plays at another speed";
         std::string refused;
         {
             // Start first: it puts back what a replaced plan changed, on that plan's song; then the new target.
@@ -756,6 +760,7 @@ private:
             automix::Phase last = automix::Phase::Idle;
             while (true) {
                 if (const char* reason = m_interrupt.exchange(nullptr)) m_session.Cancel(reason, true);
+                if (PlaybackRate() != 1.0) m_session.Cancel("Apple's player changed its speed", true);
                 {
                     std::lock_guard<std::mutex> guard(m_deckLock);
                     m_session.Tick(SteadySeconds());
