@@ -133,6 +133,9 @@ SurfaceChanges SurfaceTracker::Poll(const UiModel& model) {
     UiMiniPlayer mini = model.MiniPlayer();
     if (mini.serial != m_miniPlayerSerial) changes.miniPlayer = mini;
     m_miniPlayerSerial = mini.serial;
+    UiAnimatedCover cover = model.AnimatedCover();
+    if (cover.serial != m_animatedCoverSerial) changes.animatedCover = cover;
+    m_animatedCoverSerial = cover.serial;
 
     m_current = std::move(now);
     m_signatures = std::move(signatures);

@@ -207,10 +207,12 @@ void FollowMiniPlayer(UiService::Shared& shared, const std::shared_ptr<WindowCon
     if (context->role != WindowRole::Mini) return;
     std::vector<Surface> surfaces;
     UiMiniPlayer wish;
+    UiAnimatedCover cover;
     {
         std::lock_guard<std::mutex> lock(shared.mutex);
         surfaces = shared.surfaces;
         wish = shared.miniPlayer;
+        cover = shared.animatedCover;
     }
     auto content = context->root.get().try_as<xaml::UIElement>();
     FollowMiniCompact(shared, *context, content);  // first: it decides where Ampify's buttons stand
@@ -219,12 +221,13 @@ void FollowMiniPlayer(UiService::Shared& shared, const std::shared_ptr<WindowCon
     FollowPlayerRow(shared, context, surfaces);
     context->miniWindow =
         FollowMiniOpacity(WindowHandle(context->window.get()), wish.opacity, context->miniWindow, &shared.journal);
-    FollowMiniMotion(context->miniMotion, context->root.get(), wish.motion, shared.journal);
+    const std::string& motion = wish.motion.empty() && cover.places.mini ? cover.video : wish.motion;
+    FollowArtworkMotion(context->miniMotion, MotionPlace::Mini, context->root.get(), motion, shared.journal);
 }
 
 void ReleaseMiniPlayer(WindowContext& context) noexcept {
     if (context.role != WindowRole::Mini) return;
-    ReleaseMiniMotion(context.miniMotion);
+    ReleaseArtworkMotion(context.miniMotion);
     ReleaseMiniCompact(context);
     try {
         ReleaseStar(context);

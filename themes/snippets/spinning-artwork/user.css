@@ -56,6 +56,30 @@
     }
 }
 
+/* Apple's full-screen player (on by default): its large artwork becomes a record too, with the same turn and
+   grooves. There Apple drives the artwork's own transform as well, so the turn goes on the grid inside it, which holds
+   the cover and its thin edge; the edge goes round with it. */
+@setting fullscreen {
+    .fullscreen-artwork,
+    .fullscreen-artwork > AspectRatioGrid,
+    .fullscreen-artwork > AspectRatioGrid > Border {
+        corner-radius: 999px;
+    }
+
+    @setting turn {
+        .fullscreen-artwork > AspectRatioGrid {
+            animation: spin var(--turn) linear infinite playing;
+        }
+    }
+
+    /* Uniform, not fill: the grid sizes itself on its pictures, and a stretched record made it an oval. */
+    @setting grooves {
+        .fullscreen-artwork > AspectRatioGrid::after {
+            content: url("images/record.png");
+        }
+    }
+}
+
 @keyframes spin {
     to { transform: rotate(360deg); }
 }

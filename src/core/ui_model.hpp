@@ -76,6 +76,26 @@ struct UiMiniPlayer {
 };
 inline constexpr double kMiniOpacityMin = 0.4;  // lower, the window is hard to find again on a busy desktop
 
+// Where Ampify.ui.animatedCover plays the album's animated cover: over the play bar's artwork, the full-screen
+// player's, the mini player's.
+struct AnimatedCoverPlaces {
+    bool playbar = false;
+    bool fullscreen = false;
+    bool mini = false;
+
+    bool Any() const { return playbar || fullscreen || mini; }
+};
+
+// The album's animated cover (Ampify.ui.animatedCover): `video` is one of Apple's motion artwork files
+// (IsMotionArtworkAddress), played muted and looping over the artwork in `places`. Set by the last element that asked;
+// `elementId` empty when none does. `serial` changes each time it changes.
+struct UiAnimatedCover {
+    std::string elementId;
+    std::string video;
+    AnimatedCoverPlaces places;
+    std::uint64_t serial = 0;
+};
+
 // An animated cover Ampify plays: an MP4 file on Apple's motion artwork host, over https, of a reasonable length. Any
 // other address is refused, so an element cannot have the kernel fetch what its own network permissions do not reach.
 bool IsMotionArtworkAddress(std::string_view address);
@@ -192,6 +212,11 @@ public:
     void SetMiniPlayer(const std::string& elementId, double opacity, bool favorite, const std::string& motion);
     UiMiniPlayer MiniPlayer() const;
 
+    // What the element asks of the animated cover (Ampify.ui.animatedCover.set): a video IsMotionArtworkAddress refuses,
+    // or no place to play it, takes the element's request away. The last element to ask is the one shown.
+    void SetAnimatedCover(const std::string& elementId, const std::string& video, AnimatedCoverPlaces places);
+    UiAnimatedCover AnimatedCover() const;
+
     void RemoveElement(const std::string& elementId);
 
     std::optional<UiControl> Find(int controlId) const;
@@ -249,6 +274,8 @@ private:
     MiniPlayerAction m_miniAction = MiniPlayerAction::Toggle;
     std::vector<UiMiniPlayer> m_miniPlayers;  // one per element, the last asked at the end
     std::uint64_t m_miniPlayerSerial = 0;
+    std::vector<UiAnimatedCover> m_animatedCovers;  // one per element, the last asked at the end
+    std::uint64_t m_animatedCoverSerial = 0;
 };
 
 // Checks a tree sent by an element: only the primitives of ui_vocab.cpp, with the depth, size and text limits of

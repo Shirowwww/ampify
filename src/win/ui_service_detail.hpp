@@ -69,7 +69,7 @@
 #include "apple_player.hpp"
 #include "close_to_tray.hpp"
 #include "kit_command.hpp"
-#include "mini_motion.hpp"
+#include "artwork_motion.hpp"
 #include "mini_player_window.hpp"
 #include "xaml_host.hpp"
 
@@ -348,10 +348,17 @@ struct WindowContext : std::enable_shared_from_this<WindowContext> {
     dispatching::DispatcherQueueTimer playerRetry{nullptr};
     int playerTries = 0;
 
+    // Main window only: the animated cover over the play bar's artwork and the full-screen player's
+    // (Ampify.ui.animatedCover, FollowAnimatedCover), and the timer that looks again while the player is not laid out.
+    std::shared_ptr<ArtworkMotionState> playbarMotion;
+    std::shared_ptr<ArtworkMotionState> fullScreenMotion;
+    dispatching::DispatcherQueueTimer coverRetry{nullptr};
+    int coverTries = 0;
+
     // Mini player only: what Ampify changed in its window, and the animated cover over its artwork
-    // (Ampify.ui.miniPlayer.set, FollowMiniPlayer).
+    // (Ampify.ui.miniPlayer.set or Ampify.ui.animatedCover, FollowMiniPlayer).
     MiniWindowState miniWindow;
-    std::shared_ptr<MiniMotionState> miniMotion;
+    std::shared_ptr<ArtworkMotionState> miniMotion;
     // Ampify's buttons in the mini player's display, right of the song: the favourite star, then the players' buttons
     // of the extensions (the transport row has no room). Strong, like the other buttons; the state the star shows, and
     // until when a click's state stands while Apple applies it.
@@ -453,6 +460,7 @@ struct UiService::Shared : std::enable_shared_from_this<UiService::Shared> {
     UiAudioBadge audioBadge;      // what Apple's audio badge says, read by the worker
     std::optional<MiniPlayerAction> miniPlayerPending;  // Ampify.ui.miniPlayer.open/close/toggle, run by the main window
     UiMiniPlayer miniPlayer;  // what the elements ask of the mini player's window, read by the worker
+    UiAnimatedCover animatedCover;  // the album's animated cover and where it plays, read by the worker
     std::atomic<bool> entryInHeader{false};  // ampify.entry, read on the interface thread (PlaceSidebarItem)
     std::string cardTheme;   // the theme the Ampify page shows
     bool cardStale = false;  // the theme changed elsewhere (Marketplace, ampify theme set): the card is built again
@@ -585,6 +593,10 @@ void ReleasePlayerRow(WindowContext& context) noexcept;
 // The content of Apple's full-screen player while it is on screen and run by this thread, else null: a popup opened
 // meanwhile shows over it, not behind it in the main window.
 xaml::UIElement ShownPlayerContent() noexcept;
+// The album's animated cover over the play bar's artwork and the full-screen player's (Ampify.ui.animatedCover), at
+// each refresh of the main window; the mini player's is FollowMiniPlayer's.
+void FollowAnimatedCover(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context);
+void ReleaseAnimatedCover(WindowContext& context) noexcept;
 // The lyrics button of a player's transport row, whose style Ampify's buttons there take; null before it is laid out.
 primitives::ToggleButton PlayerLyricsButton(const xaml::UIElement& content);
 // A toggle whose state belongs to its owner: a click, a key or a screen reader's Toggle (which raises no Click) calls

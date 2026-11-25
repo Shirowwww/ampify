@@ -740,7 +740,8 @@ disc. The icons already sit in the middle of their buttons at their own size.
   on from there when the song plays again, like a turntable (Spinning artwork). Ampify steps nothing for it meanwhile.
 - Under a state, an animation starts each time the state begins.
 - An `infinite` animation moves 30 times a second and stops while Apple Music is hidden or minimized: left to the
-  compositor, it would redraw the whole window at every frame of the screen. A finite one runs on the compositor.
+  compositor, it would redraw the whole window at every frame of the screen. Apple's full-screen player counts as
+  Apple Music shown, even with the main window hidden behind it. A finite one runs on the compositor.
   A `background` colour is always moved this way, finite or not, 30 times a second. While it runs, the theme's own
   `background` for that element waits; it comes back when the animation ends without `forwards`.
 - A turning or scaling animation pivots on the element's middle (or its `transform-origin`) and follows its size when

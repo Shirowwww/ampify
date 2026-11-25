@@ -1,0 +1,32 @@
+{
+  "$schema": "../../schemas/manifest.schema.json",
+  "id": "animated-cover",
+  "name": "Animated cover",
+  "version": "1.0.0",
+  "kind": "extension",
+  "author": "Shirowwww",
+  "description": "The album's animated cover, which Apple only shows on album pages, plays over the artwork of the play bar, of the full-screen player and of the mini player. Each place can be turned off.",
+  "translations": {"fr": {"name": "Pochette animée", "description": "La pochette animée de l'album, qu'Apple ne montre que sur les pages d'album, se joue sur la pochette de la barre de lecture, du lecteur plein écran et du mini-lecteur. Chaque endroit peut être désactivé.", "settings": {"playbar": "Dans la barre de lecture", "fullscreen": "Dans le lecteur plein écran", "mini": "Dans le mini-lecteur"}}, "de": {"name": "Animiertes Cover", "description": "Das animierte Albumcover, das Apple nur auf Albumseiten zeigt, läuft auf dem Cover der Wiedergabeleiste, des Vollbild-Players und des Miniplayers. Jeder Ort lässt sich abschalten.", "settings": {"playbar": "In der Wiedergabeleiste", "fullscreen": "Im Vollbild-Player", "mini": "Im Miniplayer"}}, "es": {"name": "Portada animada", "description": "La portada animada del álbum, que Apple solo muestra en las páginas de álbum, se reproduce sobre la carátula de la barra de reproducción, del reproductor a pantalla completa y del minirreproductor. Cada lugar se puede desactivar.", "settings": {"playbar": "En la barra de reproducción", "fullscreen": "En el reproductor a pantalla completa", "mini": "En el minirreproductor"}}, "pt": {"name": "Capa animada", "description": "A capa animada do álbum, que a Apple só mostra nas páginas de álbum, toca sobre a capa da barra de reprodução, do reprodutor em tela cheia e do minirreprodutor. Cada lugar pode ser desativado.", "settings": {"playbar": "Na barra de reprodução", "fullscreen": "No reprodutor em tela cheia", "mini": "No minirreprodutor"}}, "ru": {"name": "Анимированная обложка", "description": "Анимированная обложка альбома, которую Apple показывает только на страницах альбомов, играет на обложке в панели воспроизведения, в полноэкранном плеере и в мини-плеере. Каждое место можно отключить.", "settings": {"playbar": "В панели воспроизведения", "fullscreen": "В полноэкранном плеере", "mini": "В мини-плеере"}}, "ja": {"name": "アニメーションカバー", "description": "Apple がアルバムページでしか見せないアルバムのアニメーションアートワークを、再生バー、フルスクリーンプレーヤー、ミニプレーヤーのアートワークで再生します。場所ごとにオフにできます。", "settings": {"playbar": "再生バー", "fullscreen": "フルスクリーンプレーヤー", "mini": "ミニプレーヤー"}}, "zh": {"name": "动态封面", "description": "Apple 只在专辑页面显示的专辑动态封面，会在播放栏、全屏播放器和迷你播放器的封面上播放。每个位置都可以单独关闭。", "settings": {"playbar": "在播放栏中", "fullscreen": "在全屏播放器中", "mini": "在迷你播放器中"}}, "it": {"name": "Copertina animata", "description": "La copertina animata dell'album, che Apple mostra solo nelle pagine degli album, scorre sulla copertina della barra di riproduzione, del player a schermo intero e del mini player. Ogni posto si può disattivare.", "settings": {"playbar": "Nella barra di riproduzione", "fullscreen": "Nel player a schermo intero", "mini": "Nel mini player"}}, "ko": {"name": "움직이는 커버", "description": "Apple이 앨범 페이지에서만 보여 주는 앨범의 움직이는 아트워크를 재생 바, 전체 화면 플레이어, 미니 플레이어의 커버에서 재생합니다. 위치마다 끌 수 있습니다.", "settings": {"playbar": "재생 바에서", "fullscreen": "전체 화면 플레이어에서", "mini": "미니 플레이어에서"}}},
+  "kitApi": "1.0",
+  "minAmpify": "1.6.2",
+  "preview": "preview.jpg",
+  "main": "main.js",
+  "permissions": [
+    "player.read",
+    "storage",
+    "ui.playbar",
+    "ui.fullscreen",
+    "network:music.apple.com",
+    "network:amp-api.music.apple.com",
+    "network:mvod.itunes.apple.com"
+  ],
+  "tags": [
+    "artwork",
+    "animation"
+  ],
+  "settings": [
+    {"key": "playbar", "label": "In the play bar", "type": "toggle", "default": true},
+    {"key": "fullscreen", "label": "In the full-screen player", "type": "toggle", "default": true},
+    {"key": "mini", "label": "In the mini player", "type": "toggle", "default": true}
+  ]
+}

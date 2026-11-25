@@ -157,7 +157,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         endif()
         # C++/WinRT calls RoGetActivationFactory and RoOriginateLanguageException, exported by runtimeobject.lib.
         # dwmapi: the visible frame of a window, to lay Apple's player over the main window (src/win/apple_player.cpp).
-        target_link_libraries(ampify_kernel PRIVATE ampify_theme runtimeobject dwmapi)
+        # d3d11: the frames of the animated covers, copied into ordinary images (src/win/video_frames.cpp).
+        target_link_libraries(ampify_kernel PRIVATE ampify_theme runtimeobject dwmapi d3d11)
         # The WinUI projection gives objects with more sections than the default COFF limit.
         target_compile_options(ampify_kernel PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/bigobj>)
         if(MSVC)

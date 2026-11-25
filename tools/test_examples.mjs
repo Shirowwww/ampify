@@ -3902,13 +3902,14 @@ test("sing has every string in all ten languages, with a name and a description 
   }
 });
 
-// mini-player: Apple's mini player opened from a shortcut, its window's wishes, the album's animated cover.
+// mini-player: Apple's mini player opened from a shortcut, its window's wishes. animated-cover: the album's animated
+// cover over the artwork of the play bar, the full-screen player and the mini player.
 const MINI_MASTER = "https://mvod.itunes.apple.com/itunes-assets/HLSMusic112/v4/1f/76/00/P517392561_default.m3u8";
 const MINI_VARIANT_486 = "https://mvod.itunes.apple.com/itunes-assets/HLSMusic122/v4/be/42/f8/P517392561_gr210_486x486.m3u8";
 const MINI_FILE = "https://mvod.itunes.apple.com/itunes-assets/HLSMusic122/v4/be/42/f8/P517392561_gr210_486x486_-.mp4";
 
-function fakeMiniPlayer({ config = {}, catalogId = "1649434280", albumVideo = true, storage = new Map(), catalogStatus = 200 } = {}) {
-  const dir = join(examples, "..", "extensions", "mini-player");
+function fakeArtworkExtension(id, { config = {}, catalogId = "1649434280", albumVideo = true, storage = new Map(), catalogStatus = 200 } = {}) {
+  const dir = join(examples, "..", "extensions", id);
   const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8"));
   const settings = Object.fromEntries(manifest.settings.map((setting) => [setting.key, setting.default]));
   Object.assign(settings, config);
@@ -3916,7 +3917,8 @@ function fakeMiniPlayer({ config = {}, catalogId = "1649434280", albumVideo = tr
   const used = new Set();
   const track = { id: "t-0123456789abcdef", queueItemId: 7, title: "Lavender Haze" };
   const world = {
-    binds: [], sets: [], toggles: 0, gets: [], listeners: {}, timers: [], catalogId, track, queueTitle: track.title, catalogStatus,
+    binds: [], sets: [], covers: [], toggles: 0, gets: [], listeners: {}, timers: [], catalogId, track, queueTitle: track.title,
+    catalogStatus,
   };
   const need = (permission) => {
     used.add(permission);
@@ -3945,6 +3947,13 @@ function fakeMiniPlayer({ config = {}, catalogId = "1649434280", albumVideo = tr
     miniPlayer: {
       set: (options) => (need("ui.fullscreen"), world.sets.push({ ...options })),
       toggle: () => (need("ui.fullscreen"), world.toggles++),
+    },
+    animatedCover: {
+      set: (options) => {
+        if (options && options.playbar) need("ui.playbar");
+        if (options && (options.fullscreen || options.mini)) need("ui.fullscreen");
+        world.covers.push(options && { ...options });
+      },
     },
   };
   fake.ampify.player = {
@@ -3976,42 +3985,68 @@ function fakeMiniPlayer({ config = {}, catalogId = "1649434280", albumVideo = tr
   return { ...fake, manifest, world, used };
 }
 
+const fakeMiniPlayer = (options) => fakeArtworkExtension("mini-player", options);
+const fakeAnimatedCover = (options) => fakeArtworkExtension("animated-cover", options);
+const coverShown = (fake) => (fake.world.covers.at(-1) ? fake.world.covers.at(-1).video : null);
+
 test("mini-player opens and closes Apple's mini player from its shortcut, with the window's wishes", async () => {
-  const fake = fakeMiniPlayer({ config: { opacity: "80 %", motion: false } });
+  const fake = fakeMiniPlayer({ config: { opacity: "80 %" } });
   assert.deepEqual(fake.world.binds.map((bind) => bind.keys), ["Ctrl+Shift+Alt+M"]);
   fake.world.binds[0].fn();
   assert.equal(fake.world.toggles, 1);
-  assert.deepEqual(fake.world.sets, [{ opacity: 0.8, favorite: true, motion: null }]);
+  assert.deepEqual(fake.world.sets, [{ opacity: 0.8, favorite: true }]);
   await settle();
-  assert.equal(fake.world.gets.length, 0, "no catalog request while the animated cover is off");
+  assert.equal(fake.world.gets.length, 0, "the animated cover is the Animated cover extension's");
 });
 
 test("mini-player binds no shortcut when none is chosen, and keeps the window opaque by default", () => {
-  const fake = fakeMiniPlayer({ config: { shortcut: "None", favorite: false, motion: false } });
+  const fake = fakeMiniPlayer({ config: { shortcut: "None", favorite: false } });
   assert.equal(fake.world.binds.length, 0);
-  assert.deepEqual(fake.world.sets, [{ opacity: 1, favorite: false, motion: null }]);
+  assert.deepEqual(fake.world.sets, [{ opacity: 1, favorite: false }]);
 });
 
-test("mini-player finds the album's animated cover, its H.264 file at 486 px, once per song", async () => {
+test("mini-player declares exactly the permissions it uses", () => {
   const fake = fakeMiniPlayer();
+  fake.world.binds[0].fn();
+  assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
+});
+
+test("animated-cover plays the cover in every place by default, and asks nothing with every place off", async () => {
+  const fake = fakeAnimatedCover();
   for (let i = 0; i < 6; i++) await settle();
-  assert.equal(fake.world.sets.at(-1).motion, MINI_FILE);
+  assert.deepEqual(fake.world.covers.at(-1), { video: MINI_FILE, playbar: true, fullscreen: true, mini: true });
+  const off = fakeAnimatedCover({ config: { playbar: false, fullscreen: false, mini: false } });
+  for (let i = 0; i < 6; i++) await settle();
+  assert.equal(off.world.gets.length, 0);
+  assert.equal(off.world.covers.length, 0);
+});
+
+test("animated-cover only names the places that are on", async () => {
+  const fake = fakeAnimatedCover({ config: { fullscreen: false, mini: false } });
+  for (let i = 0; i < 6; i++) await settle();
+  assert.deepEqual(fake.world.covers.at(-1), { video: MINI_FILE, playbar: true, fullscreen: false, mini: false });
+});
+
+test("animated-cover finds the album's animated cover, its H.264 file at 486 px, once per song", async () => {
+  const fake = fakeAnimatedCover();
+  for (let i = 0; i < 6; i++) await settle();
+  assert.equal(coverShown(fake), MINI_FILE);
   const catalog = fake.world.gets.find((get) => get.url.startsWith("https://amp-api.music.apple.com/"));
   assert.ok(catalog.url.includes("/catalog/fr/songs/1649434280?include=albums"), catalog.url);
   assert.equal(catalog.options.headers.Authorization, "Bearer eyJhbGciOi.eyJpc3MiOi.c2lnbmF0dXJl");
   const asked = fake.world.gets.length;
-  const sets = fake.world.sets.length;
+  const covers = fake.world.covers.length;
   fake.world.listeners.trackchange();
   for (let i = 0; i < 3; i++) fake.world.listeners.progress();
   await settle();
   assert.equal(fake.world.gets.length, asked, "the same song is not asked again");
-  assert.equal(fake.world.sets.length, sets, "nor its window's wishes sent again");
+  assert.equal(fake.world.covers.length, covers, "nor its cover sent again");
 });
 
-test("mini-player waits for Apple's queue to name the new song before looking for its cover", async () => {
-  const fake = fakeMiniPlayer({ catalogId: "111" });
+test("animated-cover waits for Apple's queue to name the new song before looking for its cover", async () => {
+  const fake = fakeAnimatedCover({ catalogId: "111" });
   for (let i = 0; i < 6; i++) await settle();
-  assert.equal(fake.world.sets.at(-1).motion, MINI_FILE);
+  assert.equal(coverShown(fake), MINI_FILE);
   // The player has moved on; the queue still names the song before.
   fake.world.track = { id: "t-fedcba9876543210", queueItemId: 8, title: "Anti-Hero" };
   fake.world.catalogId = "222";
@@ -4026,22 +4061,22 @@ test("mini-player waits for Apple's queue to name the new song before looking fo
   assert.deepEqual(asked(), ["111", "222"]);
 });
 
-test("mini-player gives up on a queue that never names the song, with Apple's still cover", async () => {
-  const fake = fakeMiniPlayer();
+test("animated-cover gives up on a queue that never names the song, with Apple's still cover", async () => {
+  const fake = fakeAnimatedCover();
   for (let i = 0; i < 6; i++) await settle();
-  assert.equal(fake.world.sets.at(-1).motion, MINI_FILE);
+  assert.equal(coverShown(fake), MINI_FILE);
   // The queue stays on the song before: its cover must not stay on the new song.
   fake.world.track = { id: "t-fedcba9876543210", queueItemId: 8, title: "Anti-Hero" };
   for (let i = 0; i < 20; i++) fake.world.listeners.progress();
   await settle();
-  assert.equal(fake.world.sets.at(-1).motion, null);
+  assert.equal(coverShown(fake), null);
   assert.equal(fake.world.gets.filter((get) => get.url.includes("/songs/")).length, 1, "nothing asked for a song not named");
 });
 
-test("mini-player asks the catalog again for a song whose answer was an error", async () => {
-  const fake = fakeMiniPlayer({ catalogStatus: 500 });
+test("animated-cover asks the catalog again for a song whose answer was an error", async () => {
+  const fake = fakeAnimatedCover({ catalogStatus: 500 });
   for (let i = 0; i < 6; i++) await settle();
-  assert.equal(fake.world.sets.at(-1).motion, null);
+  assert.equal(coverShown(fake), null);
   const songs = () => fake.world.gets.filter((get) => get.url.includes("/songs/")).length;
   assert.equal(songs(), 1);
   // The same song comes back (repeat): the error was not kept as "no cover".
@@ -4050,31 +4085,32 @@ test("mini-player asks the catalog again for a song whose answer was an error", 
   fake.world.listeners.trackchange();
   for (let i = 0; i < 6; i++) await settle();
   assert.equal(songs(), 2);
-  assert.equal(fake.world.sets.at(-1).motion, MINI_FILE);
+  assert.equal(coverShown(fake), MINI_FILE);
 });
 
-test("mini-player shows Apple's still cover when nothing plays", async () => {
-  const fake = fakeMiniPlayer();
+test("animated-cover shows Apple's still cover when nothing plays", async () => {
+  const fake = fakeAnimatedCover();
   for (let i = 0; i < 6; i++) await settle();
-  assert.equal(fake.world.sets.at(-1).motion, MINI_FILE);
+  assert.equal(coverShown(fake), MINI_FILE);
   fake.world.track = null;
   fake.world.listeners.trackchange();
-  assert.equal(fake.world.sets.at(-1).motion, null);
+  assert.equal(fake.world.covers.at(-1), null);
 });
 
-test("mini-player declares exactly the permissions it uses", async () => {
-  const fake = fakeMiniPlayer();
+test("animated-cover declares exactly the permissions it uses", async () => {
+  const fake = fakeAnimatedCover();
   for (let i = 0; i < 6; i++) await settle();
-  fake.world.binds[0].fn();
   assert.deepEqual([...fake.used].sort(), declared(fake.manifest));
 });
 
-test("mini-player has a name and a description in all ten languages", () => {
-  const manifest = JSON.parse(readFileSync(join(examples, "..", "extensions", "mini-player", "manifest.json"), "utf-8"));
-  for (const code of languages) {
-    if (code === "en") continue;
-    const translation = manifest.translations[code];
-    assert.ok(translation && translation.name && translation.description, code);
-    assert.deepEqual(Object.keys(translation.settings).sort(), manifest.settings.map((setting) => setting.key).sort(), code);
-  }
-});
+for (const id of ["mini-player", "animated-cover"]) {
+  test(`${id} has a name and a description in all ten languages`, () => {
+    const manifest = JSON.parse(readFileSync(join(examples, "..", "extensions", id, "manifest.json"), "utf-8"));
+    for (const code of languages) {
+      if (code === "en") continue;
+      const translation = manifest.translations[code];
+      assert.ok(translation && translation.name && translation.description, code);
+      assert.deepEqual(Object.keys(translation.settings).sort(), manifest.settings.map((setting) => setting.key).sort(), code);
+    }
+  });
+}

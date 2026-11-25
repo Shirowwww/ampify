@@ -258,6 +258,7 @@ void ReleaseXaml(WindowContext& context) noexcept {
         ReleasePlaybarHover(context);
         ReleaseAudioBadge(context);
         ReleasePlayerRow(context);
+        ReleaseAnimatedCover(context);
         ReleaseMiniPlayer(context);
         context.probe.clear();
         context.probeObjects.clear();
@@ -496,6 +497,7 @@ void Refresh(UiService::Shared& shared, const std::shared_ptr<WindowContext>& co
         FollowFoldedLogo(shared, context);
         FollowSongRoom(shared, context);
         ApplySurfaces(shared, context, content);
+        FollowAnimatedCover(shared, context);
         RunPendingMiniAction(shared);
     } else if (context->role == WindowRole::Mini) {
         FollowMiniPlayer(shared, context);
@@ -725,6 +727,7 @@ void UiService::Run() {
                     if (changes.audioBadge) m_shared->audioBadge = *changes.audioBadge;
                     if (changes.miniPlayerAction) m_shared->miniPlayerPending = changes.miniPlayerAction;
                     if (changes.miniPlayer) m_shared->miniPlayer = *changes.miniPlayer;
+                    if (changes.animatedCover) m_shared->animatedCover = *changes.animatedCover;
                     windows = m_shared->windows;
                 }
                 // The mini player shows the badge, the players' buttons and its window's wishes too.

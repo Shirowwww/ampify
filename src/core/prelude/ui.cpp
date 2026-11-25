@@ -163,6 +163,15 @@ const char kUi[] = R"AMPIFYJS(
     if (typeof motion !== "string") throw new TypeError("ui: miniPlayer.set expects an address as motion");
     return native.uiMiniPlayerSet(opacity, options.favorite === true, motion);
   };
+  // The album's animated cover (the address of one of Apple's motion artwork videos) over the artwork of the play
+  // bar, the full-screen player and the mini player, each asked for by name.
+  const animatedCoverSet = (options) => {
+    if (options === undefined || options === null) return native.uiAnimatedCover("", false, false, false);
+    if (typeof options !== "object") throw new TypeError("ui: animatedCover.set expects { video, playbar, fullscreen, mini } or null");
+    const video = options.video === undefined || options.video === null ? "" : options.video;
+    if (typeof video !== "string") throw new TypeError("ui: animatedCover.set expects an address as video");
+    return native.uiAnimatedCover(video, options.playbar === true, options.fullscreen === true, options.mini === true);
+  };
   const hoverListeners = new Set();
   const onHover = (fn) => {
     if (typeof fn !== "function") throw new TypeError("ui: onHover expects a function");
@@ -324,6 +333,7 @@ const char kUi[] = R"AMPIFYJS(
       toggle: () => native.uiMiniPlayer("toggle"),
       set: (options) => miniPlayerSet(options),
     }),
+    animatedCover: Object.freeze({ set: (options) => animatedCoverSet(options) }),
     panel: Object.freeze({
       register: (id, vue) => native.uiPanel(text(id), treeText(vue, "panel:" + text(id))),
       remove(id) {

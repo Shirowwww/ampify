@@ -107,22 +107,28 @@ void RemoveCopies(WindowContext& context) {
     context.playerCopies.clear();
 }
 
-// The player shows before its row is laid out: the refresh is queued again a few times.
-void RetryLater(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
-    if (context->playerTries >= kPlayerRetries) return;
-    if (!context->playerRetry) {
-        context->playerRetry = context->dispatcher.CreateTimer();
-        context->playerRetry.Interval(kPlayerRetryStep);
-        context->playerRetry.IsRepeating(false);
+// The player shows before its row or its artwork is laid out: the refresh is queued again a few times, with `timer`
+// and `tries` of the context.
+void RetryLater(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context,
+                dispatching::DispatcherQueueTimer& timer, int& tries) {
+    if (tries >= kPlayerRetries) return;
+    if (!timer) {
+        timer = context->dispatcher.CreateTimer();
+        timer.Interval(kPlayerRetryStep);
+        timer.IsRepeating(false);
         WeakShared weakShared = shared.weak_from_this();
         WeakContext weakContext = context;
-        OnUiTick(context->playerRetry, [weakShared, weakContext](auto const&, auto const&) noexcept {
+        OnUiTick(timer, [weakShared, weakContext](auto const&, auto const&) noexcept {
             if (auto live = weakContext.lock()) QueueRefresh(weakShared, live);
         });
     }
-    if (context->playerRetry.IsRunning()) return;
-    context->playerTries++;
-    context->playerRetry.Start();
+    if (timer.IsRunning()) return;
+    tries++;
+    timer.Start();
+}
+
+void RetryLater(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
+    RetryLater(shared, context, context->playerRetry, context->playerTries);
 }
 
 }  // namespace
@@ -230,6 +236,40 @@ void FollowPlayerRow(UiService::Shared& shared, const std::shared_ptr<WindowCont
                     "Interface: button \"" + control.label + "\" of " + control.elementId + " placed in " + where +
                         (mini ? ", right of the song" : ", before its lyrics button"));
     }
+}
+
+void FollowAnimatedCover(UiService::Shared& shared, const std::shared_ptr<WindowContext>& context) {
+    if (context->role != WindowRole::Main) return;
+    UiAnimatedCover cover;
+    {
+        std::lock_guard<std::mutex> lock(shared.mutex);
+        cover = shared.animatedCover;
+    }
+    const std::string none;
+    FollowArtworkMotion(context->playbarMotion, MotionPlace::Playbar, context->root.get(),
+                        cover.places.playbar ? cover.video : none, shared.journal);
+    // Hidden, the full-screen player lets its video go: it comes back from the cache when the player shows again.
+    xaml::UIElement player = cover.places.fullscreen ? ShownPlayerContent() : nullptr;
+    if (!player) {
+        ReleaseArtworkMotion(context->fullScreenMotion);
+        context->coverTries = 0;
+        return;
+    }
+    if (FollowArtworkMotion(context->fullScreenMotion, MotionPlace::FullScreen, player, cover.video, shared.journal)) {
+        context->coverTries = 0;
+    } else {
+        RetryLater(shared, context, context->coverRetry, context->coverTries);
+    }
+}
+
+void ReleaseAnimatedCover(WindowContext& context) noexcept {
+    try {
+        if (context.coverRetry) context.coverRetry.Stop();
+        context.coverRetry = nullptr;
+    } catch (...) {
+    }
+    ReleaseArtworkMotion(context.playbarMotion);
+    ReleaseArtworkMotion(context.fullScreenMotion);
 }
 
 void ReleasePlayerRow(WindowContext& context) noexcept {

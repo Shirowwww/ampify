@@ -77,7 +77,14 @@ bool XamlTreeBackend::Attach(WindowRole role) {
     }
     m_role = role;
     m_window = winrt::make_weak(window);
-    m_animations.WindowShown([handle = WindowHandle(window)] { return !handle || WindowOnScreen(handle); });
+    // Apple's full-screen player is themed from the main window's pass (its content is walked with it): its loops turn
+    // while it shows, even with the main window hidden behind it (the record of Spinning artwork, issue #13).
+    m_animations.WindowShown([handle = WindowHandle(window), role] {
+        if (!handle || WindowOnScreen(handle)) return true;
+        if (role != WindowRole::Main) return false;
+        HWND player = WindowHandle(AppWindowOf(WindowRole::Player));
+        return player && WindowOnScreen(player);
+    });
     // Walking or writing the tree while Apple Music closes crashed it in Microsoft.UI.Xaml.dll.
     std::shared_ptr<bool> closed = m_closed;
     window.Closed([closed](IInspectable const&, xaml::WindowEventArgs const&) noexcept { *closed = true; });

@@ -534,6 +534,60 @@ TEST_CASE(Interface_TheMiniPlayerSetChecksItsOptions) {
     CHECK(f.host.ui.MiniPlayer().elementId.empty());
 }
 
+TEST_CASE(Interface_TheAnimatedCoverTakesTheLastElementsVideoAndItsPlaces) {
+    ampify::UiModel model;
+    std::uint64_t serial = model.AnimatedCover().serial;
+    model.SetAnimatedCover("one", kMotion, {.playbar = true});
+    model.SetAnimatedCover("two", kMotion, {.fullscreen = true, .mini = true});
+    CHECK(model.AnimatedCover().elementId == "two");
+    CHECK(model.AnimatedCover().video == kMotion);
+    CHECK(!model.AnimatedCover().places.playbar);
+    CHECK(model.AnimatedCover().places.fullscreen);
+    CHECK(model.AnimatedCover().places.mini);
+    CHECK(model.AnimatedCover().serial != serial);
+    model.SetAnimatedCover("two", "", {.fullscreen = true});  // no video: the first element's shows again
+    CHECK(model.AnimatedCover().elementId == "one");
+    CHECK(model.AnimatedCover().places.playbar);
+    model.SetAnimatedCover("one", "https://example.com/a.mp4", {.playbar = true});  // not Apple's: nothing
+    CHECK(model.AnimatedCover().elementId.empty());
+    model.SetAnimatedCover("one", kMotion, {});  // nowhere to play: nothing either
+    CHECK(model.AnimatedCover().elementId.empty());
+    model.SetAnimatedCover("one", kMotion, {.mini = true});
+    serial = model.AnimatedCover().serial;
+    model.RemoveElement("one");
+    CHECK(model.AnimatedCover().elementId.empty());
+    CHECK(model.AnimatedCover().video.empty());
+    CHECK(model.AnimatedCover().serial != serial);
+}
+
+TEST_CASE(Interface_TheAnimatedCoverSetChecksItsOptionsAndPermissions) {
+    Fixture f;
+    auto element = f.Make("cover-set", "extension", R"("ui.playbar", "ui.fullscreen")", R"(
+        Ampify.ui.animatedCover.set({ video: ")" + kMotion + R"(", playbar: true, fullscreen: true });
+        try { Ampify.ui.animatedCover.set({ video: 3 }); } catch (e) { Ampify.log("[set] " + e.name); }
+        try { Ampify.ui.animatedCover.set("x"); } catch (e) { Ampify.log("[set] " + e.name); }
+        try { Ampify.ui.animatedCover.set({ video: "https://example.com/v.mp4", playbar: true }); } catch (e) { Ampify.log("[set] " + e.name); }
+    )");
+    CHECK(element->Start());
+    CHECK(f.host.ui.AnimatedCover().elementId == "cover-set");
+    CHECK(f.host.ui.AnimatedCover().places.playbar);
+    CHECK(f.host.ui.AnimatedCover().places.fullscreen);
+    CHECK(!f.host.ui.AnimatedCover().places.mini);
+    CHECK(f.Logged("[set] TypeError"));
+    CHECK(f.Logged("[set] RangeError"));
+    element->Stop();
+    CHECK(f.host.ui.AnimatedCover().elementId.empty());
+
+    // The play bar asks for ui.playbar, Apple's players for ui.fullscreen.
+    auto barOnly = f.Make("cover-bar", "extension", R"("ui.playbar")", R"(
+        Ampify.ui.animatedCover.set({ video: ")" + kMotion + R"(", playbar: true });
+        try { Ampify.ui.animatedCover.set({ video: ")" + kMotion + R"(", mini: true }); } catch (e) { Ampify.log("[perm] " + e.message); }
+    )");
+    CHECK(barOnly->Start());
+    CHECK(f.host.ui.AnimatedCover().places.playbar);
+    CHECK(f.Logged("[perm]"));
+}
+
 TEST_CASE(Interface_TitleNeedsTheWindowPermission) {
     Fixture f;
     auto denied = f.Make("title-no", "extension", "", R"(Ampify.ui.title.set("Demo");)");

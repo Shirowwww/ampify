@@ -376,6 +376,10 @@ declare const Ampify: {
       open(): void; close(): void; toggle(): void;
       set(options: { opacity?: number; favorite?: boolean; motion?: string | null } | null): void;
     };
+    /** The album's animated cover (one of Apple's motion artwork MP4 files) over the artwork of the places asked. */
+    animatedCover: {
+      set(options: { video?: string | null; playbar?: boolean; fullscreen?: boolean; mini?: boolean } | null): void;
+    };
     panel: { register(id: string, view: UiNode): void; remove(id: string): boolean; onClose(id: string, fn: () => void): () => void };
     title: { set(text: string): void; get(): string; reset(): void };
     /** A new label for a top bar or play bar button this element added: its text without an icon, its tooltip with one. */

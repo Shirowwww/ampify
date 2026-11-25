@@ -42,10 +42,11 @@ struct SurfaceChanges {
     std::optional<UiAudioBadge> audioBadge;  // what Apple's audio badge says changed
     std::optional<MiniPlayerAction> miniPlayerAction;  // the last Ampify.ui.miniPlayer.open/close/toggle since the last poll
     std::optional<UiMiniPlayer> miniPlayer;            // what the elements ask of the mini player's window changed
+    std::optional<UiAnimatedCover> animatedCover;      // the animated cover or the places it plays changed
 
     bool Empty() const {
         return added.empty() && changed.empty() && removed.empty() && !route && !applePlayer && !hover && !audioBadge &&
-               !miniPlayerAction && !miniPlayer;
+               !miniPlayerAction && !miniPlayer && !animatedCover;
     }
 };
 
@@ -69,6 +70,7 @@ private:
     std::uint64_t m_audioBadgeSerial = 0;
     std::uint64_t m_miniRequests = 0;
     std::uint64_t m_miniPlayerSerial = 0;
+    std::uint64_t m_animatedCoverSerial = 0;
     std::uint64_t m_revision = 0;
     std::uint64_t m_version = 0;  // UiModel::Version at the last reading
     bool m_polled = false;

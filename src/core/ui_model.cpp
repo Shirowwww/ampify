@@ -510,6 +510,9 @@ void UiModel::RemoveElement(const std::string& elementId) {
     if (std::erase_if(m_miniPlayers, [&](const UiMiniPlayer& wish) { return wish.elementId == elementId; }) > 0) {
         m_miniPlayerSerial++;
     }
+    if (std::erase_if(m_animatedCovers, [&](const UiAnimatedCover& wish) { return wish.elementId == elementId; }) > 0) {
+        m_animatedCoverSerial++;
+    }
 }
 
 std::optional<UiControl> UiModel::Find(int controlId) const {
@@ -610,6 +613,20 @@ UiMiniPlayer UiModel::MiniPlayer() const {
     std::lock_guard<std::mutex> guard(m_mutex);
     UiMiniPlayer wish = m_miniPlayers.empty() ? UiMiniPlayer{} : m_miniPlayers.back();
     wish.serial = m_miniPlayerSerial;
+    return wish;
+}
+
+void UiModel::SetAnimatedCover(const std::string& elementId, const std::string& video, AnimatedCoverPlaces places) {
+    Edit edit(*this);
+    std::erase_if(m_animatedCovers, [&](const UiAnimatedCover& wish) { return wish.elementId == elementId; });
+    if (IsMotionArtworkAddress(video) && places.Any()) m_animatedCovers.push_back(UiAnimatedCover{elementId, video, places, 0});
+    m_animatedCoverSerial++;
+}
+
+UiAnimatedCover UiModel::AnimatedCover() const {
+    std::lock_guard<std::mutex> guard(m_mutex);
+    UiAnimatedCover wish = m_animatedCovers.empty() ? UiAnimatedCover{} : m_animatedCovers.back();
+    wish.serial = m_animatedCoverSerial;
     return wish;
 }
 

@@ -261,6 +261,23 @@ struct UiNatives : ScriptBridge {
         return JS_UNDEFINED;
     }
 
+    // native.uiAnimatedCover(video, playbar, fullscreen, mini): the album's animated cover over the artwork of the
+    // places asked, "" for none. The play bar needs ui.playbar, Apple's players ui.fullscreen.
+    AMPIFY_NATIVE(UiAnimatedCover) {
+        ScriptExtension* ext = Owner(ctx);
+        JSValue failure = JS_UNDEFINED;
+        std::string video = String(ctx, argc, argv, 0).value_or("");
+        AnimatedCoverPlaces places{argc >= 2 && JS_ToBool(ctx, argv[1]) != 0, argc >= 3 && JS_ToBool(ctx, argv[2]) != 0,
+                                   argc >= 4 && JS_ToBool(ctx, argv[3]) != 0};
+        if (places.playbar && !Require(ctx, ext, "ui.playbar", &failure)) return failure;
+        if ((places.fullscreen || places.mini) && !Require(ctx, ext, "ui.fullscreen", &failure)) return failure;
+        if (!video.empty() && !IsMotionArtworkAddress(video)) {
+            return Throw(ctx, "RangeError", "animatedCover.set: video is not an animated cover of Apple's");
+        }
+        HostOf(ext).Ui().SetAnimatedCover(ext->id(), video, places);
+        return JS_UNDEFINED;
+    }
+
     // native.uiFullscreenClose(session): closes the element's own fullscreen surface, so it needs no permission.
     AMPIFY_NATIVE(UiFullscreenClose) {
         ScriptExtension* ext = Owner(ctx);
@@ -353,6 +370,7 @@ void DefineUi(api::NativeScope& scope) {
     scope.Function("uiApplePlayer", UiNatives::UiApplePlayer, 0);
     scope.Function("uiMiniPlayer", UiNatives::UiMiniPlayer, 1);
     scope.Function("uiMiniPlayerSet", UiNatives::UiMiniPlayerSet, 3);
+    scope.Function("uiAnimatedCover", UiNatives::UiAnimatedCover, 4);
     scope.Function("uiPage", UiNatives::UiPage, 2);
     scope.Function("uiNavigate", UiNatives::UiNavigate, 1);
     scope.Function("uiTitle", UiNatives::UiTitle, 1);

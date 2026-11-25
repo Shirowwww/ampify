@@ -88,7 +88,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 | Selected and playing rows, toggles that are on, greyed buttons | `:selected` and the `selected-background` colours for selected rows, `:playing` for the row of the song playing (`.list-item:playing`), `:checked` and `:disabled` for controls | Done |
 | Lyrics lines | `.lyrics`, `.lyrics-synced`, `.lyrics-line`, `.lyrics-line-content`, `.lyrics-words`, `.lyrics-background-words`, `.lyrics-instrumental`; the line being sung with `:current` (`.lyrics-line-content:current`, the Lyrics spotlight snippet) | Done |
 | Full-screen player | Apple's player (`.fullscreen-*`) | Done |
-| Mini player | Its own window and interface thread, with a copy of the theme engine there: the theme's colours, scheme and snippets reach it, and `.mini-player`, `.mini-artwork`, `.mini-controls`... style it ([names](themes/names.md#search)); the window's material stays the main window's. The Minimal mini player snippet trims it; the Mini player extension opens it from a shortcut, makes it see-through and plays the album's animated cover in it (`Ampify.ui.miniPlayer`) | Partial: checked by tests only, not on screen |
+| Mini player | Its own window and interface thread, with a copy of the theme engine there: the theme's colours, scheme and snippets reach it, and `.mini-player`, `.mini-artwork`, `.mini-controls`... style it ([names](themes/names.md#search)); the window's material stays the main window's. The Minimal mini player snippet trims it; the Mini player extension opens it from a shortcut, makes it see-through (`Ampify.ui.miniPlayer`), and the Animated cover extension plays the album's animated cover in it, in the play bar and in the full-screen player (`Ampify.ui.animatedCover`) | Partial: checked by tests only, not on screen |
 | Layout changes (bar at the bottom, columns swapped) | `ampify:bottom-bar`, `order`, `grid-*`; Apple's lists resist | Partial |
 | `overflow`, `clip-path` | `overflow: hidden` and `clip-path: inset(...)` cut an element to a rectangle; no rounded or shaped clips | Done |
 | `filter` | `blur()`, `saturate()`, `grayscale()`, `sepia()`, `brightness()`, `contrast()`, `invert()`, `hue-rotate()`, and Ampify's `tint()` and `duotone()`, on an element with one child; not `drop-shadow()` or `url()` | Partial: colour filters checked by tests only, not on screen |
@@ -99,7 +99,7 @@ Features that only exist in Spotify (podcasts, DJ, Friend Activity, Canvas, ads)
 
 | Spicetify snippet | Ampify | Status |
 |---|---|---|
-| Rotating or spinning CD cover art | `spinning-artwork`: a round record with grooves and a spindle hole, turning while a song plays and still in pause | Done |
+| Rotating or spinning CD cover art | `spinning-artwork`: a round record with grooves and a spindle hole, turning while a song plays and still in pause, in the play bar and in Apple's full-screen player | Done |
 | Hamsters, Oneko, Duck and other GIFs on the playback bar | `::before` / `::after` images | Done |
 | Equalizer in the bar | `display-equalizer`: `bars(10)` in the artwork's colour, thin or thick bars | Done |
 | Rounded or square images, buttons and bars (Be Square, Rounded Images) | `corner-radius`; `round-corners` (Corners) rounds with one radius, or squares every panel, the bar and Ampify's panels included | Done |

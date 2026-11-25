@@ -489,6 +489,7 @@ Ampify.ui.miniPlayer.open()            // permission ui.fullscreen: Apple Music'
 Ampify.ui.miniPlayer.close()           // as Alt+F4 on it does: Apple Music's main window comes back
 Ampify.ui.miniPlayer.toggle()          // closes it when it is on screen, opens it otherwise
 Ampify.ui.miniPlayer.set({ opacity, favorite, motion })  // what the element asks of its window; null: nothing
+Ampify.ui.animatedCover.set({ video, playbar, fullscreen, mini })  // ui.playbar, ui.fullscreen (1.6.2)
 Ampify.ui.panel.register(id, view)     // a 380 px column on the right; it slides in from the right
 Ampify.ui.panel.remove(id)             // slides it back out; register brings it back
 Ampify.ui.panel.onClose(id, fn)        // the user closed it with its Close button: it is removed (register brings it
@@ -575,6 +576,12 @@ Ampify.ui.navigate(path)
   throws). Ampify downloads it once, keeps the last six, and plays it muted and looping over the artwork, which Apple
   grows into the album view on a click; nothing plays while Windows' animation effects are off. The last element to
   ask wins; `set(null)`, or stopping the element, gives Apple's window back.
+- `animatedCover.set({ video, playbar, fullscreen, mini })` plays the album's animated cover, the same kind of address
+  as the `motion` of `miniPlayer.set`, over the artwork of each place set to `true`: the play bar (permission
+  `ui.playbar`), Apple's full-screen player and its mini player (permission `ui.fullscreen`). Same download, cache and
+  rules. The video stays inside the artwork's own frame, so a theme or snippet that rounds or turns the artwork
+  (Spinning artwork) shapes it too. In the mini player, a `motion` given to `miniPlayer.set` goes first. The last
+  element to ask wins; `set(null)`, or stopping the element, gives Apple's still covers back.
 - An app page takes the place of Apple Music's page, with a Back button; Apple Music's own navigation closes it.
 - A `lyrics` node draws itself from Apple's player at the screen's pace: the element renders it once, with no timer of
   its own. Give it room, as a growing child of a `stack` of fixed `height`. An `image` with `src: "artwork"` shows
