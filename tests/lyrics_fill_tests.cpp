@@ -1,6 +1,7 @@
 // apple.lyricsFill: where the edge of a row's gradient stands as the line is sung (src/core/lyrics_fill.hpp).
 
 #include <cmath>
+#include <utility>
 #include <vector>
 
 #include "../src/core/lyrics_fill.hpp"
@@ -75,29 +76,98 @@ TEST_CASE(LyricsFill_ARowWaitsForItsFirstWordAndTimesNeverGoBack) {
     CHECK(Near(EdgeAt({}, 10), 0.0));
 }
 
-// apple.lyricsFill = soft: the colour turns from sung to unsung over a width centred on the edge.
-TEST_CASE(LyricsFill_ASoftEdgeStartsBeforeEachWordAndEndsPastIt) {
-    std::vector<WordSpan> spans{{0.1, 0.3}, {0.6, 0.9}};
-    std::vector<WordSpan> soft = ampify::SoftSpans(spans, 0.1);
-    CHECK(soft.size() == 2);
-    if (soft.size() != 2) return;
-    CHECK(Near(soft[0].from, 0.05));  // the whole soft edge before the first word: nothing lit early
-    CHECK(Near(soft[0].to, 0.35));    // and past its end: the word sung whole
-    CHECK(Near(soft[1].from, 0.55));
-    CHECK(Near(soft[1].to, 0.95));
-    CHECK(ampify::SoftSpans({}, 0.1).empty());
+// apple.lyricsFill = soft: the colour turns from sung to unsung between two stops, each with a path of its own.
+TEST_CASE(LyricsFill_ASoftEdgeFadesEachWordWithoutReachingTheNextOne) {
+    // Issue #5: the soft part spilled onto the next word while it waited to be sung.
+    std::vector<LyricWord> words{Word(0, 300), Word(1000, 1200)};
+    std::vector<WordSpan> spans{{0.0, 0.3}, {0.35, 0.7}};  // a space narrower than the soft part
+    ampify::SoftFillPaths soft = ampify::SoftRowFillPaths(words, spans, 0, 0.1);
+    CHECK(!soft.sung.empty() && !soft.unsung.empty());
+    CHECK(EdgeAt(soft.unsung, 0) <= 0.0 + 1e-9);   // the first word wholly unsung as it starts
+    CHECK(Near(EdgeAt(soft.sung, 150), 0.10));       // halfway: the soft part, its whole width, inside the word
+    CHECK(Near(EdgeAt(soft.unsung, 150), 0.20));
+    CHECK(Near(EdgeAt(soft.sung, 300), 0.3));        // the first word sung whole at its end
+    CHECK(EdgeAt(soft.unsung, 300) <= 0.35 + 1e-9);  // and the next one still wholly unsung
+    CHECK(Near(EdgeAt(soft.sung, 900), 0.3));        // while it waits
+    CHECK(EdgeAt(soft.unsung, 900) <= 0.35 + 1e-9);
+    CHECK(Near(EdgeAt(soft.unsung, 1100), 0.575));   // then it fades in turn
+    CHECK(Near(EdgeAt(soft.sung, 1200), 0.7));
+    CHECK(ampify::SoftRowFillPaths({}, {}, 0, 0.1).sung.empty());
 }
 
-TEST_CASE(LyricsFill_ASoftEdgeNeverGoesBackBetweenCloseWords) {
-    // A space narrower than the soft edge: the next word starts where the edge stands, it does not step back.
-    std::vector<LyricWord> words{Word(0, 400), Word(400, 800)};
-    std::vector<WordSpan> spans{{0.0, 0.48}, {0.52, 1.0}};
-    std::vector<WordSpan> soft = ampify::SoftSpans(spans, 0.2);
-    CHECK(Near(soft[1].from, soft[0].to));
-    std::vector<FillKey> path = RowFillPath(words, soft, 0);
-    for (size_t i = 1; i < path.size(); i++) CHECK(path[i].edge >= path[i - 1].edge);
-    CHECK(EdgeAt(path, 0) + 0.1 <= 0.0 + 1e-9);   // the first word wholly unsung before it starts
-    CHECK(EdgeAt(path, 800) - 0.1 >= 1.0 - 1e-9);  // the last wholly sung at its end
+TEST_CASE(LyricsFill_ASoftEdgeKeepsItsWidthInAWideSpace) {
+    std::vector<LyricWord> words{Word(0, 300), Word(1000, 1200)};
+    std::vector<WordSpan> spans{{0.0, 0.3}, {0.6, 1.0}};
+    ampify::SoftFillPaths soft = ampify::SoftRowFillPaths(words, spans, 0, 0.1);
+    CHECK(Near(EdgeAt(soft.sung, 500), 0.3));  // past the sung word, as wide as ever, short of the next one
+    CHECK(Near(EdgeAt(soft.unsung, 500), 0.4));
+    CHECK(Near(EdgeAt(soft.sung, 1000), 0.5));  // the next word starts: the soft part stands just before it
+    CHECK(Near(EdgeAt(soft.unsung, 1000), 0.6));
+}
+
+TEST_CASE(LyricsFill_ASoftEdgesStopsNeverGoBackNorCross) {
+    // Words back to back, overlapping, and apart; a row that starts late.
+    std::vector<LyricWord> words{Word(1500, 1900), Word(1900, 2100), Word(2000, 2600), Word(3000, 3100)};
+    std::vector<WordSpan> spans{{0.02, 0.2}, {0.23, 0.3}, {0.32, 0.7}, {0.9, 0.98}};
+    ampify::SoftFillPaths soft = ampify::SoftRowFillPaths(words, spans, 1000, 0.12);
+    for (const auto* path : {&soft.sung, &soft.unsung}) {
+        for (size_t i = 1; i < path->size(); i++) {
+            CHECK((*path)[i].atMs > (*path)[i - 1].atMs);
+            CHECK((*path)[i].edge >= (*path)[i - 1].edge - 1e-9);
+        }
+    }
+    for (double at = 0; at <= 2500; at += 5) CHECK(EdgeAt(soft.sung, at) <= EdgeAt(soft.unsung, at) + 1e-9);
+    CHECK(EdgeAt(soft.unsung, 400) <= 0.02 + 1e-9);  // nothing lit before the row's first word
+    CHECK(EdgeAt(soft.sung, 2200) >= 0.98 - 1e-9);   // all of it sung at the end
+}
+
+// The iPhone app lifts a word from its start, over a second or its own length when longer, slowing down.
+TEST_CASE(LyricsFill_AWordRisesFromItsStartOverASecondOrItsLength) {
+    CHECK(Near(ampify::LiftAt(1000, 1250, 900), 0.0));
+    CHECK(Near(ampify::LiftAt(1000, 1250, 1500), 0.75));  // a short word: half its second, three quarters up
+    CHECK(Near(ampify::LiftAt(1000, 1250, 2000), 1.0));
+    CHECK(Near(ampify::LiftAt(0, 3000, 1500), 0.75));     // a long word rises over its own length
+    CHECK(Near(ampify::LiftAt(0, 3000, 9000), 1.0));
+    CHECK(Near(ampify::LiftDurationMs(0, 250), 1000));
+}
+
+// The compositor draws LiftPath, straight between its keys: the same curve as LiftAt.
+TEST_CASE(LyricsFill_TheRiseDrawnFollowsTheRiseTested) {
+    for (const auto& [start, end] : {std::pair{400.0, 650.0}, std::pair{0.0, 3000.0}, std::pair{-300.0, 200.0}}) {
+        const std::vector<FillKey> path = ampify::LiftPath(start, end);
+        CHECK(!path.empty() && path.front().atMs >= 0);
+        for (size_t i = 1; i < path.size(); i++) CHECK(path[i].atMs > path[i - 1].atMs);
+        for (double at = 0; at <= end + 2000; at += 7) {
+            CHECK(std::fabs(EdgeAt(path, at) - ampify::LiftAt(start, end, at)) < 0.002);
+        }
+    }
+}
+
+// A row's plan always has its paths: none for a row with no word, one shared by both stops for the crisp edge.
+TEST_CASE(LyricsFill_ARowPlanIsWholeOrNone) {
+    std::vector<LyricWord> words{Word(0, 300), Word(1000, 1200)};
+    std::vector<WordSpan> spans{{0.0, 0.3}, {0.35, 0.7}};
+    CHECK(!ampify::RowFillPlan::Of({}, {}, 0, 0).has_value());
+    CHECK(!ampify::RowFillPlan::Of({}, {}, 0, 0.1).has_value());
+    const auto crisp = ampify::RowFillPlan::Of(words, spans, 0, 0);
+    CHECK(crisp && !crisp->Soft() && !crisp->Sung().empty() && &crisp->Unsung() == &crisp->Sung());
+    const auto soft = ampify::RowFillPlan::Of(words, spans, 0, 0.1);
+    CHECK(soft && soft->Soft() && !soft->Sung().empty() && !soft->Unsung().empty());
+    CHECK(Near(soft->LastMs(), 1200));
+}
+
+// Right-to-left lyrics: words laid from the right are in order along a gradient drawn from the right, and a row whose
+// words do not follow one another along its gradient is left to Apple (the stops would cross).
+TEST_CASE(LyricsFill_RightToLeftWordsAreReadAlongTheGradient) {
+    std::vector<LyricWord> words{Word(0, 300), Word(1000, 1200)};
+    std::vector<WordSpan> fromRight{{0.7, 1.0}, {0.3, 0.65}};
+    const std::vector<WordSpan> along = ampify::SpansAlong(fromRight, 1, 0);
+    CHECK(along.size() == 2 && Near(along[0].from, 0.0) && Near(along[0].to, 0.3));
+    CHECK(Near(along[1].from, 0.35) && Near(along[1].to, 0.7));
+    CHECK(ampify::RowFillPlan::Of(words, along, 0, 0.1).has_value());
+    CHECK(!ampify::RowFillPlan::Of(words, ampify::SpansAlong(fromRight, 0, 1), 0, 0.1).has_value());
+    CHECK(!ampify::RowFillPlan::Of(words, ampify::SpansAlong(fromRight, 0, 1), 0, 0).has_value());
+    CHECK(ampify::SpansAlong(fromRight, 0.5, 0.5).empty());
 }
 
 TEST_CASE(LyricsFill_ApplesGradientIsKnownWhetherItsEdgeIsCrispOrSpread) {

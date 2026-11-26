@@ -108,9 +108,27 @@ The Atmos measurements in [atmos-loudness.md](atmos-loudness.md) were taken on `
   virtualized: a song's 90 hosts stand in the view at once. Opening the full-screen player or the mini player left a
   single `KaraokeLyricsView` to follow, its height changing: Apple seems to move the same view between them. Ampify's `apple.lyricsFill` gives each row's mask a gradient of its own,
   moved by a key-frame animation along the TTML word times (`src/win/lyrics_fill.cpp`, `src/core/lyrics_fill.cpp`).
-  With `soft`, the two middle stops stand half a soft width on either side of that edge (0.6 of the row's height, so
-  the romaji get a narrower one), each clamped to 0..1 in its expression so the four stops stay in order; each word's
-  span is widened by that half on both sides, and never starts before the previous one ends.
+  With `soft`, the two middle stops have a path each, a soft width apart (0.6 of the row's height, so the romaji get a
+  narrower one), each clamped to 0..1 in its expression: the sung stop is held between the previous word's end and
+  the sung word's end, the unsung stop between the sung word's start and the next word's start. One gradient over the
+  row then draws what the iPhone app draws with a gradient per word: until 2026-11-26 the soft part was centred on a
+  single edge that went half a width past each word, so the next word's first letters lit 26 to 75 % before it
+  started (issue #5, "Pisces and a Gemini"); now 1 to 4 %, the iPhone app's 1 to 6 %. Right-to-left lyrics (Arabic,
+  seen 2026-11-26 on Elyanna's "Ganeni"): Apple lays the words of such a row from the right and runs its gradient
+  the other way; its romaji row under it stays left to right. Ampify reads where the words stand along each row's
+  own gradient (`SpansAlong`): until then, the crisp edge of an Arabic row lit it whole and went out backwards. A row
+  whose words do not follow one another along its gradient is left to Apple.
+- **How Apple lifts the sung words (1.1792, read in `AMP.UI.Views.dll` and traced live 2026-11-26, issue #5).** Each
+  word visual of a sung row (in the hidden container the row's mask draws) rests centred in the row (row 43.04 high,
+  word 28.64, Offset.Y 7.2 in the side pane) and rises 2 up: a `Vector3KeyFrameAnimation` on `Offset` from
+  `this.StartingValue`, over the word's remaining time clamped to 400 to 3000 ms; a word already sung is set up at once.
+  Apple starts it again at each step of its once-a-second clock, so a word rises late, in 0.2 to 0.3 s, and sometimes
+  in two goes (a static Offset read mid-way, 5.219, shows the restart). The iPhone app (measured on a 60 fps
+  recording) lifts a word from its start over about a second, slowing down: 10 % at +40 ms, 90 % at ~680 ms. With
+  `soft`, Ampify gives each word's `TransformMatrix` an expression that takes Apple's motion back out, read from the
+  Offset the compositor draws (`this.Target.Offset.Y`), and adds its own lift, a key-frame path per word on the row's
+  timeline (`LiftPath`, sampled from `LiftAt`). The rest
+  height comes from the row and word heights: after a pause or a jump back Apple leaves a line's words up.
 - **What the lyrics fill keeps to (1.1792, measured 2026-11-19, issue #5 again).** Apple's own karaoke clock (the view
   model's `CurrentTime`, slot 7, a TimeSpan) also moves only once a second (every ~1020 ms). Ampify reads Apple's
   position every 250 ms, so each new value arrives 0 to 250 ms late, and the delay slides slowly as the two rhythms
