@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.6.2 (2026-11-26)
+
+Animated covers play in the play bar and the full-screen player, the spinning record turns in full screen too, and
+the soft edge of word-by-word lyrics now looks like the iPhone app.
+
+### Extensions
+
+- New: Animated cover. The album's animated cover, which Apple only shows on album pages, plays over the artwork of
+  the play bar, the full-screen player and the mini player, with a switch for each place. It is drawn like a picture,
+  so it keeps the artwork's rounded corners and turns with Spinning artwork. A video Windows cannot play leaves the
+  still cover in place.
+- Mini player: the animated cover moved to the Animated cover extension. If you had it on, turn on Animated cover.
+
+### Themes
+
+- Spinning artwork: the full-screen player's artwork turns too, with the same grooves and settings, and a new setting
+  leaves the full-screen player alone.
+
+### Other
+
+- Word-by-word lyrics, soft edge: the next word stays dark until it is sung, and each word rises over about a second
+  from its start, as on the iPhone, instead of Apple's quick, stepped lift.
+- Word-by-word lyrics: lines Apple writes from right to left, such as Arabic, no longer light up backwards.
+
 ## 1.6.1 (2026-11-24)
 
 Dolby Atmos songs start at the right volume, the song panel tells more about the sound, and a docked panel no longer
