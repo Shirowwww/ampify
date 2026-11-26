@@ -147,19 +147,28 @@ controls::Panel FindArtworkFrame(const xaml::DependencyObject& root, MotionPlace
     return nullptr;
 }
 
-void Remove(ArtworkMotionState& state) {
+// The element leaves Apple's tree first, each step on its own: a player that fails to close never leaves a dead canvas
+// over the cover.
+void Remove(ArtworkMotionState& state) noexcept {
+    try {
+        if (state.element) {
+            if (auto panel = state.element.Parent().try_as<controls::Panel>()) {
+                std::uint32_t index = 0;
+                if (panel.Children().IndexOf(state.element, index)) panel.Children().RemoveAt(index);
+            }
+        }
+    } catch (...) {
+    }
     if (state.frames) state.frames->Stop();
     state.frames = nullptr;
-    if (state.player) {
-        state.player.Pause();
-        state.player.Source(nullptr);
-        state.player.Close();
-    }
-    if (state.element) {
-        if (auto panel = state.element.Parent().try_as<controls::Panel>()) {
-            std::uint32_t index = 0;
-            if (panel.Children().IndexOf(state.element, index)) panel.Children().RemoveAt(index);
+    try {
+        if (state.player) {
+            state.player.Pause();
+            state.player.Source(nullptr);
+            state.player.Close();
         }
+    } catch (...) {
+        // Already closed: it plays nothing more either way.
     }
     state.player = nullptr;
     state.element = nullptr;
@@ -245,21 +254,50 @@ bool Place(ArtworkMotionState& state, const controls::Panel& frame) {
     return true;
 }
 
+// On the window's thread: this address is given up until another one comes, and the still cover shows again.
+void Fail(ArtworkMotionState& state, const std::string& what, const std::string& why, Journal* journal) {
+    state.loading = false;
+    state.failed = true;
+    Remove(state);
+    if (journal) journal->Write(std::string(TraitsOf(state.place).label) + ": the animated cover could not be " + what +
+                                " (" + why + ")");
+}
+
+// A video the system cannot decode (HEVC without its extension, say) never gives a frame: the player says so here, on
+// one of its own threads.
+void WatchFailure(const playback::MediaPlayer& player, const std::weak_ptr<ArtworkMotionState>& weak,
+                  std::uint64_t generation, Journal* journal) {
+    auto queue = dispatching::DispatcherQueue::GetForCurrentThread();
+    player.MediaFailed([weak, generation, queue, journal](auto&&, const playback::MediaPlayerFailedEventArgs& args) noexcept {
+        std::string why = "unreadable video";
+        try {
+            if (!args.ErrorMessage().empty()) why = winrt::to_string(args.ErrorMessage());
+        } catch (...) {
+        }
+        TryEnqueueUi(queue, [weak, generation, why, journal]() noexcept {
+            try {
+                auto state = weak.lock();
+                if (state && state->generation == generation && state->player) Fail(*state, "played", why, journal);
+            } catch (...) {
+                // Work queued on Apple Music's thread: nothing may escape it.
+            }
+        });
+    });
+}
+
 // On the window's thread: the stream goes to the player if the same address is still wanted there.
 void Deliver(const std::weak_ptr<ArtworkMotionState>& weak, std::uint64_t generation,
              const streams::InMemoryRandomAccessStream& stream, const std::string& failure, Journal* journal) {
     auto state = weak.lock();
     if (!state || state->generation != generation || !state->player) return;
     state->loading = false;
-    const std::string label = TraitsOf(state->place).label;
     if (!stream) {
-        state->failed = true;
-        Remove(*state);
-        if (journal) journal->Write(label + ": the animated cover could not be loaded (" + failure + ")");
+        Fail(*state, "loaded", failure, journal);
         return;
     }
+    WatchFailure(state->player, weak, generation, journal);
     state->player.Source(winrt::Windows::Media::Core::MediaSource::CreateFromStream(stream, L"video/mp4"));
-    if (journal) journal->Write(label + ": animated cover given to the player over the artwork");
+    if (journal) journal->Write(std::string(TraitsOf(state->place).label) + ": animated cover given to the player over the artwork");
 }
 
 // Downloads the video (or takes it from the cache) and copies it into a stream on the thread pool, then delivers it on

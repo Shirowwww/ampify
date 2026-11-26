@@ -16,6 +16,8 @@
 
 #include <algorithm>
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <mutex>
 
 namespace ampify::win {
@@ -28,6 +30,13 @@ namespace playback = winrt::Windows::Media::Playback;
 namespace xamlimaging = winrt::Microsoft::UI::Xaml::Media::Imaging;
 
 constexpr int kMinSide = 32;  // below this the picture is a blur anyway
+// A frame on its way longer than this was lost (the image left the tree, the window's queue closed): the next one goes.
+constexpr std::int64_t kLostFrameMs = 1000;
+
+std::int64_t NowMs() noexcept {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
 
 // One Direct3D device for every video, made at the first frame. Never destroyed: a static destructor would run after
 // Windows shut COM down. Multithread-protected: the frames are copied on Media Foundation's threads.
@@ -78,8 +87,9 @@ struct VideoFrames::Shared {
     int height = 0;
     std::atomic<int> side{0};
     std::atomic<bool> busy{false};     // a frame is on its way to the image: the next ones are skipped
+    std::atomic<std::int64_t> busySince{0};
     std::atomic<bool> stopped{false};
-    bool shown = false;  // the first frame showed (window's thread)
+    std::atomic<bool> shown{false};  // the first frame reached the image
     winrt::Microsoft::UI::Dispatching::DispatcherQueue queue{nullptr};
     winrt::weak_ref<xamlimaging::SoftwareBitmapSource> source;
     std::function<void()> firstFrame;
@@ -89,7 +99,8 @@ namespace {
 
 using Shared = VideoFrames::Shared;
 
-// On the window's thread: the frame goes to the image; the next one may come once the image took it.
+// On the window's thread: the frame goes to the image; the next one may come once the image took it. The image shows
+// only once the first frame is in it, so it never flashes empty.
 void Show(const std::shared_ptr<Shared>& shared, const imaging::SoftwareBitmap& bitmap) {
     auto source = shared->source.get();
     if (shared->stopped || !source) {
@@ -97,11 +108,17 @@ void Show(const std::shared_ptr<Shared>& shared, const imaging::SoftwareBitmap& 
         return;
     }
     auto action = source.SetBitmapAsync(bitmap);
-    action.Completed([shared](auto&&, auto&&) noexcept { shared->busy = false; });
-    if (!shared->shown) {
-        shared->shown = true;
-        if (shared->firstFrame) shared->firstFrame();
-    }
+    action.Completed([shared](auto&&, winrt::Windows::Foundation::AsyncStatus status) noexcept {
+        shared->busy = false;
+        if (status != winrt::Windows::Foundation::AsyncStatus::Completed || shared->shown.exchange(true)) return;
+        TryEnqueueUi(shared->queue, [shared]() noexcept {
+            try {
+                if (!shared->stopped && shared->firstFrame) shared->firstFrame();
+            } catch (...) {
+                // Work queued on Apple Music's thread: nothing may escape it.
+            }
+        });
+    });
 }
 
 winrt::fire_and_forget Convert(std::shared_ptr<Shared> shared, d3d::IDirect3DSurface surface) {
@@ -124,7 +141,10 @@ winrt::fire_and_forget Convert(std::shared_ptr<Shared> shared, d3d::IDirect3DSur
 
 // On Media Foundation's thread: the frame, at the size it is shown, into the surface, then on to the image.
 void OnFrame(const std::shared_ptr<Shared>& shared, const playback::MediaPlayer& player) noexcept {
-    if (shared->stopped || shared->busy.exchange(true)) return;
+    if (shared->stopped) return;
+    const std::int64_t now = NowMs();
+    if (shared->busy.exchange(true) && now - shared->busySince.load() < kLostFrameMs) return;
+    shared->busySince = now;
     try {
         auto session = player.PlaybackSession();
         const int naturalWidth = static_cast<int>(session.NaturalVideoWidth());
